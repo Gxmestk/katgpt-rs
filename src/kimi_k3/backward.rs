@@ -398,9 +398,8 @@ fn forward_layer_saved(
     // Step 2: boundary push
     if is_boundary {
         block_state.push(prefix_sum);
-        for x in prefix_sum.iter_mut() {
-            *x = 0.0;
-        }
+        // `fill` lowers to a memset instead of a per-element store loop.
+        prefix_sum.fill(0.0);
     }
 
     // Step 3: input_layernorm + attention
@@ -427,12 +426,16 @@ fn forward_layer_saved(
         }
         _ => panic!("attention mismatch"),
     };
-    saved.attn_out = attn_out.clone();
+    // Move (not clone) the freshly-allocated attn_out into `saved` and read it
+    // back through `saved.attn_out` — saves one `[d]` Vec allocation + copy per
+    // layer per token. Values and accumulation order are untouched.
+    saved.attn_out = attn_out;
 
     // Step 4: prefix_sum += attn_out
-    for i in 0..d {
-        prefix_sum[i] += attn_out[i];
-    }
+    // Elementwise SIMD add: each lane is a single independent `a + b`, so no
+    // reassociation and the gradients that later consume `prefix_sum` are
+    // bit-identical. `[..d]` keeps the old panic-on-short-operand behaviour.
+    katgpt_core::simd::simd_add_inplace(&mut prefix_sum[..d], &saved.attn_out[..d]);
     saved.prefix_sum_after_attn = prefix_sum.to_vec();
 
     // Step 5: MLP attn-res
@@ -469,12 +472,11 @@ fn forward_layer_saved(
         }
         _ => panic!("FFN mismatch"),
     };
-    saved.ffn_out = ffn_out.clone();
+    // Move (not clone) — same rationale as `saved.attn_out` above.
+    saved.ffn_out = ffn_out;
 
-    // Step 7: prefix_sum += ffn_out
-    for i in 0..d {
-        prefix_sum[i] += ffn_out[i];
-    }
+    // Step 7: prefix_sum += ffn_out — elementwise SIMD add, see Step 4.
+    katgpt_core::simd::simd_add_inplace(&mut prefix_sum[..d], &saved.ffn_out[..d]);
 }
 
 pub(crate) fn dense_situ_ffn_forward_saved(
@@ -597,6 +599,16 @@ pub fn kimi_k3_backward_sequence(
         block_grads.push(bg);
     }
 
+    // Hoisted out of the layer loop: `d_attn_out[t]` and `d_ps_after_attn_all[t]`
+    // are both established by a full-width `copy_from_slice` for EVERY `t` in
+    // `0..l` inside the per-token loop below (which has no `break`/`continue`),
+    // so no slot can be read before it is written in the current layer's pass.
+    // Reusing them turns 2 × l Vec allocations *per layer* into 2 × l total.
+    // ── Step 2a scratch: Produces d_attn_out[t] = dL/d(attention_output) per token.
+    let mut d_attn_out: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
+    // Also save d_ps_after_attn for the self-attn residual backward.
+    let mut d_ps_after_attn_all: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
+
     // ── Step 2: Layer-by-layer backward (reverse) ──
     for layer_idx in (0..config.num_layers).rev() {
         let layer_cfg = config.layer_config(layer_idx);
@@ -605,21 +617,18 @@ pub fn kimi_k3_backward_sequence(
         let is_mla = config.is_mla_layer(layer_idx);
         let is_boundary = layer_idx.is_multiple_of(config.attn_res_config.block_size);
 
-        // ── Step 2a: MLP/FFN block backward (per token) ──
-        // Produces d_attn_out[t] = dL/d(attention_output) for each token.
-        let mut d_attn_out: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
-        // Also save d_ps_after_attn for the self-attn residual backward.
-        let mut d_ps_after_attn_all: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
-
         for t in 0..l {
             let saved = &saved_tokens[t].layers[layer_idx];
 
             // FFN residual: ps_out = ps_after_attn + ffn_out
             // dL/d(ffn_out) = d_prefix[t]; dL/d(ps_after_attn)_from_ffn = d_prefix[t]
-            let d_ffn_out = d_prefix[t].clone();
+            // `ffn_backward` takes `d_output: &[f32]` and never mutates it, so
+            // borrow `d_prefix[t]` directly instead of cloning a `[d]` Vec per
+            // token per layer.
 
             // FFN backward → dL/d(normed_mlp) + FFN weight grads
-            let d_normed_mlp = ffn_backward(&layer_cfg.ffn, &layer_w.ffn, saved, &d_ffn_out, layer_grads);
+            let d_normed_mlp =
+                ffn_backward(&layer_cfg.ffn, &layer_w.ffn, saved, &d_prefix[t], layer_grads);
 
             // Post-attn RMSNorm backward → dL/d(mixed_mlp)
             let d_mixed_mlp = mla_rmsnorm_backward(
@@ -638,8 +647,13 @@ pub fn kimi_k3_backward_sequence(
             }
             let mut d_mlp_blocks: Vec<Vec<f32>> =
                 (0..num_mlp_blocks).map(|_| vec![0.0f32; d]).collect();
-            // d_prefix[t] is the FFN residual gradient; now add attn-res contribution
-            let mut d_ps_after = d_prefix[t].clone(); // dL/d(ps_after_attn)_from_ffn
+            // d_prefix[t] is the FFN residual gradient; now add attn-res contribution.
+            // Accumulate straight into the pre-allocated `d_attn_out[t]` row instead
+            // of cloning `d_prefix[t]` into a fresh Vec and then cloning that again
+            // below: same starting contents, same in/out accumulation by
+            // `attn_res_backward`, and `d_attn_out[t]` was going to receive exactly
+            // this value anyway. Drops 2 of the 3 `[d]` allocations per token per layer.
+            d_attn_out[t].copy_from_slice(&d_prefix[t]); // dL/d(ps_after_attn)_from_ffn
 
             attn_res_backward(
                 &config.attn_res_config,
@@ -648,22 +662,29 @@ pub fn kimi_k3_backward_sequence(
                 &saved.prefix_sum_after_attn,
                 &d_mixed_mlp,
                 &mut d_mlp_blocks,
-                &mut d_ps_after,
+                &mut d_attn_out[t],
                 &mut layer_grads.mlp_attn_res_norm,
                 &mut layer_grads.mlp_attn_res_proj,
             );
 
-            // Accumulate block grads
-            for i in 0..num_mlp_blocks {
+            // Accumulate block grads.
+            // `block_grads[t]` may be LONGER than `d_mlp_blocks` (the `while` above
+            // only grows it to at least `num_mlp_blocks`) and `d_mlp_blocks` has
+            // exactly `num_mlp_blocks` rows, so `zip` visits exactly the same
+            // `0..num_mlp_blocks` rows the indexed loop did. Pre-slicing the rows
+            // drops the `Vec<Vec<f32>>` re-indexing + bounds checks per element;
+            // elementwise `+=` means no reassociation.
+            for (bg_row, d_row) in block_grads[t].iter_mut().zip(d_mlp_blocks.iter()) {
+                let bg = &mut bg_row[..d];
+                let dr = &d_row[..d];
                 for j in 0..d {
-                    block_grads[t][i][j] += d_mlp_blocks[i][j];
+                    bg[j] += dr[j];
                 }
             }
 
-            // d_ps_after is now dL/d(ps_after_attn) = FFN residual + attn-res contribution
-            d_ps_after_attn_all[t] = d_ps_after.clone();
-            // Self-attn residual: dL/d(attn_out) = d_ps_after_attn
-            d_attn_out[t] = d_ps_after;
+            // d_attn_out[t] is now dL/d(ps_after_attn) = FFN residual + attn-res
+            // contribution; mirror it into d_ps_after_attn_all[t].
+            d_ps_after_attn_all[t].copy_from_slice(&d_attn_out[t]);
         }
 
         // ── Step 2b: Attention backward (MLA cross-token or KDA BPTT) ──
@@ -754,10 +775,15 @@ pub fn kimi_k3_backward_sequence(
             // Self-attn residual: for non-boundary, ps_after_attn = ps_in + attn_out
             // → dL/d(ps_in)_from_residual = d_ps_after_attn
             // For boundary, ps_in was reset to 0 → no residual gradient.
+            // Elementwise SIMD adds throughout this block: each lane is a single
+            // independent `a + b`, so no reassociation — the accumulated gradients
+            // are bit-identical to the scalar indexed loops. The `[..d]` slices keep
+            // the old panic-on-short-operand behaviour.
             if !is_boundary {
-                for i in 0..d {
-                    d_ps_in[i] += d_ps_after_attn_all[t][i];
-                }
+                katgpt_core::simd::simd_add_inplace(
+                    &mut d_ps_in[..d],
+                    &d_ps_after_attn_all[t][..d],
+                );
             }
 
             // Self attn-res backward (if applied) or copy gradient.
@@ -781,21 +807,17 @@ pub fn kimi_k3_backward_sequence(
                     &mut layer_grads.self_attn_res_proj,
                 );
 
-                // Accumulate block grads
-                for i in 0..num_self_blocks {
-                    for j in 0..d {
-                        block_grads[t][i][j] += d_self_blocks[i][j];
-                    }
+                // Accumulate block grads. `d_self_blocks` has exactly
+                // `num_self_blocks` rows and `block_grads[t]` has at least that
+                // many, so `zip` covers exactly the rows the indexed loop did.
+                for (bg_row, d_row) in block_grads[t].iter_mut().zip(d_self_blocks.iter()) {
+                    katgpt_core::simd::simd_add_inplace(&mut bg_row[..d], &d_row[..d]);
                 }
                 // Add attn-res gradient for ps_in
-                for i in 0..d {
-                    d_ps_in[i] += d_ps_from_attnres[i];
-                }
+                katgpt_core::simd::simd_add_inplace(&mut d_ps_in[..d], &d_ps_from_attnres[..d]);
             } else {
                 // mixed_self = ps_in (copy)
-                for i in 0..d {
-                    d_ps_in[i] += d_mixed_self[i];
-                }
+                katgpt_core::simd::simd_add_inplace(&mut d_ps_in[..d], &d_mixed_self[..d]);
             }
 
             // d_ps_in becomes d_prefix for the previous layer
@@ -808,9 +830,11 @@ pub fn kimi_k3_backward_sequence(
     for t in 0..l {
         let token_id = saved_tokens[t].token_id as usize;
         let base = token_id * d;
-        for (j, slot) in (0..d).zip(&mut grads.embed_weight[base..base + d]) {
-            *slot += d_prefix[t][j];
-        }
+        // Elementwise SIMD add — same per-lane `a + b`, bit-identical.
+        katgpt_core::simd::simd_add_inplace(
+            &mut grads.embed_weight[base..base + d],
+            &d_prefix[t][..d],
+        );
     }
 }
 
@@ -917,16 +941,24 @@ pub fn attn_res_backward(
     // dL/dv[i] += probs[i] * dL/dout
     // dL/dprob[i] = dot(v[i], dL/dout)
     let mut d_probs = vec![0.0f32; num_entries];
+    let d_out_d = &d_out[..d];
     for (i, residual) in block_values.iter().enumerate() {
+        // `probs[i]` is invariant across `j` — load it once and pre-slice both
+        // rows so the inner loop carries no bounds checks and no re-indexing of
+        // the `Vec<Vec<f32>>`. Per-element expression `dst += p * g` is unchanged.
+        let p = probs[i];
+        let dbv = &mut d_block_values[i][..d];
         for j in 0..d {
-            d_block_values[i][j] += probs[i] * d_out[j];
+            dbv[j] += p * d_out_d[j];
         }
         d_probs[i] = simd_dot_f32(residual, d_out, d);
     }
     // Prefix sum entry
     {
+        let p = probs[num_entries - 1];
+        let dps = &mut d_prefix_sum[..d];
         for j in 0..d {
-            d_prefix_sum[j] += probs[num_entries - 1] * d_out[j];
+            dps[j] += p * d_out_d[j];
         }
         d_probs[num_entries - 1] = simd_dot_f32(prefix_sum, d_out, d);
     }
@@ -949,6 +981,9 @@ pub fn attn_res_backward(
     //            += dL/d(r_i) * d(r_i)/d(v[i])       (from inv_rms)
 
     let mut d_score_weight = vec![0.0f32; d];
+    // `d as f32` was re-converted on every element of the inner loop below.
+    let d_f = d as f32;
+    let score_weight_d = &score_weight[..d];
     for i in 0..num_entries {
         let r_i = inv_rms_values[i];
         let s_i = scores[i] / r_i; // = dot(v[i], score_weight)
@@ -959,41 +994,60 @@ pub fn attn_res_backward(
         // dL/d(score_weight) += d_s_i * v[i] (from dot(v[i], score_weight))
         // The v[i] is block_values[i] or prefix_sum
         let v_i: &[f32] = if i < block_values.len() {
-            &block_values[i]
+            &block_values[i][..d]
         } else {
-            prefix_sum
+            &prefix_sum[..d]
         };
+        // The `i < block_values.len()` discrimination is INVARIANT across `j`, so
+        // pick the destination row once instead of branching (and re-walking the
+        // `Vec<Vec<f32>>` indirection) on every element. `d_block_values` /
+        // `d_prefix_sum` are distinct parameters from `block_values` / `prefix_sum`,
+        // so this `&mut` row cannot alias `v_i`.
+        let d_v_i: &mut [f32] = if i < block_values.len() {
+            &mut d_block_values[i][..d]
+        } else {
+            &mut d_prefix_sum[..d]
+        };
+        let d_sw = &mut d_score_weight[..d];
 
+        // GRADIENT SAFETY: the two former `j` loops are fused into one. Every
+        // element's expression is byte-for-byte identical — same operand order,
+        // same grouping `d_r_i * (-v_i[j] * r_i * r_i * r_i / d_f)`, no
+        // reassociation and no FMA contraction introduced. `d_score_weight[j]`,
+        // `d_v_i[j]` and `v_i[j]` are independent per `j`, so the two loops were
+        // already order-independent w.r.t. each other; fusing them only halves
+        // the loads of `v_i[j]` and the loop overhead.
         for j in 0..d {
-            d_score_weight[j] += d_s_i * v_i[j];
-        }
+            d_sw[j] += d_s_i * v_i[j];
 
-        // dL/d(v[i]) from the dot product: d_s_i * score_weight[j]
-        // (s_i = dot(v[i], score_weight), so d(s_i)/d(v[i][j]) = score_weight[j])
-        for j in 0..d {
-            let dot_grad = d_s_i * score_weight[j];
+            // dL/d(v[i]) from the dot product: d_s_i * score_weight[j]
+            // (s_i = dot(v[i], score_weight), so d(s_i)/d(v[i][j]) = score_weight[j])
+            let dot_grad = d_s_i * score_weight_d[j];
 
             // dL/d(v[i]) from inv_rms: d_r_i * d(r_i)/d(v[i][j])
             // r_i = 1/sqrt(mean(v²) + eps) = (mean(v²) + eps)^(-1/2)
             // dr/dv[j] = -1/2 * (mean(v²)+eps)^(-3/2) * (2*v[j]/n)
             //          = -v[j] * r_i³ / n
-            let inv_rms_grad = d_r_i * (-v_i[j] * r_i * r_i * r_i / d as f32);
+            let inv_rms_grad = d_r_i * (-v_i[j] * r_i * r_i * r_i / d_f);
 
-            let total_v_grad = dot_grad + inv_rms_grad;
-            if i < block_values.len() {
-                d_block_values[i][j] += total_v_grad;
-            } else {
-                d_prefix_sum[j] += total_v_grad;
-            }
+            d_v_i[j] += dot_grad + inv_rms_grad;
         }
     }
 
     // ── score_weight = norm_weight ⊙ proj_weight ──
     // dL/d(norm_weight[j]) = dL/d(score_weight[j]) * proj_weight[j]
     // dL/d(proj_weight[j]) = dL/d(score_weight[j]) * norm_weight[j]
-    for j in 0..d {
-        d_norm_weight[j] += d_score_weight[j] * weights.proj_weight[j];
-        d_proj_weight[j] += d_score_weight[j] * weights.norm_weight[j];
+    // Pre-sliced to `d` so the four accesses per element carry no bounds checks.
+    {
+        let d_sw = &d_score_weight[..d];
+        let pw = &weights.proj_weight[..d];
+        let nw = &weights.norm_weight[..d];
+        let d_nw = &mut d_norm_weight[..d];
+        let d_pw = &mut d_proj_weight[..d];
+        for j in 0..d {
+            d_nw[j] += d_sw[j] * pw[j];
+            d_pw[j] += d_sw[j] * nw[j];
+        }
     }
 }
 
@@ -1042,9 +1096,8 @@ fn dense_situ_ffn_backward(
     simd_transpose_matvec_into(&mut d_h_up, &expert.up_proj, &d_up, d_ffn, d_in);
     simd_outer_product_acc(&mut grads.up_proj, &d_up, &saved.h, d_ffn, d_in);
 
-    for i in 0..d_in {
-        d_h[i] += d_h_up[i];
-    }
+    // Elementwise SIMD add — per-lane `a + b`, bit-identical to the scalar loop.
+    katgpt_core::simd::simd_add_inplace(&mut d_h[..d_in], &d_h_up[..d_in]);
 
     d_h
 }
@@ -1062,6 +1115,15 @@ fn situ_backward(
     let inv_beta = 1.0 / beta;
     let n = d_act.len();
 
+    // Pre-slice all five operands to `n` so the inner loops carry no bounds
+    // checks. `[..n]` panics on a short operand exactly like the old indexed
+    // loops did, so panic semantics are unchanged.
+    let d_act = &d_act[..n];
+    let gate_inter = &gate_inter[..n];
+    let up_inter = &up_inter[..n];
+    let d_gate = &mut d_gate[..n];
+    let d_up = &mut d_up[..n];
+
     if let Some(lb) = linear_beta {
         let inv_lb = 1.0 / lb;
         for i in 0..n {
@@ -1070,10 +1132,14 @@ fn situ_backward(
             let da = d_act[i];
             let gs = 1.0 / (1.0 + (-g).exp()); // sigmoid(g)
             let gt = (g * inv_beta).tanh();    // tanh(g/beta)
-            let ut = lb * (u * inv_lb).tanh(); // lb * tanh(u/lb)
+            // `tanh(u/lb)` was evaluated TWICE per element (once inside `ut`, once
+            // as `tanh_u`). Compute it once and derive `ut = lb * tanh_u` — the
+            // exact same expression tree, so bit-identical, but it removes one
+            // `tanh` (a genuine transcendental) per element on the gradient path.
+            let tanh_u = (u * inv_lb).tanh();
+            let ut = lb * tanh_u; // lb * tanh(u/lb)
 
             let d_act_dg = (1.0 - gt * gt) * gs * ut + beta * gt * gs * (1.0 - gs) * ut;
-            let tanh_u = (u * inv_lb).tanh();
             let d_act_du = beta * gt * gs * (1.0 - tanh_u * tanh_u);
 
             d_gate[i] = da * d_act_dg;

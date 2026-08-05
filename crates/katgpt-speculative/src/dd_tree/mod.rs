@@ -1138,6 +1138,17 @@ pub fn build_dd_tree_dendritic(
     let base_budget = config.tree_budget;
     let mut parent_buf: Vec<usize> = vec![0usize; seq_len];
 
+    // Per-depth cache for the two gate inputs that depend ONLY on
+    // `marginals[next_depth]` and never on the popped node: the entropy (an
+    // O(vocab) scan with one `exp()` per element) and the top-K index list (an
+    // O(vocab·K) scan that also allocated a fresh `Vec` per call). The
+    // best-first loop pops many nodes at the same depth, so both were being
+    // recomputed identically on every pop. Both are pure functions of their
+    // arguments, so caching per depth yields bit-identical values while
+    // collapsing O(nodes·vocab) exp() calls into O(depths·vocab), and removes
+    // the per-pop `Vec` allocation.
+    let mut depth_gate_cache: Vec<Option<(f32, Vec<usize>)>> = vec![None; seq_len];
+
     // Optional: seed greedy chain backbone first
     if chain_seed {
         let mut chain_path = 0u128;
@@ -1195,14 +1206,17 @@ pub fn build_dd_tree_dendritic(
             let parent_tokens =
                 extract_parent_tokens_into(best.parent_path, best.depth + 1, &mut parent_buf);
 
-            // Compute gate signal from entropy + coincidence at this depth
-            let entropy = entropy_f32(marginals[next_depth]);
-            let coinc = coincidence_score(
-                &top_k_indices(marginals[next_depth], gate.coincidence_window),
-                parent_tokens,
-                gate.coincidence_window,
-            );
-            let nmda_gate = gate.compute_gate(entropy, coinc);
+            // Compute gate signal from entropy + coincidence at this depth.
+            // `entropy` / `top_k` are depth-invariant (see `depth_gate_cache`);
+            // only `coincidence_score` depends on this node's `parent_tokens`.
+            let cached = depth_gate_cache[next_depth].get_or_insert_with(|| {
+                (
+                    entropy_f32(marginals[next_depth]),
+                    top_k_indices(marginals[next_depth], gate.coincidence_window),
+                )
+            });
+            let coinc = coincidence_score(&cached.1, parent_tokens, gate.coincidence_window);
+            let nmda_gate = gate.compute_gate(cached.0, coinc);
 
             // Early exit: proximal dendrite sufficient
             if nmda_gate < 0.1 {

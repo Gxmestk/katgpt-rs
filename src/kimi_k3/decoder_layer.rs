@@ -266,9 +266,8 @@ pub fn kimi_decoder_layer_forward(
         block_state.push(prefix_sum);
         // Reset prefix_sum — new block starts fresh.
         // It will be set to attn_out below (step 4: prefix_sum was None → = hidden).
-        for x in prefix_sum.iter_mut() {
-            *x = 0.0;
-        }
+        // `fill` lowers to a memset instead of an element-at-a-time store loop.
+        prefix_sum.fill(0.0);
     }
 
     // ── Step 3: input_layernorm → attention ───────────────────────────────
@@ -303,9 +302,10 @@ pub fn kimi_decoder_layer_forward(
 
     // ── Step 4: Accumulate attention output into prefix_sum ───────────────
     // prefix_sum += attn_out (if boundary: prefix_sum was 0 → prefix_sum = attn_out)
-    for i in 0..d {
-        prefix_sum[i] += attn_out[i];
-    }
+    // Elementwise SIMD add — no reassociation (each lane is a single independent
+    // `a + b`), so bit-identical to the scalar loop. The `[..d]` slices keep the
+    // old panic-on-short-operand behaviour.
+    katgpt_core::simd::simd_add_inplace(&mut prefix_sum[..d], &attn_out[..d]);
 
     // ── Step 5: apply_attn_res (MLP) — mix prefix_sum with blocks ─────────
     let mixed = apply_attn_res(
@@ -333,9 +333,8 @@ pub fn kimi_decoder_layer_forward(
     };
 
     // ── Step 7: Accumulate FFN output into prefix_sum ─────────────────────
-    for i in 0..d {
-        prefix_sum[i] += ffn_out[i];
-    }
+    // Elementwise SIMD add — see Step 4 for the bit-identity argument.
+    katgpt_core::simd::simd_add_inplace(&mut prefix_sum[..d], &ffn_out[..d]);
 }
 
 /// Dense SiTU FFN forward (layer 0 only).

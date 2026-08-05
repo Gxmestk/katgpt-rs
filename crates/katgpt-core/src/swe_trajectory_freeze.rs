@@ -394,11 +394,18 @@ impl StateMagnitudeEncoder {
             let mut sum_sq = 0.0_f32;
             let mut dot_prev = 0.0_f32;
             if i > 0 {
-                let prev = trajectory[i - 1];
-                for j in 0..dim {
-                    let x = state[j];
+                // Pre-slice both rows to `dim` up front: the `[..dim]` slicing
+                // panics on a short row exactly as the old `state[j]`/`prev[j]`
+                // indexing did, but hoists both per-element bounds checks out
+                // of the loop and lets LLVM vectorize. `zip` over two slices
+                // that are both exactly `dim` long visits the same elements in
+                // the same order, so the float accumulation order into
+                // `sum_sq`/`dot_prev` is unchanged (bit-identical).
+                let cur = &state[..dim];
+                let prev = &trajectory[i - 1][..dim];
+                for (&x, &p) in cur.iter().zip(prev.iter()) {
                     sum_sq += x * x;
-                    dot_prev += x * prev[j];
+                    dot_prev += x * p;
                 }
             } else {
                 for &x in *state {

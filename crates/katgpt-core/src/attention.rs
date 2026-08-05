@@ -201,6 +201,18 @@ fn tiled_attention_inner(
 
     let tile_elems = BR * head_dim;
 
+    // s_tile is hoisted out of the query-tile loop. It is BR*BC = 1024 f32
+    // (4 KiB), so re-declaring it per query tile meant a 4 KiB memset per tile
+    // — 512 KiB of pure stores per head at seq_len=1024. That init is dead: the
+    // only two reads of s_tile are `s_tile[i*BC .. i*BC + actual_bc]` at the row
+    // max and at the P̃ computation, both for `i in 0..actual_br`, and the score
+    // pass just above writes exactly that same `[0..actual_br) × [0..actual_bc)`
+    // rectangle on every k-tile iteration. So no slot is ever read before being
+    // written in the same pass, and stale values from a previous query tile can
+    // never be observed. The one-time -inf fill is retained only as a
+    // debugging-friendly poison value.
+    let mut s_tile = [f32::NEG_INFINITY; BR * BC];
+
     for q_tile_idx in 0..q_tiles {
         let q_start = q_tile_idx * BR;
         let q_end = (q_start + BR).min(seq_len);
@@ -211,27 +223,26 @@ fn tiled_attention_inner(
         let mut max_tile = [f32::NEG_INFINITY; BR];
         let mut norm_tile = [0.0f32; BR];
 
-        // s_tile initialized to -inf so padding columns (j >= actual_bc) are masked.
-        // The used region [0..actual_br, 0..actual_bc] is fully overwritten each k_tile
-        // by the score computation below — no need to re-clear.
-        let mut s_tile = [f32::NEG_INFINITY; BR * BC];
         for k_tile_idx in 0..k_tiles {
             let k_start = k_tile_idx * BC;
             let k_end = (k_start + BC).min(seq_len);
             let actual_bc = k_end - k_start;
 
             // 1. Score tile: S = q_tile @ k_tile.T (BR × BC)
+            // `q_row` is invariant in `j` but was being re-sliced (range check +
+            // panic path) on every one of `actual_bc` iterations; the score row
+            // is pre-sliced too, which drops the `i * BC + j` recompute and its
+            // bounds check. `s_row.len() == actual_bc`, so `enumerate()` walks
+            // exactly the same `j` range as before.
             for i in 0..actual_br {
                 let q_off = (q_start + i) * head_dim;
-                for j in 0..actual_bc {
+                let q_row = &q[q_off..q_off + head_dim];
+                let s_row = &mut s_tile[i * BC..i * BC + actual_bc];
+                for (j, s) in s_row.iter_mut().enumerate() {
                     let k_off = (k_start + j) * head_dim;
-                    s_tile[i * BC + j] = crate::simd::simd_dot_f32(
-                        &q[q_off..q_off + head_dim],
-                        &k[k_off..k_off + head_dim],
-                        head_dim,
-                    );
+                    *s = crate::simd::simd_dot_f32(q_row, &k[k_off..k_off + head_dim], head_dim);
                 }
-                // j >= actual_bc: stays -inf (masked from softmax)
+                // j >= actual_bc: never read (see the s_tile note above)
             }
             // i >= actual_br: stays -inf (boundary query rows)
 
@@ -268,11 +279,16 @@ fn tiled_attention_inner(
                 let rowsum = crate::simd::simd_sum_f32(p_row);
 
                 // Accumulate P̃[i][j] × V[j] into o_tile[i] (SIMD-accelerated)
-                for (j, p_row_j) in p_row.iter().enumerate().take(actual_bc) {
-                    let p = *p_row_j;
+                // `o_tile`'s row slice is invariant in `j` yet was re-borrowed
+                // (range check) on every iteration of the kernel's innermost
+                // accumulate. Hoist it. `p_row.len() == actual_bc` already, so
+                // the old `.take(actual_bc)` was a no-op and the `j` sequence —
+                // hence the accumulation order into `o_row` — is unchanged.
+                let o_row = &mut o_tile[i * head_dim..i * head_dim + head_dim];
+                for (j, &p) in p_row.iter().enumerate() {
                     let v_off = (k_start + j) * head_dim;
                     crate::simd::simd_fused_scale_acc(
-                        &mut o_tile[i * head_dim..],
+                        o_row,
                         &v[v_off..v_off + head_dim],
                         p,
                         head_dim,
@@ -321,10 +337,14 @@ fn attention_fallback(
     // 1. Compute scores = Q @ K.T (seq_len × seq_len)
     let mut scores_local;
     let scores: &mut [f32] = match scores_buf {
-        Some(buf) if buf.len() >= needed => {
-            buf[..needed].fill(0.0);
-            buf
-        }
+        // No pre-zeroing: `needed == seq_len * seq_len` (the caller's only
+        // definition, line 146) and the score pass below *assigns* every
+        // `scores[i * seq_len + j]` for `i, j in 0..seq_len`, i.e. exactly
+        // `[0, needed)`. The softmax pass and the `scores @ V` pass then read
+        // only that same range. So every slot read was written first in this
+        // call — the O(seq_len²) memset was dead, on what is the common
+        // short-sequence decode path.
+        Some(buf) if buf.len() >= needed => buf,
         _ => {
             scores_local = vec![0.0f32; needed];
             &mut scores_local
@@ -332,13 +352,14 @@ fn attention_fallback(
     };
     for i in 0..seq_len {
         let q_off = i * head_dim;
-        for j in 0..seq_len {
+        // `q_row` is invariant in `j`; pre-slicing it and the score row hoists
+        // their range checks out of the inner loop. `s_row.len() == seq_len`, so
+        // `enumerate()` covers the identical `j` range.
+        let q_row = &q[q_off..q_off + head_dim];
+        let s_row = &mut scores[i * seq_len..(i + 1) * seq_len];
+        for (j, s) in s_row.iter_mut().enumerate() {
             let k_off = j * head_dim;
-            scores[i * seq_len + j] = crate::simd::simd_dot_f32(
-                &q[q_off..q_off + head_dim],
-                &k[k_off..k_off + head_dim],
-                head_dim,
-            );
+            *s = crate::simd::simd_dot_f32(q_row, &k[k_off..k_off + head_dim], head_dim);
         }
     }
 
@@ -351,18 +372,18 @@ fn attention_fallback(
     // 3. Compute output = scores @ V (seq_len × head_dim)
     //    Loop order (i, j, d) for contiguous V row access and cache-friendly output accumulation
     for i in 0..seq_len {
-        let scores_off = i * seq_len;
         let out_off = i * head_dim;
-        output[out_off..out_off + head_dim].fill(0.0);
-        for j in 0..seq_len {
-            let s = scores[scores_off + j];
+        // Both rows are invariant in `j`: the output row was re-borrowed (range
+        // check) and `scores[scores_off + j]` re-indexed on every iteration of
+        // this innermost accumulate. `s_row.len() == seq_len`, so the `j`
+        // sequence — and therefore the accumulation order into `out_row` — is
+        // unchanged.
+        let s_row = &scores[i * seq_len..(i + 1) * seq_len];
+        let out_row = &mut output[out_off..out_off + head_dim];
+        out_row.fill(0.0);
+        for (j, &s) in s_row.iter().enumerate() {
             let v_off = j * head_dim;
-            crate::simd::simd_fused_scale_acc(
-                &mut output[out_off..out_off + head_dim],
-                &v[v_off..v_off + head_dim],
-                s,
-                head_dim,
-            );
+            crate::simd::simd_fused_scale_acc(out_row, &v[v_off..v_off + head_dim], s, head_dim);
         }
     }
 }

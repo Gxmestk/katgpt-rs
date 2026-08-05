@@ -477,9 +477,12 @@ fn estimate_local_tangent_into(
     }
     for &idx in neighbor_indices {
         let row = &natural_pool[idx * d..(idx + 1) * d];
-        for j in 0..d {
-            mean[j] += row[j];
-        }
+        // `simd_fused_scale_acc(dst, src, 1.0)` is element-wise
+        // `dst[j] = fma(1.0, src[j], dst[j])`. `1.0 * src[j]` is exact, so the
+        // FMA rounds exactly once on `src[j] + dst[j]` — identical to the scalar
+        // `mean[j] += row[j]`. Element-wise (not a reduction), so lane order is
+        // irrelevant and the accumulation order across neighbours is unchanged.
+        simd_fused_scale_acc(mean, row, 1.0, d);
     }
     let inv_k = 1.0 / k as f32;
     for v in mean.iter_mut() {
@@ -488,10 +491,14 @@ fn estimate_local_tangent_into(
 
     // Form centered matrix S_i (k×d, row-major): each row = neighbor - mean.
     let centered = &mut centered_neighbors[..k * d];
-    for (i, &idx) in neighbor_indices.iter().enumerate() {
+    // Pre-slice the destination row once per neighbour instead of recomputing
+    // `i * d + j` (and its bounds check) per element. `centered` is exactly
+    // `k * d` long and `neighbor_indices.len() == k` (asserted above), so
+    // `chunks_exact_mut(d)` yields exactly as many rows as indices.
+    for (&idx, dst) in neighbor_indices.iter().zip(centered.chunks_exact_mut(d)) {
         let row = &natural_pool[idx * d..(idx + 1) * d];
-        for j in 0..d {
-            centered[i * d + j] = row[j] - mean[j];
+        for (o, (&x, &m)) in dst.iter_mut().zip(row.iter().zip(mean.iter())) {
+            *o = x - m;
         }
     }
 
@@ -586,8 +593,18 @@ pub fn tangent_erasure_direction_into(
     for v in direction.iter_mut() {
         *v = 0.0;
     }
+    // `alpha` is loop-invariant and its documented default is exactly 1.0, where
+    // `powf` is an identity that still costs a full libm call per basis vector.
+    // IEEE 754 requires `pow(x, 1) == x` exactly for every finite x (and the
+    // sigmas here are non-negative singular values), so the fast path yields the
+    // bit-identical weight.
+    let alpha_is_one = alpha == 1.0;
     for j in 0..r {
-        let weight = sigma[j].powf(alpha);
+        let weight = if alpha_is_one {
+            sigma[j]
+        } else {
+            sigma[j].powf(alpha)
+        };
         let coeff = weight * coords[j];
         if coeff == 0.0 {
             continue;

@@ -246,16 +246,24 @@ pub fn select_top_p_blockwise(scores: &[f32], top_p: f32, block_size: usize) -> 
 
     let n_blocks = n_total.div_ceil(block_size);
 
-    // Stage 1: Block-level aggregation - max score per block
+    // Stage 1: Block-level aggregation - max score per block.
+    //
+    // Walk `scores` as `chunks(block_size)` zipped with the block accumulators
+    // instead of indexing with `i / block_size`. That removes an integer
+    // division AND two bounds checks per score, and keeps the running max in a
+    // register instead of read-modify-writing `block_scores` every element.
+    // `scores.chunks(block_size)` yields exactly `n_total.div_ceil(block_size)`
+    // == `n_blocks` chunks, so the `zip` covers every accumulator (no silent
+    // short-iteration), and each block still sees its elements in ascending
+    // index order — the same comparison sequence as before.
     let mut block_scores: Vec<f32> = vec![f32::NEG_INFINITY; n_blocks];
-    for (i, &s) in scores.iter().enumerate() {
-        let block_idx = i / block_size;
-        // Branchless max to help auto-vectorization
-        block_scores[block_idx] = if s > block_scores[block_idx] {
-            s
-        } else {
-            block_scores[block_idx]
-        };
+    for (acc, chunk) in block_scores.iter_mut().zip(scores.chunks(block_size)) {
+        let mut m = f32::NEG_INFINITY;
+        for &s in chunk {
+            // Branchless max to help auto-vectorization
+            m = if s > m { s } else { m };
+        }
+        *acc = m;
     }
 
     // Stage 2: Softmax + top-p at block level

@@ -290,6 +290,15 @@ pub fn build_hop_dd_tree(marginals: &[HopMarginal], config: &HopTreeConfig) -> V
     }
 
     // ── Best-first expansion ───────────────────────────────────
+    // Lazily-filled per-depth log-confidence cache. `log_confidence()` is
+    // `confidence.ln()` — a function of the candidate alone, never of the
+    // popped node — yet the expansion loop below recomputed it for every
+    // candidate on every pop (budget × candidates `ln()` calls per build).
+    // Caching gives one `ln()` per (depth, candidate) and is bit-identical
+    // (same pure function, same input); the confidence-floor test still runs
+    // per candidate, so which entries are read is unchanged.
+    let mut log_conf: Vec<Vec<f64>> = vec![Vec::new(); marginals.len()];
+
     while let Some(node) = heap.pop() {
         if tree.len() >= config.tree_budget {
             break;
@@ -308,7 +317,14 @@ pub fn build_hop_dd_tree(marginals: &[HopMarginal], config: &HopTreeConfig) -> V
         }
 
         let next_marginal = &marginals[next_depth];
-        for candidate in &next_marginal.candidates {
+        let lc = &mut log_conf[next_depth];
+        if lc.is_empty() {
+            lc.reserve(next_marginal.candidates.len());
+            for c in &next_marginal.candidates {
+                lc.push(c.log_confidence());
+            }
+        }
+        for (ci, candidate) in next_marginal.candidates.iter().enumerate() {
             if candidate.confidence < config.confidence_floor {
                 continue;
             }
@@ -316,7 +332,7 @@ pub fn build_hop_dd_tree(marginals: &[HopMarginal], config: &HopTreeConfig) -> V
                 break;
             }
 
-            let child_score = node_score + candidate.log_confidence();
+            let child_score = node_score + lc[ci];
             heap.push(HopTreeNode {
                 score: child_score,
                 depth: next_depth,

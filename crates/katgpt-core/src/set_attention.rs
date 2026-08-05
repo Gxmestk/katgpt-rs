@@ -344,13 +344,16 @@ pub fn set_sigmoid_attention_into(
     // Sigmoid temperature scale: 1/√k · β, precomputed once.
     let scale = cfg.beta / (k as f32).sqrt();
 
-    // ── Copy states into output first; we add the residual on top ─────
-    // (output[i] = states[i] + γ · Σ_j α_ij · (v_j − states[i]))
-    // For the identity-V case (w_v is None), this lets us write the residual
-    // contribution as γ · Σ_j α_ij · (states[j] − states[i]) directly.
-    output.copy_from_slice(states);
-
     // ── For each query i, compute α_ij and accumulate ────────────────
+    //
+    // The `output.copy_from_slice(states)` seed is only needed by the sparse
+    // path, so it now lives in the `Some` arm. `dense_accumulate` *assigns*
+    // `out_i[m] = state_i[m] + …` for every `i in 0..n` and `m in 0..d`, and
+    // `output.len()` is checked to equal exactly `n * d` above, so every slot
+    // it later reads is written first in the same pass — the n·d memcpy was
+    // entirely dead on the dense path. (Only observable difference: if
+    // `dense_accumulate`'s `d <= 16` release assert fires, `output` is now left
+    // untouched rather than pre-seeded on the way out of the panic.)
     match cfg.top_k {
         None => dense_accumulate(
             output,
@@ -366,6 +369,10 @@ pub fn set_sigmoid_attention_into(
             scale,
         ),
         Some(k_max) => {
+            // The sparse path accumulates (`out_i[m] += …`) over only the top-k
+            // peers, so it needs `output` seeded with `states` first:
+            // output[i] = states[i] + γ · Σ_j α_ij · (v_j − states[i]).
+            output.copy_from_slice(states);
             if k_max == 0 {
                 return Ok(()); // top-0 = no contribution; output = states (already copied)
             }
@@ -592,6 +599,13 @@ fn topk_accumulate(
             vp
         })
     });
+    // Normalise by k_max (NOT N) so the sparse path has the same per-peer step
+    // semantics as the dense path — a peer in the top-k contributes as much as
+    // it would in the dense case. Both `effective_k` and `gamma` are fixed
+    // before the query loop, so this cast + divide is loop-invariant; it used to
+    // run once per query. (`dense_accumulate` already hoists the equivalent.)
+    let normaliser = effective_k as f32;
+    let gamma_per_peer = gamma / normaliser;
     for i in 0..n {
         let q_row = &scratch_q[i * k..(i + 1) * k];
         for j in 0..n {
@@ -622,12 +636,7 @@ fn topk_accumulate(
             front.sort_unstable_by(cmp_alpha);
         }
         let top = &idx[..effective_k];
-        // Accumulate only over the top-k peers. We normalise by k_max (NOT N)
-        // here so the sparse path has the same per-peer step semantics as the
-        // dense path — a peer in the top-k contributes as much as it would in
-        // the dense case.
-        let normaliser = effective_k as f32;
-        let gamma_per_peer = gamma / normaliser;
+        // Accumulate only over the top-k peers (`gamma_per_peer` hoisted above).
         let state_i = &states[i * d..(i + 1) * d];
         let out_i = &mut output[i * d..(i + 1) * d];
         for &j in top {

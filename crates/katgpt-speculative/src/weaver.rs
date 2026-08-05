@@ -572,6 +572,19 @@ impl WeaverCorrector {
                 if !p.is_finite() {
                     continue;
                 }
+                // O(1) fast reject before the binary search. `top` is sorted
+                // descending, so once it holds K entries any `p` STRICTLY below
+                // the K-th best has `v > p` true for all K entries, which makes
+                // `partition_point` return exactly `k` and the `pos < k` branch
+                // below a no-op. `p == worst` deliberately falls through to the
+                // original path (there `partition_point` returns `k-1` and the
+                // entry does get inserted), so the selected set is unchanged.
+                if top.len() == k
+                    && let Some(&(_, worst)) = top.last()
+                    && p < worst
+                {
+                    continue;
+                }
                 let pos = top.partition_point(|&(_, v)| v > p);
                 if pos < k {
                     top.insert(pos, (vid, p));
@@ -721,9 +734,15 @@ impl WeaverCorrector {
                 if !p.is_finite() {
                     continue;
                 }
-                let pos = scratch
-                    .top_pairs
-                    .partition_point(|&(_, v)| v > p);
+                // O(1) fast reject — see `correct_marginals_inplace` for why
+                // `p < worst` (strict) leaves the selected set unchanged.
+                if scratch.top_pairs.len() == k
+                    && let Some(&(_, worst)) = scratch.top_pairs.last()
+                    && p < worst
+                {
+                    continue;
+                }
+                let pos = scratch.top_pairs.partition_point(|&(_, v)| v > p);
                 if pos < k {
                     scratch.top_pairs.insert(pos, (vid, p));
                     if scratch.top_pairs.len() > k {

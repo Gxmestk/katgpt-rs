@@ -321,6 +321,14 @@ pub fn kimi_k3_backward_sequence_ckpt(
         block_grads.push(bg);
     }
 
+    // Hoisted out of the layer loop: `d_attn_out[t]` and `d_ps_after_attn_all[t]`
+    // are both established by a full-width `copy_from_slice` for EVERY `t` in
+    // `0..l` inside the Step-2a per-token loop below (no `break`/`continue`), so
+    // no slot can be read before it is written in the current layer's pass.
+    // Reusing them turns 2 × l Vec allocations *per layer* into 2 × l total.
+    let mut d_attn_out: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
+    let mut d_ps_after_attn_all: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
+
     // ── Step 2: Layer-by-layer backward (reverse) ──
     for layer_idx in (0..config.num_layers).rev() {
         let layer_cfg = config.layer_config(layer_idx);
@@ -397,14 +405,14 @@ pub fn kimi_k3_backward_sequence_ckpt(
         }
 
         // ── Step 2a: MLP/FFN block backward (per token) ──
-        let mut d_attn_out: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
-        let mut d_ps_after_attn_all: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; d]).collect();
-
         for t in 0..l {
             let saved = &layer_saved_per_token[t];
 
-            let d_ffn_out = d_prefix[t].clone();
-            let d_normed_mlp = ffn_backward(&layer_cfg.ffn, &layer_w.ffn, saved, &d_ffn_out, layer_grads);
+            // `ffn_backward` takes `d_output: &[f32]` and never mutates it, so
+            // borrow `d_prefix[t]` directly instead of cloning a `[d]` Vec per
+            // token per layer.
+            let d_normed_mlp =
+                ffn_backward(&layer_cfg.ffn, &layer_w.ffn, saved, &d_prefix[t], layer_grads);
 
             let d_mixed_mlp = mla_rmsnorm_backward(
                 &d_normed_mlp,
@@ -421,7 +429,13 @@ pub fn kimi_k3_backward_sequence_ckpt(
             }
             let mut d_mlp_blocks: Vec<Vec<f32>> =
                 (0..num_mlp_blocks).map(|_| vec![0.0f32; d]).collect();
-            let mut d_ps_after = d_prefix[t].clone();
+            // Accumulate straight into the pre-allocated `d_attn_out[t]` row
+            // instead of cloning `d_prefix[t]` into a fresh Vec and then cloning
+            // that again at the end of the iteration. Same starting contents
+            // (`d_prefix[t]`), same in/out accumulation by `attn_res_backward`,
+            // and `d_attn_out[t]` was going to receive exactly this value anyway
+            // — so this drops 2 of the 3 `[d]` allocations per token per layer.
+            d_attn_out[t].copy_from_slice(&d_prefix[t]);
 
             attn_res_backward(
                 &config.attn_res_config,
@@ -430,19 +444,25 @@ pub fn kimi_k3_backward_sequence_ckpt(
                 &saved.prefix_sum_after_attn,
                 &d_mixed_mlp,
                 &mut d_mlp_blocks,
-                &mut d_ps_after,
+                &mut d_attn_out[t],
                 &mut layer_grads.mlp_attn_res_norm,
                 &mut layer_grads.mlp_attn_res_proj,
             );
 
-            for i in 0..num_mlp_blocks {
+            // Pre-sliced row walk: `block_grads[t]` may be LONGER than
+            // `d_mlp_blocks` (the `while` above only grows it to at least
+            // `num_mlp_blocks`), and `d_mlp_blocks` has exactly `num_mlp_blocks`
+            // rows — so `zip` visits exactly the same `0..num_mlp_blocks` rows the
+            // indexed loop did. Elementwise `+=`, no reassociation.
+            for (bg_row, d_row) in block_grads[t].iter_mut().zip(d_mlp_blocks.iter()) {
+                let bg = &mut bg_row[..d];
+                let dr = &d_row[..d];
                 for j in 0..d {
-                    block_grads[t][i][j] += d_mlp_blocks[i][j];
+                    bg[j] += dr[j];
                 }
             }
 
-            d_ps_after_attn_all[t] = d_ps_after.clone();
-            d_attn_out[t] = d_ps_after;
+            d_ps_after_attn_all[t].copy_from_slice(&d_attn_out[t]);
         }
 
         // ── Step 2b: Attention backward (MLA cross-token or KDA BPTT) ──
@@ -529,10 +549,15 @@ pub fn kimi_k3_backward_sequence_ckpt(
                 vec![0.0f32; d]
             };
 
+            // Elementwise SIMD adds throughout this block: each lane is a single
+            // independent `a + b`, so no reassociation — accumulated gradients are
+            // bit-identical to the scalar indexed loops. `[..d]` keeps the old
+            // panic-on-short-operand behaviour.
             if !is_boundary {
-                for i in 0..d {
-                    d_ps_in[i] += d_ps_after_attn_all[t][i];
-                }
+                katgpt_core::simd::simd_add_inplace(
+                    &mut d_ps_in[..d],
+                    &d_ps_after_attn_all[t][..d],
+                );
             }
 
             if saved.has_self_attn_res {
@@ -553,18 +578,15 @@ pub fn kimi_k3_backward_sequence_ckpt(
                     &mut layer_grads.self_attn_res_proj,
                 );
 
-                for i in 0..num_self_blocks {
-                    for j in 0..d {
-                        block_grads[t][i][j] += d_self_blocks[i][j];
-                    }
+                // `d_self_blocks` has exactly `num_self_blocks` rows and
+                // `block_grads[t]` has at least that many, so `zip` covers exactly
+                // the rows the indexed loop did.
+                for (bg_row, d_row) in block_grads[t].iter_mut().zip(d_self_blocks.iter()) {
+                    katgpt_core::simd::simd_add_inplace(&mut bg_row[..d], &d_row[..d]);
                 }
-                for i in 0..d {
-                    d_ps_in[i] += d_ps_from_attnres[i];
-                }
+                katgpt_core::simd::simd_add_inplace(&mut d_ps_in[..d], &d_ps_from_attnres[..d]);
             } else {
-                for i in 0..d {
-                    d_ps_in[i] += d_mixed_self[i];
-                }
+                katgpt_core::simd::simd_add_inplace(&mut d_ps_in[..d], &d_mixed_self[..d]);
             }
 
             d_prefix[t] = d_ps_in;
@@ -579,9 +601,11 @@ pub fn kimi_k3_backward_sequence_ckpt(
     for (t, ckpt_tok) in ckpt.tokens.iter().enumerate() {
         let token_id = ckpt_tok.token_id as usize;
         let base = token_id * d;
-        for (j, slot) in (0..d).zip(&mut grads.embed_weight[base..base + d]) {
-            *slot += d_prefix[t][j];
-        }
+        // Elementwise SIMD add — same per-lane `a + b`, bit-identical.
+        katgpt_core::simd::simd_add_inplace(
+            &mut grads.embed_weight[base..base + d],
+            &d_prefix[t][..d],
+        );
     }
 }
 

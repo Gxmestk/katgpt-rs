@@ -219,15 +219,18 @@ pub fn interpolate_query(query: &[f32], artifact: &MemorySoupArtifact) -> (Vec<f
     // Project query: projected[j] = sum_a gate_weight[j*n_embd + a] * query[a]
     // SIMD-accelerated matvec — one dot product per output lane.
     let mut projected = vec![0.0f32; dim];
-    // Allow: hot SIMD matvec — explicit row indexing keeps the dot-product lane clear.
-    #[allow(clippy::needless_range_loop)]
-    for j in 0..dim {
-        let row_off = j * artifact.n_embd;
-        projected[j] = crate::simd::simd_dot_f32(
-            &artifact.gate_weight[row_off..row_off + artifact.n_embd],
-            query,
-            artifact.n_embd,
-        );
+    // Row-major walk via `chunks_exact`: `gate_weight.len() == gate_dim *
+    // n_embd` is enforced by the importer's `expected` size check, so
+    // `chunks_exact(n_embd)` yields exactly `dim` rows and the `zip` lengths
+    // are equal (no silently-short iteration). This drops the per-row range
+    // bounds check and the multiply, and each row's dot product is computed
+    // from the same elements in the same order as before (bit-identical).
+    let n_embd = artifact.n_embd;
+    for (out, row) in projected
+        .iter_mut()
+        .zip(artifact.gate_weight.chunks_exact(n_embd))
+    {
+        *out = crate::simd::simd_dot_f32(row, query, n_embd);
     }
 
     // Score each checkpoint and apply sigmoid gate.
@@ -245,8 +248,11 @@ pub fn interpolate_query(query: &[f32], artifact: &MemorySoupArtifact) -> (Vec<f
     // dst = 1.0*dst + w*src in one NEON/AVX2 pass per chunk.
     let delta_len = artifact.checkpoints[0].delta.len();
     let mut interpolated = vec![0.0f32; delta_len];
-    for (i, cp) in artifact.checkpoints.iter().enumerate() {
-        let w = gammas[i];
+    // `gammas` was built by mapping over `checkpoints`, so the two have equal
+    // length — the `zip` visits every checkpoint in the same order as the
+    // previous indexed loop, just without the per-iteration `gammas[i]` bounds
+    // check. Accumulation order into `interpolated` is unchanged.
+    for (cp, &w) in artifact.checkpoints.iter().zip(gammas.iter()) {
         crate::simd::simd_fused_decay_write(&mut interpolated, 1.0, &cp.delta, w);
     }
 

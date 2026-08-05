@@ -402,12 +402,18 @@ pub fn forward_block_causal_positions(
             &mut scores_buf,
         );
 
-        // Pad attn_w to seq_len for consistent output (zero-fill then slice-copy per head)
+        // Pad attn_w to seq_len for consistent output. No zero-fill needed:
+        // `all_attn_weights` was freshly allocated zeroed above and each `p`
+        // touches the disjoint row `[p * attn_row_stride, (p+1) * attn_row_stride)`
+        // exactly once, so the `[t_n..seq_len)` tail of every head is still the
+        // original 0.0. Pre-slicing the row also drops one bounds check per head.
         let attn_base = p * attn_row_stride;
-        all_attn_weights[attn_base..attn_base + attn_row_stride].fill(0.0f32);
-        for h in 0..config.n_head {
-            let dst = attn_base + h * seq_len;
-            all_attn_weights[dst..dst + t_n].copy_from_slice(&attn_w_buf[h * t_n..h * t_n + t_n]);
+        let attn_row = &mut all_attn_weights[attn_base..attn_base + attn_row_stride];
+        for (h, w_src) in attn_w_buf[..config.n_head * t_n]
+            .chunks_exact(t_n)
+            .enumerate()
+        {
+            attn_row[h * seq_len..h * seq_len + t_n].copy_from_slice(w_src);
         }
 
         matmul(&mut x_proj, &layer.attn_wo, &attn_out_buf, n, n);

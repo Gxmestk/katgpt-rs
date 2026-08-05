@@ -210,22 +210,33 @@ pub fn attention_forward_safe_into(
 
     attn_out[..n_head * head_dim].fill(0.0);
 
+    // Pre-slice the K/V planes to exactly `seq_len` rows once, so the per-head /
+    // per-t walks use `chunks_exact` instead of re-deriving `t * kv_dim + kv_off`
+    // (two bounds checks per position per head). The `zip`s below are length-safe
+    // by construction: `scores[..seq_len]` has exactly `seq_len` elements and
+    // `k_rows`/`v_rows` have exactly `seq_len * kv_dim` bytes, hence exactly
+    // `seq_len` chunks of `kv_dim` — so no iteration is silently dropped.
+    let k_rows = &k_all[..seq_len * kv_dim];
+    let v_rows = &v_all[..seq_len * kv_dim];
+
     for h in 0..n_head {
         let kv_group = h * n_kv_head / n_head;
         let q_off = h * head_dim;
         let kv_off = kv_group * head_dim;
+        // `q` row and the `attn_out` row are loop-invariant across `t`: hoist the
+        // slicing (and its bounds check) out of the inner loops.
+        let q_head = &q[q_off..q_off + head_dim];
 
         // Compute scores (reuse buffer across heads)
         let mut max_score = f32::NEG_INFINITY;
-        for t in 0..seq_len {
-            let dot = simd::simd_dot_f32(
-                &q[q_off..q_off + head_dim],
-                &k_all[t * kv_dim + kv_off..t * kv_dim + kv_off + head_dim],
-                head_dim,
-            );
-            scores[t] = dot * scale;
-            if scores[t] > max_score {
-                max_score = scores[t];
+        for (dst, k_row) in scores[..seq_len]
+            .iter_mut()
+            .zip(k_rows.chunks_exact(kv_dim))
+        {
+            let s = simd::simd_dot_f32(q_head, &k_row[kv_off..kv_off + head_dim], head_dim) * scale;
+            *dst = s;
+            if s > max_score {
+                max_score = s;
             }
         }
 
@@ -240,10 +251,14 @@ pub fn attention_forward_safe_into(
         // Weighted value sum: accumulate per-position scaled value rows (SIMD-friendly)
         // Loop order: t outer → contiguous v_all row access, better cache locality.
         // Previous d-outer/t-inner order touched a different cache line per t for each d.
-        for t in 0..seq_len {
-            let s = scores[t];
-            let v_row = &v_all[t * kv_dim + kv_off..t * kv_dim + kv_off + head_dim];
-            simd::simd_fused_scale_acc(&mut attn_out[q_off..q_off + head_dim], v_row, s, head_dim);
+        // Accumulation order over `t` is unchanged (ascending), so the float sum is
+        // bit-identical to the indexed version.
+        let out_head = &mut attn_out[q_off..q_off + head_dim];
+        for (&s, v_row) in scores[..seq_len]
+            .iter()
+            .zip(v_rows.chunks_exact(kv_dim))
+        {
+            simd::simd_fused_scale_acc(out_head, &v_row[kv_off..kv_off + head_dim], s, head_dim);
         }
     }
 }
@@ -276,10 +291,13 @@ pub fn forward_block_causal_with(
 
     let committed = ctx.committed_len;
 
-    // Only clear logits for uncommitted positions
-    for p in committed..seq_len {
-        ctx.logits_flat[p * vocab..(p + 1) * vocab].fill(0.0);
-    }
+    // No logits pre-clear needed: Phase B below iterates exactly `committed..seq_len`
+    // and ends each iteration with a full-width
+    // `logits_flat[p * vocab..(p + 1) * vocab].copy_from_slice(&ctx.logits_buf)`
+    // (logits_buf is exactly `vocab` long, so copy_from_slice covers every slot).
+    // The loop has no `break`/`continue`, so every slot the old `fill(0.0)` touched
+    // is unconditionally overwritten before anyone can read it. Committed positions
+    // keep their previous logits, exactly as before.
 
     // Phase A: Fill K/V cache, x_norm, xr for UNCOMMITTED positions only
     for (p, &token) in tokens.iter().enumerate().take(seq_len).skip(committed) {

@@ -604,9 +604,15 @@ impl<const D: usize> HebbianKernelMemory<D> {
         }
         let m = self.config.m;
         let mut fwd = vec![0.0_f32; D * keys.len()];
-        for (i, k) in keys.iter().enumerate() {
-            let mut phi = vec![0.0_f32; m];
-            self.forward_into(k, &mut phi, &mut fwd[i * D..(i + 1) * D]);
+        // `phi` is pure scratch: `forward_into` assigns every slot `0..m` (its
+        // `for r in 0..m` write of `scratch_phi[r]`) before the `B · ϕ` pass
+        // reads `scratch_phi[..m]`, so hoisting it out of the loop needs no
+        // re-zeroing and turns `keys.len()` allocations into one.
+        // `fwd.len() == D * keys.len()`, so `chunks_exact_mut(D)` yields exactly
+        // `keys.len()` rows — the `zip` cannot iterate short.
+        let mut phi = vec![0.0_f32; m];
+        for (k, out_row) in keys.iter().zip(fwd.chunks_exact_mut(D)) {
+            self.forward_into(k, &mut phi, out_row);
         }
         // Build the fact map as key_idx → value_idx for fast lookup.
         let mut map_by_key = vec![usize::MAX; keys.len()];
@@ -616,19 +622,27 @@ impl<const D: usize> HebbianKernelMemory<D> {
             }
         }
         let mut gamma_min = f32::INFINITY;
-        for (i, k_idx) in (0..keys.len()).enumerate() {
+        // `fwd.chunks_exact(D)` yields exactly `keys.len()` rows (see above), and
+        // the old `(0..keys.len()).enumerate()` produced `i == k_idx` for every
+        // iteration, so the row index and the `map_by_key` index are the same
+        // counter.
+        for (k_idx, fwd_i) in fwd.chunks_exact(D).enumerate() {
             let v_fi_idx = map_by_key[k_idx];
             if v_fi_idx == usize::MAX {
                 continue;
             }
-            let fwd_i = &fwd[i * D..(i + 1) * D];
+            // ⟨v_{f(i)}, MLP(k_i)⟩ depends only on the outer index, but was
+            // being recomputed for every competitor `j` — one of the two
+            // D-length dot products per (i, j) pair was pure waste. Hoisting it
+            // computes the identical value once, so every `gamma` is
+            // bit-identical.
+            let v_fi = values[v_fi_idx];
+            let s_fi = simd_dot_f32(v_fi, fwd_i, D);
             for (j, v_j) in values.iter().enumerate() {
                 if j == v_fi_idx {
                     continue;
                 }
-                let v_fi = values[v_fi_idx];
                 // ⟨v_{f(i)} − v_j, MLP(k_i)⟩ = ⟨v_{f(i)}, MLP(k_i)⟩ − ⟨v_j, MLP(k_i)⟩
-                let s_fi = simd_dot_f32(v_fi, fwd_i, D);
                 let s_j = simd_dot_f32(v_j, fwd_i, D);
                 let gamma = s_fi - s_j;
                 if gamma < gamma_min {

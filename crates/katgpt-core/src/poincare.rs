@@ -792,24 +792,24 @@ pub fn fit_poincare_adapter(
     let mut phi_z = vec![0.0f32; n * phi_out];
     let mut hidden = vec![0.0f32; phi_hidden_eff];
     let mut phi_row = vec![0.0f32; phi_out];
-    for (i, z) in z_samples.iter().enumerate() {
-        eval_phi_into(
-            z,
-            &dummy_adapter(
-                &phi_w1,
-                &phi_b1,
-                &phi_w2,
-                &phi_b2,
-                latent_dim,
-                phi_out,
-                phi_hidden_eff,
-            ),
-            &mut phi_row,
-            &mut hidden,
-        );
-        for k in 0..phi_out {
-            phi_z[i * phi_out + k] = phi_row[k];
-        }
+    // The fitting adapter is loop-invariant: `dummy_adapter` deep-copies the
+    // four weight buffers (4 heap allocations) and none of them are mutated
+    // inside this loop, so it was being rebuilt — and thrown away — once per
+    // sample. Build it once. `phi_z` has exactly `n * phi_out` elements and
+    // `n == z_samples.len()` (line 721), so `chunks_exact_mut` yields exactly
+    // as many rows as there are samples and the `zip` cannot iterate short.
+    let fit_adapter = dummy_adapter(
+        &phi_w1,
+        &phi_b1,
+        &phi_w2,
+        &phi_b2,
+        latent_dim,
+        phi_out,
+        phi_hidden_eff,
+    );
+    for (z, row) in z_samples.iter().zip(phi_z.chunks_exact_mut(phi_out)) {
+        eval_phi_into(z, &fit_adapter, &mut phi_row, &mut hidden);
+        row.copy_from_slice(&phi_row[..phi_out]);
     }
 
     // ── Step 3: Ridge fit W = (ZᵀZ + αI)⁻¹ · ZᵀY ──────────────────

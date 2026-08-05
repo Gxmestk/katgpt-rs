@@ -1091,11 +1091,15 @@ fn backward(
             let q_off = h * hd;
             let kv_off = kv_group * hd;
 
+            // `d_attn_out[p, h]` is invariant across `t` — slice it once instead of
+            // re-slicing (and re-bounds-checking) it inside all three `t` loops.
+            let d_ao_h = &d_ao[q_off..q_off + hd];
+
             // d_raw_weights[t] = dot(d_attn_out[h], v[t,h])
             // No fill needed: d_raw[t] is assigned (not accumulated) below.
             for t in 0..seq_len {
                 bctx.d_raw[t] = katgpt_core::simd::simd_dot_f32(
-                    &d_ao[q_off..q_off + hd],
+                    d_ao_h,
                     &act.v[t * kvd + kv_off..t * kvd + kv_off + hd],
                     hd,
                 );
@@ -1110,32 +1114,43 @@ fn backward(
             );
             let d_scores = &bctx.d_softmax_buf[..seq_len];
 
-            // d_v[t] += weights[t] * d_attn_out[h]
+            // Fused d_v / d_q / d_k accumulation — one pass over `t` instead of three.
+            //
+            // GRADIENT SAFETY (bit-identical): `d_q[p, h]` is the only accumulator
+            // whose float addition order matters here (all `t` write the same row),
+            // and it still sees `t` strictly ascending — exactly as in the old
+            // standalone loop. `d_v[t, h]` and `d_k[t, h]` each target a distinct
+            // row per `t`, so interleaving them with the `d_q` reduction cannot
+            // reassociate anything. `d_scores[t] * scale` is now computed once per
+            // `t` instead of twice (same expression, same value).
+            //
+            // `act.q[p, h]` is invariant across `t` and is hoisted out; `d_q_h` is
+            // likewise a single hoisted `&mut` row. `bctx.d_v` / `bctx.d_q` /
+            // `bctx.d_k` / `bctx.d_attn_out` / `bctx.d_softmax_buf` are distinct
+            // struct fields, so the split borrows are disjoint.
+            let q_ph = &act.q[p * n + q_off..p * n + q_off + hd];
+            let d_q_h = &mut bctx.d_q[p * n + q_off..p * n + q_off + hd];
             for t in 0..seq_len {
+                let ds_scaled = d_scores[t] * scale;
+                // d_v[t] += weights[t] * d_attn_out[h]
                 katgpt_core::simd::simd_fused_scale_acc(
                     &mut bctx.d_v[t * kvd + kv_off..t * kvd + kv_off + hd],
-                    &d_ao[q_off..q_off + hd],
+                    d_ao_h,
                     w_h[t],
                     hd,
                 );
-            }
-
-            // d_q[h] += d_scores[t] * k[t,h] * scale
-            for t in 0..seq_len {
+                // d_q[h] += d_scores[t] * k[t,h] * scale
                 katgpt_core::simd::simd_fused_scale_acc(
-                    &mut bctx.d_q[p * n + q_off..p * n + q_off + hd],
+                    d_q_h,
                     &act.k[t * kvd + kv_off..t * kvd + kv_off + hd],
-                    d_scores[t] * scale,
+                    ds_scaled,
                     hd,
                 );
-            }
-
-            // d_k[t,h] += d_scores[t] * q[p,h] * scale
-            for t in 0..seq_len {
+                // d_k[t,h] += d_scores[t] * q[p,h] * scale
                 katgpt_core::simd::simd_fused_scale_acc(
                     &mut bctx.d_k[t * kvd + kv_off..t * kvd + kv_off + hd],
-                    &act.q[p * n + q_off..p * n + q_off + hd],
-                    d_scores[t] * scale,
+                    q_ph,
+                    ds_scaled,
                     hd,
                 );
             }

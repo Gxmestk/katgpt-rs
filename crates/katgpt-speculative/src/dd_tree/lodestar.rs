@@ -101,6 +101,16 @@ pub fn build_dd_tree_lodestar(
     let mut parent_buf: Vec<usize> = vec![0usize; seq_len];
     // Reusable scratch for jump-ahead span walk; avoids per-iteration allocation.
     let mut span_parents_buf: Vec<usize> = Vec::with_capacity(seq_len);
+    // Lazily-filled per-depth log-marginal cache (same shape as
+    // `TreeBuilder::cache_log_marginals`). The expansion loop below calls
+    // `prob.ln()` once per vocab entry on EVERY heap-pop, but the value depends
+    // only on `(depth, token)` — never on the popped node — so with a 32K vocab
+    // and a 64-node budget that is ~2M redundant `ln()` calls per build. Filling
+    // one table per depth on first expansion of that depth makes it one `ln()`
+    // per `(depth, token)`. Filled with the SAME `if p > 0.0 { p.ln() } else
+    // { 0.0 }` rule, and read only under the identical `prob > 0.0` guard, so
+    // the `0.0` filler for non-positive probs is never observed.
+    let mut log_marginals: Vec<Vec<f32>> = vec![Vec::new(); seq_len];
 
     // Seed root children (depth 0, empty parent). After placing a token at depth
     // 0, remaining slots = seq_len - 1.
@@ -209,12 +219,21 @@ pub fn build_dd_tree_lodestar(
 
             // Standard per-token expansion with budget mask.
             let remaining_after = seq_len - start_depth - 1;
-            for (i, &prob) in marginals[start_depth].iter().enumerate() {
+            let marginal = marginals[start_depth];
+            let log_m = &mut log_marginals[start_depth];
+            if log_m.is_empty() {
+                log_m.reserve(marginal.len());
+                for &p in marginal {
+                    log_m.push(if p > 0.0 { p.ln() } else { 0.0 });
+                }
+            }
+            for (i, &prob) in marginal.iter().enumerate() {
                 // NEURO-SYMBOLIC INTERCEPT + LODESTAR BUDGET MASK
                 if prob > 0.0 && horizon.is_valid(start_depth, i, parent_tokens) {
                     let d = horizon.min_completion_distance(start_depth, i, parent_tokens);
                     if d != u32::MAX && (d as usize) <= remaining_after {
-                        let score = best.score + prob.ln();
+                        // `log_m[i]` == `prob.ln()` here (guard is `prob > 0.0`).
+                        let score = best.score + log_m[i];
                         heap.push(TreeNode {
                             score: a_star_score(score, lambda, d),
                             depth: start_depth,
