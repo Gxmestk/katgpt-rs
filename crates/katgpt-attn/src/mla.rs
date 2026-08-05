@@ -323,6 +323,25 @@ impl MlaKVCache {
         self.seq_len = 0;
     }
 
+    /// Rewind the cache's logical length to `seq_len` without deallocating.
+    /// Used by the Ouro looped forward (Plan 324) to prevent KV cache expansion
+    /// across loop iterations: each iteration re-processes the same token
+    /// position, so it should overwrite the entry at `pos` rather than append.
+    /// Before iteration t (t >= 1), rewind to `pos` so the next `append()` writes
+    /// at position `pos` (overwriting iteration 0's entry) + restores seq_len
+    /// to `pos + 1`. The previous entries (0..pos) are preserved.
+    ///
+    /// # Panics
+    /// Panics if `seq_len` exceeds the current length (can't grow via rewind).
+    pub fn rewind_to(&mut self, seq_len: usize) {
+        debug_assert!(
+            seq_len <= self.seq_len,
+            "rewind_to({seq_len}) > current seq_len {} — rewind can only shrink",
+            self.seq_len
+        );
+        self.seq_len = seq_len;
+    }
+
     /// Append a token's compressed KV latent + shared RoPE key.
     ///
     /// Returns the position index of the newly cached token.
