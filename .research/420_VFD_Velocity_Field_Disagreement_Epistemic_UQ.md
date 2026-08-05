@@ -144,7 +144,7 @@ Operating on each Super-GOAT factory module:
 
 (e) **NeuronShard / freeze envelope** (`riir-neuron-db/src/`): the 2-member ensemble for VFD is **already** 2 `VelocityFieldEnsembleShard`s — VFD reads them, doesn't mutate them. No new shard type. The conformal-calibrated VFD threshold is a separate small artifact (one f32 per task) — could be a sidecar or a config field.
 
-(f) **DEC Stokes-calculus** (`katgpt-core/src/dec/`): The VFD proof's continuity-equation step (eq. 17, `∂_s p_s + div(p_s u_s) = 0`) IS `belief_mass_divergence`. The VFD score is a discrete approximation of the velocity-field difference; `codifferential(b̂)` is the divergence of the COMBINED drift. **They are complementary, not redundant**: VFD measures member-vs-member divergence; `codifferential` measures combined-vs-mass-conservation divergence. Cross-checking the two is a sanity gate.
+(f) **DEC Stokes-calculus** (`katgpt-dec/src/`): The VFD proof's continuity-equation step (eq. 17, `∂_s p_s + div(p_s u_s) = 0`) IS `belief_mass_divergence`. The VFD score is a discrete approximation of the velocity-field difference; `codifferential(b̂)` is the divergence of the COMBINED drift. **They are complementary, not redundant**: VFD measures member-vs-member divergence; `codifferential` measures combined-vs-mass-conservation divergence. Cross-checking the two is a sanity gate.
 
 ---
 

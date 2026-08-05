@@ -293,7 +293,7 @@ error matrix, even optimally-chosen rank-8 might not recover enough accuracy.
 
 Idea: enrich Moka's 12 input planes with DEC-computed features (stone density
 divergence, influence curl, harmonic territory component from
-`katgpt-core/src/dec/`) and absorb the new channels via a reader-LoRA on the
+`katgpt-dec/src/`) and absorb the new channels via a reader-LoRA on the
 stem conv (12→32 becomes 16→32, with the 4 new channel weights as the LoRA).
 
 **The honest problem:** the "correct" weights for the new input channels are

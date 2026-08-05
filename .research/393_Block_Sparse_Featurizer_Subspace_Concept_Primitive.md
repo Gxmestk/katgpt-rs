@@ -95,7 +95,7 @@ A k-dim orthonormal block `{u_1..u_k}` commits as `k·d` raw f32 scalars (the bl
 
 `style_weights[64]` is already a 64-dim basis. BSF reframing: it should be interpretable as a **set of g-dim blocks** (e.g., 4 blocks of 16, or 8 blocks of 8), where each block is one "play-style concept" (aggressive, defensive, economic, social, ...). The freeze envelope commits the block partition + per-block stable rank. Consolidation (Raven/δ-Mem) selects which blocks to keep based on stable rank (low-stable-rank blocks are "saturated concepts"; high-stable-rank are "still exploring"). AnyRAG escalation: a query that activates a high-stable-rank block (under-explored concept) escalates.
 
-**(f) DEC Stokes-calculus operators (`katgpt-rs/crates/katgpt-core/src/dec/`)**
+**(f) DEC Stokes-calculus operators (`katgpt-rs/crates/katgpt-dec/src/`)**
 
 DEC `hodge_decompose` splits a flow field into exact ⊕ harmonic ⊕ coexact channels — a **3-block decomposition** of the flow. BSF reframing: each DEC channel IS a concept block, and the stable rank of each channel's flow tells you whether that concept is 1D (exact = gradient = rank 1) or multidim (harmonic/coexact can be higher rank). The DEC substrate already does block-structured decomposition; BSF adds the "treat each block as a steerable concept region" interpretation. **Curse-of-dimensionality caveat (AGENTS.md):** boundary-vs-volume wins only for d ≤ 3 — DEC blocks (2D maps, 3D belief regions) are in the winning regime; HLA/shard blocks (d=8, d=64) are NOT. Do not apply boundary-flux BSF reasoning to high-dim shards.
 

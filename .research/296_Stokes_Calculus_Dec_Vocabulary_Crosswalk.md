@@ -14,7 +14,7 @@
 
 ## TL;DR
 
-**Verdict: GOAT (not Super-GOAT).** The Generalized Stokes' Theorem machinery (`d`, `δ`, `Δ`, Hodge decomposition) **already ships** as the DEC module (`katgpt-rs/crates/katgpt-core/src/dec/`, Plan 251, Research 219). Tests verify `curl(grad)=0` and `div(curl)=0` exactly — i.e. the Green/Gauss/Stokes identities hold by construction. `DecFlowField` already exposes exact/coexact/harmonic (gradient/solenoidal/topological) channels.
+**Verdict: GOAT (not Super-GOAT).** The Generalized Stokes' Theorem machinery (`d`, `δ`, `Δ`, Hodge decomposition) **already ships** as the DEC module (`katgpt-rs/crates/katgpt-dec/src/`, Plan 251, Research 219). Tests verify `curl(grad)=0` and `div(curl)=0` exactly — i.e. the Green/Gauss/Stokes identities hold by construction. `DecFlowField` already exposes exact/coexact/harmonic (gradient/solenoidal/topological) channels.
 
 What does **not** ship is three named **wrapper primitives** that turn the shipped operators into directly-callable Stokes-theorem tools:
 

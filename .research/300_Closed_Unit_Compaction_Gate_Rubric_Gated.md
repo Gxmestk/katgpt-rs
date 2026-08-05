@@ -276,7 +276,7 @@ Three-layer check (notes + code + vocabulary translation) performed in this sess
 - `riir-ai/crates/riir-engine/src/cgsp_runtime/` — curiosity signals (C3/N1 source, not gate).
 - `riir-neuron-db/src/phase_gate.rs` — **`can_freeze` is the cross-domain isomorphic instance** (see Research 007 cross-ref). Recognizing it as CUCG-for-shards is the novelty; the freeze gate itself is shipped, but its unification with trajectory compaction is not.
 - `riir-chain/src/encoding/latcal*.rs` — LatCal commitment (sync-boundary bridge — relevant for the audit trail, not the gate itself).
-- `katgpt-rs/crates/katgpt-core/src/dec/` — DEC operators (C3 divergence signal source, not gate).
+- `katgpt-rs/crates/katgpt-dec/src/` — DEC operators (C3 divergence signal source, not gate).
 
 **Honest prior-art accounting:** The mechanism "multi-predicate rubric + Boolean fire rule + trajectory-summary compaction + cache-reuse probe + token-pct backstop + skip-if-reliable" is **not shipped in any combination**. Each individual piece has a cousin; the combination and its cross-domain unification are novel. → **YES**.
 

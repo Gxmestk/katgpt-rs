@@ -169,7 +169,7 @@ Cast the paper's mechanism onto the seven Super-GOAT factory modules:
 
 (e) **NeuronShard / ArchetypeBlendShard / KarcShard / MerkleFrozenEnvelope / Raven/δ-Mem consolidation** (`riir-neuron-db/src/`): **Strong fit.** `NeuronShard::style_weights[64]` IS a compressed latent representation of a weight manifold. **iMAUVE for shards**: midpoint of two shards' style_weights, fed through the shard's reconstruction, should produce a coherent intermediate behavior. The closest shipped cousin is `neighbor_heal` (Plan 316) — but 316 *applies* interpolation for healing, does not *evaluate* whether interpolation stays on-manifold. The evaluation primitive is missing.
 
-(f) **DEC Stokes operators** (`katgpt-rs/crates/katgpt-core/src/dec/`): `hodge_decompose` (exact/coexact/harmonic) could in principle serve as a "is this interpolation on-manifold" diagnostic — a vector field is harmonic iff curl-free and divergence-free. Stretch mapping; the paper's metric is empirical (decode midpoint, compare to distribution), not differential-geometric.
+(f) **DEC Stokes operators** (`katgpt-rs/crates/katgpt-dec/src/`): `hodge_decompose` (exact/coexact/harmonic) could in principle serve as a "is this interpolation on-manifold" diagnostic — a vector field is harmonic iff curl-free and divergence-free. Stretch mapping; the paper's metric is empirical (decode midpoint, compare to distribution), not differential-geometric.
 
 **Latent reframing conclusion**: the modelless primitive lands strongest on (a) HLA, (b) latent_functor, (e) NeuronShard/ArchetypeBlendShard. The primitive is **interpolation-quality evaluation for committed latent artifacts**.
 

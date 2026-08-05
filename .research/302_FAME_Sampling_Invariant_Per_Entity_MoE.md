@@ -87,7 +87,7 @@ The Super-GOAT is the fusion: **per-NPC committed archetype blend × KARC trajec
 | HLA forward state evolution | **`evolve_hla`** | `crates/katgpt-sense/src/reconstruction.rs` |
 | Forward + backward latent passes (bidirectional prefill) | **Plan 025 bidirectional prefill** | reader LoRA (prefill) + writer LoRA (decode) — the Bi-NCDE's fwd/bwd split, modellessly |
 | Two-brain model (info brain = ground truth, think brain = belief) | **AGENTS.md §Spatial Cognition** | one-way bridge, fog-of-war gated |
-| Discretization-invariant path sum / line integral | **DEC `line_integral`** | Plan 314, Research 296, `crates/katgpt-core/src/dec/` |
+| Discretization-invariant path sum / line integral | **DEC `line_integral`** | Plan 314, Research 296, `crates/katgpt-dec/src/` |
 | Lipschitz-stable closed-form regression operator | **FuncAttn** (different mechanism — see vocabulary alert) | Plan 286, Research 257, `crates/katgpt-core/src/funcattn/mod.rs` |
 | Frozen operator-field snapshots (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard/mod.rs` — `style_weights[64]`, `hla_moments[8]` |
 | Deterministic linear-op commitment (2×2 fixed-point blocks) | **LatCal** | `riir-chain/src/encoding/latcal.rs` — `LatCalMatrix`, `to_fixed` |
@@ -134,7 +134,7 @@ Operating on each Super-GOAT factory module:
 
 (e) **NeuronShard / freeze envelope** (`riir-neuron-db/src/`): `ArchetypeBlendShard` subtype. Layout: `[zone_hash(32) | π_flat(K·4) | archetype_library_hash(32) | version(4) | blake3(32) | merkle_root(32)]` ≈ 132 + 4K bytes, K=3 → 144 bytes, padded to 192. `MerkleFrozenEnvelope` wraps it for self-play freeze/thaw. **The archetype library itself is a separate frozen artifact** (K NeuronShards, one per archetype), referenced by hash — not duplicated per NPC.
 
-(f) **DEC Stokes-calculus** (`katgpt-core/src/dec/`): The Young-integral sampling invariance maps to `d∘d=0` — the operator's output depends only on the cochain, not on cell refinement. The continuous attention integral `Ẑ(j)(t) = ∫ α̂ V dτ` IS a DEC rank-1 cochain path sum (`line_integral` in Plan 314). The Lipschitz stability `‖Ẑ-Ẑ̃‖_∞ ≤ L·‖X-X̃‖_{1-var}` is a Hodge-decomposition stability result. **Curse-of-dimensionality caveat (R296):** boundary-vs-volume wins only for d ≤ 3; HLA (d=8) and full shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *sampling-invariance property*, not for perf.
+(f) **DEC Stokes-calculus** (`katgpt-dec/src/`): The Young-integral sampling invariance maps to `d∘d=0` — the operator's output depends only on the cochain, not on cell refinement. The continuous attention integral `Ẑ(j)(t) = ∫ α̂ V dτ` IS a DEC rank-1 cochain path sum (`line_integral` in Plan 314). The Lipschitz stability `‖Ẑ-Ẑ̃‖_∞ ≤ L·‖X-X̃‖_{1-var}` is a Hodge-decomposition stability result. **Curse-of-dimensionality caveat (R296):** boundary-vs-volume wins only for d ≤ 3; HLA (d=8) and full shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *sampling-invariance property*, not for perf.
 
 ---
 

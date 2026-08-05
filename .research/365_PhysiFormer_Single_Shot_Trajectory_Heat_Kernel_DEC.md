@@ -222,7 +222,7 @@ SLoD's `heat_kernel_weights(eigenvalues, eigenvectors, query, sigma)` computes `
 
 ## 5. Plan (sketch — full plan in `.plans/365_`)
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/dec/heat_kernel_trajectory.rs` + feature `dec_heat_kernel_trajectory`
+**Target:** `katgpt-rs/crates/katgpt-dec/src/heat_kernel_trajectory.rs` + feature `dec_heat_kernel_trajectory`
 
 **Phases:**
 1. **Linear heat kernel** — `heat_kernel_trajectory_linear(cx, h0, motor, t, eigendecomposition)` using precomputed DEC eigendecomposition. Exact for linear propagation. Benchmark vs T-step `evolve_motor_gated_field` at T=20, 50, 100, 200.

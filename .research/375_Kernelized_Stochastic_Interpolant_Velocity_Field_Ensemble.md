@@ -119,7 +119,7 @@ Operating on each Super-GOAT factory module:
 
 (e) **NeuronShard / freeze envelope** (`riir-neuron-db/src/`): `VelocityFieldEnsembleShard` subtype. Layout: `[zone_hash(32) | η_flat(P·4) | field_library_hash(32) | schedule_hash(16) | version(4) | blake3(32) | merkle_root(32)]` ≈ 116 + 4P bytes, P=8 → 148 bytes, padded to 192. `MerkleFrozenEnvelope` wraps it for atomic hot-swap. **The velocity-field library itself is a separate frozen artifact** (P NeuronShards), referenced by hash — not duplicated per ensemble.
 
-(f) **DEC Stokes-calculus** (`katgpt-core/src/dec/`): The combined drift `b̂_t` is a vector field on the latent manifold. `codifferential(b̂_t)` measures its divergence; `belief_mass_divergence(b̂_t) ≈ 0` is a modelless sanity check that the ensemble preserves belief mass. The Girsanov-derived `D*_t` is the *raw scalar* that crosses sync to keep the ensemble's stochastic transport mass-conserving. **Curse-of-dimensionality caveat (R296):** DEC ops win only for d ≤ 3; HLA (d=8) and shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *mass-conservation property*, not perf.
+(f) **DEC Stokes-calculus** (`katgpt-dec/src/`): The combined drift `b̂_t` is a vector field on the latent manifold. `codifferential(b̂_t)` measures its divergence; `belief_mass_divergence(b̂_t) ≈ 0` is a modelless sanity check that the ensemble preserves belief mass. The Girsanov-derived `D*_t` is the *raw scalar* that crosses sync to keep the ensemble's stochastic transport mass-conserving. **Curse-of-dimensionality caveat (R296):** DEC ops win only for d ≤ 3; HLA (d=8) and shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *mass-conservation property*, not perf.
 
 ---
 

@@ -200,7 +200,7 @@ Re-cast the Gibbs retrieval operator as a latent-to-latent op on each Super-GOAT
 | **`cgsp_runtime/`** | Curiosity = high-entropy particle (exploration); relaxation to attractor = exploitation. Gibbs weighting becomes "how to collapse K curiosity threads into one decision per tick." | Novel application; riir-ai game runtime. |
 | **LatCal** (`riir-chain/src/encoding/`) | The Gibbs weight `1/E²` is a deterministic scalar that crosses `SyncBlock → ChainConsensus` as a raw value. The K hypotheses stay local-latent; only the chosen index + its weight sync. | Sync boundary respected. |
 | **`NeuronShard`** (riir-neuron-db) | `style_weights[64]` = stored attractor pattern. `MerkleFrozenEnvelope` = committed flat minimum. `can_freeze = (spectral_flatness < 0.3)` (Plan 333) IS the paper's "flat minimum ⇒ robust" claim, restated as a freeze gate. CUCG G7 isomorphism: trajectory compaction ≡ shard freeze. | Already shipped — paper is confirmatory. |
-| **DEC** (`katgpt-rs/crates/katgpt-core/src/dec/`) | Flat minimum = harmonic component. `harmonic_projector(belief)` = deterministic basin detector. Stokes `∫_M dω = ∫_∂M ω` ⇒ basin mass via boundary flux (Plan 314). | Fusion C; future Super-GOAT cross-ref. |
+| **DEC** (`katgpt-rs/crates/katgpt-dec/src/`) | Flat minimum = harmonic component. `harmonic_projector(belief)` = deterministic basin detector. Stokes `∫_M dω = ∫_∂M ω` ⇒ basin mass via boundary flux (Plan 314). | Fusion C; future Super-GOAT cross-ref. |
 
 ---
 

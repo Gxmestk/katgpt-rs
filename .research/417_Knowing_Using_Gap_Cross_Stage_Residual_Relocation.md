@@ -148,7 +148,7 @@ Re-cast on each Super-GOAT factory module:
 
 **(e) `NeuronShard` / consolidation / AnyRAG / vibe KG** (`riir-neuron-db/src/`): the **second-closest latent analog**. Consolidation's `sleep(N)` is a stage-chain over wake-events. A wake-event representation that doesn't get consolidated into the shard because it's stranded in the wrong consolidation "stage" is a KU-Gap analog. But consolidation is offline (sleep-cycle), not runtime — the latency budget is different. The more direct mapping is `MerkleFrozenEnvelope` snapshot compositing (R259 already covers this for weight-level composites).
 
-**(f) DEC Stokes operators** (`katgpt-core/src/dec/`): irrelevant — DEC is about manifold geometry on cochains, not residual stream relocation.
+**(f) DEC Stokes operators** (`katgpt-dec/src/`): irrelevant — DEC is about manifold geometry on cochains, not residual stream relocation.
 
 **Verdict on the latent reframe:** the latent-space reframe *partially* lands — the (b) latent_functor and (e) consolidation analogs are real but weaker than the paper's LLM-layer axis. Our latent substrate doesn't have the same "early vs late MLP" structure that gives the paper its two-cluster pattern. The genuinely unshipped primitive is the **operator** (applied relocation); the diagnostic is a natural extension of Plan 358's scorer.
 

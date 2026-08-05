@@ -114,7 +114,7 @@ The output is a predicted cycle count that is **≤ the steady-state `max()`** w
 
 This paper is hardware/performance modeling, not latent-space. The latent reframing is thin:
 
-- **The tile-graph DAG is structurally a cell complex** — nodes are cells, edges are face relationships. The dependency-driven scheduling (in-degree == 0 → ready) is topological sorting. This connects to our DEC substrate (`katgpt-core/src/dec/`) at the **graph-structure** level, but the semantics are different (scheduling dependencies vs geometric cochains). No productive fusion identified.
+- **The tile-graph DAG is structurally a cell complex** — nodes are cells, edges are face relationships. The dependency-driven scheduling (in-degree == 0 → ready) is topological sorting. This connects to our DEC substrate (`katgpt-dec/src/`) at the **graph-structure** level, but the semantics are different (scheduling dependencies vs geometric cochains). No productive fusion identified.
 - **The overlap prediction connects to the Plasma→Hot tier boundary.** If the tile-graph predicts an ANE fused kernel finishes in 0.5 ms (vs the roofline's 0.8 ms `max()`), the tier-dispatch threshold shifts. This is a refinement of Plan 379's routing verdict, not a latent-space operation.
 
 No Super-GOAT angle. The value is in ANE performance prediction accuracy, not in latent-space operations.

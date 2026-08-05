@@ -103,7 +103,7 @@ R398 deferred the behavioral headline to riir-train after exhausting the three p
 5. **`katgpt-core crates/katgpt-core/src/faithfulness/probe.rs`** (Plan 278, opt-in, **wired in riir-poc**) — causal-intervention attribution. `DefaultFaithfulnessProbe`, `is_faithfully_used`. **The attribution tool.** Precedent: `riir-ai/crates/riir-poc/benches/jlens_concept_readout_goat.rs`.
 6. **`riir-neuron-db/src/freeze.rs`** — `MerkleFrozenEnvelope`. **The region-swap primitive.**
 7. **Percepta** (R031/032, `katgpt-percepta` crate) — analytical weight construction for deterministic regions.
-8. **DEC** (`katgpt-core/src/dec/`, DEFAULT-ON) — geometric region producer (`codifferential`, `heat_kernel_trajectory`).
+8. **DEC** (`katgpt-dec/src/`, DEFAULT-ON) — geometric region producer (`codifferential`, `heat_kernel_trajectory`).
 
 **The gap (Q1):** no `compile_schema → gated functor graph` primitive; no `can_reach` applied to functor-to-functor edges; no schema-keyed per-region `FunctorEntry` freeze/thaw. These three are genuinely missing. The pieces all ship; the topology-over-functors wiring does not.
 
