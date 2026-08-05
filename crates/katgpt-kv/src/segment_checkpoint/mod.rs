@@ -102,14 +102,17 @@ impl SegmentStore {
 
     /// Get a segment checkpoint by ID. Increments access count.
     ///
-    /// Single hash lookup per map (was three: `contains_key` + `entry` + `get`).
+    /// Two hash lookups total (was three: `contains_key` + `get_mut` + `get`).
+    /// The `segments` probe doubles as the presence check, and the returned
+    /// reference is handed straight back — `segments` and `access_counts` are
+    /// disjoint fields so the immutable borrow of one coexists with the
+    /// mutable borrow of the other.
     pub fn get(&mut self, segment_id: u32) -> Option<&SegmentCheckpoint> {
-        if self.segments.contains_key(&segment_id)
-            && let Some(count) = self.access_counts.get_mut(&segment_id)
-        {
+        let checkpoint = self.segments.get(&segment_id)?;
+        if let Some(count) = self.access_counts.get_mut(&segment_id) {
             *count += 1;
         }
-        self.segments.get(&segment_id)
+        Some(checkpoint)
     }
 
     /// Get all segment summaries for γ gate computation.

@@ -64,8 +64,12 @@ pub fn entmax_1p5_into(
     }
 
     probs_buf[..n].fill(0.0);
+    // `0.5 * tau` is loop-invariant — hoisted out of the support loop. The
+    // multiply is performed exactly once with the same operands, so each `v`
+    // is bit-identical to the per-iteration form.
+    let half_tau = 0.5 * tau;
     for &(orig_idx, score) in sorted_buf.iter().take(support_size) {
-        let v = 0.5 * score - 0.5 * tau;
+        let v = 0.5 * score - half_tau;
         probs_buf[orig_idx] = v * v;
     }
 

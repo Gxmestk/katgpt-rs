@@ -395,20 +395,41 @@ impl SkillLifecyclePlayer {
             None => 0.0,
         };
 
+        // `SkillMemory::recent(n)` returns the last `min(n, total, capacity)`
+        // entries in chronological order, so the FAILURE_RECENT_K window is
+        // exactly the tail of the MEMORY_RECENT_K window. One snapshot therefore
+        // serves both, and neither branch materialises a `Vec<&MemoryEntry>` any
+        // more. `lifecycle_bonus` runs 8× per tick, so this drops 32 heap
+        // allocations per tick to 8 (or 0 before episode FAILURE_RECENT_K).
+        let need_trend = self.episode_count >= MEMORY_RECENT_K;
+        let need_failure = self.episode_count >= FAILURE_RECENT_K;
+        let recent = match need_trend || need_failure {
+            true => self
+                .memory
+                .recent(MEMORY_RECENT_K.max(FAILURE_RECENT_K)),
+            false => Vec::new(),
+        };
+
         // Memory trend bonus: compute slope of recent rewards for this arm
-        let trend_bonus = if self.episode_count >= MEMORY_RECENT_K {
-            let recent = self.memory.recent(MEMORY_RECENT_K);
-            let arm_entries: Vec<&MemoryEntry> = recent
-                .iter()
-                .filter(|e| e.arm as usize == arm_idx)
-                .collect();
-            if arm_entries.len() >= 3 {
-                let mid = arm_entries.len() / 2;
-                let first_half_mean: f32 =
-                    arm_entries[..mid].iter().map(|e| e.reward).sum::<f32>() / mid as f32;
-                let second_half_mean: f32 =
-                    arm_entries[mid..].iter().map(|e| e.reward).sum::<f32>()
-                        / (arm_entries.len() - mid) as f32;
+        let trend_bonus = if need_trend {
+            let window = &recent[recent.len().saturating_sub(MEMORY_RECENT_K)..];
+            let matches = window.iter().filter(|e| e.arm as usize == arm_idx);
+            let n = matches.clone().count();
+            if n >= 3 {
+                let mid = n / 2;
+                // Same chronological accumulation order as the old
+                // `arm_entries[..mid]` / `arm_entries[mid..]` sums, so the f32
+                // partial sums are bit-identical.
+                let mut first_sum = 0.0f32;
+                let mut second_sum = 0.0f32;
+                for (i, e) in matches.enumerate() {
+                    match i < mid {
+                        true => first_sum += e.reward,
+                        false => second_sum += e.reward,
+                    }
+                }
+                let first_half_mean: f32 = first_sum / mid as f32;
+                let second_half_mean: f32 = second_sum / (n - mid) as f32;
                 let trend = second_half_mean - first_half_mean;
                 trend * MEMORY_TREND_WEIGHT
             } else {
@@ -419,15 +440,18 @@ impl SkillLifecyclePlayer {
         };
 
         // Failure suppression: if recent entries show high failure rate, penalize
-        let failure_penalty = if self.episode_count >= FAILURE_RECENT_K {
-            let recent = self.memory.recent(FAILURE_RECENT_K);
-            let arm_entries: Vec<&MemoryEntry> = recent
-                .iter()
-                .filter(|e| e.arm as usize == arm_idx)
-                .collect();
-            if !arm_entries.is_empty() {
-                let failure_count = arm_entries.iter().filter(|e| e.is_failure).count();
-                let failure_ratio = failure_count as f32 / arm_entries.len() as f32;
+        let failure_penalty = if need_failure {
+            let window = &recent[recent.len().saturating_sub(FAILURE_RECENT_K)..];
+            let mut total = 0usize;
+            let mut failure_count = 0usize;
+            for e in window.iter().filter(|e| e.arm as usize == arm_idx) {
+                total += 1;
+                if e.is_failure {
+                    failure_count += 1;
+                }
+            }
+            if total > 0 {
+                let failure_ratio = failure_count as f32 / total as f32;
                 if failure_ratio > FAILURE_SUPPRESS_RATIO {
                     -2.0 * failure_ratio
                 } else {

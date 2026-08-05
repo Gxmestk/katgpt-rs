@@ -70,14 +70,28 @@ impl<'a> ComposedPruner<'a> {
 
 impl ConstraintPruner for ComposedPruner<'_> {
     fn is_valid(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
-        // Evaluate each sub-pruner
-        let mut atom_results = Vec::with_capacity(self.pruners.len());
-        for pruner in &self.pruners {
-            atom_results.push(pruner.is_valid(depth, token_idx, parent_tokens));
+        // Evaluate each sub-pruner into stack scratch. `is_valid` is called once
+        // per candidate token, so the old `Vec::with_capacity` was a per-token
+        // heap allocation; realistic compositions are a handful of pruners.
+        const STACK_ATOMS: usize = 32;
+        let n_p = self.pruners.len();
+        let mut stack_atoms = [false; STACK_ATOMS];
+        let mut heap_atoms: Vec<bool> = if n_p > STACK_ATOMS {
+            vec![false; n_p]
+        } else {
+            Vec::new()
+        };
+        let atom_results: &mut [bool] = if n_p > STACK_ATOMS {
+            &mut heap_atoms
+        } else {
+            &mut stack_atoms[..n_p]
+        };
+        for (slot, pruner) in atom_results.iter_mut().zip(self.pruners.iter()) {
+            *slot = pruner.is_valid(depth, token_idx, parent_tokens);
         }
 
         // Evaluate the expression tree
-        matches!(self.expr.eval(&atom_results), PrunerResult::Accept)
+        matches!(self.expr.eval(atom_results), PrunerResult::Accept)
     }
 
     fn batch_is_valid(
@@ -101,13 +115,25 @@ impl ConstraintPruner for ComposedPruner<'_> {
             pruner.batch_is_valid(depth, &candidates[..n], parent_tokens, row);
         }
 
-        // Reused atom-result row for one candidate at a time.
-        let mut atom_results = vec![false; n_p];
+        // Reused atom-result row for one candidate at a time — stack-resident
+        // for realistic pruner counts (removes one per-call heap allocation).
+        const STACK_ATOMS: usize = 32;
+        let mut stack_atoms = [false; STACK_ATOMS];
+        let mut heap_atoms: Vec<bool> = if n_p > STACK_ATOMS {
+            vec![false; n_p]
+        } else {
+            Vec::new()
+        };
+        let atom_results: &mut [bool] = if n_p > STACK_ATOMS {
+            &mut heap_atoms
+        } else {
+            &mut stack_atoms[..n_p]
+        };
         for i in 0..n {
             for pi in 0..n_p {
                 atom_results[pi] = atom_batch[pi * n + i];
             }
-            results[i] = matches!(self.expr.eval(&atom_results), PrunerResult::Accept);
+            results[i] = matches!(self.expr.eval(atom_results), PrunerResult::Accept);
         }
     }
 }

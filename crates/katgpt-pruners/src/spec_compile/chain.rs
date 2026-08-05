@@ -129,10 +129,29 @@ impl ConstraintPruner for SpecChain {
         // Initialize with first spec
         self.specs[0].batch_is_valid(depth, candidates, parent_tokens, results);
 
-        // Combine each subsequent spec
-        let mut buf = vec![false; len];
+        // Single-spec chain: nothing to combine, and no scratch needed.
+        if self.specs.len() < 2 {
+            return;
+        }
+
+        // Combine each subsequent spec. Small batches (the DDTree fanout case)
+        // use stack scratch, so the old per-call `vec![false; len]` heap
+        // allocation is gone from the per-token path.
+        const STACK_CAP: usize = 128;
+        let mut stack_buf = [false; STACK_CAP];
+        let mut heap_buf: Vec<bool> = if len > STACK_CAP {
+            vec![false; len]
+        } else {
+            Vec::new()
+        };
+        let buf: &mut [bool] = if len > STACK_CAP {
+            &mut heap_buf
+        } else {
+            &mut stack_buf[..len]
+        };
+
         for (i, spec) in self.specs.iter().skip(1).enumerate() {
-            spec.batch_is_valid(depth, candidates, parent_tokens, &mut buf);
+            spec.batch_is_valid(depth, candidates, parent_tokens, &mut *buf);
             match self.ops[i] {
                 ChainOp::And => {
                     for j in 0..len {

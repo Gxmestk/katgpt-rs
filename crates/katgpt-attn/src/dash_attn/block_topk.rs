@@ -131,18 +131,24 @@ impl VortexFlow for BlockTopKRouter {
             let mut dot1 = 0.0f32;
             let mut dot2 = 0.0f32;
             let mut dot3 = 0.0f32;
-            let chunks = hd / 4;
-            for c in 0..chunks {
-                let base = c * 4;
-                dot0 += query[base] * centroid[base];
-                dot1 += query[base + 1] * centroid[base + 1];
-                dot2 += query[base + 2] * centroid[base + 2];
-                dot3 += query[base + 3] * centroid[base + 3];
+            // `chunks_exact(4)` over pre-sliced rows: each yielded slice has a
+            // statically known length of 4, so the 8 per-iteration bounds
+            // checks collapse. The four lane accumulators receive their addends
+            // in exactly the same order as the index form and the tail covers
+            // the same `main..hd` range → bit-identical.
+            let main = (hd / 4) * 4;
+            for (q_c, c_c) in query[..main]
+                .chunks_exact(4)
+                .zip(centroid[..main].chunks_exact(4))
+            {
+                dot0 += q_c[0] * c_c[0];
+                dot1 += q_c[1] * c_c[1];
+                dot2 += q_c[2] * c_c[2];
+                dot3 += q_c[3] * c_c[3];
             }
             let mut dot = dot0 + dot1 + dot2 + dot3;
-            let rem = hd % 4;
-            for d in (hd - rem)..hd {
-                dot += query[d] * centroid[d];
+            for (&q_d, &c_d) in query[main..hd].iter().zip(centroid[main..hd].iter()) {
+                dot += q_d * c_d;
             }
             *score = dot * scale;
         }
@@ -725,18 +731,24 @@ impl VortexFlow for PerGroupTopKRouter {
             let mut dot1 = 0.0f32;
             let mut dot2 = 0.0f32;
             let mut dot3 = 0.0f32;
-            let chunks = hd / 4;
-            for c in 0..chunks {
-                let base = c * 4;
-                dot0 += query[base] * centroid[base];
-                dot1 += query[base + 1] * centroid[base + 1];
-                dot2 += query[base + 2] * centroid[base + 2];
-                dot3 += query[base + 3] * centroid[base + 3];
+            // `chunks_exact(4)` over pre-sliced rows: each yielded slice has a
+            // statically known length of 4, so the 8 per-iteration bounds
+            // checks collapse. The four lane accumulators receive their addends
+            // in exactly the same order as the index form and the tail covers
+            // the same `main..hd` range → bit-identical.
+            let main = (hd / 4) * 4;
+            for (q_c, c_c) in query[..main]
+                .chunks_exact(4)
+                .zip(centroid[..main].chunks_exact(4))
+            {
+                dot0 += q_c[0] * c_c[0];
+                dot1 += q_c[1] * c_c[1];
+                dot2 += q_c[2] * c_c[2];
+                dot3 += q_c[3] * c_c[3];
             }
             let mut dot = dot0 + dot1 + dot2 + dot3;
-            let rem = hd % 4;
-            for d in (hd - rem)..hd {
-                dot += query[d] * centroid[d];
+            for (&q_d, &c_d) in query[main..hd].iter().zip(centroid[main..hd].iter()) {
+                dot += q_d * c_d;
             }
             *score = dot * scale;
         }

@@ -132,12 +132,17 @@ pub fn encode_vector_into(
 ) {
     out.clear();
     out.reserve(triplets.len());
-    for t in triplets {
-        out.push(if use_joint_rounding {
-            encode_triplet_joint(t, codebook)
-        } else {
-            encode_triplet_simple(t, codebook)
-        });
+    // Loop-unswitch on the invariant `use_joint_rounding` flag: the branch was
+    // re-tested for every triplet on the per-token store path. Same call per
+    // triplet, same order, so the output is identical.
+    if use_joint_rounding {
+        for t in triplets {
+            out.push(encode_triplet_joint(t, codebook));
+        }
+    } else {
+        for t in triplets {
+            out.push(encode_triplet_simple(t, codebook));
+        }
     }
 }
 
@@ -169,12 +174,14 @@ pub fn decode_vector(indices: &[TripletIndices], codebook: &OctopusCodebook) -> 
 ///
 /// Writes exactly `indices.len() * 3` elements.
 pub fn decode_vector_into(indices: &[TripletIndices], codebook: &OctopusCodebook, out: &mut [f32]) {
-    for (i, idx) in indices.iter().enumerate() {
-        let v = decode_triplet(idx, codebook);
-        let base = i * 3;
-        out[base] = v[0];
-        out[base + 1] = v[1];
-        out[base + 2] = v[2];
+    // `chunks_exact_mut(3)` walks the same 3-element windows but hoists the
+    // three per-triplet bounds checks out of the loop. The `[..indices.len()*3]`
+    // slice keeps the original panic-on-short-`out` behaviour.
+    for (chunk, idx) in out[..indices.len() * 3]
+        .chunks_exact_mut(3)
+        .zip(indices.iter())
+    {
+        chunk.copy_from_slice(&decode_triplet(idx, codebook));
     }
 }
 

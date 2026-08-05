@@ -378,10 +378,12 @@ impl BomberPlayer for TftPlayer {
         }
 
         // 3. Score actions based on current mode
-        let bomb_positions: std::collections::HashSet<(i32, i32)> =
-            self.known_bombs.iter().map(|(p, _, _)| *p).collect();
-
         let mut scores: [(BomberAction, f32); ACTION_COUNT] = ALL_ACTIONS.map(|a| (a, 0.0));
+
+        // Loop-invariant: `in_blast_zone` is pure and none of its arguments change
+        // inside the loop, so hoisting turns 7 wall-aware blast scans per tick
+        // into 1.
+        let in_danger = in_blast_zone(pos, grid, &self.known_bombs);
 
         for (i, action) in ALL_ACTIONS.iter().enumerate() {
             let h = score_action(
@@ -411,7 +413,6 @@ impl BomberPlayer for TftPlayer {
 
             // Strategy bonus: only in Retaliatory mode AND not in immediate danger.
             // When in blast zone, even Retaliatory TFT must flee first — hunt later.
-            let in_danger = in_blast_zone(pos, grid, &self.known_bombs);
             let strategy_bonus = match (self.mode, in_danger) {
                 (TftMode::Retaliatory { .. }, false) => {
                     Self::retaliation_bonus(action, grid, pos, nearest_opponent, predicted_opponent)
@@ -436,8 +437,14 @@ impl BomberPlayer for TftPlayer {
                         | BomberAction::Left
                         | BomberAction::Right => {
                             let target = move_target(&action, pos);
+                            // Linear scan over `known_bombs` (typically < 8)
+                            // instead of building a per-tick `HashSet` whose only
+                            // use was this one lookup on the 10% explore branch.
                             grid.is_walkable(target.x, target.y)
-                                && !bomb_positions.contains(&(target.x, target.y))
+                                && !self
+                                    .known_bombs
+                                    .iter()
+                                    .any(|(p, _, _)| *p == (target.x, target.y))
                                 && !in_blast_zone(target, grid, &self.known_bombs)
                         }
                         _ => false, // Don't randomly explore Bomb/Wait

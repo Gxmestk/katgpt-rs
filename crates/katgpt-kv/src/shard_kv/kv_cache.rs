@@ -556,14 +556,31 @@ impl ShardKVCache {
             let gs = cb.group_size;
             let n_groups = self.kv_dim / gs;
 
+            // Nearest-centroid search — the hottest loop on the prefill V path
+            // (n_groups × codebook_size × gs). Pre-slicing the group and walking
+            // the centroid table with `chunks_exact(gs)` hoists both per-element
+            // bounds checks out of the innermost loop and lets LLVM vectorize
+            // it. `centroids.len() == codebook_size * gs` by construction, so
+            // the chunk count is exactly `codebook_size`.
+            //
+            // The squared-distance accumulation still walks `d` in ascending
+            // order and `c` in ascending order, so `dist` is summed in the same
+            // sequence and the strict `<` comparison picks the same winner —
+            // bit-identical output.
             for g in 0..n_groups {
                 let base = g * gs;
+                let group = &self.scratch_normalized[base..base + gs];
                 let mut best_dist = f32::MAX;
                 let mut best_idx = 0u8;
-                for c in 0..cb.codebook_size {
+                for (c, centroid) in cb
+                    .centroids
+                    .chunks_exact(gs)
+                    .take(cb.codebook_size)
+                    .enumerate()
+                {
                     let mut dist = 0.0f32;
-                    for d in 0..gs {
-                        let diff = self.scratch_normalized[base + d] - cb.centroids[c * gs + d];
+                    for (&x, &m) in group.iter().zip(centroid) {
+                        let diff = x - m;
                         dist += diff * diff;
                     }
                     if dist < best_dist {

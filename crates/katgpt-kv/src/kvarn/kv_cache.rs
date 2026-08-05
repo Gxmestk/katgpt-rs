@@ -1143,10 +1143,10 @@ pub fn rtn_quantize_rows_into(
     // Initialise the scales/zps prefixes to the defaults the allocating
     // wrapper used (scales=1.0, zps=0.0) so the degenerate-row early-continue
     // path produces bit-identical TileMeta contents.
-    for r in 0..rows {
-        scales[r] = 1.0;
-        zps[r] = 0.0;
-    }
+    // `fill` on the exact prefix lowers to a memset instead of a scalar store
+    // loop; the written values are the same constants.
+    scales[..rows].fill(1.0);
+    zps[..rows].fill(0.0);
     for r in 0..rows {
         let row_off = r * cols;
         let row = &tile[row_off..row_off + cols];
@@ -1174,10 +1174,16 @@ pub fn rtn_quantize_rows_into(
         // so the hot inner loop becomes a single `mul_add` + round, no division.
         let inv_scale = 1.0 / scale;
         let bias = -lo * inv_scale;
+        // Hoist the row slice out of the per-element loop: the `packed[r*bpr..]`
+        // range slice (and its bounds check) was rebuilt for every element.
+        // The open-ended range is kept verbatim — `pack_value` consults
+        // `row.len()` for its write guards, so shortening the slice to exactly
+        // `bpr` would change behaviour on the final element of a row.
+        let prow = &mut packed[r * bpr..];
         for (c, &v) in row.iter().enumerate() {
             let normalized = v.mul_add(inv_scale, bias);
             let q = (normalized.round() as u32).clamp(0, levels - 1);
-            pack_value(&mut packed[r * bpr..], c, q, bits as usize);
+            pack_value(prow, c, q, bits as usize);
         }
     }
 }
@@ -1239,22 +1245,28 @@ pub fn rtn_quantize_rows_grouped_into(
     // wrapper used (scales=1.0, zps=0.0) so the degenerate-group early-continue
     // path produces bit-identical TileMeta contents.
     let total_entries = rows * groups_per_row;
-    for idx in 0..total_entries {
-        scales[idx] = 1.0;
-        zps[idx] = 0.0;
-    }
+    // `fill` on the exact prefix lowers to a memset instead of a scalar store
+    // loop; the written values are the same constants.
+    scales[..total_entries].fill(1.0);
+    zps[..total_entries].fill(0.0);
 
     for r in 0..rows {
         let row_off = r * cols;
+        // Pre-slice the row and the packed row once per row so the per-element
+        // bounds checks below hoist out of the innermost loops.
+        let row = &tile[row_off..row_off + cols];
+        // Open-ended range kept verbatim — `pack_value` consults `row.len()`
+        // for its write guards, so shortening to `bpr` would change behaviour.
+        let prow = &mut packed[r * bpr..];
         for g in 0..groups_per_row {
             let g_start = g * group_size;
             let g_end = (g_start + group_size).min(cols);
+            let group = &row[g_start..g_end];
 
-            // Find min/max within this group
+            // Find min/max within this group — same element order as before.
             let mut lo = f32::MAX;
             let mut hi = f32::MIN;
-            for c in g_start..g_end {
-                let v = tile[row_off + c];
+            for &v in group {
                 lo = lo.min(v);
                 hi = hi.max(v);
             }
@@ -1273,11 +1285,10 @@ pub fn rtn_quantize_rows_grouped_into(
             // Quantize and pack elements in this group — single mul_add per element.
             let inv_scale = 1.0 / scale;
             let bias = -lo * inv_scale;
-            for c in g_start..g_end {
-                let v = tile[row_off + c];
+            for (c, &v) in (g_start..g_end).zip(group) {
                 let normalized = v.mul_add(inv_scale, bias);
                 let q = (normalized.round() as u32).clamp(0, levels - 1);
-                pack_value(&mut packed[r * bpr..], c, q, bits as usize);
+                pack_value(&mut *prow, c, q, bits as usize);
             }
         }
     }

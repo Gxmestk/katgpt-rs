@@ -108,13 +108,16 @@ impl ConstraintPruner for CompiledSpec {
                 }
             }
             None => {
-                // No applicable rule — check global sets, then default allow
+                // No applicable rule — check global sets, then default allow.
+                // `global_allowed.is_empty()` does not depend on the candidate,
+                // so hoist it out of the per-candidate loop.
                 let len = candidates.len().min(results.len());
+                let has_global_allowlist = !self.global_allowed.is_empty();
                 for i in 0..len {
                     let idx = candidates[i];
                     if self.global_blocked.contains(idx) {
                         results[i] = false;
-                    } else if !self.global_allowed.is_empty() {
+                    } else if has_global_allowlist {
                         results[i] = self.global_allowed.contains(idx);
                     } else {
                         results[i] = true;

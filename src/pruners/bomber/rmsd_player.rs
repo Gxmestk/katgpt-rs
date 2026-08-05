@@ -439,12 +439,15 @@ impl BomberPlayer for RmsdPlayer {
                         f32::NEG_INFINITY
                     } else {
                         let mut s = 1.0;
-                        if let Some(pu) = self
+                        // One pass: `min_by_key` walked the list to find the
+                        // nearest power-up, then the distance it had already
+                        // computed was re-derived. Integer min ⇒ same value.
+                        if let Some(dist) = self
                             .known_powerups
                             .iter()
-                            .min_by_key(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .map(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .min()
                         {
-                            let dist = (target.x - pu.0).abs() + (target.y - pu.1).abs();
                             s += 0.5 / (dist as f32 + 1.0);
                         }
                         let min_bomb_dist = bomb_positions
@@ -506,12 +509,12 @@ impl BomberPlayer for RmsdPlayer {
         let danger = danger_level(pos, grid, &self.known_bombs);
         let reward = compute_sdar_reward(self.alive, danger, self.powerups_collected);
 
-        // 7. RMSD filtering: determine which actions get updates
-        //    Teacher = hinted_scores, Student = q_values
-        let hinted_vec: Vec<f32> = hinted_scores.to_vec();
-        let q_vec: Vec<f32> = self.q_values.to_vec();
-        let (_selected_actions, _rmsd_metrics) =
-            self.rmsd_filter.filter_actions(&hinted_vec, &q_vec);
+        // 7. RMSD filtering happens in `distill_step` (line ~334), which is where
+        //    the selected-action mask is actually consumed. The call that used to
+        //    sit here discarded both return values, and `filter_actions` takes
+        //    `&self` on a two-`usize` struct with no interior mutability — so it
+        //    was provably dead work: 2 `to_vec()`s plus, inside the callee, four
+        //    more `Vec`s, a sort, and an O(n²) membership scan, every tick.
 
         // Feed scalar reward to SDAR components — same as SdarPlayer
         self.sdar_bandit.update(template_id, reward);
@@ -570,7 +573,10 @@ impl BomberPlayer for RmsdPlayer {
                     }
                 }
                 BomberAction::Wait => {
-                    if in_blast_zone(pos, grid, &self.known_bombs) {
+                    // Identical arguments to `currently_in_blast` above and
+                    // `in_blast_zone` is pure — reuse instead of re-walking every
+                    // bomb's wall-aware blast ray a second time each tick.
+                    if currently_in_blast {
                         final_scores[i] = f32::NEG_INFINITY;
                     }
                 }

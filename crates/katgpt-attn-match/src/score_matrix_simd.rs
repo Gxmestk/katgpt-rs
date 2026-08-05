@@ -125,9 +125,15 @@ pub fn dot_8wide(a: &[f32], b: &[f32], d: usize) -> f32 {
     // Simple loop — LLVM auto-vectorizes this to optimal SIMD FMA on every
     // target we ship (NEON, AVX2). The single accumulator maps to one SIMD
     // register; the final reduction is a single horizontal add.
+    //
+    // The lengths are only `debug_assert`ed, so in release builds `a[k]`/`b[k]`
+    // carried per-element bounds checks against unknown slice lengths. Slicing
+    // the `..d` prefixes up front turns those `2·d` checks into two range checks
+    // outside the loop, leaving a clean unguarded FMA chain for the vectorizer.
+    // Same k order, same single accumulator → bit-identical.
     let mut dot = 0.0f32;
-    for k in 0..d {
-        dot += a[k] * b[k];
+    for (&x, &y) in a[..d].iter().zip(b[..d].iter()) {
+        dot += x * y;
     }
     dot
 }

@@ -190,21 +190,41 @@ fn mean_of_remaining(logits: &[f32], peaks: &[(usize, f32)]) -> f32 {
         return f32::NEG_INFINITY;
     }
 
-    let peak_set: Vec<bool> = {
-        let mut s = vec![false; full_len];
-        for &(idx, _) in peaks {
-            if idx < full_len {
-                s[idx] = true;
-            }
+    // Old form built a `vec![false; logits.len()]` bitmap on every call — a
+    // vocab-sized heap allocation per candidate. `peaks` is only `span_k`
+    // entries, so instead sort the (tiny) peak index list and walk `logits`
+    // once with a cursor into it. Same ascending index order and same skipped
+    // set (out-of-range indices never match; duplicates collapse), so the f32
+    // accumulation order — and therefore the result bit pattern — is unchanged.
+    const STACK_PEAKS: usize = 64;
+    let n_peaks = peaks.len();
+    let mut stack_idx = [0usize; STACK_PEAKS];
+    let mut heap_idx: Vec<usize> = Vec::new();
+    let peak_idx: &mut [usize] = if n_peaks > STACK_PEAKS {
+        heap_idx.reserve(n_peaks);
+        heap_idx.extend(peaks.iter().map(|&(i, _)| i));
+        heap_idx.as_mut_slice()
+    } else {
+        for (slot, &(i, _)) in stack_idx[..n_peaks].iter_mut().zip(peaks) {
+            *slot = i;
         }
-        s
+        &mut stack_idx[..n_peaks]
     };
+    peak_idx.sort_unstable();
 
-    let (sum, count) = logits
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| !peak_set[*i])
-        .fold((0.0f32, 0usize), |(s, c), (_, &v)| (s + v, c + 1));
+    let mut sum = 0.0f32;
+    let mut count = 0usize;
+    let mut p = 0usize;
+    for (i, &v) in logits.iter().enumerate() {
+        while p < peak_idx.len() && peak_idx[p] < i {
+            p += 1;
+        }
+        if p < peak_idx.len() && peak_idx[p] == i {
+            continue;
+        }
+        sum += v;
+        count += 1;
+    }
 
     if count == 0 {
         f32::NEG_INFINITY

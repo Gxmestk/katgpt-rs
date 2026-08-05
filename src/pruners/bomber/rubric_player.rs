@@ -430,12 +430,15 @@ impl BomberPlayer for RubricPlayer {
                         f32::NEG_INFINITY
                     } else {
                         let mut s = 1.0;
-                        if let Some(pu) = self
+                        // One pass: `min_by_key` walked the list to find the
+                        // nearest power-up, then the distance it had already
+                        // computed was re-derived. Integer min ⇒ same value.
+                        if let Some(dist) = self
                             .known_powerups
                             .iter()
-                            .min_by_key(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .map(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .min()
                         {
-                            let dist = (target.x - pu.0).abs() + (target.y - pu.1).abs();
                             s += 0.5 / (dist as f32 + 1.0);
                         }
                         let min_bomb_dist = bomb_positions
@@ -557,7 +560,10 @@ impl BomberPlayer for RubricPlayer {
                     }
                 }
                 BomberAction::Wait => {
-                    if in_blast_zone(pos, grid, &self.known_bombs) {
+                    // Identical arguments to `currently_in_blast` above and
+                    // `in_blast_zone` is pure — reuse instead of re-walking every
+                    // bomb's wall-aware blast ray a second time each tick.
+                    if currently_in_blast {
                         final_scores[i] = f32::NEG_INFINITY;
                     }
                 }

@@ -549,18 +549,25 @@ pub fn evaluate_validator(candidate: &ValidatorCandidate, rounds: u32) -> ArenaE
         }
 
         let mut round_events: Vec<GameEvent> = Vec::new();
+        // Reused across ticks: `clear()` + `extend` instead of a fresh `Vec` per tick.
+        let mut tick_events: Vec<GameEvent> = Vec::new();
         let mut last_approved: Option<BomberAction> = None;
-        let mut last_safe_actions: Vec<BomberAction> = Vec::new();
+        // Bit `i` set ⇔ `BomberAction::all()[i]` was safe. `BomberAction::all()[i]
+        // .as_usize() == i`, so expanding the mask in index order reproduces the
+        // old `Vec<BomberAction>` exactly — but without a heap allocation per tick
+        // for a value that is only read on the (rare) death path.
+        let mut last_safe_mask: u8 = 0;
         let mut rule_player_died = false;
         let mut death_tick = 0u32;
 
         // Run tick loop
         for _tick in 0..EVAL_TICK_LIMIT {
             // Drain events from previous tick
-            let tick_events: Vec<GameEvent> = {
+            {
                 let mut event_reader = world.resource_mut::<bevy_ecs::event::Events<GameEvent>>();
-                event_reader.drain().collect()
-            };
+                tick_events.clear();
+                tick_events.extend(event_reader.drain());
+            }
             round_events.extend(tick_events.iter().cloned());
 
             // Check if rule player died in previous tick
@@ -595,11 +602,12 @@ pub fn evaluate_validator(candidate: &ValidatorCandidate, rounds: u32) -> ArenaE
 
                 // C4: Capture state for failure trace extraction
                 last_approved = Some(action);
-                last_safe_actions = BomberAction::all()
-                    .iter()
-                    .filter(|a| is_safe_action(a, grid, pos0, rule_player.known_bombs()))
-                    .copied()
-                    .collect();
+                last_safe_mask = 0;
+                for (bit, a) in BomberAction::all().iter().enumerate() {
+                    if is_safe_action(a, grid, pos0, rule_player.known_bombs()) {
+                        last_safe_mask |= 1 << bit;
+                    }
+                }
 
                 actions[0] = Some(action);
             }
@@ -625,7 +633,8 @@ pub fn evaluate_validator(candidate: &ValidatorCandidate, rounds: u32) -> ArenaE
         // Drain remaining events
         {
             let mut event_reader = world.resource_mut::<bevy_ecs::event::Events<GameEvent>>();
-            round_events.extend(event_reader.drain().collect::<Vec<GameEvent>>());
+            // `drain()` is already an iterator — the intermediate `Vec` was waste.
+            round_events.extend(event_reader.drain());
         }
 
         // Compute round metrics from events
@@ -649,9 +658,8 @@ pub fn evaluate_validator(candidate: &ValidatorCandidate, rounds: u32) -> ArenaE
                                 round,
                                 death_tick,
                                 approved_action: approved.as_usize() as u8,
-                                safe_actions: last_safe_actions
-                                    .iter()
-                                    .map(|a| a.as_usize() as u8)
+                                safe_actions: (0u8..BomberAction::all().len() as u8)
+                                    .filter(|bit| last_safe_mask & (1 << bit) != 0)
                                     .collect(),
                             });
                         }

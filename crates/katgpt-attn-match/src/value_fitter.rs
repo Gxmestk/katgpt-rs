@@ -80,13 +80,19 @@ pub fn fit_cv_least_squares(
         let y_row = &y[i * d..(i + 1) * d];
         for j in 0..t {
             let x_ij = x_row[j];
+            // Pre-slice the accumulator rows so the per-element bounds checks
+            // hoist out of the inner loops (and the FMA chains auto-vectorize).
+            // The k-walk order is unchanged for both accumulators, so every
+            // partial sum is formed in the same order → bit-identical.
             // X^T Y: full column (all d dims needed downstream).
-            for k in 0..d {
-                xty[j * d + k] += x_ij * y_row[k];
+            let xty_row = &mut xty[j * d..(j + 1) * d];
+            for (acc, &y_k) in xty_row.iter_mut().zip(y_row.iter()) {
+                *acc += x_ij * y_k;
             }
             // X^T X: lower triangle only (k <= j).
-            for k in 0..=j {
-                xtx[j * t + k] += x_ij * x_row[k];
+            let xtx_row = &mut xtx[j * t..j * t + j + 1];
+            for (acc, &x_k) in xtx_row.iter_mut().zip(x_row.iter()) {
+                *acc += x_ij * x_k;
             }
         }
     }
@@ -183,8 +189,11 @@ fn solve_cholesky_multi_rhs(l: &[f32], rhs: &[f32], t: usize, d: usize) -> Vec<f
         // Forward: L z = rhs[:, col]
         for j in 0..t {
             let mut s = rhs[j * d + col];
-            for k in 0..j {
-                s -= l[j * t + k] * z[k];
+            // Pre-sliced row + zip: same k order (0..j), same subtraction
+            // sequence → bit-identical, but no per-element bounds check.
+            let l_row = &l[j * t..j * t + j];
+            for (&l_jk, &z_k) in l_row.iter().zip(z[..j].iter()) {
+                s -= l_jk * z_k;
             }
             z[j] = s * inv_diag[j];
         }
@@ -285,8 +294,8 @@ fn cholesky_decompose_unblocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
         // Diagonal: sum = a[j,j] − Σ_k l[j,k]². Sequential scalar subtraction —
         // see the doc comment above for why this is NOT dot_8wide.
         let mut sum = a[j * t + j];
-        for k in 0..j {
-            sum -= l[j * t + k] * l[j * t + k];
+        for &l_jk in &l[j * t..j * t + j] {
+            sum -= l_jk * l_jk;
         }
         if sum <= 0.0 {
             return None;
@@ -294,12 +303,20 @@ fn cholesky_decompose_unblocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
         let diag = sum.sqrt();
         l[j * t + j] = diag;
         // Off-diagonal: l[i,j] = (a[i,j] − Σ_k l[i,k]·l[j,k]) / diag.
-        for i in (j + 1)..t {
+        // `split_at_mut((j+1)*t)` separates the read-only j-th row from the
+        // mutable i>j rows so both can be pre-sliced; `chunks_exact_mut(t)`
+        // then walks rows j+1.. with the row-length bound known to LLVM.
+        // Same scalar k-order (0..j) and same subtraction sequence as before
+        // → bit-identical (critical here, see the doc comment above).
+        let (l_head, l_tail) = l.split_at_mut((j + 1) * t);
+        let l_j = &l_head[j * t..j * t + j];
+        for (i_off, l_i) in l_tail.chunks_exact_mut(t).enumerate() {
+            let i = j + 1 + i_off;
             let mut s = a[i * t + j];
-            for k in 0..j {
-                s -= l[i * t + k] * l[j * t + k];
+            for (&l_ik, &l_jk) in l_i[..j].iter().zip(l_j.iter()) {
+                s -= l_ik * l_jk;
             }
-            l[i * t + j] = s / diag;
+            l_i[j] = s / diag;
         }
     }
     Some(l)
@@ -337,17 +354,17 @@ fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
     while k < t {
         let bk = bs.min(t - k);
         // 1. Extract and factorize the diagonal block A[k:k+bk, k:k+bk].
+        // Row-contiguous block copies: `copy_from_slice` lowers to a memcpy
+        // instead of `bk` bounds-checked scalar loads/stores per row.
         for i in 0..bk {
-            for j in 0..bk {
-                diag_block[i * bk + j] = a_red[(k + i) * t + (k + j)];
-            }
+            let src = &a_red[(k + i) * t + k..(k + i) * t + k + bk];
+            diag_block[i * bk..i * bk + bk].copy_from_slice(src);
         }
         let diag_l = cholesky_decompose_unblocked(&diag_block[..bk * bk], bk)?;
-        // Write lower-triangular result into L.
+        // Write lower-triangular result into L (row `i` holds `i+1` live cells).
         for i in 0..bk {
-            for j in 0..=i {
-                l[(k + i) * t + (k + j)] = diag_l[i * bk + j];
-            }
+            let src = &diag_l[i * bk..i * bk + i + 1];
+            l[(k + i) * t + k..(k + i) * t + k + i + 1].copy_from_slice(src);
         }
 
         // 2. Off-diagonal strip L[k+bk:, k:k+bk] via forward substitution.
@@ -360,12 +377,16 @@ fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
         if n_strip > 0 {
             for i in 0..n_strip {
                 let row = k + bk + i;
+                // Pre-slice the live `bk` cells of this strip row once per row
+                // instead of recomputing `row * t + (k + p)` per element.
+                let l_row = &mut l[row * t + k..row * t + k + bk];
                 for col in 0..bk {
                     let mut s = a_red[row * t + (k + col)];
-                    for p in 0..col {
-                        s -= l[row * t + (k + p)] * diag_l[col * bk + p];
+                    let dl_row = &diag_l[col * bk..col * bk + col];
+                    for (&l_p, &dl_p) in l_row[..col].iter().zip(dl_row.iter()) {
+                        s -= l_p * dl_p;
                     }
-                    l[row * t + (k + col)] = s / diag_l[col * bk + col];
+                    l_row[col] = s / diag_l[col * bk + col];
                 }
             }
 
@@ -375,11 +396,16 @@ fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
             //    stability rationale as the strip solve above.
             for i in 0..n_strip {
                 let row_i = k + bk + i;
+                // Hoist the i-row slice out of the j loop; both strip rows are
+                // contiguous `bk`-length runs. Same p-order accumulation as
+                // before → bit-identical.
+                let l_i = &l[row_i * t + k..row_i * t + k + bk];
                 for j in 0..=i {
                     let row_j = k + bk + j;
+                    let l_j = &l[row_j * t + k..row_j * t + k + bk];
                     let mut dot = 0.0f32;
-                    for p in 0..bk {
-                        dot += l[row_i * t + (k + p)] * l[row_j * t + (k + p)];
+                    for (&a_p, &b_p) in l_i.iter().zip(l_j.iter()) {
+                        dot += a_p * b_p;
                     }
                     a_red[row_i * t + row_j] -= dot;
                     a_red[row_j * t + row_i] = a_red[row_i * t + row_j];

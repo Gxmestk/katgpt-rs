@@ -40,16 +40,32 @@ use katgpt_core::ScreeningPruner;
 ///
 /// - `observe()`: O(n_embd) copy, amortized O(1) push with capacity pre-allocated
 /// - `flatness()`: O(n_embd), two accumulators (L2², L4), branch-free inner loop
-/// - `effective_rank()`: O(n_embd * buffer_len) for diagonal covariance
-/// - `relevance()`: O(1) after effective_rank, single sigmoid
+/// - `effective_rank()`: O(1) — recomputed once per `observe()`, then cached
+/// - `relevance()`: O(1), a cache read plus a single sigmoid
 pub struct BeliefRankPruner {
     /// Recent hidden states buffer [max_buffer_len][n_embd].
     hidden_buffer: Vec<Vec<f32>>,
+    /// Scratch for the per-observation covariance mean row (reused).
+    mean_scratch: Vec<f32>,
+    /// Scratch for the per-observation covariance variance row (reused).
+    var_scratch: Vec<f32>,
     /// Maximum number of hidden states to keep in buffer.
     max_buffer_len: usize,
     /// Flatness threshold above which to reject drafts.
     /// Range [0, 1]. Default: 0.7 (reject when >70% flat = high uncertainty).
     reject_threshold: f32,
+    /// Cached effective rank of the current buffer.
+    ///
+    /// `relevance()` is called once per candidate token but the rank depends
+    /// only on `hidden_buffer` / `initialized`, both of which are written
+    /// **exclusively** by [`Self::observe`] (verified: no other `&mut self`
+    /// method touches them). Recomputing it there instead of on every
+    /// `relevance()` turns an O(n_embd · buffer_len) scan plus two n_embd-sized
+    /// allocations per candidate into an O(1) field read. The stored value is
+    /// produced by the unchanged covariance code at exactly the buffer state a
+    /// subsequent `relevance()` would have seen, so the float result is
+    /// identical.
+    cached_rank: f32,
     /// Number of hidden state dimensions (n_embd).
     n_embd: usize,
     /// Whether the pruner has seen at least one hidden state.
@@ -65,8 +81,13 @@ impl BeliefRankPruner {
     pub fn new(n_embd: usize, max_buffer_len: usize, reject_threshold: f32) -> Self {
         Self {
             hidden_buffer: Vec::with_capacity(max_buffer_len),
+            mean_scratch: Vec::new(),
+            var_scratch: Vec::new(),
             max_buffer_len,
             reject_threshold,
+            // Matches the "unknown → neutral" value `effective_rank` returns
+            // before the first observation.
+            cached_rank: 0.5,
             n_embd,
             initialized: false,
         }
@@ -80,11 +101,30 @@ impl BeliefRankPruner {
             return;
         }
 
-        self.hidden_buffer.push(h.to_vec());
-        if self.hidden_buffer.len() > self.max_buffer_len {
-            self.hidden_buffer.remove(0);
+        if self.max_buffer_len > 0 && self.hidden_buffer.len() == self.max_buffer_len {
+            // Steady state: recycle the evicted front row's allocation instead
+            // of freeing it and allocating a fresh `h.to_vec()`. Ordering is
+            // preserved (front removed, new row appended) — identical to
+            // "push then remove(0)" — so the covariance loops below still see
+            // the same element order and the same float accumulation order.
+            let mut recycled = self.hidden_buffer.remove(0);
+            recycled.clear();
+            recycled.extend_from_slice(h);
+            self.hidden_buffer.push(recycled);
+        } else {
+            self.hidden_buffer.push(h.to_vec());
+            if self.hidden_buffer.len() > self.max_buffer_len {
+                self.hidden_buffer.remove(0);
+            }
         }
         self.initialized = true;
+
+        // Refresh the cache once per observation (see `cached_rank`).
+        let mut mean = std::mem::take(&mut self.mean_scratch);
+        let mut var = std::mem::take(&mut self.var_scratch);
+        self.cached_rank = self.compute_effective_rank(&mut mean, &mut var);
+        self.mean_scratch = mean;
+        self.var_scratch = var;
     }
 
     /// Compute the flatness score of a single hidden state vector.
@@ -126,7 +166,19 @@ impl BeliefRankPruner {
     /// Returns value in [0, 1]:
     /// - 0.0 = low rank (confident, peaked)
     /// - 1.0 = high rank (uncertain, flat/diverse)
+    #[inline]
     pub fn effective_rank(&self) -> f32 {
+        // O(1): kept fresh by `observe`, the only writer of the inputs.
+        self.cached_rank
+    }
+
+    /// The covariance/participation-ratio computation behind
+    /// [`Self::effective_rank`]. Called once per [`Self::observe`].
+    ///
+    /// `mean` / `var` are caller-owned scratch (reused across observations, so
+    /// the two `vec![0.0f32; n]` allocations are gone); `clear()` + `resize` to
+    /// zero reproduces the old fresh-zeroed vectors exactly.
+    fn compute_effective_rank(&self, mean: &mut Vec<f32>, var: &mut Vec<f32>) -> f32 {
         match (self.initialized, self.hidden_buffer.is_empty()) {
             (false, _) | (true, true) => return 0.5, // Unknown → neutral
             (true, false) => {}
@@ -141,18 +193,20 @@ impl BeliefRankPruner {
         let n = self.n_embd;
 
         // Compute mean of buffer
-        let mut mean = vec![0.0f32; n];
+        mean.clear();
+        mean.resize(n, 0.0f32);
         for h in &self.hidden_buffer {
             for i in 0..n {
                 mean[i] += h[i];
             }
         }
-        for m in &mut mean {
+        for m in mean.iter_mut() {
             *m /= k as f32;
         }
 
         // Compute diagonal of covariance: var[i] = Σ (h[j][i] - mean[i])² / (k-1)
-        let mut var = vec![0.0f32; n];
+        var.clear();
+        var.resize(n, 0.0f32);
         for h in &self.hidden_buffer {
             for i in 0..n {
                 let d = h[i] - mean[i];
@@ -160,14 +214,14 @@ impl BeliefRankPruner {
             }
         }
         let denom = (k - 1).max(1) as f32;
-        for v in &mut var {
+        for v in var.iter_mut() {
             *v /= denom;
         }
 
         // Participation ratio: (Σ var²)² / (n * Σ var⁴)
         let mut l2_sq: f32 = 0.0;
         let mut l4: f32 = 0.0;
-        for &x in &var {
+        for &x in var.iter() {
             let x2 = x * x;
             l2_sq += x2;
             l4 += x2 * x2;

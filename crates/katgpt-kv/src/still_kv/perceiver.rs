@@ -147,16 +147,17 @@ impl StillPerceiver {
             scores.fill(0.0);
 
             // Compute scores = Q @ K^T * scale
+            // The Q row and the score row are invariant across `ki`, so both
+            // slices (and their bounds checks) are hoisted out of the inner loop.
             for qi in 0..t {
                 let q_row = qi * d + h_off;
+                let q = &latent_queries[q_row..q_row + head_dim];
                 let score_row = qi * big_t;
-                for ki in 0..big_t {
+                let srow = &mut scores[score_row..score_row + big_t];
+                for (ki, s) in srow.iter_mut().enumerate() {
                     let k_row = ki * d + h_off;
-                    let dot = dot_chunk4(
-                        &latent_queries[q_row..q_row + head_dim],
-                        &kv_cache[k_row..k_row + head_dim],
-                    );
-                    scores[score_row + ki] = dot * scale;
+                    let dot = dot_chunk4(q, &kv_cache[k_row..k_row + head_dim]);
+                    *s = dot * scale;
                 }
             }
 
@@ -164,27 +165,28 @@ impl StillPerceiver {
             softmax_rows(&mut scores, t, big_t);
 
             // Weighted sum: output[i, h_off..h_off+head_dim] = sum_j attn[i,j] * V[j, h_off..h_off+head_dim]
+            // The output row is invariant across `ki` — hoisted out so the
+            // per-`ki` re-slice disappears. Accumulation still walks `ki`
+            // ascending, so the float summation order is unchanged.
             for qi in 0..t {
                 let score_row = qi * big_t;
+                let srow = &scores[score_row..score_row + big_t];
                 let out_base = qi * d + h_off;
-                for ki in 0..big_t {
-                    let w = scores[score_row + ki];
+                let orow = &mut output[out_base..out_base + head_dim];
+                for (ki, &w) in srow.iter().enumerate() {
                     if w < 1e-8 {
                         continue; // skip near-zero weights
                     }
                     let v_base = ki * d + h_off;
-                    accumulate_chunk4(
-                        &mut output[out_base..out_base + head_dim],
-                        &kv_cache[v_base..v_base + head_dim],
-                        w,
-                    );
+                    accumulate_chunk4(orow, &kv_cache[v_base..v_base + head_dim], w);
                 }
             }
         }
 
-        // Residual connection
-        for i in 0..t * d {
-            output[i] += latent_queries[i];
+        // Residual connection — `zip` drops the per-element bounds check; same
+        // element-wise addition in the same order.
+        for (o, &q) in output.iter_mut().zip(latent_queries.iter()) {
+            *o += q;
         }
 
         output
@@ -230,48 +232,48 @@ impl StillPerceiver {
 
             scores.fill(0.0);
 
+            // Q row + score row hoisted out of the `ki` loop (loop-invariant).
             for qi in 0..t {
                 let q_row = qi * d + h_off;
+                let q = &latent_queries[q_row..q_row + head_dim];
                 let score_row = qi * big_t;
-                for ki in 0..big_t {
+                let srow = &mut scores[score_row..score_row + big_t];
+                for (ki, s) in srow.iter_mut().enumerate() {
                     let k_row = ki * d + h_off;
-                    let dot = dot_chunk4(
-                        &latent_queries[q_row..q_row + head_dim],
-                        &kv_cache[k_row..k_row + head_dim],
-                    );
-                    scores[score_row + ki] = dot * scale;
+                    let dot = dot_chunk4(q, &kv_cache[k_row..k_row + head_dim]);
+                    *s = dot * scale;
                 }
             }
 
             softmax_rows(&mut scores, t, big_t);
 
-            // Accumulate head-averaged attention weights
+            // Accumulate head-averaged attention weights — `zip` drops two
+            // bounds checks per element; same order, same per-element math.
             let head_weight = 1.0 / num_heads as f32;
-            for i in 0..t * big_t {
-                agg_weights[i] += scores[i] * head_weight;
+            for (a, &s) in agg_weights.iter_mut().zip(scores.iter()) {
+                *a += s * head_weight;
             }
 
+            // Output row hoisted out of the `ki` loop; `ki` still ascends so the
+            // accumulation order into `output` is unchanged.
             for qi in 0..t {
                 let score_row = qi * big_t;
+                let srow = &scores[score_row..score_row + big_t];
                 let out_base = qi * d + h_off;
-                for ki in 0..big_t {
-                    let w = scores[score_row + ki];
+                let orow = &mut output[out_base..out_base + head_dim];
+                for (ki, &w) in srow.iter().enumerate() {
                     if w < 1e-8 {
                         continue;
                     }
                     let v_base = ki * d + h_off;
-                    accumulate_chunk4(
-                        &mut output[out_base..out_base + head_dim],
-                        &kv_cache[v_base..v_base + head_dim],
-                        w,
-                    );
+                    accumulate_chunk4(orow, &kv_cache[v_base..v_base + head_dim], w);
                 }
             }
         }
 
         // Residual connection
-        for i in 0..t * d {
-            output[i] += latent_queries[i];
+        for (o, &q) in output.iter_mut().zip(latent_queries.iter()) {
+            *o += q;
         }
 
         (output, agg_weights)
@@ -312,44 +314,42 @@ impl StillPerceiver {
             scores.fill(0.0);
 
             // Compute scores = Q @ K^T * scale
+            // Q row + score row hoisted out of the `ki` loop (loop-invariant).
             for qi in 0..t {
                 let q_row = qi * d + h_off;
+                let q = &norm[q_row..q_row + head_dim];
                 let score_row = qi * t;
-                for ki in 0..t {
+                let srow = &mut scores[score_row..score_row + t];
+                for (ki, s) in srow.iter_mut().enumerate() {
                     let k_row = ki * d + h_off;
-                    let dot = dot_chunk4(
-                        &norm[q_row..q_row + head_dim],
-                        &norm[k_row..k_row + head_dim],
-                    );
-                    scores[score_row + ki] = dot * scale;
+                    let dot = dot_chunk4(q, &norm[k_row..k_row + head_dim]);
+                    *s = dot * scale;
                 }
             }
 
             // Softmax per row
             softmax_rows(&mut scores, t, t);
 
-            // Weighted sum
+            // Weighted sum — output row hoisted out of the `ki` loop; `ki` still
+            // ascends so the float accumulation order is unchanged.
             for qi in 0..t {
                 let score_row = qi * t;
+                let srow = &scores[score_row..score_row + t];
                 let out_base = qi * d + h_off;
-                for ki in 0..t {
-                    let w = scores[score_row + ki];
+                let orow = &mut output[out_base..out_base + head_dim];
+                for (ki, &w) in srow.iter().enumerate() {
                     if w < 1e-8 {
                         continue;
                     }
                     let v_base = ki * d + h_off;
-                    accumulate_chunk4(
-                        &mut output[out_base..out_base + head_dim],
-                        &norm[v_base..v_base + head_dim],
-                        w,
-                    );
+                    accumulate_chunk4(orow, &norm[v_base..v_base + head_dim], w);
                 }
             }
         }
 
         // Residual connection
-        for i in 0..t * d {
-            output[i] += latents[i];
+        for (o, &l) in output.iter_mut().zip(latents.iter()) {
+            *o += l;
         }
 
         output

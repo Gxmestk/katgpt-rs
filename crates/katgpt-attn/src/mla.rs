@@ -435,8 +435,11 @@ pub(crate) fn rmsnorm_inplace(x: &mut [f32], gamma: &[f32], eps: f32) {
     let n = x.len();
     let sum_sq = simd_dot_f32(x, x, n);
     let inv_rms = 1.0 / (sum_sq / n as f32 + eps).sqrt();
-    for i in 0..n {
-        x[i] = x[i] * inv_rms * gamma[i];
+    // zip instead of double indexing: same left-to-right multiply order
+    // (`x * inv_rms * gamma`) → bit-identical, but the two bounds checks per
+    // element hoist out of the loop.
+    for (xi, &g) in x.iter_mut().zip(gamma.iter()) {
+        *xi = *xi * inv_rms * g;
     }
 }
 
@@ -606,8 +609,10 @@ pub fn mla_forward_token<'s>(
                 v_h,
                 d_c,
             );
-            for (vi, &vc) in v_c_j_h_scratch[..v_h].iter().enumerate() {
-                o_h[vi] += weight * vc;
+            // zip drops the `o_h[vi]` bounds check; same j-then-vi visit order,
+            // so each `o_h` accumulator sees the same addend sequence.
+            for (o, &vc) in o_h.iter_mut().zip(v_c_j_h_scratch[..v_h].iter()) {
+                *o += weight * vc;
             }
         }
     }
@@ -624,9 +629,15 @@ pub fn mla_forward_token<'s>(
     {
         // gate = sigmoid(g_proj · h)  [v_h*n_h]
         simd_matmul_rows(&mut scratch.gate_buf, w_g, h, proj_size, d);
-        for i in 0..proj_size {
-            let g = 1.0 / (1.0 + (-scratch.gate_buf[i]).exp());
-            scratch.attn_out[i] *= g;
+        // zip over the two pre-sliced prefixes: same element order and the same
+        // `1/(1+exp(-x))` expression per element → bit-identical, minus the two
+        // bounds checks per element.
+        for (o, &gb) in scratch.attn_out[..proj_size]
+            .iter_mut()
+            .zip(scratch.gate_buf[..proj_size].iter())
+        {
+            let g = 1.0 / (1.0 + (-gb).exp());
+            *o *= g;
         }
     }
 

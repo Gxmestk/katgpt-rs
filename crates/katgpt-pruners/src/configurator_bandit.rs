@@ -390,9 +390,10 @@ impl ConfiguratorBandit {
             context.epiplexity_bin,
         );
 
-        // If context has been visited, use UCB1
-        if self.stats.contains_key(&key) {
-            let stats = self.stats.get_mut(&key).unwrap();
+        // If context has been visited, use UCB1.
+        // Single hash lookup: `contains_key` + `get_mut().unwrap()` hashed the
+        // key twice.
+        if let Some(stats) = self.stats.get_mut(&key) {
             let arm = stats.best_ucb1_arm();
             return from_arm_index(arm);
         }

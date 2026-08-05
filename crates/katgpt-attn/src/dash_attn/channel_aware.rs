@@ -6,7 +6,7 @@
 //!
 //! Feature gate: `vortex_flow` (Plan 196, Phase 2, default-OFF).
 
-use super::block_topk::{BlockTopKRouter, argtopk, argtopk_with_scratch, sigmoid};
+use super::block_topk::{BlockTopKRouter, argtopk_with_scratch, sigmoid};
 use super::vortex_flow::{RoutingDecision, VortexFlow, VortexScratch};
 
 // ---------------------------------------------------------------------------
@@ -184,41 +184,50 @@ impl RoutingChannelDiscovery {
         let scale = 1.0 / (head_dim as f32).sqrt();
         let mut total_overlap = 0.0f32;
 
+        // Scratch hoisted out of the per-query loop: every buffer below is
+        // fully overwritten (scores) or cleared by `argtopk` (indices) on each
+        // iteration, so reuse is observationally identical while dropping four
+        // heap allocations per query.
+        let mut full_scores = vec![0.0f32; n_blocks];
+        let mut masked_scores = vec![0.0f32; n_blocks];
+        let mut full_indices = Vec::with_capacity(top_k);
+        let mut masked_indices = Vec::with_capacity(top_k);
+        let mut topk_pairs: Vec<(usize, f32)> = Vec::new();
+
         for qi in 0..n_queries {
             let query = &queries[qi * head_dim..(qi + 1) * head_dim];
 
             // Full-dim baseline scores
-            let mut full_scores = vec![0.0f32; n_blocks];
-            for bi in 0..n_blocks {
-                let centroid = &block_centroids[bi * head_dim..(bi + 1) * head_dim];
-                full_scores[bi] = query
+            for (score, centroid) in full_scores
+                .iter_mut()
+                .zip(block_centroids.chunks_exact(head_dim))
+            {
+                *score = query
                     .iter()
                     .zip(centroid.iter())
                     .map(|(a, b)| a * b)
                     .sum::<f32>()
                     * scale;
             }
-            let mut full_indices = Vec::new();
-            argtopk(&full_scores, top_k, &mut full_indices);
-            let full_set: Vec<usize> = full_indices;
+            argtopk_with_scratch(&full_scores, top_k, &mut full_indices, &mut topk_pairs);
 
             // Masked routing scores (only routing channels)
-            let mut masked_scores = vec![0.0f32; n_blocks];
-            for bi in 0..n_blocks {
-                let centroid = &block_centroids[bi * head_dim..(bi + 1) * head_dim];
+            for (score, centroid) in masked_scores
+                .iter_mut()
+                .zip(block_centroids.chunks_exact(head_dim))
+            {
                 let dot: f32 = routing_channels
                     .iter()
                     .map(|&d| query[d] * centroid[d])
                     .sum();
-                masked_scores[bi] = dot * scale;
+                *score = dot * scale;
             }
-            let mut masked_indices = Vec::new();
-            argtopk(&masked_scores, top_k, &mut masked_indices);
+            argtopk_with_scratch(&masked_scores, top_k, &mut masked_indices, &mut topk_pairs);
 
             // Overlap fraction
             let overlap = masked_indices
                 .iter()
-                .filter(|idx| full_set.contains(idx))
+                .filter(|idx| full_indices.contains(idx))
                 .count() as f32;
             total_overlap += overlap / top_k as f32;
         }

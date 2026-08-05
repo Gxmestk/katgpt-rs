@@ -424,26 +424,32 @@ fn col_stds_into(tile: &[f32], rows: usize, cols: usize, result: &mut [f32], mea
     if rows == 0 {
         return;
     }
-    // Two-pass: mean then variance. Initialize scratch.
-    for j in 0..cols {
-        mean[j] = 0.0;
-        result[j] = 0.0;
+    if cols == 0 {
+        // `chunks_exact(0)` panics; the original index loops were no-ops here.
+        return;
     }
-    for i in 0..rows {
-        let off = i * cols;
-        for j in 0..cols {
-            mean[j] += tile[off + j];
+    // Two-pass: mean then variance. Initialize scratch (`fill` → memset).
+    mean[..cols].fill(0.0);
+    result[..cols].fill(0.0);
+    // Walk the tile row by row with `chunks_exact(cols)` so the per-element
+    // bounds checks on `tile` and `mean`/`result` hoist out of the inner loop
+    // and LLVM can vectorize. Rows are still visited in ascending `i` and
+    // columns in ascending `j`, so each accumulator sums its elements in
+    // exactly the same order — bit-identical.
+    let tile = &tile[..rows * cols];
+    for row in tile.chunks_exact(cols) {
+        for (m, &v) in mean[..cols].iter_mut().zip(row) {
+            *m += v;
         }
     }
     let inv_rows = 1.0 / rows as f32;
     for m in mean[..cols].iter_mut() {
         *m *= inv_rows;
     }
-    for i in 0..rows {
-        let off = i * cols;
-        for j in 0..cols {
-            let d = tile[off + j] - mean[j];
-            result[j] += d * d;
+    for row in tile.chunks_exact(cols) {
+        for ((r, &m), &v) in result[..cols].iter_mut().zip(mean[..cols].iter()).zip(row) {
+            let d = v - m;
+            *r += d * d;
         }
     }
     for r in result[..cols].iter_mut() {
@@ -471,16 +477,21 @@ fn row_stds_into(tile: &[f32], rows: usize, cols: usize, result: &mut [f32]) {
         return;
     }
     let inv_cols = 1.0 / cols as f32;
-    for (i, res) in result[..rows].iter_mut().enumerate() {
+    // Pre-slice each row once (`chunks_exact`) instead of indexing `tile[off+j]`
+    // per element — same ascending-`j` accumulation order, so both the mean and
+    // the variance sums are bit-identical.
+    for (row, res) in tile[..rows * cols]
+        .chunks_exact(cols)
+        .zip(result[..rows].iter_mut())
+    {
         let mut mean = 0.0f32;
-        let off = i * cols;
-        for j in 0..cols {
-            mean += tile[off + j];
+        for &v in row {
+            mean += v;
         }
         mean *= inv_cols;
         let mut var = 0.0f32;
-        for j in 0..cols {
-            let d = tile[off + j] - mean;
+        for &v in row {
+            let d = v - mean;
             var += d * d;
         }
         *res = (var * inv_cols).sqrt();

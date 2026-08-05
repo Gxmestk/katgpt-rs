@@ -229,62 +229,99 @@ fn scalar_find_intervals(mask: &[bool]) -> Vec<(usize, usize)> {
 }
 
 // ---------------------------------------------------------------------------
+// Shared word-at-a-time state-machine scan
+// ---------------------------------------------------------------------------
+
+/// Interval-closure state machine over a byte view of a `&[bool]` mask.
+///
+/// States: `0` = no valid byte seen yet, `1` = inside a valid region,
+/// `2` = a gap was entered after a valid region. A valid byte in state `2`
+/// is a closure violation.
+///
+/// `chunk_bytes` (16 for NEON, 32 for AVX2) is the vector width the caller
+/// routes at; it must be a multiple of 8 so the head can be consumed as whole
+/// `u64` words.
+///
+/// The previous form indexed `bytes[offset + i]` inside a nested loop and
+/// dispatched on a `(state, is_valid)` tuple `match` — two bounds checks and a
+/// multi-way branch per byte. This version:
+///  * splits head/tail with `split_at`, so the walks are bounds-check free;
+///  * consumes the head 8 bytes at a time as a `u64`, and short-circuits the
+///    two uniform cases (`0x0000..` = all invalid, `0x0101..` = all valid)
+///    with a single state update instead of eight — masks in this codebase are
+///    long runs of equal bytes, so this is the dominant path;
+///  * falls back to the per-byte machine for mixed words and the tail.
+///
+/// The state transitions are byte-for-byte the same as the tuple `match`:
+/// `(0,true)->1`, `(1,true)->1`, `(2,true)->violation`, `(0,false)->0`,
+/// `(1,false)->2`, `(2,false)->2`. The uniform-word shortcuts apply that same
+/// transition eight times, which is idempotent for both uniform inputs.
+#[cfg(feature = "interval_pruner")]
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+#[inline]
+fn word_is_interval_closed(bytes: &[u8], chunk_bytes: usize) -> bool {
+    /// A `u64` of eight `true` bools (Rust guarantees `true` is the byte `0x01`).
+    const ALL_VALID: u64 = 0x0101_0101_0101_0101;
+
+    let head_len = (bytes.len() / chunk_bytes) * chunk_bytes;
+    let (head, tail) = bytes.split_at(head_len);
+
+    let mut state: u8 = 0;
+
+    // `chunk_bytes` is a multiple of 8, so `head` divides evenly into words.
+    for word in head.chunks_exact(8) {
+        let w = u64::from_ne_bytes(word.try_into().unwrap_or([0u8; 8]));
+        if w == 0 {
+            // Eight invalid bytes: 0 stays 0, 1 becomes 2, 2 stays 2.
+            if state == 1 {
+                state = 2;
+            }
+        } else if w == ALL_VALID {
+            // Eight valid bytes: violation from state 2, else state becomes 1.
+            if state == 2 {
+                return false;
+            }
+            state = 1;
+        } else {
+            for &b in word {
+                if b != 0 {
+                    if state == 2 {
+                        return false;
+                    }
+                    state = 1;
+                } else if state == 1 {
+                    state = 2;
+                }
+            }
+        }
+    }
+
+    for &b in tail {
+        if b != 0 {
+            if state == 2 {
+                return false;
+            }
+            state = 1;
+        } else if state == 1 {
+            state = 2;
+        }
+    }
+
+    true
+}
+
+// ---------------------------------------------------------------------------
 // NEON implementation (aarch64)
 // ---------------------------------------------------------------------------
 
 #[cfg(target_arch = "aarch64")]
 #[cfg(feature = "interval_pruner")]
 unsafe fn neon_is_interval_closed(mask: &[bool]) -> bool {
-    let n = mask.len();
-
-    // Process 16 bools at a time using state machine.
     // Rust's bool is 1 byte (0x00 or 0x01), so we can safely reinterpret
-    // the slice as &[u8] for SIMD loading.
-    let bytes: &[u8] = unsafe { std::slice::from_raw_parts(mask.as_ptr() as *const u8, n) };
-
-    let chunks = n / NEON_U8;
-    let remainder = n % NEON_U8;
-
-    // State machine across chunks:
-    // 0 = haven't seen valid yet
-    // 1 = currently in valid region
-    // 2 = was valid, now in gap (invalid after valid)
-    let mut state: u8 = 0;
-
-    for c in 0..chunks {
-        let offset = c * NEON_U8;
-
-        // Process 16 bytes — check for invalid-after-valid then valid-after-invalid.
-        for i in 0..NEON_U8 {
-            let is_valid = bytes[offset + i] != 0;
-            match (state, is_valid) {
-                (0, true) => state = 1,    // first valid
-                (0, false) => {}           // leading invalid
-                (1, true) => {}            // still valid
-                (1, false) => state = 2,   // entered gap
-                (2, true) => return false, // GAP VIOLATION: valid after gap
-                (2, false) => {}           // still in gap
-                _ => {}
-            }
-        }
-    }
-
-    // Process remainder with scalar.
-    let offset = chunks * NEON_U8;
-    for i in 0..remainder {
-        let is_valid = bytes[offset + i] != 0;
-        match (state, is_valid) {
-            (0, true) => state = 1,
-            (0, false) => {}
-            (1, true) => {}
-            (1, false) => state = 2,
-            (2, true) => return false,
-            (2, false) => {}
-            _ => {}
-        }
-    }
-
-    true
+    // the slice as &[u8] for wide loading.
+    let bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(mask.as_ptr() as *const u8, mask.len()) };
+    word_is_interval_closed(bytes, NEON_U8)
 }
 
 // ---------------------------------------------------------------------------
@@ -294,49 +331,10 @@ unsafe fn neon_is_interval_closed(mask: &[bool]) -> bool {
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "interval_pruner")]
 unsafe fn avx2_is_interval_closed(mask: &[bool]) -> bool {
-    let n = mask.len();
-
     // Rust's bool is 1 byte (0x00 or 0x01), safe to reinterpret as u8.
-    let bytes: &[u8] = unsafe { std::slice::from_raw_parts(mask.as_ptr() as *const u8, n) };
-
-    let chunks = n / AVX2_U8;
-    let remainder = n % AVX2_U8;
-
-    // Same state machine as NEON but with 32-byte chunks.
-    let mut state: u8 = 0;
-
-    for c in 0..chunks {
-        let offset = c * AVX2_U8;
-
-        for i in 0..AVX2_U8 {
-            let is_valid = bytes[offset + i] != 0;
-            match (state, is_valid) {
-                (0, true) => state = 1,
-                (0, false) => {}
-                (1, true) => {}
-                (1, false) => state = 2,
-                (2, true) => return false,
-                (2, false) => {}
-                _ => {}
-            }
-        }
-    }
-
-    let offset = chunks * AVX2_U8;
-    for i in 0..remainder {
-        let is_valid = bytes[offset + i] != 0;
-        match (state, is_valid) {
-            (0, true) => state = 1,
-            (0, false) => {}
-            (1, true) => {}
-            (1, false) => state = 2,
-            (2, true) => return false,
-            (2, false) => {}
-            _ => {}
-        }
-    }
-
-    true
+    let bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(mask.as_ptr() as *const u8, mask.len()) };
+    word_is_interval_closed(bytes, AVX2_U8)
 }
 
 // ---------------------------------------------------------------------------

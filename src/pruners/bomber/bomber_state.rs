@@ -11,8 +11,6 @@
 //! 4. Collect revealed power-ups
 //! 5. Increment tick
 
-use std::collections::{HashSet, VecDeque};
-
 use crate::pruners::bomber::{
     ARENA_H, ARENA_W, ArenaGrid, BOMB_FUSE_TICKS, BomberAction, Cell, DEFAULT_BLAST_RANGE,
     DEFAULT_MAX_BOMBS, PowerUpKind, SPAWN_POSITIONS, TICK_LIMIT,
@@ -254,12 +252,21 @@ impl BomberState {
         }
 
         let mut visited = [false; ARENA_W * ARENA_H];
-        let mut queue = VecDeque::new();
+        // Fixed-capacity FIFO instead of a heap `VecDeque`. Every cell is marked
+        // visited before it is pushed and out-of-bounds cells are rejected first,
+        // so at most `ARENA_W * ARENA_H` entries (including the seed) ever enter
+        // the queue. Pop order is identical to `pop_front`.
+        let mut queue = [((0i32, 0i32), 0i32); ARENA_W * ARENA_H];
+        let mut head = 0usize;
+        let mut tail = 0usize;
 
         visited[pi] = true;
-        queue.push_back((pos, 0));
+        queue[tail] = (pos, 0);
+        tail += 1;
 
-        while let Some(((cx, cy), dist)) = queue.pop_front() {
+        while head < tail {
+            let ((cx, cy), dist) = queue[head];
+            head += 1;
             for (nx, ny) in [(cx, cy - 1), (cx, cy + 1), (cx - 1, cy), (cx + 1, cy)] {
                 if nx < 0 || (nx as usize) >= ARENA_W || ny < 0 || (ny as usize) >= ARENA_H {
                     continue;
@@ -276,7 +283,8 @@ impl BomberState {
                 if !blast[ni] {
                     return Some(next_dist);
                 }
-                queue.push_back(((nx, ny), next_dist));
+                queue[tail] = ((nx, ny), next_dist);
+                tail += 1;
             }
         }
 
@@ -320,14 +328,19 @@ impl BomberState {
 
         // Phase 1: Find all bombs that will explode (chain reactions).
         // Uses current cell state — walls block blast propagation.
-        let mut to_explode: HashSet<(i32, i32)> = HashSet::new();
+        // Insertion-ordered `Vec` instead of a `HashSet`: a board never holds more
+        // than a handful of bombs, so a linear scan is cheaper than hashing — and
+        // it makes the Phase 2 iteration order deterministic (the `HashSet` used
+        // std's per-process-randomized `RandomState`, so the previous order — and
+        // hence `revealed_powerups` order — varied between runs).
+        let mut to_explode: Vec<(i32, i32)> = Vec::new();
         let mut queue: Vec<BombSnapshot> = expired;
 
         while let Some(bomb) = queue.pop() {
             if to_explode.contains(&bomb.pos) {
                 continue;
             }
-            to_explode.insert(bomb.pos);
+            to_explode.push(bomb.pos);
 
             for &(dx, dy) in &DIRECTIONS {
                 for dist in 1..=bomb.range as i32 {
@@ -436,9 +449,17 @@ impl BomberState {
 
     /// Collect revealed power-ups at player positions.
     fn collect_powerups(&mut self) {
-        // Phase 1: Find collections (player_idx, position, kind)
-        let mut collections: Vec<(usize, (i32, i32), PowerUpKind)> = Vec::new();
-        let mut claimed: HashSet<(i32, i32)> = HashSet::new();
+        if self.revealed_powerups.is_empty() {
+            return;
+        }
+
+        // Phase 1: Find collections (player_idx, position, kind).
+        // At most one collection per player, so both the claim set and the
+        // collection list are stack arrays of 4 — no heap traffic in `advance()`,
+        // which runs once per MCTS node expansion. Order is unchanged.
+        let mut collections: [(usize, (i32, i32), PowerUpKind); 4] =
+            [(0, (0, 0), PowerUpKind::BombUp); 4];
+        let mut n = 0usize;
 
         for i in 0..4 {
             let player = &self.players[i];
@@ -446,22 +467,24 @@ impl BomberState {
                 continue;
             }
             for (pos, kind) in &self.revealed_powerups {
-                if *pos == player.pos && claimed.insert(*pos) {
-                    collections.push((i, *pos, *kind));
+                // `claimed.insert(*pos)` on a set of ≤4 entries → linear scan.
+                if *pos == player.pos && !collections[..n].iter().any(|(_, p, _)| p == pos) {
+                    collections[n] = (i, *pos, *kind);
+                    n += 1;
                     break;
                 }
             }
         }
 
         // Phase 2: Remove collected power-ups
-        for (_, pos, _) in &collections {
+        for (_, pos, _) in &collections[..n] {
             if let Some(idx) = self.revealed_powerups.iter().position(|(p, _)| p == pos) {
                 self.revealed_powerups.remove(idx);
             }
         }
 
         // Phase 3: Apply effects
-        for (player_idx, _, kind) in collections {
+        for &(player_idx, _, kind) in &collections[..n] {
             let player = &mut self.players[player_idx];
             match kind {
                 PowerUpKind::BombUp => player.max_bombs += 1,

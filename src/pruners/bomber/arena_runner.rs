@@ -105,27 +105,36 @@ pub fn run_bomber_game(
     }
 
     let mut round_events: Vec<GameEvent> = Vec::new();
+    // Reused across ticks: `clear()` + `extend` instead of a fresh `Vec` per tick.
+    let mut tick_events: Vec<GameEvent> = Vec::new();
 
     // ── Tick loop ──────────────────────────────────────────────
     for _tick in 0..config.tick_limit {
         // Drain events from previous tick
-        let tick_events: Vec<GameEvent> = {
+        {
             let mut event_reader = world.resource_mut::<Events<GameEvent>>();
-            event_reader.drain().collect()
-        };
+            tick_events.clear();
+            tick_events.extend(event_reader.drain());
+        }
         round_events.extend(tick_events.iter().cloned());
 
         // Each alive player selects an action
         let mut actions = [None; 4];
-        for (i, player) in players.iter_mut().enumerate() {
-            let pos = world
-                .get::<super::GridPos>(entities[i])
-                .copied()
-                .unwrap_or_default();
-            let alive = world.get::<super::Alive>(entities[i]).is_some();
-            if alive {
-                let grid = world.resource::<ArenaGrid>().clone();
-                actions[i] = Some(player.select_action(&grid, pos, &tick_events, rng));
+        {
+            // Borrow the grid instead of cloning it per alive player.
+            // `ArenaGrid::cells` is a `Vec<Vec<Cell>>`, so each clone cost 1 + 13
+            // allocations — up to 56 allocations per tick. Nothing in this loop
+            // mutates the world (`run_tick` runs after the borrow ends).
+            let grid: &ArenaGrid = world.resource::<ArenaGrid>();
+            for (i, player) in players.iter_mut().enumerate() {
+                let pos = world
+                    .get::<super::GridPos>(entities[i])
+                    .copied()
+                    .unwrap_or_default();
+                let alive = world.get::<super::Alive>(entities[i]).is_some();
+                if alive {
+                    actions[i] = Some(player.select_action(grid, pos, &tick_events, rng));
+                }
             }
         }
 
@@ -138,7 +147,7 @@ pub fn run_bomber_game(
     // Drain remaining events after loop ends
     {
         let mut event_reader = world.resource_mut::<Events<GameEvent>>();
-        round_events.extend(event_reader.drain().collect::<Vec<GameEvent>>());
+        round_events.extend(event_reader.drain());
     }
 
     // ── Score computation from events ──────────────────────────
