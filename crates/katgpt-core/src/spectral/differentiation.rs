@@ -16,10 +16,10 @@
 //! - **This primitive** — input is a flat array of equally-spaced samples on
 //!   a *periodic* 1D domain (time-series window, cyclic HLA channel, ring
 //!   buffer). O(N log N), no topological setup, no CellComplex required.
-//! - **DEC `exterior_derivative`** (`crates/katgpt-core/src/dec/operators.rs`)
-//!   — general case on arbitrary cell complexes (irregular meshes, 2D/3D
-//!   grids, manifolds with boundary). Slower per-call due to boundary-operator
-//!   assembly, but handles anything.
+//! - **DEC `exterior_derivative`** (`crates/katgpt-dec/src/operators.rs`,
+//!   re-exported as `katgpt_core::dec`) — general case on arbitrary cell
+//!   complexes (irregular meshes, 2D/3D grids, manifolds with boundary).
+//!   Slower per-call due to boundary-operator assembly, but handles anything.
 //!
 //! ## Why modelless
 //!
