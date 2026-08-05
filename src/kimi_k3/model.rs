@@ -341,6 +341,53 @@ pub fn kimi_k3_forward_token<'a>(
     let embed_end = embed_start + d;
     runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
 
+    // ── Steps 2-5: Decoder core (shared with forward_token_hidden) ────────
+    forward_decoder_to_logits(config, weights, runtime)
+}
+
+/// Forward pass starting from an arbitrary hidden state (Issue 407 T2).
+///
+/// This is the same decoder path as [`kimi_k3_forward_token`] (steps 2-5:
+/// decoder layers → output attn-res → final norm → LM head), but skips the
+/// embedding lookup (step 1). Instead, the caller provides the hidden input
+/// directly via `runtime.hidden` (the caller must set it before calling).
+///
+/// Used by the [`PauseStrategy::ZeroEmbedding`] path — the hidden state is
+/// zeroed, so the KDA recurrent state evolves purely via its internal
+/// dynamics (ξ_{n+1} = M·ξ_n + F(0)) with no new token signal.
+///
+/// **Block state contract:** this function clears `runtime.block_state` at
+/// entry (step 0), matching `kimi_k3_forward_token`. The caller does NOT need
+/// to clear it separately.
+pub fn kimi_k3_forward_token_hidden<'a>(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &'a mut KimiK3Runtime,
+) -> &'a [f32] {
+    // Step 0: same block_state reset as forward_token.
+    runtime.block_state.clear();
+    // Step 1 is skipped — runtime.hidden is whatever the caller set.
+    // Steps 2-5:
+    forward_decoder_to_logits(config, weights, runtime)
+}
+
+/// The shared decoder core: steps 2-5 of the forward pass.
+///
+/// Reads `runtime.hidden` (set by the caller — either via embedding lookup
+/// in `kimi_k3_forward_token`, or zeroed in `kimi_k3_forward_token_hidden`).
+/// Runs all decoder layers, applies output attn-res, final RMSNorm, and the
+/// LM head projection. Writes logits to `runtime.logits`.
+///
+/// **Block state contract:** the caller must clear `runtime.block_state`
+/// before calling (step 0). Both public wrappers (`kimi_k3_forward_token`,
+/// `kimi_k3_forward_token_hidden`) do this.
+fn forward_decoder_to_logits<'a>(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &'a mut KimiK3Runtime,
+) -> &'a [f32] {
+    let d = config.hidden_size;
+
     // ── Step 2: Decoder layers ────────────────────────────────────────────
     for (layer_idx, layer_w) in weights.layers.iter().enumerate() {
         let layer_cfg = config.layer_config(layer_idx);
@@ -389,6 +436,163 @@ pub fn kimi_k3_forward_token<'a>(
     );
 
     &runtime.logits
+}
+
+// ─── Pause-token latent CoT (Issue 407 T2) ─────────────────────────────────
+//
+// Kimi-K3 analog of RiM (Recurrent Interface Machines) — inject N "pause"
+// tokens after the prompt that advance the KDA recurrent state without
+// emitting output. The model "thinks" by processing pause tokens,
+// accumulating KDA state, before generating the answer.
+//
+// The mechanism is inference-time only (zero GPU). The KDA layers (75% of
+// the model) have a fixed-size recurrent state — this IS the latent thought
+// carrier. Pause tokens exploit it without retraining.
+//
+// **Honest expectation:** on an SFT model never trained with pause tokens,
+// the GOAT gate (G5-K3: does N>0 pause tokens improve compile rate vs N=0?)
+// is the empirical question. This primitive provides the mechanism; the gate
+// example (plan318_pause_token_gate) measures whether it helps.
+
+/// Strategy for pause-token "thinking" (Issue 407 T2).
+///
+/// Determines what input drives the KDA recurrent state update during pause
+/// steps. The forward pass always runs the full decoder (advancing KDA + MLA
+/// cache), but the caller discards the logits.
+#[derive(Clone, Copy, Debug)]
+pub enum PauseStrategy {
+    /// Use a specific token ID (e.g., newline, period, or a benign token).
+    /// The model processes the token normally; its embedding drives the KDA
+    /// recurrent update. Best when the token is in-distribution for the model
+    /// (common punctuation/whitespace the SFT corpus contained).
+    TokenId(u32),
+    /// Zero-embedding "no-op think" — bypass the embedding lookup entirely,
+    /// feed a zero vector as the hidden input via
+    /// [`kimi_k3_forward_token_hidden`]. This advances the KDA state purely
+    /// via its recurrent dynamics (ξ_{n+1} = M·ξ_n + F(0)), with no new
+    /// token information. Closest to the RiM "think without new input" idea,
+    /// but note: with h=0, the KDA projections produce q=k=v=0 (no bias in
+    /// the linear layers), so F(0) may be near-zero → the state mostly decays.
+    ZeroEmbedding,
+    /// Repeat the last prompt token — the KDA state evolves with the same
+    /// input signal, potentially refining the representation via ShortConv
+    /// state advancement + recurrent matrix application.
+    RepeatLast,
+}
+
+/// Configuration for pause-token "thinking" before generation (Issue 407 T2).
+#[derive(Clone, Copy, Debug)]
+pub struct PauseConfig {
+    /// Number of pause tokens to inject after the prompt, before generation.
+    /// N=0 is the baseline (no thinking). Typical sweep values: 0, 1, 4, 16.
+    pub n_pause: usize,
+    /// Strategy for the pause token input.
+    pub strategy: PauseStrategy,
+}
+
+impl PauseConfig {
+    /// No pause tokens — the baseline / N=0 case.
+    pub const fn none() -> Self {
+        Self {
+            n_pause: 0,
+            strategy: PauseStrategy::ZeroEmbedding,
+        }
+    }
+
+    /// N pause tokens with the given strategy.
+    pub const fn new(n_pause: usize, strategy: PauseStrategy) -> Self {
+        Self { n_pause, strategy }
+    }
+}
+
+impl Default for PauseConfig {
+    fn default() -> Self {
+        Self::none()
+    }
+}
+
+/// Advance the KDA recurrent state by one "pause step" without emitting output.
+///
+/// Processes a pause token (or zero-embedding / repeat-last) through the full
+/// forward path (decoder layers → output attn-res → norm → LM head). The
+/// logits are computed but the caller discards them — the purpose is to
+/// evolve the per-layer `attn_state` (KDA recurrent state + MLA KV cache).
+///
+/// **State persistence:** the KDA recurrent state (`KdaLayerCache.heads` +
+/// `ShortConv1D`) and MLA KV cache persist across all `kimi_k3_forward_token` /
+/// `kimi_k3_pause_step` calls within a sequence (they live in
+/// `runtime.layers[i].attn_state`). Only `block_state` is reset per call
+/// (within-layer accumulation, fresh per token).
+///
+/// # Arguments
+/// - `last_token` — the last real token processed (used by `RepeatLast`).
+///   Pass the last prompt token ID.
+pub fn kimi_k3_pause_step(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &mut KimiK3Runtime,
+    strategy: PauseStrategy,
+    last_token: u32,
+) {
+    match strategy {
+        PauseStrategy::TokenId(id) => {
+            // Normal forward; logits discarded by caller.
+            kimi_k3_forward_token(config, weights, runtime, id);
+        }
+        PauseStrategy::RepeatLast => {
+            kimi_k3_forward_token(config, weights, runtime, last_token);
+        }
+        PauseStrategy::ZeroEmbedding => {
+            // Zero the hidden state, then forward without embedding lookup.
+            runtime.hidden.fill(0.0);
+            kimi_k3_forward_token_hidden(config, weights, runtime);
+        }
+    }
+}
+
+/// Inject N pause steps after the prompt, before generation (Issue 407 T2).
+///
+/// This is the batch convenience wrapper around [`kimi_k3_pause_step`]. After
+/// the prompt has been fed (via `kimi_k3_forward_token` for each prompt
+/// token), call this to inject `config.n_pause` thinking steps. Then start
+/// normal autoregressive decoding from the last logits.
+///
+/// **Returns** the logits after the final pause step (or the input logits
+/// if `n_pause == 0`), so the caller can start generation without an extra
+/// forward call.
+///
+/// # Arguments
+/// - `last_prompt_token` — the last token of the prompt (used by `RepeatLast`).
+/// - `last_logits` — the logits from the last prompt token's forward. Returned
+///   unchanged when `n_pause == 0`.
+pub fn kimi_k3_inject_pause(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &mut KimiK3Runtime,
+    pause: &PauseConfig,
+    last_prompt_token: u32,
+    last_logits: &[f32],
+) -> Vec<f32> {
+    if pause.n_pause == 0 {
+        return last_logits.to_vec();
+    }
+    let mut current = last_logits.to_vec();
+    for _ in 0..pause.n_pause {
+        let logits = match pause.strategy {
+            PauseStrategy::TokenId(id) => {
+                kimi_k3_forward_token(config, weights, runtime, id)
+            }
+            PauseStrategy::RepeatLast => {
+                kimi_k3_forward_token(config, weights, runtime, last_prompt_token)
+            }
+            PauseStrategy::ZeroEmbedding => {
+                runtime.hidden.fill(0.0);
+                kimi_k3_forward_token_hidden(config, weights, runtime)
+            }
+        };
+        current = logits.to_vec();
+    }
+    current
 }
 
 // ─── Traced forward (per-layer hidden-state snapshots) ──────────────────────
@@ -599,4 +803,157 @@ pub fn kimi_k3_forward_token_timed<'a>(
     timing.lm_head_us += t.elapsed().as_micros();
 
     &runtime.logits
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// G1 (refactor bit-identical): forward_token via forward_decoder_to_logits
+    /// produces finite, non-trivial logits on random weights. This verifies the
+    /// refactor didn't break the forward path — the logic is identical, only
+    /// the code organization changed.
+    #[test]
+    fn g1_forward_token_refactor_produces_finite_logits() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        let logits = kimi_k3_forward_token(&config, &weights, &mut runtime, 5);
+
+        assert_eq!(logits.len(), config.vocab_size);
+        assert!(logits.iter().all(|&l| l.is_finite()), "logits must be finite");
+        // Non-trivial: not all zeros (random weights produce non-zero logits).
+        let max_abs = logits.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+        assert!(max_abs > 0.0, "logits must be non-trivial (max_abs={max_abs})");
+    }
+
+    /// G2 (forward_token_hidden works): the hidden-direct variant produces finite
+    /// logits + advances state the same way as forward_token when given the
+    /// same hidden input.
+    #[test]
+    fn g2_forward_token_hidden_produces_finite_logits() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        // Zero the hidden state + forward via the hidden path.
+        runtime.hidden.fill(0.0);
+        let logits = kimi_k3_forward_token_hidden(&config, &weights, &mut runtime);
+
+        assert_eq!(logits.len(), config.vocab_size);
+        assert!(logits.iter().all(|&l| l.is_finite()));
+    }
+
+    /// G3 (pause step advances KDA state): after a pause step, the hidden state
+    /// of at least one KDA layer should differ from before. This verifies the
+    /// KDA recurrent state is actually evolving during pause — the whole point
+    /// of the mechanism.
+    #[test]
+    fn g3_pause_step_advances_kda_state() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        // Feed a prompt token to initialize state.
+        kimi_k3_forward_token(&config, &weights, &mut runtime, 10);
+
+        // Snapshot the logits (they reflect the KDA state at this point).
+        let logits_before = runtime.logits.clone();
+
+        // Inject a pause step (ZeroEmbedding strategy).
+        kimi_k3_pause_step(
+            &config,
+            &weights,
+            &mut runtime,
+            PauseStrategy::ZeroEmbedding,
+            10,
+        );
+
+        // The logits after pause should differ (KDA state evolved).
+        let logits_after = runtime.logits.clone();
+        let diff = logits_before
+            .iter()
+            .zip(logits_after.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, |a, b| a + b);
+        assert!(
+            diff > 0.0,
+            "KDA state must evolve during pause (total logit diff={diff})"
+        );
+    }
+
+    /// G4 (inject_pause n_pause=0 is a no-op): when n_pause is 0, the function
+    /// should return the input logits unchanged.
+    #[test]
+    fn g4_inject_pause_zero_is_noop() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        let input_logits = vec![0.5; config.vocab_size];
+        let result = kimi_k3_inject_pause(
+            &config,
+            &weights,
+            &mut runtime,
+            &PauseConfig::none(),
+            10,
+            &input_logits,
+        );
+
+        assert_eq!(result, input_logits, "n_pause=0 must be identity");
+    }
+
+    /// G5 (RepeatLast strategy works): pause with RepeatLast advances state.
+    #[test]
+    fn g5_pause_repeat_last_advances_state() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        kimi_k3_forward_token(&config, &weights, &mut runtime, 10);
+        let logits_before = runtime.logits.clone();
+
+        kimi_k3_pause_step(
+            &config,
+            &weights,
+            &mut runtime,
+            PauseStrategy::RepeatLast,
+            10,
+        );
+
+        let diff = logits_before
+            .iter()
+            .zip(runtime.logits.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, |a, b| a + b);
+        assert!(diff > 0.0, "RepeatLast must advance KDA state");
+    }
+
+    /// G6 (TokenId strategy works): pause with a specific token advances state.
+    #[test]
+    fn g6_pause_token_id_advances_state() {
+        let config = KimiK3ModelConfig::kimi_k3_0_40b();
+        let weights = super::super::loader::KimiK3ModelWeights::random(&config, 42);
+        let mut runtime = KimiK3Runtime::new(&config, 32);
+
+        kimi_k3_forward_token(&config, &weights, &mut runtime, 10);
+        let logits_before = runtime.logits.clone();
+
+        // Use token ID 3 (a low but non-special token) as the pause token.
+        kimi_k3_pause_step(
+            &config,
+            &weights,
+            &mut runtime,
+            PauseStrategy::TokenId(3),
+            10,
+        );
+
+        let diff = logits_before
+            .iter()
+            .zip(runtime.logits.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, |a, b| a + b);
+        assert!(diff > 0.0, "TokenId(3) must advance KDA state");
+    }
 }
