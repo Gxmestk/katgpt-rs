@@ -1136,6 +1136,8 @@ The substrate primitives it composes each have their own GOAT gates (GDN2/KDA Pl
 
 📖 Proposal: 032 (Kimi-K3 native support — referenced in source; no standalone `.proposals/032_*.md` file). Research: [447](../../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) (architecture distillation) + riir-ai [331](../../../riir-ai/.research/331_kimi_k3_phase6_safetensors_header_analysis.md) (tensor name verification) + [330](../../../riir-ai/.research/330_kimi_k3_modeling_code_divergences.md) (modeling divergences). Substrate: `src/kimi_k3/{mod,decoder_layer,model,loader,tiktoken}.rs`. Example: `examples/kimi_k3_hello_world.rs`. Consumer benches: [012](../../.benchmarks/012_kimi_k3_trajectory_geometry.md) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) + [018](../../.benchmarks/018_sequence_trajectory.md) + [020](../../.benchmarks/020_generation_trajectory.md).
 
+> **Backward (BPTT) path:** see [§76](#76-kimi-k3-analytic-backward--training-reference-gradient-pass) for the analytic gradient pass (`kimi_k3_backward` + per-primitive `kda_backward` / `mla_backward` / `moe_backward`). Training-time reference consumed by riir-train; NOT a production inference path.
+
 ## 34. QGF — Q-Guided Flow Test-Time Gradient Guidance (Plan 268)
 
 Distilled from [arXiv:2606.11087](https://arxiv.org/abs/2606.11087) — Zhou et al., *Q-Guided Flow*. Test-time Q-gradient guidance for any `SpeculativeGenerator`: steers discrete generation toward higher expected Q by tilting logits `p' = p_t + (1/β)·∇Q`. No continuous diffusion, no flow-matching training, no BPTT — pure inference-time steering.
@@ -2415,3 +2417,90 @@ Three of four components are DEFAULT-ON (GOAT 6/6 each); only the parent aggrega
 🔧 Feature flags: `symbolic_distill` + `concept_grounding` + `decision_explain` DEFAULT-ON; `insight_explain` opt-in. All in `katgpt-pruners`.
 
 📖 Plan: [210](../../.plans/210_insight_symbolic_distillation_explanation.md).
+
+## 74. CP^(d-1) Symmetric-Space Hopfield — Top-Eigenvector Recall (Plan 567)
+
+Associative-memory recall on the symmetric space CP^(d-1) = SU(d)/U(d-1) instead of the sphere S^(n-1): the memory kernel `K_i = Σ_μ O_μ^(i) |ξ^μ_i⟩⟨ξ^μ_i|` is a d×d Hermitian **spiked** random matrix, and recall = align `|s_i⟩` with its **top eigenvector**. The top eigenvector is BBP-protected (Baik-Ben Arous-Pêché) against GUE crosstalk — the structural reason CP^(d-1) capacity **grows** with d (asymptotic α_c: 0.05 at d=2, 0.62 at d=3, 2.41 at d=4, ~40 at d=8) while gapless vector alignment on S^(n-1) **decays** as 4/(27n).
+
+**Paper:** Galitski, *High-Capacity Generalized Hopfield Networks* — [alphaXiv 2607.hopfield-networks](https://www.alphaxiv.org/abs/2607.hopfield-networks) (JQI/UMD, 2026-07-31). Ships the generalized Gell-Mann basis + `f_abc`/`d_abc` structure constants (computed in closed form, not tabulated — a d=8 dense `f_abc` table would be 63³ entries), Mattis overlaps in real Bloch arithmetic, shifted-power-iteration top eigenvector, EXACT closed-form CP^(d-1) constraint projection (the Bloch map is a Euclidean similarity, so the closest pure state is the top eigenvector of ρ — no iterative projected gradient needed), the generalized Landau-Lifshitz-Gilbert dissipative flow (precession conserves energy, Gilbert damping lowers it monotonically), and finite-N capacity measurement.
+
+Pure modelless — closed-form construction + Rayleigh-quotient ascent, NO gradient descent, so memories load from a frozen snapshot (freeze/thaw Path 1).
+
+### GOAT gate (Bench 567) — STAYS OPT-IN
+
+| Gate | Criterion | Result |
+|---|---|---|
+| G1 correctness | recall recovers corrupted memories below α_c | **PASS** — 27 unit tests |
+| G2 capacity | measured α_c at our real N; capacity grows with d | **PASS** — α_c(d=3,N=64)=1.295 vs α_c(d=2)=0.174 (7.4× gain from moving off the sphere) |
+| G3 no-regression | opt-in, default-off; `--all-features` clean | **PASS** |
+| G4 perf | O(d³) paths sub-µs at d ≤ 4, alloc-free | **PASS** (after fixing a plan cost-model error — the `d³` eigendecomp is trivial; the real cost is `O(P·N·D2)` Mattis overlaps, cached incrementally) |
+| G5 Plan 276 unblock | flips ≤ 10× leaky AND tracking ≥ leaky − 0.05 | **PASS, narrowly** — CP² recall with task-aligned memories: flips 347→3, tracking 0.000→1.000. Haar-random memories fail tracking (memory set must align with beliefs to be recalled — exactly freeze/thaw Path 1). Non-monotone in snap strength — depends on a hyperparameter with no principled setting. |
+| **G6 Fusion B (KG capacity)** | ≥ 3× cosine-ANN triple capacity | **❌ FAIL** — CP² recall worse than cosine at every N (capacity ratio 1.00×). LLG unblock follow-up REFUTED (bit-identical precision to single-step). Projected-cosine diagnostic: projection HELPS 3–9× as a denoising op, but associative recall destroys angular precision — not actionable on production retrieve paths (queries use clean centroids where raw cosine already hits 1.0). |
+| G7 BBP gap | relative gap > 0.1 at finite N | **PASS** — strongest result (0.73–0.95 everywhere, 7× margin at worst) |
+
+**Promotion decision: `cp_hopfield` STAYS OPT-IN.** Default-on requires G5 AND G6 AND G7. G6 FAILS, and G5 passes only in the narrow sense, so the promotion precondition is not met.
+
+### Why opt-in
+
+1. **G6 FAIL is load-bearing.** The Super-GOAT headline (KG retrieval capacity gain) is refuted — CP² associative recall trades angular precision for basin robustness, which is the wrong trade for type-hit retrieval.
+2. **G5 snap-sensitivity.** The Plan 276 unblock depends on a snap hyperparameter with no principled setting; the result is real but not a clean margin.
+3. **No production consumer wired.** The primitive is validated mechanistically; a concrete consumer (riir-neuron-db `ItemEmbedIndex`, riir-games personality recall) would need to demonstrate a gain the synthetic G6 could not.
+
+🔧 Feature flag: `cp_hopfield` (katgpt-core, opt-in). Implies nothing — standalone.
+
+📖 Plan: [567](../../.plans/567_cp_hopfield_top_eigenvector_recall.md). Research: [466](../../.research/466_CPd_minus_1_Hopfield_Top_Eigenvector_Recall.md). Benchmark: [567](../../.benchmarks/567_cp_hopfield_goat.md).
+
+## 75. Gemma 4 Inference Config (Issue 577) — Infrastructure
+
+`gemma4_inference` adds the `Gemma4LayerType` enum + `Config::gemma4_12b()` preset + `ModelArchitecture::Gemma4` variant, enabling Gemma 4 (sliding + full attention + per-layer shape) model loading. **Infrastructure, not an algorithmic primitive** — exists so the riir-engine Plan 318 Phase F 4B/2B MLA-MoE student has a real 12B baseline to beat, and so future Gemma 4 consumers have a config entry point.
+
+The feature is a leaf-clean type addition in `katgpt-types` (`Gemma4LayerType`, `Config` preset) forwarded through `katgpt-core`. The forward path + GGUF loader live in riir-engine (opt-in `gemma4_inference` there, gated on this config type).
+
+### What ships
+
+- `Gemma4LayerType` enum (sliding-window vs full-attention per-layer tag).
+- `Config::gemma4_12b()` preset (hidden size, num layers, vocab, etc.).
+- `ModelArchitecture::Gemma4` variant.
+- `MultiLayerKVCache::new_with_per_layer_kv_dim` — supports per-layer KV dim (Gemma 4 mixes sliding + full attention, which can have different KV shapes).
+
+### Why opt-in
+
+1. **Gates the loader + forward path in riir-engine.** The config type alone is cheap; the model file + forward kernels are not in katgpt-rs.
+2. **No own GOAT gate.** Infrastructure — its value is enabling the GOAT gates of consumers (riir-engine Plan 318 Phase F baseline).
+
+🔧 Feature flag: `gemma4_inference` (katgpt-core → katgpt-types, opt-in). riir-engine re-exposes it.
+
+📖 Issue: 577 (resolved; no standalone `.issues/577_*.md` file — reference is in commit `96ac0a18` + `20a088af`). Substrate: `crates/katgpt-types/src/` (Config + Gemma4LayerType) + `crates/katgpt-core/src/`.
+
+## 76. Kimi-K3 Analytic Backward — Training-Reference Gradient Pass
+
+The analytic backward (BPTT) path for the Kimi-K3 native support (§33). Composes the per-primitive backward modules — **MLA attention** (`mla_backward`), **KDA linear attention** (`kda_backward`), **MoE FFN** (`moe_backward`) — with model-level composition backward (attn-res + RMSNorm + dense SiTU FFN + LM head + embedding) into a full-model gradient pass. Also includes gradient checkpointing (C7) + training-suitable weight init (C9).
+
+This is a **training-time reference**, NOT a production inference path — consumed by `riir-train`. It is the documented modelless-by-mandate exception: the gradient kernels are analytic (hand-derived Jacobians, finite-diff verified), but the *purpose* is gradient descent, which is training. The inference-side modelless mandate is unaffected.
+
+### What ships
+
+| Feature | Module | Role |
+|---|---|---|
+| `kda_backward` (katgpt-attn) | `kda/backward.rs` | KDA analytic backward + conv-ring cross-token BPTT (C5). f64 accumulation to prevent NaN from gradient overflow (Issue 389 T4 ripple fix). |
+| `mla_backward` (katgpt-attn) | `mla/backward.rs` | MLA analytic backward (C4). Cross-token composition gradient check relaxed for finite-diff tolerance. |
+| `moe_backward` (katgpt-transformer) | transformer MoE | MoE FFN analytic backward (C4). |
+| `kimi_k3_backward` (root) | `src/kimi_k3/backward.rs` | Full-model composition: `kimi_k3_forward_token_saved` (forward with activation capture) + `kimi_k3_backward_sequence` + `attn_res_backward` + `dense_situ_ffn_backward` + `situ_backward` + `KimiK3ModelGradients`. Implies `kimi_k3_loader` + the three per-primitive backward features. |
+
+### Gradient check results
+
+- **Single-layer (KDA+Dense, L=1):** PASS, max rel_err 0.26%.
+- **No-attn-res (3 layers, block_size=1000, L=2):** PASS, max rel_err 1.38%.
+- **All-KDA (3 layers, block_size=4, L=2):** PASS, max rel_err 8.34%.
+- **Smoke test (kimi_k3_0_40b dims, vocab=64):** PASS (no NaN/Inf).
+- **Full-model (3 layers with MLA at layer 2):** FAIL at 36% — MLA integration issue (MLA backward validated in isolation at 1.77%). Under investigation.
+
+### Why opt-in
+
+1. **Training-time reference.** The modelless-by-mandate exception — consumed by riir-train, never on the production inference path.
+2. **Heavy dep chain.** Implies `kimi_k3_loader` (safetensors + memmap2 + base64) + the three per-primitive backward features.
+3. **Full-model MLA composition backward has a known FAIL.** Single-primitive backward passes its gradient check; the multi-layer MLA composition does not yet.
+
+🔧 Feature flags: `kda_backward` + `mla_backward` (katgpt-attn), `moe_backward` (katgpt-transformer), `kimi_k3_backward` (root, composes all three + the model-level backward). All opt-in (default-off).
+
+📖 Substrate: `crates/katgpt-attn/src/{kda,mla}/backward.rs` + `crates/katgpt-transformer/src/` + `src/kimi_k3/backward.rs`. Related: §33 (Kimi-K3 forward). The backward work landed across commits `e896771c` (KDA + grad check), `8d3bd4f8` (MLA), `25d0c031` (MoE), `1de0e634` (KDA multi-token BPTT), `beffe760` (full-model), `5b232f33` (gradient checkpointing), `b7d5b33f` (weight init), `dfd139ea` + `9bb31500` (f64 accumulation NaN fix).

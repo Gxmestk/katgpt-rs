@@ -328,7 +328,7 @@ The diagnostics flag the sanity config (rank collapse detected: erank 24.68 → 
 
 **Re-opens only on** (a) hardware where f16 loads are genuinely cheaper than f32 loads AND a hardware FCVT-equivalent is free, OR (b) a full-f16 forward context (Issue 201's line, which also failed — see section 18 below).
 
-📖 Issue: [`.issues/200_f16_weight_quantization_forward_base.md`](../../.issues/200_f16_weight_quantization_forward_base.md) (retained as negative-result reference). Substrate: `crates/katgpt-forward/src/forward.rs:774-932`. Perf doc: [`.docs/08_performance/engineering.md`](../08_performance/engineering.md) §'What We Don't Do' (updated with empirical verdict 2026-07-29 commit `9bd1eed2`).
+📖 Issue 200 (CLOSED + removed per noise-reduction rule 2026-08-05; the negative result lives here + in Bench 563). Substrate: `crates/katgpt-forward/src/forward.rs:774-932` (`forward_base_f16` + `forward_f16`, opt-in `pub` paths with no internal caller). Perf doc: [`.docs/08_performance/engineering.md`](../08_performance/engineering.md) §'What We Don't Do' (updated with empirical verdict 2026-07-29 commit `9bd1eed2`).
 
 ## 18. Full f16 Forward FHM Investigation (Issue 201) — G2 FAIL: 1.31× < 1.5× gate
 
@@ -350,7 +350,7 @@ Root causes (full detail in Bench 563):
 
 **The remaining quantization path with a plausible ≥1.5× win is INT8 with INT8 activations** (different dequant path: scale + zero-point). But on Apple Silicon it hits the same bandwidth-ceiling argument — INT8 GEMV arithmetic intensity is still bandwidth-bound at L3-exceeding sizes, and the dequant overhead makes it worse. Filed as a **non-goal** in both Issues 200 and 201.
 
-📖 Issue: [`.issues/201_full_f16_forward_investigation.md`](../../.issues/201_full_f16_forward_investigation.md) (retained as negative-result reference). Benchmark: [`.benchmarks/563_issue201_f16_f16_fhm_negative.md`](../../.benchmarks/563_issue201_f16_f16_fhm_negative.md). Substrate (nightly-only WIP, not on develop): `crates/katgpt-types/src/simd/dot.rs` `simd_dot_f16_f16` (sibling-agent investigation; see git history if needed).
+📖 Issue 201 (CLOSED + removed per noise-reduction rule 2026-08-05; the negative result lives here). **Canonical evidence:** [Bench 563](../../.benchmarks/563_issue201_f16_f16_fhm_negative.md) (the full-f16 FHM measurement, covering both Issue 200 weight-only + Issue 201 full-f16 root-cause analysis). Substrate (nightly-only WIP, not on develop): `crates/katgpt-types/src/simd/dot.rs` `simd_dot_f16_f16` (sibling-agent investigation; see git history if needed).
 
 ## 19. Quant-Error LoRA G5 (Issue 565) — DECISIVELY NEGATIVE: 0% PUCT Win-Rate
 
