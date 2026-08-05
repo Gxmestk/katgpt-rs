@@ -487,7 +487,21 @@ If a plan is blocked by a missing primitive, implement the minimal version. Afte
 
 **Path 0 — training-target decomposition (the Flow Sampling lesson, arxiv 2605.03984):** Before checking paths 1–3, ask: "is the mechanism's value the **training-loop innovation itself** (new optimizer/loss/curriculum/RL algorithm), or the **math the training computes** (closed-form drift, conditional score, Riemannian correction, steering formula, regression target)?" If the latter, decompose the math into components and grep the codebase for the modelless analog of EACH component (see §1 step 2 standing training-math vocabulary). If ALL components have modelless analogs → the mechanism is MODELLESS-VALIDABLE as a fusion of existing primitives — no riir-train deferral needed. **Canonical: Flow Sampling** — the conditional drift formula decomposes into dllm interpolant + Latent Field Steering (Plan 309) reward-gradient + freeze/thaw replay buffer; the training loop is just one way to compute that math. Only if the math has no modelless decomposition → proceed to paths 1–3 below.
 
-**The three modelless unblock paths (check ALL before deferring, AFTER path 0 decomposition fails):**
+**Path 0.5 — training-cost-weighted re-evaluation (the Plan 318 amendment, adopted 2026-08-05):** If Path 0 decomposition fails (the math does NOT decompose into modelless primitives), check whether a training round-trip is affordable under the current Plan 318 GPU regime (~4.7 s/step on 4090 for the 0.40B fixture, ~13 hours for a 10K-step run; the 4B target will be ~10× slower — see Plan 318). If affordable, the deferral is not a "genuine riir-train dependency" but a **cost-justified training dependency** — and the deferral should be downgraded from a one-line redirect to a **Plan** (in `riir-train/.plans/`) that:
+1. Names the specific training recipe (paper + section + hyperparams).
+2. Estimates the GPU-hours cost (steps × s/step ÷ 3600).
+3. Defines a GOAT gate comparing the trained version against the modelless baseline (the trained version MUST measurably beat the modelless baseline on a named metric — quality, latency, or robustness — to justify the training spend).
+4. Promotes the trained version ONLY if it beats the modelless baseline; otherwise keeps the modelless path as default and documents the trained artifact as an opt-in feature gate.
+
+This does NOT weaken the modelless-first mandate — it makes the cost-benefit explicit. A modelless primitive that ships at 95% quality is still the right default; a trained primitive that achieves 99% at 13 GPU-hours may be worth the cost for a headline feature (latent CoT via looping is the canonical example — see Plan 318 "GOAT harvest map").
+
+**Dual-track framing (also adopted 2026-08-05):** the research workflow now supports TWO complementary planning tracks:
+- **Modelless track (default):** the current §3.5 protocol — Path 0 + Paths 1–3. Produces inference-time primitives in `katgpt-rs` / `riir-ai`.
+- **Model-based track (Plan 318 gated):** for papers where the training recipe IS the value, AND Plan 318 makes the training affordable (Path 0.5). Produces training plans in `riir-train/.plans/` that align with the modelless runtime via `LoraPair { reader, writer }` consumption (Plan 025) and freeze/thaw (`MerkleFrozenEnvelope`).
+
+The two tracks are NOT competing — they are complementary. The modelless track produces the runtime; the model-based track produces the trained weights that flow into the runtime via freeze/thaw. A single paper can contribute to BOTH tracks: a modelless inference primitive (shipped now) + a trained weight artifact (shipped when Plan 318 produces a checkpoint). The canonical pattern is LT2 (Research 073 / Plan 108) = modelless looped runtime, + Ouro (Research 073 PASS-Redirect) = trained looped weights that would feed LT2 via freeze/thaw.
+
+**The three modelless unblock paths (check ALL before deferring, AFTER path 0 decomposition fails; run Path 0.5 AFTER all three fail to confirm the training cost is justified):**
 
 1. **Freeze/thaw snapshot correction** (`riir-neuron-db/src/freeze.rs`, `MerkleFrozenEnvelope`) — can a frozen snapshot state, thawed at inference, fix the issue? If the failure is a systematic bias from a runtime construction (e.g., doubled signal, position mismatch, attention pattern asymmetry), a corrected snapshot + thaw may eliminate it without gradient descent.
 2. **Raw/lora reader-writer hot-swap** (`LoraPair { reader, writer }`, Plan 025; `LoRAHotSwap`, `dispatch_lora_merge` in riir-ai) — can a **deterministically constructed** (not trained) reader or writer adapter fix the issue? Applying a pre-constructed LoRA overlay is modelless (weight addition, no backprop). The question is: can the correction be derived in closed form (e.g., scale-by-0.5, zero-out-specific-positions, identity-minus-projection) rather than learned via gradient descent?
@@ -521,6 +535,8 @@ Gate/mechanism/paper appears to need training
 - Which of paths 1–3 were checked.
 - Why each failed (concrete reason, not "doesn't apply").
 - What specifically requires gradient descent that no deterministic construction can provide.
+- **Path 0.5 (mandatory when Plan 318 is live):** whether a training round-trip is affordable under the current GPU regime. If YES → the deferral becomes a Plan in `riir-train/.plans/` (not just a one-line redirect) with a named recipe, GPU-hours estimate, and GOAT gate design. If NO (training too expensive at current scale, e.g. the 4B target config not yet added to katgpt-rs) → explicitly note the cost barrier and the condition under which it lifts ("re-evaluate when the 4B config lands in katgpt-rs").
+- **Dual-track contribution:** state whether the paper contributes to the modelless track (inference primitive, shipped now), the model-based track (training plan, gated on Plan 318), or both. A paper that ships a modelless primitive today AND has a training follow-up is the canonical dual-track contribution — do not collapse it to a single verdict.
 
 ### 3.6. Defend-wrong PoC for parity claims — MANDATORY before any "already ships" / "parity" verdict
 
