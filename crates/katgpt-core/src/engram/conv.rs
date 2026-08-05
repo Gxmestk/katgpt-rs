@@ -130,18 +130,33 @@ pub fn conv_causal_into(v_tilde: &[f32], out: &mut [f32], kernel: [f32; 4], dila
         "conv_causal_into: out.len() must equal v_tilde.len()"
     );
 
-    let dil = dilation.max(1) as isize;
-    for (t, out_slot) in out.iter_mut().enumerate().take(n) {
+    let dil = dilation.max(1);
+    let m = out.len().min(n);
+    // Split the output range at the point where the oldest tap first comes
+    // into range. Below `head` some taps are zero-padded (branchy); at or
+    // above it *all four* taps are guaranteed in range, so the body needs no
+    // per-tap bounds test at all. The accumulation order (oldest → current)
+    // is unchanged, so results stay bit-identical.
+    let head = 3usize.saturating_mul(dil).min(m);
+    for (t, out_slot) in out[..head].iter_mut().enumerate() {
         let mut acc = 0.0f32;
         // kernel[0] = oldest tap (t - 3δ); kernel[3] = current (t - 0δ).
         // Out-of-range taps contribute 0 (zero-padding at the left edge).
         for (j, &k) in kernel.iter().enumerate() {
-            let offset = (3 - j) as isize * dil;
-            let tap_t = t as isize - offset;
-            if tap_t >= 0 {
-                acc += k * v_tilde[tap_t as usize];
+            let offset = (3 - j) * dil;
+            if t >= offset {
+                acc += k * v_tilde[t - offset];
             }
         }
+        *out_slot = acc;
+    }
+    for (i, out_slot) in out[head..m].iter_mut().enumerate() {
+        let base = head + i - 3 * dil;
+        let mut acc = 0.0f32;
+        acc += kernel[0] * v_tilde[base];
+        acc += kernel[1] * v_tilde[base + dil];
+        acc += kernel[2] * v_tilde[base + 2 * dil];
+        acc += kernel[3] * v_tilde[base + 3 * dil];
         *out_slot = acc;
     }
 }
@@ -208,18 +223,33 @@ pub fn conv_causal_dyn_into(v_tilde: &[f32], out: &mut [f32], kernel: &[f32], di
         "conv_causal_dyn_into: out.len() must equal v_tilde.len()"
     );
 
-    let dil = dilation.max(1) as isize;
-    let last = (k - 1) as isize; // index of the current-position tap
-    for (t, out_slot) in out.iter_mut().enumerate().take(n) {
+    let dil = dilation.max(1);
+    let last = k - 1; // index of the current-position tap
+    let m = out.len().min(n);
+    // Same head/body split as `conv_causal_into`: past `head` every tap is
+    // in range, so the body drops the per-tap zero-padding branch. The
+    // accumulation order (oldest → current) is unchanged.
+    let head = last.saturating_mul(dil).min(m);
+    for (t, out_slot) in out[..head].iter_mut().enumerate() {
         let mut acc = 0.0f32;
         // kernel[0] = oldest tap (t - (K-1)·δ); kernel[K-1] = current (t - 0·δ).
         // Out-of-range taps contribute 0 (zero-padding at the left edge).
         for (j, &kw) in kernel.iter().enumerate() {
-            let offset = (last - j as isize) * dil;
-            let tap_t = t as isize - offset;
-            if tap_t >= 0 {
-                acc += kw * v_tilde[tap_t as usize];
+            let offset = (last - j) * dil;
+            if t >= offset {
+                acc += kw * v_tilde[t - offset];
             }
+        }
+        *out_slot = acc;
+    }
+    for (i, out_slot) in out[head..m].iter_mut().enumerate() {
+        // head == last*dil here (the `.min(m)` clamp only fires when this
+        // loop is empty), so the oldest tap sits at index `i`.
+        let mut acc = 0.0f32;
+        let mut tap = i;
+        for &kw in kernel.iter() {
+            acc += kw * v_tilde[tap];
+            tap += dil;
         }
         *out_slot = acc;
     }
@@ -305,31 +335,38 @@ pub fn conv_temporal_step_into(
     let dil = dilation.max(1);
     let last = k - 1; // index of the current-position tap in kernel[]
 
-    // Zero output first (all channels), then accumulate. Cheaper than
-    // per-channel fill because the inner kernel loop is short (K small).
+    // Zero output first (all channels), then accumulate.
     for slot in out.iter_mut() {
         *slot = 0.0;
     }
 
-    for j in 0..d {
-        let mut acc = 0.0f32;
-        for (ki, &kw) in kernel.iter().enumerate() {
-            if kw == 0.0 {
-                continue;
-            }
-            // kernel[ki] weights the signal at offset (last - ki) * dil timesteps ago.
-            let timesteps_ago = (last - ki) * dil;
-            if timesteps_ago == 0 {
-                acc += kw * v_current[j];
-            } else if timesteps_ago <= h {
-                // v_history is oldest-first; the entry timesteps_ago back is at
-                // index `h - timesteps_ago`.
-                let hist_idx = h - timesteps_ago;
-                acc += kw * v_history[hist_idx][j];
-            }
-            // else: before sequence start — zero-padding (contributes 0).
+    // Loop interchange: taps outer, channels inner. The original ran the
+    // K-tap loop (with its zero-test, offset multiply and history index
+    // arithmetic) once per channel — O(K·D) branches and index computations.
+    // Hoisting the tap bookkeeping out of the channel loop leaves a
+    // contiguous `out[j] += kw * src[j]` AXPY per tap, which LLVM
+    // auto-vectorizes. Each `out[j]` still accumulates the taps in ascending
+    // `ki` order starting from 0.0, so the float arithmetic is unchanged.
+    let out_d = &mut out[..d];
+    for (ki, &kw) in kernel.iter().enumerate() {
+        if kw == 0.0 {
+            continue;
         }
-        out[j] = acc;
+        // kernel[ki] weights the signal at offset (last - ki) * dil timesteps ago.
+        let timesteps_ago = (last - ki) * dil;
+        let src: &[f32] = if timesteps_ago == 0 {
+            v_current
+        } else if timesteps_ago <= h {
+            // v_history is oldest-first; the entry timesteps_ago back is at
+            // index `h - timesteps_ago`.
+            &v_history[h - timesteps_ago]
+        } else {
+            // Before sequence start — zero-padding (contributes 0).
+            continue;
+        };
+        for (o, &s) in out_d.iter_mut().zip(src[..d].iter()) {
+            *o += kw * s;
+        }
     }
 }
 

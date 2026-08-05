@@ -108,6 +108,19 @@ pub fn fft_smooth_into(
         let fy_centered = fy_raw - h_f * ((fy_raw >= half_h) as u32 as f32);
         let fyc_sq = fy_centered * fy_centered;
         let row_off = fy * w;
+        // Whole-row early out: `r_sq = fxc² + fyc² >= fyc_sq` because `fxc² >= 0`,
+        // so if `fyc_sq > cutoff_r_sq` every element of this row gets mask 0.0.
+        // Apply the *same* `*= 0.0` (not a store of 0.0, which would differ in
+        // the sign of zero and for non-finite inputs) but skip the per-element
+        // centered-coordinate arithmetic and compare. For the typical small
+        // `cutoff` this is the large majority of rows.
+        if fyc_sq > cutoff_r_sq {
+            for c in &mut buf[row_off..row_off + w] {
+                c.re *= 0.0;
+                c.im *= 0.0;
+            }
+            continue;
+        }
         for fx in 0..w {
             let fx_raw = fx as f32;
             let fx_centered = fx_raw - w_f * ((fx_raw >= half_w) as u32 as f32);

@@ -145,10 +145,10 @@ pub fn symmetric_eig(
     scratch.ensure_capacity(n);
 
     // Initialize eigvecs = I (will accumulate Q from Householder + Q' from QL).
+    // memset + n diagonal stores instead of n² branchy element writes.
+    eigvecs[..n * n].fill(0.0);
     for i in 0..n {
-        for j in 0..n {
-            eigvecs[i * n + j] = if i == j { 1.0 } else { 0.0 };
-        }
+        eigvecs[i * n + i] = 1.0;
     }
 
     // Copy A into the working buffer.
@@ -256,30 +256,42 @@ fn tridiagonalize(
         //   K = beta * (v·p) / 2
         //   w = p - K * v
         //   A_sub ← A_sub - v wᵀ - w vᵀ   (symmetric rank-2 update)
+        // Slice `v`/`w` down to `block_size` once so the inner loops carry no
+        // bounds checks and LLVM can vectorize them (the arithmetic order is
+        // unchanged, so the result stays bit-identical).
+        let v_blk = &v[..block_size];
         for (i, p_i) in p.iter_mut().enumerate().take(block_size) {
             let row_offset = (block_start + i) * n + block_start;
+            let a_row = &a[row_offset..row_offset + block_size];
             let mut s = 0.0_f64;
-            for (j, &vj) in v.iter().enumerate().take(block_size) {
-                s += a[row_offset + j] * vj;
+            for (&a_ij, &vj) in a_row.iter().zip(v_blk.iter()) {
+                s += a_ij * vj;
             }
             *p_i = beta * s;
         }
+        let p_blk = &p[..block_size];
         let mut vp = 0.0_f64;
-        for i in 0..block_size {
-            vp += v[i] * p[i];
+        for (&vi, &pi) in v_blk.iter().zip(p_blk.iter()) {
+            vp += vi * pi;
         }
         let k_coef = beta * vp * 0.5;
-        for i in 0..block_size {
-            w[i] = p[i] - k_coef * v[i];
+        for ((w_i, &p_i), &v_i) in w[..block_size]
+            .iter_mut()
+            .zip(p_blk.iter())
+            .zip(v_blk.iter())
+        {
+            *w_i = p_i - k_coef * v_i;
         }
         // Symmetric rank-2 update: A_sub[i,j] -= v[i]*w[j] + w[i]*v[j].
         // Cache-friendly: one pass per row of A_sub; v, w fit in L1/L2.
+        let w_blk = &w[..block_size];
         for i in 0..block_size {
-            let vi = v[i];
-            let wi = w[i];
+            let vi = v_blk[i];
+            let wi = w_blk[i];
             let row_offset = (block_start + i) * n + block_start;
-            for j in 0..block_size {
-                a[row_offset + j] -= vi * w[j] + wi * v[j];
+            let a_row = &mut a[row_offset..row_offset + block_size];
+            for ((a_ij, &wj), &vj) in a_row.iter_mut().zip(w_blk.iter()).zip(v_blk.iter()) {
+                *a_ij -= vi * wj + wi * vj;
             }
         }
 
@@ -295,15 +307,15 @@ fn tridiagonalize(
         // Accumulate Q ← Q · H where H acts on rows/cols block_start..n.
         // For each row i of Q: s = beta · (Q[i, block_start..n] · v);
         // then Q[i, block_start..n] -= s · v.
-        for i in 0..n {
-            let row_offset = i * n + block_start;
+        for q_row in q[..n * n].chunks_exact_mut(n) {
+            let row_slice = &mut q_row[block_start..block_start + block_size];
             let mut s = 0.0_f64;
-            for j in 0..block_size {
-                s += q[row_offset + j] * v[j];
+            for (&q_ij, &vj) in row_slice.iter().zip(v_blk.iter()) {
+                s += q_ij * vj;
             }
             s *= beta;
-            for j in 0..block_size {
-                q[row_offset + j] -= s * v[j];
+            for (q_ij, &vj) in row_slice.iter_mut().zip(v_blk.iter()) {
+                *q_ij -= s * vj;
             }
         }
     }
@@ -436,11 +448,15 @@ fn tqli_implicit_shift(
                 // [[c, s], [-s, c]] (the inverse transpose of the active rotation).
                 // Applies to ALL rows of z, not just the active block, because the
                 // QL step is a similarity transform on the full matrix.
-                for k in 0..n {
-                    let row_offset = k * n;
-                    let f = z[row_offset + i + 1];
-                    z[row_offset + i + 1] = s * z[row_offset + i] + c * f;
-                    z[row_offset + i] = c * z[row_offset + i] - s * f;
+                // Row-wise via chunks_exact_mut: one bounds-checked pair of
+                // loads per row instead of two index computations + four
+                // bounds checks. `z[..,i]` is loaded once and reused (the
+                // original read it twice), so the arithmetic is identical.
+                for row in z[..n * n].chunks_exact_mut(n) {
+                    let z_i = row[i];
+                    let f = row[i + 1];
+                    row[i + 1] = s * z_i + c * f;
+                    row[i] = c * z_i - s * f;
                 }
             }
 

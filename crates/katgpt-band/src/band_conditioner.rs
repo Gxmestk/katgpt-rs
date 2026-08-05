@@ -299,27 +299,47 @@ fn partial_correlation(x: &[f32], y: &[f32], z_columns: &[&[f32]], n: usize) -> 
     }
     let mut basis_cols = 1;
 
+    // Cache ‖basis[:, j]‖² per column. A finalized basis column is never
+    // mutated again, so its norm is loop-invariant across every later
+    // `z_col`/`prev` pair — the old code recomputed it O(cols²) times.
+    // Accumulation order is unchanged (same rows, same sequence), so the
+    // cached value is bit-identical to the recomputed one.
+    let mut col_norms = [0.0f32; 8];
+    {
+        let mut nrm = 0.0f32;
+        for row in basis.iter() {
+            nrm += row[0] * row[0];
+        }
+        col_norms[0] = nrm;
+    }
+
     // Orthogonalize z-columns against current basis (modified Gram-Schmidt).
     for z_col in z_columns {
         // Copy z_col into basis slot.
-        for i in 0..n {
-            basis[i][basis_cols] = z_col[i];
+        for (row, &z) in basis.iter_mut().zip(z_col[..n].iter()) {
+            row[basis_cols] = z;
         }
         // Subtract projections onto previous basis vectors.
         for prev in 0..basis_cols {
+            let norm = col_norms[prev];
+            if norm <= 1e-12 {
+                continue;
+            }
             let mut dot = 0.0f32;
-            let mut norm = 0.0f32;
             for row in basis.iter() {
                 dot += row[basis_cols] * row[prev];
-                norm += row[prev] * row[prev];
             }
-            if norm > 1e-12 {
-                let coef = dot / norm;
-                for row in basis.iter_mut() {
-                    row[basis_cols] -= coef * row[prev];
-                }
+            let coef = dot / norm;
+            for row in basis.iter_mut() {
+                row[basis_cols] -= coef * row[prev];
             }
         }
+        // Finalize: record this column's norm for later iterations.
+        let mut nrm = 0.0f32;
+        for row in basis.iter() {
+            nrm += row[basis_cols] * row[basis_cols];
+        }
+        col_norms[basis_cols] = nrm;
         basis_cols += 1;
     }
 
@@ -337,17 +357,22 @@ fn partial_correlation(x: &[f32], y: &[f32], z_columns: &[&[f32]], n: usize) -> 
 /// `basis[i][j]` for `i in 0..n, j in 0..cols`.
 #[allow(clippy::needless_range_loop)] // stride math: j indexes the 2nd dim of `basis[i][j]`
 fn project_out(v: &mut [f32], basis: &[[f32; 8]], cols: usize, n: usize) {
+    // Slice both operands to `n` once so the inner loops are bounds-check
+    // free zipped scans (identical accumulation order).
+    let rows = &basis[..n];
+    let v = &mut v[..n];
     for j in 0..cols {
         let mut dot = 0.0f32;
         let mut norm = 0.0f32;
-        for i in 0..n {
-            dot += v[i] * basis[i][j];
-            norm += basis[i][j] * basis[i][j];
+        for (&vi, row) in v.iter().zip(rows.iter()) {
+            let bij = row[j];
+            dot += vi * bij;
+            norm += bij * bij;
         }
         if norm > 1e-12 {
             let coef = dot / norm;
-            for i in 0..n {
-                v[i] -= coef * basis[i][j];
+            for (vi, row) in v.iter_mut().zip(rows.iter()) {
+                *vi -= coef * row[j];
             }
         }
     }
@@ -356,9 +381,10 @@ fn project_out(v: &mut [f32], basis: &[[f32; 8]], cols: usize, n: usize) {
 /// Pearson correlation coefficient of `x[..n]` and `y[..n]`.
 fn pearson_r(x: &[f32], y: &[f32], n: usize) -> f32 {
     let (mut sx, mut sy, mut sxy, mut sx2, mut sy2) = (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
-    for i in 0..n {
-        let xi = f64::from(x[i]);
-        let yi = f64::from(y[i]);
+    // Zip the two `n`-prefixes: one pair of bounds checks instead of 2n.
+    for (&xr, &yr) in x[..n].iter().zip(y[..n].iter()) {
+        let xi = f64::from(xr);
+        let yi = f64::from(yr);
         sx += xi;
         sy += yi;
         sxy += xi * yi;
@@ -426,9 +452,9 @@ impl Default for InfoNceConfig {
 /// Default critic: dot product of `x_emb` and `y_emb`, modulated by `z_emb` magnitude.
 fn default_dot_critic(x_emb: &[f32], y_emb: &[f32], z_emb: &[f32]) -> f32 {
     let mut dot = 0.0f32;
-    let n = x_emb.len().min(y_emb.len());
-    for i in 0..n {
-        dot += x_emb[i] * y_emb[i];
+    // `zip` truncates at `min(len)` with no per-element bounds check.
+    for (&xi, &yi) in x_emb.iter().zip(y_emb.iter()) {
+        dot += xi * yi;
     }
     let z_norm = z_emb.iter().map(|v| v * v).sum::<f32>().sqrt();
     dot / (1.0 + z_norm) // sigmoid-friendly scale

@@ -151,12 +151,17 @@ impl JacobianSupportEstimator {
             let row = &hidden[s * d_hidden..(s + 1) * d_hidden];
             // f(h) baseline (dot product with task_emb, truncated).
             let base = dot_truncated(row, task_emb);
-            for i in 0..d_hidden {
+            // Split the coordinate loop at `min(d_hidden, task_emb.len())` so
+            // the bulk pass is a bounds-check-free, branch-free 3-way zip
+            // (the old `task_emb.get(i)` did a length check + select per
+            // coordinate). Arithmetic per coordinate is unchanged.
+            let n_t = d_hidden.min(task_emb.len());
+            for ((m, &h_i), &t_i) in mag[..n_t]
+                .iter_mut()
+                .zip(row[..n_t].iter())
+                .zip(task_emb[..n_t].iter())
+            {
                 // Central finite difference on coordinate i.
-                // Hoist the four repeated `task_emb.get(i).copied().unwrap_or(0.0)`
-                // and the two `row[i]` reads out of the arithmetic.
-                let t_i = task_emb.get(i).copied().unwrap_or(0.0);
-                let h_i = row[i];
                 let hp = h_i + eps;
                 let hm = h_i - eps;
                 // Re-evaluate the readout with coordinate i perturbed.
@@ -165,7 +170,16 @@ impl JacobianSupportEstimator {
                 let fp = base + (hp - h_i) * t_i;
                 let fm = base + (hm - h_i) * t_i;
                 let jv_i = (fp - fm) / two_eps;
-                mag[i] += jv_i.abs();
+                *m += jv_i.abs();
+            }
+            // Tail: coordinates past the end of `task_emb` behave as t_i = 0.
+            for (m, &h_i) in mag[n_t..d_hidden].iter_mut().zip(row[n_t..].iter()) {
+                let hp = h_i + eps;
+                let hm = h_i - eps;
+                let fp = base + (hp - h_i) * 0.0;
+                let fm = base + (hm - h_i) * 0.0;
+                let jv_i = (fp - fm) / two_eps;
+                *m += jv_i.abs();
             }
         }
         // Average and threshold.
@@ -190,10 +204,11 @@ impl JacobianSupportEstimator {
 /// Truncated dot product: sum of `a[i]*b[i]` for `i < min(a.len(), b.len())`.
 #[inline]
 fn dot_truncated(a: &[f32], b: &[f32]) -> f32 {
-    let n = a.len().min(b.len());
+    // `zip` already truncates at `min(a.len(), b.len())` and is bounds-check
+    // free, so the accumulation loop auto-vectorizes. Same summation order.
     let mut s = 0.0_f32;
-    for i in 0..n {
-        s += a[i] * b[i];
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        s += x * y;
     }
     s
 }

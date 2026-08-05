@@ -370,28 +370,33 @@ pub fn spectral_differentiate_into(
         }
         1 => {
             // (iω)^1 = i·ω. Multiply by (0 + i·ω) = rotate +90° and scale.
-            for j in 0..n {
-                // Zero the Nyquist bin for odd orders on even-length signals
-                // to keep the output real.
-                if is_even_n && j == nyquist_idx {
-                    scratch.freq_buf[j] = Complex::new(0.0, 0.0);
-                    continue;
-                }
+            //
+            // `iter_mut().enumerate()` drops three bounds checks per bin, and
+            // the Nyquist zeroing is hoisted out of the loop body (it used to
+            // be a branch evaluated on every bin). Multiplying the Nyquist bin
+            // and *then* overwriting it with zero gives the same final value as
+            // skipping it, so the result is unchanged.
+            for (j, bin) in scratch.freq_buf.iter_mut().enumerate() {
                 let k = signed_freq_index(j, n) as f32;
                 let omega = two_pi_over_nh * k;
                 // (i·ω) · (a + bi) = (-ω·b) + i·(ω·a)
-                let a = scratch.freq_buf[j].re;
-                let b = scratch.freq_buf[j].im;
-                scratch.freq_buf[j] = Complex::new(-omega * b, omega * a);
+                let a = bin.re;
+                let b = bin.im;
+                *bin = Complex::new(-omega * b, omega * a);
+            }
+            // Zero the Nyquist bin for odd orders on even-length signals
+            // to keep the output real.
+            if is_even_n {
+                scratch.freq_buf[nyquist_idx] = Complex::new(0.0, 0.0);
             }
         }
         2 => {
             // (iω)^2 = -ω². Real multiplier, no rotation.
-            for j in 0..n {
+            for (j, bin) in scratch.freq_buf.iter_mut().enumerate() {
                 let k = signed_freq_index(j, n) as f32;
                 let omega = two_pi_over_nh * k;
                 let mult = -omega * omega;
-                scratch.freq_buf[j] *= mult;
+                *bin *= mult;
             }
         }
         _ => {

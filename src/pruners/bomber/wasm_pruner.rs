@@ -204,9 +204,13 @@ impl BomberInner {
         self.batch_is_valid_fn.is_some()
     }
 
-    /// Write bytes to WASM linear memory at the given offset.
-    fn write_memory(&mut self, offset: usize, data: &[u8]) -> Result<(), String> {
-        let end = offset + data.len();
+    /// Grow WASM linear memory so that `end` bytes are addressable.
+    ///
+    /// Split out of [`write_memory`] so that callers holding a borrow on
+    /// another field of `self` (e.g. `state_buf`) can grow first and then
+    /// copy via disjoint field borrows.
+    #[inline]
+    fn ensure_capacity(&mut self, end: usize) -> Result<(), String> {
         let mem_size = self.memory.data_size(&self.store);
         if end > mem_size {
             let extra_pages = ((end - mem_size) / 65536) + 1;
@@ -214,7 +218,30 @@ impl BomberInner {
                 .grow(&mut self.store, extra_pages as u64)
                 .map_err(|e| format!("failed to grow WASM memory: {e}"))?;
         }
+        Ok(())
+    }
+
+    /// Write bytes to WASM linear memory at the given offset.
+    fn write_memory(&mut self, offset: usize, data: &[u8]) -> Result<(), String> {
+        let end = offset + data.len();
+        self.ensure_capacity(end)?;
         self.memory.data_mut(&mut self.store)[offset..end].copy_from_slice(data);
+        Ok(())
+    }
+
+    /// Copy the first `len` bytes of the reusable `state_buf` into WASM memory.
+    ///
+    /// Avoids the intermediate `[u8; 1024]` stack bounce (a 1 KiB memset plus a
+    /// second copy) that a `write_memory(&self.state_buf...)` call would require
+    /// to satisfy the borrow checker. `Memory` is `Copy`, so the destination
+    /// slice borrows only `self.store` while the source borrows only
+    /// `self.state_buf` — disjoint fields.
+    fn write_state_buf(&mut self, offset: usize, len: usize) -> Result<(), String> {
+        let end = offset + len;
+        self.ensure_capacity(end)?;
+        let memory = self.memory;
+        let dst = memory.data_mut(&mut self.store);
+        dst[offset..end].copy_from_slice(self.state_buf.as_bytes(len));
         Ok(())
     }
 
@@ -223,6 +250,20 @@ impl BomberInner {
         let data = &self.memory.data(&self.store)[offset..offset + count * 4];
         data.chunks_exact(4)
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect()
+    }
+
+    /// Read Q16.16 results from WASM memory, decoding straight into `f32`.
+    ///
+    /// Fused version of `read_u32_results` + `.map(decode).collect()`: one
+    /// allocation instead of two.
+    fn read_q16_results(&self, offset: usize, count: usize) -> Vec<f32> {
+        let data = &self.memory.data(&self.store)[offset..offset + count * 4];
+        data.chunks_exact(4)
+            .map(|c| {
+                let v = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+                (v as f32 / 65536.0).clamp(0.0, 1.0)
+            })
             .collect()
     }
 
@@ -242,15 +283,13 @@ impl BomberInner {
             return false;
         }
 
-        // Serialize into reusable stack buffer, then copy to release borrow
+        // Serialize into reusable stack buffer, then copy straight into WASM
+        // memory (no intermediate 1 KiB stack bounce).
         let (bytes_written, token_count) = self
             .state_buf
             .serialize(grid, player_x, player_y, player_id, bombs);
 
-        let mut tmp = [0u8; 1024];
-        tmp[..bytes_written].copy_from_slice(self.state_buf.as_bytes(bytes_written));
-
-        if self.write_memory(0, &tmp[..bytes_written]).is_err() {
+        if self.write_state_buf(0, bytes_written).is_err() {
             return false;
         }
 
@@ -289,10 +328,7 @@ impl BomberInner {
             .state_buf
             .serialize(grid, player_x, player_y, player_id, bombs);
 
-        let mut tmp = [0u8; 1024];
-        tmp[..bytes_written].copy_from_slice(self.state_buf.as_bytes(bytes_written));
-
-        if self.write_memory(0, &tmp[..bytes_written]).is_err() {
+        if self.write_state_buf(0, bytes_written).is_err() {
             return 0.0;
         }
 
@@ -341,10 +377,6 @@ impl BomberInner {
         // 1. Serialize grid + bombs (batch layout: no player data)
         let (state_bytes, state_tokens) = self.state_buf.serialize_grid(grid, bombs);
 
-        // Stack copy to release state_buf borrow before mutable self access
-        let mut tmp = [0u8; 1024];
-        tmp[..state_bytes].copy_from_slice(self.state_buf.as_bytes(state_bytes));
-
         // 2. Compute aligned offsets
         let players_off = align8(state_bytes);
         let players_bytes = n * 3 * 4; // N × (id, x, y)
@@ -352,22 +384,24 @@ impl BomberInner {
         let actions_bytes = m * 4;
         let results_off = actions_off + actions_bytes;
 
-        // 3. Write state
-        self.write_memory(0, &tmp[..state_bytes]).ok()?;
+        // 3. Write state (direct from state_buf — no 1 KiB stack bounce)
+        self.write_state_buf(0, state_bytes).ok()?;
 
-        // 4. Write players array: N × (id: u32, x: u32, y: u32)
-        let mut players_buf = [0u8; MAX_PLAYERS * 12];
+        // 4+5. Write players array (N × (id: u32, x: u32, y: u32)) immediately
+        // followed by the action indices. The two regions are contiguous
+        // (`actions_off == players_off + players_bytes`), so a single staged
+        // buffer + one `write_memory` call replaces two.
+        let mut args_buf = [0u8; MAX_PLAYERS * 12 + ACTION_COUNT * 4];
         for (i, &(id, x, y)) in players.iter().take(n).enumerate() {
             let off = i * 12;
-            players_buf[off..off + 4].copy_from_slice(&(id as u32).to_le_bytes());
-            players_buf[off + 4..off + 8].copy_from_slice(&(x as u32).to_le_bytes());
-            players_buf[off + 8..off + 12].copy_from_slice(&(y as u32).to_le_bytes());
+            args_buf[off..off + 4].copy_from_slice(&(id as u32).to_le_bytes());
+            args_buf[off + 4..off + 8].copy_from_slice(&(x as u32).to_le_bytes());
+            args_buf[off + 8..off + 12].copy_from_slice(&(y as u32).to_le_bytes());
         }
-        self.write_memory(players_off, &players_buf[..n * 12])
+        // Actions are always [0,1,2,3,4,5,6] — Issue 016 added Detonate.
+        args_buf[players_bytes..players_bytes + actions_bytes].copy_from_slice(&ACTIONS_BYTES);
+        self.write_memory(players_off, &args_buf[..players_bytes + actions_bytes])
             .ok()?;
-
-        // 5. Write actions array (always [0,1,2,3,4,5,6] — Issue 016 added Detonate)
-        self.write_memory(actions_off, &ACTIONS_BYTES).ok()?;
 
         // 6. Call batch_is_valid
         let result = batch_fn.call(
@@ -423,28 +457,25 @@ impl BomberInner {
 
         let (state_bytes, state_tokens) = self.state_buf.serialize_grid(grid, bombs);
 
-        let mut tmp = [0u8; 1024];
-        tmp[..state_bytes].copy_from_slice(self.state_buf.as_bytes(state_bytes));
-
         let players_off = align8(state_bytes);
         let players_bytes = n * 3 * 4;
         let actions_off = players_off + players_bytes;
         let actions_bytes = m * 4;
         let results_off = actions_off + actions_bytes;
 
-        self.write_memory(0, &tmp[..state_bytes]).ok()?;
+        self.write_state_buf(0, state_bytes).ok()?;
 
-        let mut players_buf = [0u8; MAX_PLAYERS * 12];
+        // Players + actions are contiguous — stage once, write once.
+        let mut args_buf = [0u8; MAX_PLAYERS * 12 + ACTION_COUNT * 4];
         for (i, &(id, x, y)) in players.iter().take(n).enumerate() {
             let off = i * 12;
-            players_buf[off..off + 4].copy_from_slice(&(id as u32).to_le_bytes());
-            players_buf[off + 4..off + 8].copy_from_slice(&(x as u32).to_le_bytes());
-            players_buf[off + 8..off + 12].copy_from_slice(&(y as u32).to_le_bytes());
+            args_buf[off..off + 4].copy_from_slice(&(id as u32).to_le_bytes());
+            args_buf[off + 4..off + 8].copy_from_slice(&(x as u32).to_le_bytes());
+            args_buf[off + 8..off + 12].copy_from_slice(&(y as u32).to_le_bytes());
         }
-        self.write_memory(players_off, &players_buf[..n * 12])
+        args_buf[players_bytes..players_bytes + actions_bytes].copy_from_slice(&ACTIONS_BYTES);
+        self.write_memory(players_off, &args_buf[..players_bytes + actions_bytes])
             .ok()?;
-
-        self.write_memory(actions_off, &ACTIONS_BYTES).ok()?;
 
         let result = batch_fn.call(
             &mut self.store,
@@ -463,11 +494,8 @@ impl BomberInner {
             return None;
         }
 
-        let raw = self.read_u32_results(results_off, n * m);
-        let scores: Vec<f32> = raw
-            .iter()
-            .map(|&v| (v as f32 / 65536.0).clamp(0.0, 1.0))
-            .collect();
+        // Decode Q16.16 straight into f32 — one allocation instead of two.
+        let scores = self.read_q16_results(results_off, n * m);
 
         Some(BatchRelevanceResult {
             scores,
@@ -701,17 +729,20 @@ impl BomberWasmPruner {
         let id = std::thread::current().id();
         let guard = self.pool.pin();
 
-        // Lock-free read: check if this thread already has an instance
-        if guard.get(&id).is_none() {
-            // First call for this thread — create instance
-            let inner = match BomberInner::new(&self.engine, &self.module) {
-                Ok(i) => Mutex::new(i),
-                Err(_) => return None,
-            };
-            guard.insert(id, inner);
-        }
-
-        let mutex = guard.get(&id)?;
+        // Lock-free read. The steady-state path is a single hash lookup;
+        // only the first call on a thread falls through to insert + re-get.
+        let mutex = match guard.get(&id) {
+            Some(m) => m,
+            None => {
+                // First call for this thread — create instance
+                let inner = match BomberInner::new(&self.engine, &self.module) {
+                    Ok(i) => Mutex::new(i),
+                    Err(_) => return None,
+                };
+                guard.insert(id, inner);
+                guard.get(&id)?
+            }
+        };
         let mut inner = match mutex.lock() {
             Ok(g) => g,
             Err(_) => return None,

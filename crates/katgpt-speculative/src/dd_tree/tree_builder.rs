@@ -189,7 +189,7 @@ impl TreeBuilder {
                             .filter_map(|(&i, &v)| {
                                 if v {
                                     Some(TreeNode {
-                                        score: marginals[0][i].ln(),
+                                        score: self.log_marginals[0][i],
                                         depth: 0,
                                         token_idx: i,
                                         parent_path: i as u128,
@@ -204,7 +204,7 @@ impl TreeBuilder {
                         for (&i, &v) in self.candidates_buf.iter().zip(self.valid_buf.iter()) {
                             if v {
                                 self.heap.push(TreeNode {
-                                    score: marginals[0][i].ln(),
+                                    score: self.log_marginals[0][i],
                                     depth: 0,
                                     token_idx: i,
                                     parent_path: i as u128,
@@ -216,7 +216,7 @@ impl TreeBuilder {
                     for (i, &prob) in marginals[0].iter().enumerate() {
                         if prob > 0.0 && pruner.is_valid(0, i, &[]) {
                             self.heap.push(TreeNode {
-                                score: prob.ln(),
+                                score: self.log_marginals[0][i],
                                 depth: 0,
                                 token_idx: i,
                                 parent_path: i as u128,
@@ -254,7 +254,7 @@ impl TreeBuilder {
                             };
 
                             self.heap.push(TreeNode {
-                                score: parent_chain_score + prob.ln(),
+                                score: parent_chain_score + self.log_marginals[depth][i],
                                 depth,
                                 token_idx: i,
                                 parent_path: sibling_path,
@@ -275,7 +275,7 @@ impl TreeBuilder {
                     for (i, &prob) in marginals[next_depth].iter().enumerate() {
                         if prob > 0.0 && pruner.is_valid(next_depth, i, parent_tokens) {
                             self.heap.push(TreeNode {
-                                score: last.score + prob.ln(),
+                                score: last.score + self.log_marginals[next_depth][i],
                                 depth: next_depth,
                                 token_idx: i,
                                 parent_path: (last.parent_path << 16) | (i as u128),
@@ -308,7 +308,7 @@ impl TreeBuilder {
                         .filter_map(|(&i, &v)| {
                             if v {
                                 Some(TreeNode {
-                                    score: marginals[0][i].ln(),
+                                    score: self.log_marginals[0][i],
                                     depth: 0,
                                     token_idx: i,
                                     parent_path: i as u128,
@@ -323,7 +323,7 @@ impl TreeBuilder {
                     for (&i, &v) in self.candidates_buf.iter().zip(self.valid_buf.iter()) {
                         if v {
                             self.heap.push(TreeNode {
-                                score: marginals[0][i].ln(),
+                                score: self.log_marginals[0][i],
                                 depth: 0,
                                 token_idx: i,
                                 parent_path: i as u128,
@@ -335,7 +335,7 @@ impl TreeBuilder {
                 for (i, &prob) in marginals[0].iter().enumerate() {
                     if prob > 0.0 && pruner.is_valid(0, i, &[]) {
                         self.heap.push(TreeNode {
-                            score: prob.ln(),
+                            score: self.log_marginals[0][i],
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -568,7 +568,7 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
                                 parent_path: i as u128,
@@ -586,7 +586,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -627,7 +627,7 @@ impl TreeBuilder {
                         };
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -652,7 +652,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
                             parent_path: (last.parent_path << 16) | (i as u128),
@@ -676,7 +676,7 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -694,7 +694,7 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
                         parent_path: i as u128,
@@ -1258,7 +1258,7 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
                                 parent_path: i as u128,
@@ -1280,7 +1280,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -1321,7 +1321,7 @@ impl TreeBuilder {
                         };
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1346,7 +1346,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
                             parent_path: (last.parent_path << 16) | (i as u128),
@@ -1370,7 +1370,7 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -1392,7 +1392,7 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
                         parent_path: i as u128,
@@ -1589,7 +1589,7 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
                         parent_path: i as u128,
@@ -1629,7 +1629,7 @@ impl TreeBuilder {
                         };
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1654,7 +1654,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
                             parent_path: (last.parent_path << 16) | (i as u128),
@@ -1676,7 +1676,7 @@ impl TreeBuilder {
                     continue;
                 }
                 self.heap.push(TreeNode {
-                    score: prob.ln() + relevance.ln(),
+                    score: self.log_marginals[0][i] + relevance.ln(),
                     depth: 0,
                     token_idx: i,
                     parent_path: i as u128,
@@ -1879,7 +1879,7 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
                                 parent_path: i as u128,
@@ -1897,7 +1897,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -1938,7 +1938,7 @@ impl TreeBuilder {
                         };
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1963,7 +1963,7 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
                             parent_path: (last.parent_path << 16) | (i as u128),
@@ -1986,7 +1986,7 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
                             parent_path: i as u128,
@@ -2004,7 +2004,7 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
                         parent_path: i as u128,

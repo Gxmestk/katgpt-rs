@@ -163,10 +163,13 @@ impl BitmapContainer {
 
         if set_indices.len() >= ARRAY_MAX_CARDINALITY {
             let mut bits = Box::new([0u64; 1024]);
+            // `set_indices` comes from `enumerate().filter()`, so its entries are
+            // strictly increasing and hence unique — the cardinality is exactly
+            // its length. Avoids a second 8 KB scan + 1024 popcounts.
+            let count = set_indices.len() as u64;
             for lo in set_indices {
                 bits[lo as usize / 64] |= 1u64 << (lo as usize % 64);
             }
-            let count = bits.iter().map(|w| w.count_ones() as u64).sum();
             BitmapContainer::Bits(bits, count)
         } else {
             // Already sorted by construction.

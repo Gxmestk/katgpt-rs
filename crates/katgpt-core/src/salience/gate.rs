@@ -238,10 +238,20 @@ impl<A: Clone, const D: usize> SalienceTriGate<A, D> {
         debug_assert_eq!(payloads.len(), n, "decide_batch: payloads length mismatch");
         debug_assert_eq!(out.len(), n, "decide_batch: out length mismatch");
 
-        for i in 0..n {
+        // Reslice to `n` once, then zip. This hoists five per-row bounds checks
+        // (z, c, payloads, out, activations) into a single up-front length check
+        // that panics on exactly the same inputs the indexed form did.
+        let (z, c, payloads, out) = (&z[..n], &c[..n], &payloads[..n], &mut out[..n]);
+        for ((((o, a), &zi), &ci), p) in out
+            .iter_mut()
+            .zip(activations.iter())
+            .zip(z.iter())
+            .zip(c.iter())
+            .zip(payloads.iter())
+        {
             // Clone payload — the variant owns its copy. Caller passes `&[A]`
             // because the same payload table may be reused across ticks.
-            out[i] = self.decide(&activations[i], z[i], c[i], payloads[i].clone(), tick);
+            *o = self.decide(a, zi, ci, p.clone(), tick);
         }
     }
 
@@ -351,15 +361,24 @@ impl<A: Clone, const D: usize> SalienceTriGate<A, D> {
         );
         debug_assert_eq!(out.len(), n, "decide_batch_with_nudge: out length mismatch");
 
-        for i in 0..n {
-            out[i] = self.decide_with_delegate_nudge(
-                &activations[i],
-                z[i],
-                c[i],
-                nudges[i],
-                payloads[i].clone(),
-                tick,
-            );
+        // Reslice to `n` once, then zip — same rationale as `decide_batch`:
+        // six per-row bounds checks collapse into one up-front length check.
+        let (z, c, nudges, payloads, out) = (
+            &z[..n],
+            &c[..n],
+            &nudges[..n],
+            &payloads[..n],
+            &mut out[..n],
+        );
+        for (((((o, a), &zi), &ci), &ni), p) in out
+            .iter_mut()
+            .zip(activations.iter())
+            .zip(z.iter())
+            .zip(c.iter())
+            .zip(nudges.iter())
+            .zip(payloads.iter())
+        {
+            *o = self.decide_with_delegate_nudge(a, zi, ci, ni, p.clone(), tick);
         }
     }
 

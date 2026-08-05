@@ -73,10 +73,18 @@ impl MultiDomainMemory {
     ///
     /// Creates the domain if it doesn't exist.
     pub fn write_domain(&mut self, domain: &str, key: &[f32], value: &[f32]) {
-        self.ensure_domain(domain);
+        // Steady state (domain already exists) is a single hash lookup. The old
+        // `ensure_domain` + `get_mut` pair hashed `domain` twice on every write
+        // and the `domain.to_string()` is now only reached on first touch.
         if let Some(state) = self.states.get_mut(domain) {
             state.write(key, value);
+            return;
         }
+        let config = self.config;
+        self.states
+            .entry(domain.to_string())
+            .or_insert_with(|| DeltaMemoryState::new(config))
+            .write(key, value);
     }
 
     /// Get or create a domain's state.
@@ -155,8 +163,13 @@ impl MultiDomainMemory {
                 for state in self.states.values() {
                     state.read_into(query, &mut self.readout_buf[..rank]);
                     let weight = state.update_count() as f32 + 1.0;
-                    for (i, r) in self.readout_buf[..rank].iter().enumerate() {
-                        self.weighted_buf[i] += r * weight;
+                    // Zip instead of index — drops the per-element bounds check
+                    // on `weighted_buf` and lets LLVM vectorize the FMA.
+                    for (w, r) in self.weighted_buf[..rank]
+                        .iter_mut()
+                        .zip(self.readout_buf[..rank].iter())
+                    {
+                        *w += r * weight;
                     }
                     total_weight += weight;
                     routed_exists = true;

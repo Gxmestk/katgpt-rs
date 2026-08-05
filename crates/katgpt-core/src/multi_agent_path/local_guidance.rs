@@ -490,8 +490,9 @@ impl<P: Position> SpaceTimeGuidance<P> {
         let mut expansions: usize = 0;
 
         while let Some(node) = scratch.open.pop() {
-            let depth = node.depth;
-            let pos = node.pos.clone();
+            // Destructure (rather than `node.pos.clone()`): the popped node is
+            // owned, so the position moves out instead of being cloned.
+            let AstarNode { depth, pos, .. } = node;
 
             // Skip already-expanded states.
             if !scratch.closed.insert((pos.clone(), depth)) {
@@ -539,7 +540,8 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 let known_g = scratch.g_score.get(&key).copied().unwrap_or(f32::MAX);
                 if tentative_g < known_g {
                     scratch.g_score.insert(key.clone(), tentative_g);
-                    scratch.came_from.insert(key.clone(), (pos.clone(), depth));
+                    // Consume `key` on the second insert — one fewer P clone.
+                    scratch.came_from.insert(key, (pos.clone(), depth));
                     scratch.open.push(AstarNode {
                         f: tentative_g + h,
                         depth: new_depth,
@@ -700,8 +702,9 @@ impl<P: Position> SpaceTimeGuidance<P> {
         let mut expansions: usize = 0;
 
         while let Some(node) = scratch.open.pop() {
-            let depth = node.depth;
-            let pos = node.pos.clone();
+            // Destructure (rather than `node.pos.clone()`): the popped node is
+            // owned, so the position moves out instead of being cloned.
+            let AstarNode { depth, pos, .. } = node;
             let pos_idx = f(&pos);
 
             // Skip already-expanded states.
@@ -920,8 +923,12 @@ impl<P: Position> SpaceTimeGuidance<P> {
         }
 
         let mut scratch = AstarScratch::<P>::new();
-        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
 
+        // `out[i]` already holds agent i's previous-round path (empty in round
+        // 0, courtesy of the `resize` in `run_refinement`), so it doubles as
+        // the `prev_paths` bookkeeping the unrecord/re-record loop needs. This
+        // drops one full `Vec<P>` clone per agent per round plus the `n`-entry
+        // `prev_paths` allocation.
         for _round in 0..self.cfg.rounds {
             for i in 0..n {
                 let agent = AgentId(i as u32);
@@ -929,11 +936,10 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 let goal = &goals[i];
                 let alpha = alpha_of(i);
 
-                self.unrecord_path(&prev_paths[i]);
+                self.unrecord_path(&out[i]);
                 let bfs = &bfs_cache[goal];
                 let path = self.astar_for_agent(&start, bfs, alpha, &mut scratch);
                 self.record_path(&path);
-                prev_paths[i] = path.clone();
                 out[i] = path;
             }
         }
@@ -982,8 +988,9 @@ impl<P: Position> SpaceTimeGuidance<P> {
             }
         }
 
-        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
-
+        // `out[i]` doubles as agent i's previous-round path (see the HashMap
+        // path for the rationale) — saves a full `Vec<P>` clone per agent per
+        // round plus the `n`-entry `prev_paths` allocation.
         for _round in 0..self.cfg.rounds {
             for i in 0..n {
                 let agent = AgentId(i as u32);
@@ -991,12 +998,11 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 let goal = &goals[i];
                 let alpha = alpha_of(i);
 
-                self.unrecord_path(&prev_paths[i]);
+                self.unrecord_path(&out[i]);
                 let bfs = &flat_bfs_cache[goal];
                 let path =
                     self.astar_for_agent_flat(&start, bfs, bfs_cap, alpha, &mut flat_scratch);
                 self.record_path(&path);
-                prev_paths[i] = path.clone();
                 out[i] = path;
             }
         }

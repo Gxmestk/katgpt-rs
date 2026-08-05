@@ -1051,8 +1051,11 @@ fn sample_temperatured(
     // the pruner/screener gating and accumulates scaled_sum.
     exp_buf.resize(vocab, 0.0);
     let buf = &mut exp_buf[..vocab];
+    // Slice `logits` to `vocab` up front so its bounds check hoists out of the
+    // vocab-length loop (vocab can be 256K on production models).
+    let lg = &logits[..vocab];
     for t in 0..vocab {
-        buf[t] = (logits[t] - max_logit) * inv_temp;
+        buf[t] = (lg[t] - max_logit) * inv_temp;
     }
     simd_exp_inplace(buf);
 
@@ -1071,14 +1074,17 @@ fn sample_temperatured(
         return (mask, 0.0);
     }
 
-    // Sample by cumulative distribution (no exp recompute)
+    // Sample by cumulative distribution (no exp recompute).
+    // Re-slice to `vocab` so the Vec index bounds check hoists out of the scan.
     let r = (rng.next() as f64 / u64::MAX as f64) as f32;
     let inv_scaled = 1.0 / scaled_sum;
     let mut cumsum = 0.0f32;
+    let buf = &exp_buf[..vocab];
     for t in 0..vocab {
-        cumsum += exp_buf[t] * inv_scaled;
+        let p = buf[t] * inv_scaled;
+        cumsum += p;
         if cumsum >= r {
-            return (t, exp_buf[t] * inv_scaled);
+            return (t, p);
         }
     }
 
@@ -1106,6 +1112,9 @@ fn sample_greedy(
     let r = (rng.next() as f64 / u64::MAX as f64) as f32;
     let inv_sum = if sum_exp > 0.0 { 1.0 / sum_exp } else { 0.0 }; // multiply per token instead of divide
     let mut cumsum = 0.0f32;
+    // Callers always `resize(vocab)` the buffer before calling; slice once so the
+    // per-token bounds check hoists out of the vocab-length scan.
+    let exp_buf = &exp_buf[..vocab];
     for t in 0..vocab {
         if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
             continue;
@@ -1532,9 +1541,14 @@ impl HybridEmbedding {
         let one_minus_pi = 1.0 - pi;
 
         // h̃ = π * e_token + (1 - π) * e_mask
+        // Slice the two inputs to `dim` up front so their bounds checks hoist out
+        // of the loop (the `token_norm`/`mask_norm` reductions below still read
+        // the full input slices, so those keep the original bindings).
+        let te = &token_emb[..dim];
+        let me = &mask_emb[..dim];
         let mut norm_sq = 0.0f32;
         for d in 0..dim {
-            let h_tilde = pi * token_emb[d] + one_minus_pi * mask_emb[d];
+            let h_tilde = pi * te[d] + one_minus_pi * me[d];
             out[d] = h_tilde;
             norm_sq += h_tilde * h_tilde;
         }

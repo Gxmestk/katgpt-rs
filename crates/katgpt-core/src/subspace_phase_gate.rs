@@ -107,7 +107,9 @@ pub fn numerical_rank(spectrum_sorted_desc: &[f32], eta: f32) -> usize {
     }
     let threshold = eta * total_sq;
     for (i, &v) in spectrum_sorted_desc.iter().enumerate() {
-        cum_sq += v.max(0.0) * v.max(0.0);
+        // Clamp once (matching the total_sq loop above) instead of twice.
+        let v = v.max(0.0);
+        cum_sq += v * v;
         if cum_sq > threshold {
             return i + 1;
         }
@@ -199,20 +201,13 @@ impl JacobianSvdScratch {
 
     /// Reset for reuse. Does not deallocate; just zeros the active regions.
     pub fn clear(&mut self) {
-        for v in &mut self.f_x {
-            *v = 0.0;
-        }
-        for v in &mut self.f_x_pert {
-            *v = 0.0;
-        }
-        for v in &mut self.f_x_plus {
-            *v = 0.0;
-        }
+        // `fill` lowers to `memset`; the `iter_mut` loops did not reliably.
+        self.f_x.fill(0.0);
+        self.f_x_pert.fill(0.0);
+        self.f_x_plus.fill(0.0);
         // x_pert is overwritten fully before each use (copy_from_slice), so
         // it doesn't need zeroing here.
-        for v in &mut self.jac {
-            *v = 0.0;
-        }
+        self.jac.fill(0.0);
         self.svd_work.clear();
         // svd_result is reset by `one_sided_jacobi_svd_into` via `clear_for`.
     }
@@ -493,6 +488,9 @@ where
     debug_assert!(scratch.x_pert.len() >= n, "x_pert scratch too short");
     scratch.x_pert[..n].copy_from_slice(&x[..n]);
     let x_pert = &mut scratch.x_pert;
+    // Loop-invariant across both the `i` and `j` loops. Hoisting the product
+    // (not the reciprocal) keeps the divisor bit-identical.
+    let two_step = 2.0 * step;
     for i in 0..n {
         // Save the original coordinate.
         let x_i_orig = x_pert[i];
@@ -508,7 +506,7 @@ where
             f(x_pert, &mut scratch.f_x_pert);
             // Central diff: (f_plus − f_minus) / (2·step)
             for j in 0..m {
-                scratch.jac[j * n + i] = (scratch.f_x_plus[j] - scratch.f_x_pert[j]) / (2.0 * step);
+                scratch.jac[j * n + i] = (scratch.f_x_plus[j] - scratch.f_x_pert[j]) / two_step;
             }
         } else {
             // Forward diff: (f(x + step·e_i) − f(x)) / step
@@ -578,21 +576,13 @@ impl SvdScratch {
     }
 
     fn clear(&mut self) {
-        for v in &mut self.a {
-            *v = 0.0;
-        }
-        for v in &mut self.v {
-            *v = 0.0;
-        }
-        for v in &mut self.col_norms_sq {
-            *v = 0.0;
-        }
-        for v in &mut self.sigma_buf {
-            *v = 0.0;
-        }
-        for v in &mut self.perm_buf {
-            *v = 0;
-        }
+        // `fill` lowers to a single `memset` per buffer; the previous
+        // `iter_mut` loops did not always vectorize when the length is opaque.
+        self.a.fill(0.0);
+        self.v.fill(0.0);
+        self.col_norms_sq.fill(0.0);
+        self.sigma_buf.fill(0.0);
+        self.perm_buf.fill(0);
     }
 }
 
@@ -721,11 +711,11 @@ fn one_sided_jacobi_svd_into(
 
     // Copy M into work.a prefix (will be mutated to U·Σ).
     work.a[..m * n].copy_from_slice(m_flat);
-    // Initialise V = I (prefix only).
+    // Initialise V = I (prefix only). `fill` + a strided diagonal write is a
+    // `memset` plus `n` stores, versus `n²` branchy scalar stores.
+    work.v[..n * n].fill(0.0);
     for i in 0..n {
-        for j in 0..n {
-            work.v[i * n + j] = if i == j { 1.0 } else { 0.0 };
-        }
+        work.v[i * n + i] = 1.0;
     }
 
     let tol: f32 = 1e-7;
@@ -777,9 +767,14 @@ fn one_sided_jacobi_svd_into(
                 let mut app: f32 = 0.0;
                 let mut aqq: f32 = 0.0;
                 let mut apq: f32 = 0.0;
-                for r in 0..m {
-                    let arp = work.a[r * n + p];
-                    let arq = work.a[r * n + q];
+                // `chunks_exact` walks rows in the same increasing `r` order,
+                // so every accumulation is bit-identical — but it replaces the
+                // `r * n + p` multiply-add plus two bounds checks per element
+                // with a single row-stride advance (this is the hottest loop in
+                // the file: sweeps × n(n−1)/2 × m iterations).
+                for row in work.a[..m * n].chunks_exact(n) {
+                    let arp = row[p];
+                    let arq = row[q];
                     app += arp * arp;
                     aqq += arq * arq;
                     apq += arp * arq;
@@ -805,17 +800,21 @@ fn one_sided_jacobi_svd_into(
                 let c = 1.0 / (1.0 + t * t).sqrt();
                 let s = t * c;
                 // Apply rotation to columns p, q of A and V.
-                for r in 0..m {
-                    let arp = work.a[r * n + p];
-                    let arq = work.a[r * n + q];
-                    work.a[r * n + p] = c * arp - s * arq;
-                    work.a[r * n + q] = s * arp + c * arq;
+                // Same row-stride rewrite as the (app, aqq, apq) loop above:
+                // both entries are read into locals first, so the semantics are
+                // identical, but four `r * n + {p,q}` index computations and
+                // their bounds checks collapse into one row advance.
+                for row in work.a[..m * n].chunks_exact_mut(n) {
+                    let arp = row[p];
+                    let arq = row[q];
+                    row[p] = c * arp - s * arq;
+                    row[q] = s * arp + c * arq;
                 }
-                for r in 0..n {
-                    let vrp = work.v[r * n + p];
-                    let vrq = work.v[r * n + q];
-                    work.v[r * n + p] = c * vrp - s * vrq;
-                    work.v[r * n + q] = s * vrp + c * vrq;
+                for row in work.v[..n * n].chunks_exact_mut(n) {
+                    let vrp = row[p];
+                    let vrq = row[q];
+                    row[p] = c * vrp - s * vrq;
+                    row[q] = s * vrp + c * vrq;
                 }
             }
         }
@@ -846,13 +845,24 @@ fn one_sided_jacobi_svd_into(
     // Issue 124: moved from a fixed `[f32; 64]` stack array to the reusable
     // heap buffer in `SvdScratch`. The buffer is reused across calls (sized
     // once in `with_capacity`); only the `n`-length prefix is touched here.
-    let raw_sigma = &mut work.sigma_buf;
-    for i in 0..n {
-        let mut s_sq: f32 = 0.0;
-        for r in 0..m {
-            let ari = work.a[r * n + i];
-            s_sq += ari * ari;
+    //
+    // Accumulated in ONE row-major sweep (into the otherwise-unused
+    // `col_norms_sq` scratch, which is exactly what its doc comment describes)
+    // rather than `n` separate stride-`n` passes over `work.a`. Each column
+    // still accumulates over `r` in strictly increasing order, so every `s_sq`
+    // — and hence every σ — is bit-identical; only the access pattern changes
+    // from cache-hostile strided to sequential.
+    {
+        let acc = &mut work.col_norms_sq[..n];
+        acc.fill(0.0);
+        for row in work.a[..m * n].chunks_exact(n) {
+            for (s_sq, &ari) in acc.iter_mut().zip(row.iter()) {
+                *s_sq += ari * ari;
+            }
         }
+    }
+    let raw_sigma = &mut work.sigma_buf;
+    for (i, &s_sq) in work.col_norms_sq[..n].iter().enumerate() {
         raw_sigma[i] = s_sq.sqrt();
     }
 

@@ -36,7 +36,20 @@ impl IntervalMask {
     /// if i and k are valid then j is valid. O(n) single-pass scan.
     #[inline]
     pub fn is_interval_closed(&self) -> bool {
-        self.gap_count() == 0
+        // Early-exit on the first InGap→InValid transition instead of counting
+        // every gap over the whole (vocab-sized) mask. `gap_count() == 0` iff no
+        // such transition exists, so the result is identical.
+        let mut state = State::LeadingInvalid;
+        for &v in &self.mask {
+            state = match (state, v) {
+                (State::LeadingInvalid, true) | (State::InValid, true) => State::InValid,
+                (State::LeadingInvalid, false) => State::LeadingInvalid,
+                (State::InValid, false) => State::InGap,
+                (State::InGap, true) => return false,
+                (State::InGap, false) => State::InGap,
+            };
+        }
+        true
     }
 
     /// Merge nearby valid ranges. If the gap between two valid ranges is

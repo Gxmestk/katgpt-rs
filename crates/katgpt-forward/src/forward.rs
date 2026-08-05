@@ -83,11 +83,13 @@ pub unsafe fn attention_head(
     scale: f32,
 ) {
     // Pass 1: compute Q·K scores into buffer (no per-element scalar max)
+    // `q_slice` is loop-invariant — build it once instead of per-t.
+    // SAFETY: q_head_offset + hd <= n_embd (head_dim * n_head)
+    let q_slice = unsafe { std::slice::from_raw_parts(q.as_ptr().add(q_head_offset), hd) };
     for t in 0..t_n {
         let k_off = t * kv_dim + kv_group_offset;
-        // SAFETY: q_head_offset + hd <= n_embd (head_dim * n_head), k_off + hd <= block_size * kv_dim
+        // SAFETY: k_off + hd <= block_size * kv_dim
         let dot = unsafe {
-            let q_slice = std::slice::from_raw_parts(q.as_ptr().add(q_head_offset), hd);
             let k_slice = std::slice::from_raw_parts(key_cache.as_ptr().add(k_off), hd);
             katgpt_core::simd::simd_dot_f32(q_slice, k_slice, hd)
         };
@@ -116,14 +118,15 @@ pub unsafe fn attention_head(
     katgpt_core::simd::simd_scale_inplace(scores_slice, inv_sum);
     // Zero the output slice before accumulation
     attn_out[q_head_offset..q_head_offset + hd].fill(0.0);
-    // Accumulate: t outer → contiguous value_cache row access
+    // Accumulate: t outer → contiguous value_cache row access.
+    // `out_slice` is loop-invariant — build the raw slice once instead of per-t.
+    let out_slice =
+        unsafe { std::slice::from_raw_parts_mut(attn_out.as_mut_ptr().add(q_head_offset), hd) };
     for t in 0..t_n {
         let s = unsafe { *scores_buf.get_unchecked(t) };
         let v_row = unsafe {
             std::slice::from_raw_parts(value_cache.as_ptr().add(t * kv_dim + kv_group_offset), hd)
         };
-        let out_slice =
-            unsafe { std::slice::from_raw_parts_mut(attn_out.as_mut_ptr().add(q_head_offset), hd) };
         katgpt_core::simd::simd_fused_scale_acc(out_slice, v_row, s, hd);
     }
 }

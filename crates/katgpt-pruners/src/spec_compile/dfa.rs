@@ -89,28 +89,26 @@ impl SpecDFA {
         state
     }
 
+    /// Half-open index range `[start, end)` of transitions whose `from_state`
+    /// equals `state`. `transitions` is kept sorted by `from_state`
+    /// ([`Self::ensure_sorted`]), so two `partition_point` probes locate the
+    /// whole equal-key run in `O(log n)` — the previous
+    /// `binary_search_by` + linear left/right widening was `O(log n + k)`.
+    /// Returns an empty range when `state` has no outgoing transitions.
+    #[inline]
+    fn state_range(&self, state: DfaState) -> (usize, usize) {
+        let transitions = &self.transitions;
+        let start = transitions.partition_point(|t| t.from_state < state);
+        let end = transitions[start..].partition_point(|t| t.from_state == state) + start;
+        (start, end)
+    }
+
     /// Look up the transition for `ch` from `state`.
     #[inline]
     fn next_state(&self, state: DfaState, ch: u8) -> Option<DfaState> {
-        // Binary-search for the range of transitions from `state`.
-        let transitions = &self.transitions;
-        let Ok(idx) = transitions.binary_search_by(|t| t.from_state.cmp(&state)) else {
-            return None;
-        };
-
-        // Scan left to find the start of the range.
-        let mut start = idx;
-        while start > 0 && transitions[start - 1].from_state == state {
-            start -= 1;
-        }
-        // Scan right to find the end.
-        let mut end = idx + 1;
-        while end < transitions.len() && transitions[end].from_state == state {
-            end += 1;
-        }
-
+        let (start, end) = self.state_range(state);
         // Check each transition from this state.
-        for t in &transitions[start..end] {
+        for t in &self.transitions[start..end] {
             if t.char_class.contains(ch as usize) {
                 return Some(t.to_state);
             }
@@ -118,26 +116,29 @@ impl SpecDFA {
         None
     }
 
+    /// Walk the DFA from `start_state` through `parent_tokens`, mapping each
+    /// token to its byte value (out-of-range tokens map to `0`, matching the
+    /// historical `Vec<u8>` materialisation) without allocating.
+    #[inline]
+    fn state_from_tokens(&self, parent_tokens: &[usize]) -> DfaState {
+        let mut state = self.start_state;
+        for &t in parent_tokens {
+            let ch = if t > 255 { 0u8 } else { t as u8 };
+            state = match self.next_state(state, ch) {
+                Some(s) => s,
+                None => return DEAD_STATE,
+            };
+        }
+        state
+    }
+
     /// Collect all byte values that have a transition from `state`.
     /// Returns a `CompactBitmap` suitable for `ConstraintPruner` token-set queries.
     pub fn allowed_chars(&self, state: DfaState) -> CompactBitmap {
         let mut allowed = CompactBitmap::empty();
 
-        let transitions = &self.transitions;
-        let Ok(idx) = transitions.binary_search_by(|t| t.from_state.cmp(&state)) else {
-            return allowed;
-        };
-
-        let mut start = idx;
-        while start > 0 && transitions[start - 1].from_state == state {
-            start -= 1;
-        }
-        let mut end = idx + 1;
-        while end < transitions.len() && transitions[end].from_state == state {
-            end += 1;
-        }
-
-        for t in &transitions[start..end] {
+        let (start, end) = self.state_range(state);
+        for t in &self.transitions[start..end] {
             allowed.union_with(&t.char_class);
         }
         allowed
@@ -165,28 +166,18 @@ impl SpecDFA {
             head += 1;
 
             // Get transitions from s.
-            if let Ok(idx) = self.transitions.binary_search_by(|t| t.from_state.cmp(&s)) {
-                let mut start = idx;
-                while start > 0 && self.transitions[start - 1].from_state == s {
-                    start -= 1;
+            let (start, end) = self.state_range(s);
+            for t in &self.transitions[start..end] {
+                let ns = t.to_state;
+                if ns == DEAD_STATE {
+                    continue;
                 }
-                let mut end = idx + 1;
-                while end < self.transitions.len() && self.transitions[end].from_state == s {
-                    end += 1;
-                }
-
-                for t in &self.transitions[start..end] {
-                    let ns = t.to_state;
-                    if ns == DEAD_STATE {
-                        continue;
+                if (ns as usize) < visited.len() && !visited[ns as usize] {
+                    if self.accept_states.contains(ns as usize) {
+                        return d + 1;
                     }
-                    if (ns as usize) < visited.len() && !visited[ns as usize] {
-                        if self.accept_states.contains(ns as usize) {
-                            return d + 1;
-                        }
-                        visited[ns as usize] = true;
-                        queue.push((ns, d + 1));
-                    }
+                    visited[ns as usize] = true;
+                    queue.push((ns, d + 1));
                 }
             }
         }
@@ -205,53 +196,21 @@ impl SpecDFA {
         let mut span = 0u32;
 
         for _ in 0..max_steps {
-            let out = self.outgoing_count(current);
-            if out != 1 {
+            // One `state_range` probe serves both the "exactly one outgoing"
+            // test and the follow-the-edge step (was two binary searches).
+            let (start, end) = self.state_range(current);
+            if end - start != 1 {
                 break;
             }
             // Exactly one transition — follow it.
             span += 1;
-            if let Ok(idx) = self
-                .transitions
-                .binary_search_by(|t| t.from_state.cmp(&current))
-            {
-                let mut start = idx;
-                while start > 0 && self.transitions[start - 1].from_state == current {
-                    start -= 1;
-                }
-                if start < self.transitions.len() && self.transitions[start].from_state == current {
-                    let next = self.transitions[start].to_state;
-                    if next == DEAD_STATE {
-                        break;
-                    }
-                    current = next;
-                } else {
-                    break;
-                }
-            } else {
+            let next = self.transitions[start].to_state;
+            if next == DEAD_STATE {
                 break;
             }
+            current = next;
         }
         span
-    }
-
-    /// Count outgoing transitions from a state.
-    fn outgoing_count(&self, state: DfaState) -> usize {
-        let Ok(idx) = self
-            .transitions
-            .binary_search_by(|t| t.from_state.cmp(&state))
-        else {
-            return 0;
-        };
-        let mut start = idx;
-        while start > 0 && self.transitions[start - 1].from_state == state {
-            start -= 1;
-        }
-        let mut end = idx + 1;
-        while end < self.transitions.len() && self.transitions[end].from_state == state {
-            end += 1;
-        }
-        end - start
     }
 
     /// Sort transitions by `from_state` for binary-search lookup.
@@ -273,15 +232,8 @@ impl ConstraintPruner for SpecDFA {
 
         // Replay parent tokens to determine current state.
         // parent_tokens may contain usize values that are byte values (0–255).
-        let state = if parent_tokens.is_empty() {
-            self.start_state
-        } else {
-            let bytes: Vec<u8> = parent_tokens
-                .iter()
-                .map(|&t| if t > 255 { 0u8 } else { t as u8 })
-                .collect();
-            self.current_state(&bytes)
-        };
+        // `state_from_tokens` walks them in place — no per-call `Vec<u8>`.
+        let state = self.state_from_tokens(parent_tokens);
 
         if state == DEAD_STATE {
             return false;
@@ -306,14 +258,14 @@ impl CompletionHorizon for SpecDFA {
             return u32::MAX;
         }
 
-        // Compute the state after placing token_idx.
-        let mut bytes: Vec<u8> = Vec::with_capacity(parent_tokens.len() + 1);
-        for &t in parent_tokens {
-            bytes.push(if t > 255 { 0u8 } else { t as u8 });
+        // Compute the state after placing token_idx — walked in place, no `Vec`.
+        let parent_state = self.state_from_tokens(parent_tokens);
+        if parent_state == DEAD_STATE {
+            return u32::MAX;
         }
-        bytes.push(token_idx as u8);
-
-        let state = self.current_state(&bytes);
+        let Some(state) = self.next_state(parent_state, token_idx as u8) else {
+            return u32::MAX;
+        };
 
         if state == DEAD_STATE {
             return u32::MAX;
@@ -324,15 +276,7 @@ impl CompletionHorizon for SpecDFA {
 
     /// Length of the deterministic singular span from the state reached by parent_tokens.
     fn singular_span_len(&self, _depth: usize, parent_tokens: &[usize]) -> u32 {
-        let state = if parent_tokens.is_empty() {
-            self.start_state
-        } else {
-            let bytes: Vec<u8> = parent_tokens
-                .iter()
-                .map(|&t| if t > 255 { 0u8 } else { t as u8 })
-                .collect();
-            self.current_state(&bytes)
-        };
+        let state = self.state_from_tokens(parent_tokens);
 
         if state == DEAD_STATE {
             return 0;

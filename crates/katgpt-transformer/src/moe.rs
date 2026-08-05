@@ -410,14 +410,14 @@ pub fn moe_forward_token(
         d,
     );
 
-    // ── 2. Sigmoid scores (independent per expert, NEVER softmax) ─────────
+    // ── 2/3. Sigmoid scores (independent per expert, NEVER softmax) and the
+    //    noaux_tc biased scores `biased[e] = s[e] + b_e`. Fused into one pass
+    //    over the experts — the sigmoid result feeds the bias add directly
+    //    instead of being written out and re-read.
     for e in 0..n_r {
-        scratch.sigmoid_scores[e] = sigmoid(scratch.router_logits[e]);
-    }
-
-    // ── 3. noaux_tc biased scores: `biased[e] = s[e] + b_e` ──────────────
-    for e in 0..n_r {
-        scratch.biased_scores[e] = scratch.sigmoid_scores[e] + weights.e_score_correction_bias[e];
+        let s = sigmoid(scratch.router_logits[e]);
+        scratch.sigmoid_scores[e] = s;
+        scratch.biased_scores[e] = s + weights.e_score_correction_bias[e];
     }
 
     // ── 4. Top-K selection by BIASED score ───────────────────────────────
@@ -638,22 +638,26 @@ fn situ_expert_forward(
 pub(crate) fn situ_inplace(gate: &mut [f32], up: &[f32], beta: f32, linear_beta: Option<f32>) {
     debug_assert!(beta > 0.0, "situ beta must be positive");
     let inv_beta = 1.0 / beta;
+    // Slice `up` to `gate.len()` once (same panic-on-short-`up` behaviour as
+    // the old `up[i]` indexing) so the element loops zip without per-element
+    // bounds checks.
+    let up = &up[..gate.len()];
     if let Some(lb) = linear_beta {
         debug_assert!(lb > 0.0, "situ linear_beta must be positive");
         let inv_lb = 1.0 / lb;
-        for i in 0..gate.len() {
-            let g = gate[i];
+        for (g_slot, &u) in gate.iter_mut().zip(up.iter()) {
+            let g = *g_slot;
             let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
             let gate_tanh = (g * inv_beta).tanh();
-            let up_t = lb * (up[i] * inv_lb).tanh();
-            gate[i] = beta * gate_tanh * gate_sigmoid * up_t;
+            let up_t = lb * (u * inv_lb).tanh();
+            *g_slot = beta * gate_tanh * gate_sigmoid * up_t;
         }
     } else {
-        for i in 0..gate.len() {
-            let g = gate[i];
+        for (g_slot, &u) in gate.iter_mut().zip(up.iter()) {
+            let g = *g_slot;
             let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
             let gate_tanh = (g * inv_beta).tanh();
-            gate[i] = beta * gate_tanh * gate_sigmoid * up[i];
+            *g_slot = beta * gate_tanh * gate_sigmoid * u;
         }
     }
 }

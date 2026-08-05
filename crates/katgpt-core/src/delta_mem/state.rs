@@ -138,9 +138,14 @@ impl DeltaMemoryState {
         let rank = self.config.rank;
         assert_eq!(query.len(), rank, "query dimension must match rank");
         assert_eq!(out.len(), rank, "output dimension must match rank");
-        for (i, slot) in out.iter_mut().enumerate() {
-            let row_off = i * rank;
-            *slot = crate::simd::simd_dot_f32(&self.state[row_off..row_off + rank], query, rank);
+        if rank == 0 {
+            return;
+        }
+        // `chunks_exact` walks the row-major state contiguously and hands each
+        // row out already-bounds-checked, so the per-row `state[off..off+rank]`
+        // range check disappears. Identical arithmetic, identical order.
+        for (slot, row) in out.iter_mut().zip(self.state.chunks_exact(rank)) {
+            *slot = crate::simd::simd_dot_f32(row, query, rank);
         }
     }
 
@@ -180,29 +185,51 @@ impl DeltaMemoryState {
         // product instead of materializing a full `predictions` Vec, matching
         // the hot-path optimization in riir-engine's divergent copy. Numerically
         // equivalent within f32 rounding (see `read_into` doc).
-        #[allow(clippy::needless_range_loop)] // i indexes state, beta, and value
-        for i in 0..rank {
-            let beta_i = self.beta[i];
-            let lambda_i = if self.config.couple_gates {
-                1.0 - beta_i
-            } else {
-                1.0
-            };
-            let val_i = value[i];
+        if rank == 0 {
+            self.update_count += 1;
+            return;
+        }
+
+        // Split-borrow the fields the row loop touches so `state` can be walked
+        // with `chunks_exact_mut` (contiguous, bounds-check-free) while
+        // `error_history` is still pushed into in the same pass. `push_error` is
+        // inlined here for exactly that reason — calling it would need a fresh
+        // `&mut self`. The `couple_gates` branch is hoisted out of the loop
+        // (loop-invariant). Arithmetic and its order are unchanged.
+        let Self {
+            state,
+            beta,
+            error_history,
+            error_window,
+            config,
+            ..
+        } = self;
+        let couple = config.couple_gates;
+        let history_cap = *error_window * rank;
+
+        for ((row, &beta_i), &val_i) in state
+            .chunks_exact_mut(rank)
+            .zip(beta.iter())
+            .zip(value.iter())
+        {
+            let lambda_i = if couple { 1.0 - beta_i } else { 1.0 };
 
             // Inline prediction using SIMD dot product
-            let row_off = i * rank;
-            let pred_i = crate::simd::simd_dot_f32(&self.state[row_off..row_off + rank], key, rank);
+            let pred_i = crate::simd::simd_dot_f32(row, key, rank);
 
             // Fused update: S'[i,j] = λ·S[i,j] + β·(v_i - pred_i)·k_j
             let beta_delta = beta_i * (val_i - pred_i);
-            for (j, &k_j) in key.iter().enumerate() {
-                self.state[row_off + j] = lambda_i * self.state[row_off + j] + beta_delta * k_j;
+            for (s, &k_j) in row.iter_mut().zip(key.iter()) {
+                *s = lambda_i * *s + beta_delta * k_j;
             }
 
-            // Track prediction error for gate adaptation
+            // Track prediction error for gate adaptation (inlined `push_error`).
             let error = (val_i - pred_i).abs();
-            self.push_error(error);
+            if error_history.len() >= history_cap {
+                // Drain oldest batch
+                error_history.drain(..rank);
+            }
+            error_history.push(error);
         }
 
         self.update_count += 1;
@@ -359,15 +386,6 @@ impl DeltaMemoryState {
         self.state.copy_from_slice(&snapshot.state);
         self.beta.copy_from_slice(&snapshot.beta);
         self.update_count = snapshot.update_count;
-    }
-
-    /// Push error to history ring buffer
-    fn push_error(&mut self, error: f32) {
-        if self.error_history.len() >= self.error_window * self.config.rank {
-            // Drain oldest batch
-            self.error_history.drain(..self.config.rank);
-        }
-        self.error_history.push(error);
     }
 
     /// Get current error history (for external gate adaptation)

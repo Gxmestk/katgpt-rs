@@ -87,11 +87,18 @@ pub fn gegelu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         crate::simd::simd_add_scalar_inplace(&mut buf, 1.0);
         // Vectorized reciprocal: buf = sigmoid = 1/(1+exp(-1.702*gate))
         crate::simd::simd_reciprocal_inplace(&mut buf);
-        // Fused: hidden = gate * up, then scale-multiply by sigmoid
-        for j in 0..CHUNK {
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // Fused: hidden = gate * up, then scale-multiply by sigmoid.
+        // Slice all three up front so the CHUNK-length bounds checks hoist out
+        // of the inner loop and LLVM can vectorize the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
@@ -129,13 +136,20 @@ pub fn gegelu_tanh(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         // Compute denominator (exp + 1) via SIMD, then SIMD tanh + fused mul
         buf2[..CHUNK].copy_from_slice(&buf);
         crate::simd::simd_add_scalar_inplace(&mut buf2, 1.0); // buf2 = exp + 1
-        // hidden = gate * up, then hidden *= tanh(inner)
-        for j in 0..CHUNK {
-            // Branch-free tanh: exp(2x) / (exp(2x) + 1) via division
-            buf[j] /= buf2[j];
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // hidden = gate * up, then hidden *= tanh(inner).
+        // Slice up front so the CHUNK-length bounds checks hoist out of the
+        // inner loop and LLVM can vectorize both the divide and the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                // Branch-free tanh: exp(2x) / (exp(2x) + 1) via division
+                buf[j] /= buf2[j];
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
@@ -196,11 +210,18 @@ pub fn swiglu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         crate::simd::simd_add_scalar_inplace(&mut buf, 1.0);
         // Vectorized reciprocal: buf = sigmoid = 1/(1+exp(-gate))
         crate::simd::simd_reciprocal_inplace(&mut buf);
-        // Fused: hidden = gate * up, then scale-multiply by sigmoid
-        for j in 0..CHUNK {
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // Fused: hidden = gate * up, then scale-multiply by sigmoid.
+        // Slice all three up front so the CHUNK-length bounds checks hoist out
+        // of the inner loop and LLVM can vectorize the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
@@ -249,10 +270,16 @@ pub fn situ(
 ) {
     debug_assert!(beta > 0.0, "situ beta must be positive");
     let inv_beta = 1.0 / beta;
+    // Slice the read-only inputs to the output length up front so the per-element
+    // bounds checks on `gate`/`up` hoist out of the inner loop (same panic
+    // condition as the previous indexed form, just checked once).
+    let n = hidden.len();
+    let gate = &gate[..n];
+    let up = &up[..n];
     if let Some(lb) = linear_beta {
         debug_assert!(lb > 0.0, "situ linear_beta must be positive");
         let inv_lb = 1.0 / lb;
-        for i in 0..hidden.len() {
+        for i in 0..n {
             let g = gate[i];
             // Exact sigmoid: 1 / (1 + exp(-g)) — handles large |g| via exp saturation
             let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
@@ -261,7 +288,7 @@ pub fn situ(
             hidden[i] = beta * gate_tanh * gate_sigmoid * up_t;
         }
     } else {
-        for i in 0..hidden.len() {
+        for i in 0..n {
             let g = gate[i];
             let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
             let gate_tanh = (g * inv_beta).tanh();

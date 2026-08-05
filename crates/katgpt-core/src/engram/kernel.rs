@@ -138,8 +138,10 @@ pub fn sigmoid_fuse_multi_branch_into(
         // independent scalar gate — no inter-branch competition.
         let gate = fast_sigmoid(normalized_dot / config.tau);
 
-        for j in 0..d {
-            out[j] = gate * v[j];
+        // Slice both sides to D once so the store loop is bounds-check-free
+        // and auto-vectorizes.
+        for (o, &vj) in out[..d].iter_mut().zip(v[..d].iter()) {
+            *o = gate * vj;
         }
     }
 }
@@ -193,9 +195,10 @@ pub fn rmsnorm_into(x: &[f32], eps: f32, out: &mut [f32]) {
     // (per types/math.rs rmsnorm comment).
     let inv_rms = 1.0 / ((sum_sq / n as f32) + eps).sqrt();
     // Pass 2: scale x → out. We can't use simd_scale_inplace directly since
-    // out ≠ x in general, so do a manual copy-with-scale.
-    for i in 0..n {
-        out[i] = x[i] * inv_rms;
+    // out ≠ x in general, so do a manual copy-with-scale. Zipping the two
+    // pre-sliced halves keeps the loop bounds-check-free.
+    for (o, &xi) in out[..n].iter_mut().zip(x.iter()) {
+        *o = xi * inv_rms;
     }
 }
 
@@ -278,9 +281,10 @@ pub fn sigmoid_fuse_into(
 
     // Write gate * v[j] into out — SIMD-friendly stride-1 write. We use a
     // manual loop (not simd_scale_inplace) because src and dst are
-    // different slices; a small D=32 loop auto-vectorizes cleanly.
-    for j in 0..d {
-        out[j] = gate * v[j];
+    // different slices; slicing both to D up front removes the per-element
+    // bounds checks so the small D=32 loop auto-vectorizes cleanly.
+    for (o, &vj) in out[..d].iter_mut().zip(v[..d].iter()) {
+        *o = gate * vj;
     }
 }
 

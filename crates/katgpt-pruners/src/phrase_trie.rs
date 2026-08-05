@@ -3,6 +3,10 @@
 //! O(1) child lookup via `Vec<Option<usize>>`. Zero alloc on advance.
 //! Feature-gated behind `phrase_boost`.
 
+/// Active-set size below which [`PhraseTrie::advance`] dedups by linear scan of
+/// the output vec instead of allocating a `nodes.len()` bitset.
+const SMALL_ACTIVE_DEDUP: usize = 32;
+
 // ── Node ───────────────────────────────────────────────────────
 
 /// Single trie node. Children are indexed by token ID — O(1) lookup, no hashing.
@@ -128,8 +132,26 @@ impl PhraseTrie {
     ///
     /// O(active_nodes) with O(nodes) bitset for dedup.
     pub fn advance(&self, active: &[usize], token_id: usize) -> Vec<usize> {
-        let mut seen = vec![false; self.nodes.len()];
         let mut next = Vec::with_capacity(active.len() + 1);
+        // `next` holds at most `active.len()` entries, so for a small active set
+        // a linear dedup against `next` itself is far cheaper than allocating +
+        // zeroing a `nodes.len()` bitset (one malloc/free dominates ≤ 528
+        // in-cache compares). Output and ordering are identical either way.
+        if active.len() <= SMALL_ACTIVE_DEDUP {
+            for &node_idx in active {
+                if let Some(child) = self.nodes[node_idx].children[token_id]
+                    && !next.contains(&child)
+                {
+                    next.push(child);
+                }
+            }
+            // Root (index 0) is always active — new phrases can start at any position.
+            if !next.contains(&0) {
+                next.push(0);
+            }
+            return next;
+        }
+        let mut seen = vec![false; self.nodes.len()];
         for &node_idx in active {
             if let Some(child) = self.nodes[node_idx].children[token_id]
                 && !seen[child]

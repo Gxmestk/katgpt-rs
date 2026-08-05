@@ -219,11 +219,8 @@ where
         // Equal-weight init: η_i = 1/P. This is the "no-fit" fallback (the
         // ensemble reduces to a plain average). It is NOT regression-optimal;
         // callers who want the paper's gain MUST call `fit_into`.
-        let uniform = 1.0 / (P as f32);
-        let mut eta = [0.0f32; P];
-        for v in eta.iter_mut() {
-            *v = uniform;
-        }
+        // Splat directly instead of zero-init-then-overwrite.
+        let eta = [1.0 / (P as f32); P];
         Self { fields, eta }
     }
 
@@ -319,6 +316,7 @@ pub fn accumulate_pair_into<F, const P: usize, const D: usize>(
 {
     for (i, field_i) in fields.iter().enumerate().take(P) {
         field_i.eval_into(i_t, &mut scratch.b_out_i);
+        let row_i = i * P;
         for (j, field_j) in fields.iter().enumerate().take(P).skip(i) {
             // Upper triangle (i ≤ j).
             let dot = if i == j {
@@ -329,7 +327,7 @@ pub fn accumulate_pair_into<F, const P: usize, const D: usize>(
                 field_j.eval_into(i_t, &mut scratch.b_out_j);
                 simd_dot_f32(&scratch.b_out_i, &scratch.b_out_j, D)
             };
-            scratch.gram[i * P + j] += dot;
+            scratch.gram[row_i + j] += dot;
             if i != j {
                 // Mirror to lower triangle — K is symmetric.
                 scratch.gram[j * P + i] += dot;
@@ -491,9 +489,8 @@ where
     #[inline]
     pub fn eval_into(&self, x: &[f32], out: &mut [f32; D], scratch_b: &mut [f32; D]) {
         // out = 0, then out += η_i · b_i(x) for each i.
-        for v in out.iter_mut() {
-            *v = 0.0;
-        }
+        // `fill` lowers to `memset`; this is a documented ~21 ns/call path.
+        out.fill(0.0);
         for i in 0..P {
             self.fields[i].eval_into(x, scratch_b);
             let eta_i = self.eta[i];
@@ -1187,11 +1184,8 @@ impl<const P: usize, const D: usize> HeterogeneousEnsemble<P, D> {
                 i, entry.bases.d_dst, D
             );
         }
-        let uniform = 1.0 / (P as f32);
-        let mut eta = [0.0f32; P];
-        for v in eta.iter_mut() {
-            *v = uniform;
-        }
+        // Splat directly instead of zero-init-then-overwrite.
+        let eta = [1.0 / (P as f32); P];
         Self { entries, eta }
     }
 
@@ -1280,21 +1274,23 @@ impl<const P: usize, const D: usize> HeterogeneousEnsemble<P, D> {
         out: &mut [f32; D],
         scratch: &mut HeterogeneousFitScratch<P, D>,
     ) {
-        for v in out.iter_mut() {
-            *v = 0.0;
-        }
+        out.fill(0.0);
         for i in 0..P {
+            // Hoist the entry lookup: it was re-indexed four times per field.
+            let entry = &self.entries[i];
             // Size the native buffer to this field's native_dim.
-            let d_i = self.entries[i].field.native_dim();
-            let k_i = self.entries[i].bases.k;
+            let d_i = entry.field.native_dim();
+            let k_i = entry.bases.k;
             let native_buf_i = &mut scratch.native_buf_i[..d_i];
             let spectral = &mut scratch.spectral_buf[..k_i];
-            self.entries[i].field.eval_native_into(x, native_buf_i);
+            entry.field.eval_native_into(x, native_buf_i);
             // Inline transport: project to spectral, reconstruct at D.
-            project_to_spectral_into(native_buf_i, &self.entries[i].bases, spectral);
-            reconstruct_from_spectral_into(spectral, &self.entries[i].bases, &mut scratch.b_at_d_i);
+            project_to_spectral_into(native_buf_i, &entry.bases, spectral);
+            reconstruct_from_spectral_into(spectral, &entry.bases, &mut scratch.b_at_d_i);
             let eta_i = self.eta[i];
-            for (out_k, b_k) in out.iter_mut().zip(scratch.b_at_d_i.iter()).take(D) {
+            // `out` and `b_at_d_i` are both `[f32; D]`, so the `.take(D)` that
+            // used to be here was a no-op that hid the length from LLVM.
+            for (out_k, b_k) in out.iter_mut().zip(scratch.b_at_d_i.iter()) {
                 *out_k += eta_i * b_k;
             }
         }
@@ -1314,27 +1310,30 @@ impl<const P: usize, const D: usize> HeterogeneousEnsemble<P, D> {
         for i in 0..P {
             // Size the native buffer to this field's native_dim. The scratch
             // buffer is max-sized across entries; we borrow the prefix.
-            let d_i = self.entries[i].field.native_dim();
-            let k_i = self.entries[i].bases.k;
+            // Hoist the entry lookup out of the O(P²) loop nest.
+            let entry_i = &self.entries[i];
+            let d_i = entry_i.field.native_dim();
+            let k_i = entry_i.bases.k;
             let native_buf_i = &mut scratch.native_buf_i[..d_i];
             let spectral = &mut scratch.spectral_buf[..k_i];
-            self.entries[i].field.eval_native_into(i_t, native_buf_i);
+            entry_i.field.eval_native_into(i_t, native_buf_i);
             // Inline transport: project to spectral, reconstruct at D.
-            project_to_spectral_into(native_buf_i, &self.entries[i].bases, spectral);
-            reconstruct_from_spectral_into(spectral, &self.entries[i].bases, &mut scratch.b_at_d_i);
+            project_to_spectral_into(native_buf_i, &entry_i.bases, spectral);
+            reconstruct_from_spectral_into(spectral, &entry_i.bases, &mut scratch.b_at_d_i);
             for j in i..P {
                 let dot = if i == j {
                     simd_dot_f32(&scratch.b_at_d_i, &scratch.b_at_d_i, D)
                 } else {
-                    let d_j = self.entries[j].field.native_dim();
-                    let k_j = self.entries[j].bases.k;
+                    let entry_j = &self.entries[j];
+                    let d_j = entry_j.field.native_dim();
+                    let k_j = entry_j.bases.k;
                     let native_buf_j = &mut scratch.native_buf_j[..d_j];
                     let spectral_j = &mut scratch.spectral_buf[..k_j];
-                    self.entries[j].field.eval_native_into(i_t, native_buf_j);
-                    project_to_spectral_into(native_buf_j, &self.entries[j].bases, spectral_j);
+                    entry_j.field.eval_native_into(i_t, native_buf_j);
+                    project_to_spectral_into(native_buf_j, &entry_j.bases, spectral_j);
                     reconstruct_from_spectral_into(
                         spectral_j,
-                        &self.entries[j].bases,
+                        &entry_j.bases,
                         &mut scratch.b_at_d_j,
                     );
                     simd_dot_f32(&scratch.b_at_d_i, &scratch.b_at_d_j, D)
