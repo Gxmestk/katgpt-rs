@@ -105,6 +105,54 @@ This is P3 track-only because:
    `K_OPTIONS = [1,2,4,8,16]` IS TC^K selection means the latent-iteration arm is
    already complexity-class-aware in practice, just without the formal label.
 
+**Last verified:** 2026-08-05 (see Re-verification log below).
+
+## Re-verification log
+
+### 2026-08-05 — deferral still holds (no new substrate landed)
+
+Full re-audit performed against the 11-day window since the 2026-07-25 Issue 135
+consolidation (303 commits in `katgpt-rs`, `git log --since="2026-07-25"`).
+
+**All 5 referenced components still exist + are accurate:**
+
+| Component | Verified location | Issue-claim status |
+|---|---|---|
+| SwiR (`swir_switch_thinking`) | `katgpt-rs/crates/katgpt-transformer/src/swir/` | ✅ DEFAULT-ON confirmed (root `default` array; comment "DEFAULT-ON (Plan 313 T6.2, 2026-06-27)") |
+| Breakeven Bandit (`breakeven_routing`) | `katgpt-rs/crates/katgpt-core/src/breakeven/mod.rs` (`BreakevenTracker`) | ✅ DEFAULT-ON confirmed |
+| `k_selector` (`K_OPTIONS`) | **`riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs`** | ✅ `K_OPTIONS = [1,2,4,8,16]` exact match. Cross-repo (riir-ai, not katgpt-rs) — the issue references Plan 318, not a path, so this is accurate. |
+| DEC operators (`d`/`δ`/`Δ`/Hodge) | **`katgpt-rs/crates/katgpt-dec/src/{operators,hodge}.rs`** | ⚠️ Operators exist + are real; the repo's own `AGENTS.md` claims they live at `katgpt-core/src/dec/` but that path does NOT exist (the `katgpt-core/src/dec/` directory is absent; the operators live in the separate `katgpt-dec` workspace crate). Accessible via the `dec_operators` feature. The issue's component table makes no path claim, so no issue edit needed — but note the AGENTS.md drift for a future doc-sync. |
+| BoMSampler / QuasiMoTTo | `katgpt-core/src/micro_belief/` + `katgpt-core/src/speculative/qmc/` | ✅ both confirmed |
+
+**No new classifier-like primitive landed since 2026-07-25.** Targeted greps for
+`complexity_class|ComplexityClass|self_reducib|SelfReducib|FPRAS|complexity_classifier|problem_classifier`
+return ZERO source matches (the only hits are this issue file + "complexity class" prose
+in PKM/retrieval-stack docs referring to Big-O classes, not TC^K/#P). The 303 commits in
+the window were: Kimi-K3 analytic-backward training infra (Plan 318 C4-C9), cp_hopfield
+(Plan 567), katgpt-canon (Proposal 009), SipIt transformer inversion (Plan 561), EventLog
+query combinator (Plan 562), CD-LAM latent-confounder diagnostic (Issue 194), HLA→belief
+rename (Issue 195), perf sweeps, and f16 forward-path negative results (Issues 200/201).
+None detect inference-query complexity class.
+
+**Pre-existing cousin evaluated — IrreducibilityGate / SimulationGate**
+(`katgpt-rs/crates/katgpt-ruliology/src/{irreducibility,simulation_gate}.rs`, Plan 188).
+This pre-dates the deferral (so it's not a new unblock), and it is **domain-mismatched**:
+it computes a Kolmogorov-complexity proxy (RLE compression ratio) over a **game payoff
+matrix** to decide `reducible→analytical shortcut, irreducible→full simulation`. The
+fusion's blocker requires detecting TC^K-vs-#P structure of an **inference query**, which
+is a different signal in a different domain. It is the closest shipped "problem-shape
+heuristic" (deferral rationale point 2 explicitly names this category as needing its
+own GOAT gate), but applying it to inference queries would require re-deriving the
+compression target (payoff matrix → ???) and re-validating it beats SwiR's entropy signal.
+No such work has been done. NOT a candidate as-shipped.
+
+**All 4 deferral rationale points remain accurate** as of 2026-08-05:
+1. Paper still provides no classifier.
+2. Modelless-first mandate still in effect (`katgpt-rs/AGENTS.md` §"Modelless-first
+   mandate" L6-7, L11-12, L17-18); no modelless classifier found.
+3. SwiR still DEFAULT-ON (verified above).
+4. `K_OPTIONS = [1,2,4,8,16]` still exact.
+
 ## Re-evaluation trigger
 
 Revisit if any of the following lands:
@@ -126,3 +174,5 @@ Breakeven × k_selector × DEC × BoM — is a GOAT candidate, but is blocked on
 complexity-class classifier the paper does not provide. Track only; revisit if a
 modelless classifier lands. (Issue 135 — the FPRAS arm — consolidated here
 2026-07-25: same detector gap blocked both.)
+
+Re-verified 2026-08-05: deferral blocker (complexity-class classifier) still missing; no new substrate landed.
