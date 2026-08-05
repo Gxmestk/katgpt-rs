@@ -356,6 +356,138 @@ pub fn kimi_k3_forward_token_saved(
     saved.logits = runtime.logits.clone();
 }
 
+/// Run the full Kimi-K3 forward starting from an arbitrary hidden state,
+/// saving all activations (Plan 324 Phase A4 — Ouro looped training).
+///
+/// Mirrors [`kimi_k3_forward_token_hidden`] (the inference variant) but
+/// captures all intermediates for the analytic backward pass. This is the
+/// saved-activations counterpart of `kimi_k3_forward_token_hidden`: same
+/// decoder path (clear block_state → skip embedding → layers → output
+/// attn-res → final norm → LM head), but the caller must set `runtime.hidden`
+/// to the desired input hidden state before calling.
+///
+/// Used by the Ouro/LoopLM looped training recipe: each loop iteration after
+/// the first feeds the previous iteration's final hidden state back through
+/// the full decoder stack. The KDA recurrent state + MLA KV cache accumulate
+/// across iterations (handled by the per-layer forward primitives); only the
+/// `block_state` (residual stream) is reset per iteration.
+///
+/// **Block state contract:** clears `runtime.block_state` at entry (step 0),
+/// matching `kimi_k3_forward_token_saved`. The caller does NOT need to clear
+/// it separately.
+///
+/// **Saved activations contract:** `saved.layers` is cleared at entry. The
+/// `saved.token_id` and `saved.pos` fields are set to the caller-provided
+/// values (the loop iteration uses the same `pos` as the first iteration —
+/// RoPE is position-dependent, not iteration-dependent).
+#[allow(clippy::too_many_arguments)]
+pub fn kimi_k3_forward_token_hidden_saved(
+    config: &KimiK3ModelConfig,
+    weights: &KimiK3ModelWeights,
+    runtime: &mut KimiK3Runtime,
+    pos: usize,
+    iteration: usize,
+    saved: &mut TokenSavedActivations,
+) {
+    let d = config.hidden_size;
+
+    // Step 0: reset per-iteration block state (matches forward_token_hidden).
+    runtime.block_state.clear();
+    saved.layers.clear();
+    saved.pos = pos;
+    // token_id is meaningless for hidden-input iterations; store the iteration
+    // index so downstream consumers can distinguish saved-activation sets.
+    saved.token_id = iteration as u32;
+
+    // Step 1 (embedding) is SKIPPED — runtime.hidden is whatever the caller
+    // set (the previous iteration's final hidden state, post-LM-head-pre-norm).
+    // The caller is responsible for ensuring runtime.hidden has length d.
+    debug_assert_eq!(
+        runtime.hidden.len(),
+        d,
+        "runtime.hidden must be set to [hidden_size] before calling forward_token_hidden_saved"
+    );
+
+    // Steps 2-5: same decoder path as kimi_k3_forward_token_saved.
+    for (layer_idx, layer_w) in weights.layers.iter().enumerate() {
+        let layer_cfg = config.layer_config(layer_idx);
+        let layer_rt = &mut runtime.layers[layer_idx];
+
+        let mut layer_saved = LayerSavedActivations {
+            prefix_sum_in: runtime.hidden.clone(),
+            has_self_attn_res: false,
+            mixed_self: Vec::new(),
+            self_inv_rms: 0.0,
+            is_boundary: false,
+            block_state_self: Vec::new(),
+            attn_out: Vec::new(),
+            prefix_sum_after_attn: Vec::new(),
+            mixed_mlp: Vec::new(),
+            mlp_inv_rms: 0.0,
+            block_state_mlp: Vec::new(),
+            ffn_out: Vec::new(),
+            mla_saved: None,
+            kda_saved: None,
+            moe_saved: None,
+            dense_saved: None,
+        };
+
+        forward_layer_saved(
+            layer_idx,
+            &layer_cfg,
+            layer_w,
+            &mut layer_rt.attn_state,
+            &mut layer_rt.attn_scratch,
+            &mut layer_rt.ffn_scratch,
+            &mut layer_rt.attn_res_self_scratch,
+            &mut layer_rt.attn_res_mlp_scratch,
+            &mut runtime.block_state,
+            Some(&mut runtime.rope_freqs),
+            &mut runtime.hidden,
+            &mut runtime.scratch_hidden,
+            &mut layer_saved,
+        );
+
+        saved.layers.push(layer_saved);
+    }
+
+    // Output attn-res (same as forward_token_saved).
+    saved.prefix_sum_final = runtime.hidden.clone();
+    saved.block_state_final = runtime.block_state.residuals.clone();
+    saved.has_output_attn_res = !runtime.block_state.is_empty();
+
+    if !runtime.block_state.is_empty() {
+        let mixed = apply_attn_res(
+            &config.attn_res_config,
+            &weights.output_attn_res,
+            &runtime.block_state,
+            &mut runtime.output_attn_res_scratch,
+            &runtime.hidden,
+        );
+        runtime.hidden.copy_from_slice(mixed);
+    }
+
+    // Save post-output-attn-res hidden (= final norm input).
+    saved.pre_final_norm = runtime.hidden.clone();
+
+    // Final RMSNorm.
+    let sum_sq = simd_sum_sq(&runtime.hidden, d);
+    let inv_rms = 1.0 / ((sum_sq / d as f32 + config.rms_eps).sqrt());
+    saved.final_norm_inv_rms = inv_rms;
+    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+    saved.final_hidden = runtime.hidden.clone();
+
+    // LM head.
+    simd_matmul_rows(
+        &mut runtime.logits,
+        &weights.lm_head_weight,
+        &runtime.hidden,
+        config.vocab_size,
+        d,
+    );
+    saved.logits = runtime.logits.clone();
+}
+
 #[allow(clippy::too_many_arguments)]
 fn forward_layer_saved(
     layer_idx: usize,
