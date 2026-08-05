@@ -2236,7 +2236,7 @@ A second consolidated table for standalone opt-in features with their own plans,
 |---|---|---|
 | `proof_cert` | 145 | Hierarchical GOAT Proof Certificates — formal verification methodology (Research 106) |
 | `proof_sketch_evolution` | 128 | Proof Sketch Evolution — Elo-rated population + global goal cache (Research 088) |
-| `ruliology` | 188 | Ruliology Bandit — simple program strategies as bandit arms (Research 168) |
+| `ruliology` | 188 | Ruliology Bandit — simple program strategies as bandit arms (Research 168). **GOAT PASS 2026-08-05 (Bench 572)** — 97/97 release tests; stays opt-in (niche tool). |
 | `symbolic_distill` | 210 | Symbolic Expression Distillation — compact polynomial expressions for DDTree boundaries (GOAT 6/6, default-ON in root) |
 
 ### Hardware & deployment

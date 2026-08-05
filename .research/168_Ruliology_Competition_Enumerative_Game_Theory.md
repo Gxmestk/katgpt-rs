@@ -90,13 +90,20 @@ Wolfram systematically enumerates ALL programs in a computational class (FSM, CA
 
 ## Verdict: What to Build
 
-| Fusion | Gain | Perf Cost | GOAT? | Default? |
-|--------|------|-----------|-------|----------|
-| **F1: RuliologyBandit** | Discovery of optimal FSM strategies at inference time | Negligible — FSM enumeration is O(1) offline | ✅ GOAT | ✅ Default |
-| **F2: CrossParadigmArena** | Reveals paradigm dominance hierarchy | Test-only, no runtime cost | ✅ GOAT | ✅ Default (test/example) |
-| **F3: ComputationalIrreducibilityGate** | Structural reason for adaptive thinking | Cheap — just compression ratio check | ✅ GOAT | ✅ Default (gate) |
-| **F4: RuliologyPruner** | Pre-filter strategy space to Pareto-front | Zero runtime — offline pruning | ✅ GOAT | ✅ Default |
-| **F5: AdaptiveStrategyMutation** | Strategy-level evolution, not action-level | Same as existing HL pipeline | ✅ GOAT | 🔧 Feature-gated |
+> **Empirical re-gate (Benchmark 572, 2026-08-05):** all 5 fusions have empirical
+> test coverage (97/97 release-mode tests pass, 1 ignored). The "✅ Default"
+> claims below were **overclaimed** — the feature was never promoted to `default`
+> in `Cargo.toml` and stays opt-in (niche tool, pulls `bandit` dep into default
+> builds). Corrected verdict in the rightmost column. Full results:
+> [`.benchmarks/572_katgpt_ruliology_goat.md`](../.benchmarks/572_katgpt_ruliology_goat.md).
+
+| Fusion | Gain | Perf Cost | GOAT? | Default? (claimed) | Default? (corrected) |
+|--------|------|-----------|-------|----------|----------|
+| **F1: RuliologyBandit** | Discovery of optimal FSM strategies at inference time | Negligible — FSM enumeration is O(1) offline | ✅ GOAT | ~~✅ Default~~ | 🔧 opt-in (empirically PASS, niche tool) |
+| **F2: CrossParadigmArena** | Reveals paradigm dominance hierarchy | Test-only, no runtime cost | ✅ GOAT | ✅ Default (test/example) | ✅ Default-test (tests always compile; arena runs on demand) |
+| **F3: ComputationalIrreducibilityGate** | Structural reason for adaptive thinking | Cheap — just compression ratio check | ✅ GOAT | ~~✅ Default (gate)~~ | 🔧 opt-in (empirically PASS, niche diagnostic) |
+| **F4: RuliologyPruner** | Pre-filter strategy space to Pareto-front | Zero runtime — offline pruning | ✅ GOAT | ~~✅ Default~~ | 🔧 opt-in (empirically PASS, offline-only filter) |
+| **F5: AdaptiveStrategyMutation** | Strategy-level evolution, not action-level | Same as existing HL pipeline | ✅ GOAT | 🔧 Feature-gated | 🔧 opt-in (unchanged) |
 
 ### Why Modelless First
 

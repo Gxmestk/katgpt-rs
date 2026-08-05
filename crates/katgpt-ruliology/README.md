@@ -39,7 +39,7 @@ println!("Winner: {:?}", matrix.rankings[0]);
 
 | Feature | Description |
 |---|---|
-| `ruliology` | Ruliology bandit — simple-program strategies as bandit arms (Plan 188). Gates the `delta_gated_co_evolve` function (which uses `DeltaGatedConfig`). Forwards to `katgpt-pruners/ruliology`. The crate's modules compile unconditionally; this feature exists for parity with the historical root feature name. |
+| `ruliology` | Ruliology bandit — simple-program strategies as bandit arms (Plan 188). Gates the `delta_gated_co_evolve` function (which uses `DeltaGatedConfig`). Forwards to `katgpt-pruners/ruliology`. The crate's modules compile unconditionally; this feature exists for parity with the historical root feature name. **GOAT gate PASS (2026-08-05, [Bench 572](../../.benchmarks/572_katgpt_ruliology_goat.md))** — 97/97 release tests pass; stays opt-in (niche tool, pulls `bandit` dep). |
 
 ## Dependencies
 
