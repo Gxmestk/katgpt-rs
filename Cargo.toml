@@ -146,6 +146,9 @@ rustfft = { version = "6", optional = true }  # CHIAR per-token DCT entropy (Pla
 # Kimi-K3 loader deps (Proposal 032 Phase 5, gated by `kimi_k3_loader`).
 safetensors = { version = "0.4", optional = true }  # model.safetensors weight loader
 base64 = { version = "0.22", optional = true }  # tiktoken.model binary format (base64-encoded token→rank pairs)
+# GPT-4/Kimi-K3 pretokenizer regex (Issue 411). Uses fancy-regex for the
+# negative lookahead `(?!�?)` + `(?!�)` in the GPT-4 regex pattern.
+fancy-regex = { version = "0.14", optional = true }
 # mmap loader for zero-copy weight access (Phase 7 — eliminates the 1.5 GB
 # `read_to_end` buffer copy). Native only: memmap2 needs a real OS file.
 # wasm32 falls back to the in-memory path.
@@ -620,7 +623,7 @@ kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_r
 # Safetensors loader + tiktoken tokenizer for real-model loading.
 # Stays OPT-IN — pulls heavy deps (safetensors, base64) only needed when
 # actually loading model.safetensors.
-kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64", "dep:memmap2"]
+kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64", "dep:fancy-regex", "dep:memmap2"]
 # Kimi-K3 full-model analytic backward (Plan 318 C6). Composes the three
 # per-primitive backward modules (MLA + MoE + KDA) + attn-res + RMSNorm +
 # dense FFN + LM head backward into a full model gradient. CPU reference for
