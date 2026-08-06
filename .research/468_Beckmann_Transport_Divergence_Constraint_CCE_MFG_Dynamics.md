@@ -286,3 +286,75 @@ insufficient depending on topology.
 `cce_moderator + dec_operators`. Kept as a reproducible negative-result artifact
 (mirrors Plan 410's Go-arena failure pattern: a falsified hypothesis is still a
 valuable research outcome).
+
+---
+
+## 8. PoC Addendum 2 (Issue 574, 2026-08-06)
+
+**Verdict: T4 PASS — the transition-kernel (balance equation) constraint
+CLOSES the free-state-distribution artifact on games with action-dependent
+transitions.**
+
+This is the first formulation to succeed where Issue 573's Beckmann divergence
+constraint (§7 above) failed. The transition-kernel constraint is the right fix
+for the CCE moderator's documented MFG dynamics gap.
+
+### PoC setup
+
+MDP game: N=2 states {LOW, HIGH}, A=2 actions {WAIT, INVEST}.
+Action-dependent transitions:
+- P(HIGH|LOW,WAIT)=0.1, P(HIGH|LOW,INVEST)=0.6,
+- P(HIGH|HIGH,WAIT)=0.5, P(HIGH|HIGH,INVEST)=0.2
+Costs: cost(LOW,WAIT)=1, cost(LOW,INVEST)=3, cost(HIGH,WAIT)=0, cost(HIGH,INVEST)=2.
+
+The exploit target is (HIGH, WAIT) with cost 0 — the unconstrained CCE puts all
+mass there, ignoring that the MDP dynamics make HIGH only self-sustaining at
+50% per step.
+
+### The closing result
+
+| Variant | γ₀ | Artifact? |
+|---|---|---|
+| Unconstrained CCE | **0.000000** | **Yes** — all mass on (HIGH, WAIT) |
+| True MDP optimum (policy iteration) | **0.833333** (5/6) | N/A — honest baseline |
+| Constrained CCE (balance equation) | **0.833333** | **No** — matches true optimum (gap = 0.0) |
+
+The balance equation `ν(s') = Σ_{s,a} ρ(s,a)·P(s'|s,a)` (Campi et al. MFG
+consistency) adds `N-1` rows to the CCE LP. The constrained CCE recovers the
+exact optimal MDP policy (always WAIT, stationary distribution ν(LOW)=5/6,
+ν(HIGH)=1/6) — the artifact is closed with zero residual gap.
+
+### Why this works (and Beckmann didn't)
+
+The Beckmann constraint (§7) restricts which **state marginals** are
+transport-reachable. On a connected graph, all marginals are reachable → the
+constraint is vacuous.
+
+The transition-kernel constraint restricts which **occupation measures** are
+self-consistent under the MDP dynamics. You can't put all mass on (HIGH, WAIT)
+because the transitions from (HIGH, WAIT) only stay in HIGH with probability
+0.5 — the stationary distribution requires mass on LOW too. The constraint
+couples state and action through the dynamics, preventing the independent
+per-state optimization that caused the artifact.
+
+### RPS reduction (T6)
+
+For RPS (state-independent transitions P(s'|s,a) = 1/3), the balance equation
+reduces to `ν = uniform` — identical to Issue 573 T4a (already tested,
+γ₀ = -1.0 persists). The transition-kernel constraint CANNOT close the RPS
+artifact because RPS has no real dynamics. RPS needs the richer-deviation-class
+fix (option 1 from §7) — a separate PoC.
+
+### What this enables
+
+**PLAN WARRANTED** for `TransitionKernelCce` as a CCE LP variant behind a
+`transition_kernel` feature flag. The constraint adds `N-1` balance-equation
+rows to the CCE LP. For the BFS-enumeration solver, the complexity increase is
+`C(N·A + |D|, 1 + |D| + N-1)` vs `C(N·A + |D|, 1 + |D|)` — still exact for
+`N·A + |D| ≤ ~25`.
+
+### PoC artifact
+
+[`tests/transition_kernel_cce_poc.rs`](../tests/transition_kernel_cce_poc.rs) —
+6 tests, gated on `cce_moderator`. Kept as a reproducible positive-result
+artifact (the mirror image of Issue 573's negative-result PoC).
