@@ -69,5 +69,5 @@ unless T1's precondition is met.
 
 - `.plans/423_spectral_rewire_primitive.md` — COMPLETE, opt-in
 - `.benchmarks/423_spectral_rewire_goat.md` §G5, §"Open Follow-ups"
-- `.issues/123_fusion_b_two_component_delta_decomposition.md` — CLOSED
-- `.issues/124_spectral_rewire_svd_col_cap.md` — RESOLVED
+- `.issues/123_fusion_b_two_component_delta_decomposition.md` — CLOSED (file removed per noise-reduction rule; git history preserves content)
+- `.issues/124_spectral_rewire_svd_col_cap.md` — RESOLVED (file removed per noise-reduction rule; git history preserves content)
