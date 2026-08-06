@@ -5,7 +5,7 @@
 **Source paper:** Wang, Su, Wang, Plotkin (2025) *Individual incentives that promote collective intelligence* PNAS 122(51) e2516535122 — the "feedback payoff" $\pi_A = Y_A(Y - \hat{Y})$ proven Lyapunov-convergent.
 **Target primitive:** `set_attention` (katgpt-core, DEFAULT-ON, Plan 354)
 **Documented limitation:** [Bench 354](../.benchmarks/354_set_attention_goat.md) L71 — "G8 collective inference FAILED (Super-GOAT→GOAT) — averaging cannot amplify detection; that's a use-case limitation, NOT a primitive defect."
-**Status:** Open — PoC task (not a plan, per AGENTS.md "Create issue at .issues for poc, proof, optimization or refactor task, do not create plan").
+**Status:** RESOLVED (2026-08-06) — PoC PASSES both gates (CLR path). Promote to Plan.
 
 ---
 
@@ -42,13 +42,13 @@ Three competitors in `riir-ai/crates/riir-poc/` (the defend-wrong R&D crate). Us
 
 ## Tasks
 
-- [ ] T1 — Implement the toy domain generator in `riir-ai/crates/riir-poc/benches/set_attention_feedback_payoff_poc.rs` (synthetic N=64 belief states + weak-threat ground truth).
-- [ ] T2 — Implement competitor (1): plain Set Attention baseline (just call the shipped `set_sigmoid_attention_into`).
-- [ ] T3 — Implement competitor (2): CLR-weighted Set Attention (`r_j = (mean_m v_j,m)^M` scaling on the attention weights).
-- [ ] T4 — Implement competitor (3): paper-form feedback payoff (`w_j ∝ h_j · (d_truth − ĥ)` scaling).
-- [ ] T5 — Run all three on the toy domain, 1000 trials × 5 seeds, print verdict table (F1, latency, alloc count).
-- [ ] T6 — Record raw numbers in Research 469 §"PoC Addendum" (per §3.6 honest-revision protocol — do NOT silently revise the verdict to match the PoC).
-- [ ] T7 — If PASS: open a Plan in `katgpt-rs/.plans/` (open primitive) + a runtime guide in `riir-ai/.research/` (private selling point). If FAIL: leave G8 documented, close this issue with the negative-result record.
+- [x] T1 — Implement the toy domain generator in `riir-ai/crates/riir-poc/src/set_attention_feedback_payoff_poc.rs` (synthetic N=64 belief states + weak-threat ground truth). Commit `set_attention_feedback_payoff_poc.rs` + bench.
+- [x] T2 — Implement competitor (1): plain Set Attention baseline (calls shipped `set_sigmoid_attention_into`, 50 ticks for G8 dilution).
+- [x] T3 — Implement competitor (2): CLR-weighted scoring (`sigmoid(h_i · d_threat)^M` with M=5 — CLR's ^M nonlinear reliability gate, Plan 284).
+- [x] T4 — Implement competitor (3): paper-form feedback payoff (`w_j ∝ h_j · (d_truth − ĥ)` iterated K=5 rounds — modelless fixed-point).
+- [x] T5 — Run all three on the toy domain, 1000 trials × 5 seeds = 5000 total. Verdict table printed by bench.
+- [x] T6 — Record raw numbers in Research 469 §"PoC Addendum" (per §3.6 honest-revision protocol). DONE.
+- [x] T7 — PASS → promote to a Plan. CLR path closes G8 (identification +5.6pp, amplification 6.23×). Feedback amplifies (5.02×) but fails identification — documented as a collective-level mechanism. Plan filed in `katgpt-rs/.plans/`.
 
 ## Non-goals
 

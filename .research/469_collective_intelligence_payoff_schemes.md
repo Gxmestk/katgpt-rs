@@ -161,6 +161,76 @@ If PoC passes → promote to a Plan (open primitive in katgpt-rs/.plans/, runtim
 
 ---
 
+## PoC Addendum (Issue 575, 2026-08-06)
+
+The PoC ran 2026-08-06 (`CARGO_TARGET_DIR=/tmp/issue_575`, 5000 trials). Raw
+results:
+
+### Top-1 identification accuracy
+
+| Competitor | Accuracy | Δ vs Individual |
+|---|---|---|
+| Individual cosine (floor) | 12.0% | — |
+| Plain SA (50 ticks, G8 baseline) | 9.4% | −2.6pp |
+| CLR sigmoid^M (M=5) | **17.6%** | **+5.6pp** |
+| Feedback payoff (5 iters) | 0.9% | −11.1pp |
+
+### Aggregate d_threat projection (crowd-level signal)
+
+| Method | Mean projection | Amplification vs plain mean |
+|---|---|---|
+| Plain mean | 0.2194 | 1.00× |
+| CLR-weighted | 1.3671 | **6.23×** |
+| Feedback-weighted | 1.1012 | **5.02×** |
+
+### Verdict: **G8 CLOSED** (CLR path)
+
+- **Gate A (identification ≥5pp over individual):** CLR **PASS** (+5.6pp).
+  Feedback **FAIL** (−11.1pp — the per-entity score `dot(h_j, d_threat − ĥ_K)`
+  doesn't discriminate after the aggregate converges).
+- **Gate B (amplification ≥2×):** CLR **PASS** (6.23×), Feedback **PASS** (5.02×).
+
+### Honest findings
+
+1. **CLR's ^M sigmoid exponent is the G8-closing mechanism.** The nonlinear
+   reliability gate sharpens the per-entity ranking (identification +5.6pp)
+   AND concentrates the aggregate (6.23× amplification). This confirms the
+   Research 469 verdict: the feedback-payoff math shape already ships in CLR.
+
+2. **Plain Set Attention confirms G8 as documented.** 50 ticks of crowd
+   averaging dilutes the signal (9.4% < 12.0% individual) — averaging
+   actively hurts identification. This is exactly Bench 354 L71's documented
+   limitation, now empirically reproduced.
+
+3. **The paper's feedback payoff amplifies the aggregate (5.02×) but FAILS
+   identification (0.9%).** The paper's mechanism works at the collective
+   level — the weighted aggregate converges toward the truth direction — but
+   the per-entity score `dot(h_j, d_threat − ĥ_K)` after convergence becomes
+   near-uniform (the gap `d_threat − ĥ_K` shrinks as ĥ_K approaches the truth).
+   The paper's contribution is in the **learning-dynamics** convergence
+   (replicator equation), not single-shot per-entity credit assignment. In a
+   modelless inference setting, CLR's ^M exponent is the better amplification
+   mechanism.
+
+4. **Quality parity verdict:** CLR **beats** the paper's feedback payoff on
+   identification (+5.6pp vs −11.1pp) while both achieve comparable aggregate
+   amplification (6.23× vs 5.02×). The Research 469 §6.1 caveat ("quality
+   parity unproven") is now **resolved**: CLR is not just architecturally
+   covering the paper — it's empirically superior on the identification axis
+   and competitive on the amplification axis.
+
+### Promotion path
+
+The PoC PASSES → promote to a Plan. The primitive to open in
+`katgpt-rs/.plans/` is a **CLR-amplified Set Attention variant** — a sibling
+of `set_sigmoid_attention_into` that accepts per-entity reliability weights
+`r_j = (mean_m v_j,m)^M` and produces a reliability-weighted aggregate. The
+paper's feedback payoff is documented as a collective-level amplification
+mechanism (useful for aggregate projection, not identification) but CLR's ^M
+exponent is the production mechanism for per-entity identification.
+
+---
+
 ## 7. References
 
 - [1] Wang, G., Su, Q., Wang, L., & Plotkin, J.B. (2025). Individual incentives that promote collective intelligence. *Proc. Natl. Acad. Sci.*, 122(51), e2516535122.
