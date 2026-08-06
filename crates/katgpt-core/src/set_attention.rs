@@ -697,6 +697,7 @@ fn topk_accumulate(
 /// # Panics (release-checked)
 ///
 /// Panics if `output.len() < n`, `directions.len() < m_exp * d`, or `m_exp == 0`.
+#[cfg(feature = "clr_weighted_set_attention")]
 pub fn clr_reliability_scores(
     states: &[f32],
     directions: &[f32],
@@ -772,6 +773,7 @@ pub fn clr_reliability_scores(
 ///
 /// Same scratch discipline as [`set_sigmoid_attention_into`] — zero heap
 /// allocations in steady state.
+#[cfg(feature = "clr_weighted_set_attention")]
 #[inline]
 pub fn clr_weighted_set_attention_into(
     states: &[f32],
@@ -917,6 +919,7 @@ pub fn clr_weighted_set_attention_into(
 /// The residual update is normalised by `R = Σ_j r_j` (the total reliability
 /// weight) so γ is invariant to the reliability scale:
 /// `h_i' = h_i + (γ/R) · Σ_j α_ij · r_j · (v_j − h_i)`.
+#[cfg(feature = "clr_weighted_set_attention")]
 #[inline]
 fn dense_accumulate_weighted(
     output: &mut [f32],
@@ -1037,6 +1040,7 @@ fn dense_accumulate_weighted(
 ///
 /// Normalises by `R_k = Σ_{j∈topk} r_j` (the total reliability weight of the
 /// selected peers) per query — matching the dense path's γ-invariance property.
+#[cfg(feature = "clr_weighted_set_attention")]
 #[inline]
 fn topk_accumulate_weighted(
     output: &mut [f32],
