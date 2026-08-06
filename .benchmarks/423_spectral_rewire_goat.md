@@ -153,8 +153,13 @@ Beyond the GOAT gate, Phase 3 drove two improvements to the primitive:
   fraction is a LoRA training artifact, not the SAR phenomenon.
   `spectral_rewire` stays opt-in as a cold-tier tool.
 - **SIMD optimization** (optional) — the 64×64 index path at ~29µs could likely
-  hit the original 10µs target with proper SIMD matmuls. Not blocking; file as
-  issue if the 64×64 hot-loop case becomes a real workload.
+  hit the original 10µs target with proper SIMD matmuls. Not blocking; doubly
+  unwarranted: (a) no real >8×8 consumer exists, and (b) riir-train Issue 374
+  proved the spectral concentration assumption fails at NPC scale
+  (`on_manifold_fraction` [0.27, 0.58] < 0.8 SAR threshold), so the primitive
+  is cold-tier-only — even if a >8×8 consumer emerged, it would likely be the
+  wrong tool for NPC-scale weight purification. (Issue 127 tracked this;
+  removed 2026-08-06 after re-verification confirmed both reasons hold.)
 
 ## TL;DR
 
