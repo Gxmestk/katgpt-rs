@@ -2203,6 +2203,22 @@ pub use poincare::{
     fit_poincare_adapter, poincare_multi_step_into, poincare_navigate_into,
 };
 
+// Plan 571: Phase Separation Probe — per-entity minimum circular distance on
+// a phase circle, distilled from the Lonely Runner Conjecture (Barajas & Serra
+// 2007, arXiv:0710.4495; proven for N≤7, conjectured beyond). The LRC
+// guarantees every entity cycles through phase_separation ≥ 1/N — a coverage
+// guarantee no existing primitive provides. Three modelless paths (O(N),
+// O(N²), O(N log N)) + two bridge helpers (raw time-phase, latent projection).
+// Pure modelless (closed-form modular arithmetic + sigmoid + dot-product).
+// Opt-in until GOAT gate G1–G4 PASS — Phase 1 skeleton ships now.
+#[cfg(feature = "phase_separation")]
+pub mod phase_separation;
+#[cfg(feature = "phase_separation")]
+pub use phase_separation::{
+    circular_distance, from_latent_projection, from_speeds_and_tick, phase_separation,
+    phase_separation_all, phase_separation_sorted,
+};
+
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
 // riir-engine, etc.) install their OWN `#[global_allocator]`; this static is

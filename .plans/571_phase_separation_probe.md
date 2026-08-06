@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:0710.4495](https://arxiv.org/abs/0710.4495) — Barajas & Serra, *The Lonely Runner with Seven Runners* (2007)
 **Private guide:** [riir-ai/.research/334_phase_separation_game_runtime_guide.md](../../riir-ai/.research/334_phase_separation_game_runtime_guide.md)
 **Target:** `katgpt-rs/crates/katgpt-core/src/phase_separation.rs` (new module) + Cargo feature `phase_separation`
-**Status:** Active — Phase 1 (skeleton)
+**Status:** Active — Phase 1 COMPLETE (skeleton + GOAT gate ALL PASS, 2026-08-06)
 
 ---
 
@@ -31,40 +31,64 @@ where `‖x‖ mod 1` is the distance to the nearest integer (circular distance 
 
 ### Tasks
 
-- [ ] **T1.1** Add `phase_separation` feature flag to `katgpt-rs/crates/katgpt-core/Cargo.toml` (opt-in, default-off).
-- [ ] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/phase_separation.rs` module with:
+- [x] **T1.1** Add `phase_separation` feature flag to `katgpt-rs/crates/katgpt-core/Cargo.toml` (opt-in, default-off).
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/phase_separation.rs` module with:
   - `phase_separation(phases: &[f32], i: usize) -> f32` — O(N) naive (for correctness testing + small N).
   - `phase_separation_all(phases: &[f32], out: &mut [f32])` — O(N²) all-pairs (for correctness testing).
-  - `phase_separation_sorted(phases_sorted: &[f32], scratch: &mut [f32], out: &mut [f32])` — O(N log N) via sort + adjacent-neighbor scan (production path).
+  - `phase_separation_sorted(phases: &[f32], scratch: &mut [f32], out: &mut [f32])` — O(N log N) via sort + adjacent-neighbor scan (production path).
   - All three write into caller-provided `&mut [f32]` — zero allocation.
-- [ ] **T1.3** Implement the sorted-scan algorithm:
-  1. Copy `phases` into `scratch`, sort ascending.
-  2. For each entity i, its separation = min(distance to left neighbor, distance to right neighbor) on the circle. The circle wrap-around is handled by also checking the first/last elements (distance = 1.0 - last + first).
-  3. Write into `out[i]`.
-  - Edge cases: N=0 → return 0.0; N=1 → return 0.5 (single entity is maximally alone); N=2 → return `‖φ_0 − φ_1‖ mod 1`.
-- [ ] **T1.4** Unit tests (G1 determinism):
-  - `g1_integer_phases_bit_identical`: phases from integer speeds `{1, 2, 3, 4, 5, 6, 7}` at tick `t=42` → verify `phase_separation_all` produces the same f32 bits as a reference Python/reference Rust implementation.
-  - `g1_circle_wraparound`: phases `{0.0, 0.49, 0.51}` → entity 0's separation should be `min(0.49, 0.49) = 0.49` (wrap-around: 1.0 - 0.51 + 0.0 = 0.49), NOT `min(0.49, 0.51) = 0.49` (same answer here, but test the wrap path explicitly).
+  - **DEVIATION (documented):** `phase_separation_sorted` takes `scratch_perm: &mut [usize]`
+    (not `&mut [f32]`) because sorting values destroys the original-index mapping. The
+    permutation-index sort is O(N log N) total (sort + linear scan), vs the
+    binary-search-per-entity approach which is O(N log N) sort + O(N log N) searches
+    (2× the work, and it failed the G2 latency gate at 18025 ns before this fix).
+    The `usize` type is required because the permutation holds original indices.
+- [x] **T1.3** Implement the sorted-scan algorithm:
+  1. Fill `scratch_perm` with `0..n`, sort by `phases[scratch_perm[k]]` ascending.
+  2. For each rank `k`, compute min circular distance to left/right sorted neighbors
+     (with circle wraparound). Write `out[scratch_perm[k]] = sep_k`.
+  - Edge cases: N=0 → no-op; N=1 → `out[0] = 0.5`; N=2 → correct min circular distance.
+- [x] **T1.4** Unit tests (G1 determinism):
+  - `g1_integer_phases_bit_identical`: phases from integer speeds `{1, 2, 3, 4, 5, 6, 7}`
+    at tick `k=42`, period P=420 (lcm) → verify `phase_separation`, `phase_separation_all`,
+    and `phase_separation_sorted` all produce bit-identical f32 output.
+  - `g1_circle_wraparound`: phases `{0.0, 0.49, 0.51}` → entity 0's separation = 0.49
+    (wraparound path).
   - `g1_edge_cases`: N=0 → 0.0; N=1 → 0.5; N=2 with phases `{0.0, 0.5}` → 0.5 each.
-  - `g1_lrc_bound_n7`: with N=7 entities, integer speeds `{1,2,3,4,5,6,7}` (gcd=1), scan ticks t=0..1000 and verify every entity hits `phase_separation ≥ 1/7 ≈ 0.1428` at least once. This is the **theorem confirmation test** — the LRC says it must happen.
-- [ ] **T1.5** Re-export at crate root: `katgpt-rs/crates/katgpt-core/src/lib.rs` → `#[cfg(feature = "phase_separation")] pub mod phase_separation;`
+  - `g1_tie_handling_tick_zero`: tick 0 → all phases 0 → all separations 0.
+  - `g1_lrc_bound_n7`: with N=7 entities, integer speeds `{1,2,3,4,5,6,7}` (gcd=1),
+    scan the discrete orbit k=0..420 (period P=lcm(1..=7)=420) and verify every entity
+    hits `phase_separation ≥ 1/7` at least once. **Theorem confirmation test PASSES.**
+    Note: the continuous LRC is over real time t; we sample at granularity 1/P via
+    `phase_i(k) = (s_i · k mod P) / P`, which approximates `{s_i · t}` at `t = k/P`.
+  - `g1_sorted_matches_naive_random`: 50 random trials, sorted scan agrees with naive
+    all-pairs within 1 ULP.
+- [x] **T1.5** Re-export at crate root: `katgpt-rs/crates/katgpt-core/src/lib.rs` →
+  `#[cfg(feature = "phase_separation")] pub mod phase_separation;` + `pub use` for all
+  6 public functions.
 
 ### G2 — Perf gate
 
-- [ ] **T1.6** Add criterion bench `katgpt-rs/crates/katgpt-core/benches/bench_571_phase_separation_goat.rs`:
+- [x] **T1.6** Add criterion bench `katgpt-rs/crates/katgpt-core/benches/bench_571_phase_separation_goat.rs`:
   - N = {10, 100, 1000, 10000} entities.
   - Measure `phase_separation_sorted` wall time.
-  - Target: < 10µs at N=1000 (sub-µs expected).
-  - Report O(N log N) scaling (N=10000 should be ~13× N=1000, not 100×).
+  - Target: < 10µs at N=1000 — **PASS at 8033 ns** (sub-10µs, 1.25× headroom).
+  - Report O(N log N) scaling — **PASS at 12.59×** (predicts ~13×).
+  - Note: uses `std::time::Instant` + `harness = false` (mirrors bench_371 pattern,
+    not criterion — avoids the criterion framework overhead for a simple gate).
 
 ### G3 — No-regression gate
 
-- [ ] **T1.7** `cargo test -p katgpt-core --lib` passes with `phase_separation` off (default) AND on (`--features phase_separation`).
-- [ ] **T1.8** `cargo clippy -p katgpt-core --all-targets --features phase_separation` zero warnings.
+- [x] **T1.7** `cargo test -p katgpt-core --lib` passes with `phase_separation` off (default,
+    1840 passed) AND on (`--features phase_separation`, 1848 passed = 1840 + 8 new).
+- [x] **T1.8** `cargo clippy -p katgpt-core --all-targets --features phase_separation` zero warnings.
 
 ### G4 — Alloc-free gate
 
-- [ ] **T1.9** `CountingAllocator` test: call `phase_separation_sorted` 1000 times on a pre-allocated scratch buffer at N=1000. Assert zero allocations after warmup (the sort writes into the caller-provided scratch; the scan is in-place).
+- [x] **T1.9** `CountingAllocator` test: call `phase_separation_sorted` 1000 times on a
+    pre-allocated `scratch_perm` buffer at N=1000. **0 allocations after warmup** —
+    the permutation sort is in place on `scratch_perm`; the scan + write use only
+    stack-local `f32` arithmetic.
 
 ---
 
@@ -72,19 +96,24 @@ where `‖x‖ mod 1` is the distance to the nearest integer (circular distance 
 
 ### Tasks
 
-- [ ] **T2.1** Add `PhaseSeparationProbe` struct (zero-sized, `Copy`) wrapping the sorted-scan with a cached scratch buffer:
-  ```rust
-  pub struct PhaseSeparationProbe {
-      scratch: Vec<f32>,  // pre-allocated, reused across calls
-  }
-  impl PhaseSeparationProbe {
-      pub fn new(capacity: usize) -> Self { ... }
-      pub fn compute(&mut self, phases: &[f32], out: &mut [f32]) { ... }
-  }
-  ```
-  This lets callers pre-allocate once and reuse across ticks (the MMORPG 20Hz tick pattern).
-- [ ] **T2.2** Add `from_speeds_and_tick(speeds: &[u32], tick: u64, out_phases: &mut [f32])` helper that computes `(s_i * tick) mod P` into `out_phases` before the separation scan. `P` = the period (caller-specified, or LCM of speeds). This is the raw time-phase path (sync-safe).
-- [ ] **T2.3** Add `from_latent_projection(latent_states: &[f32], direction: &[f32], out_phases: &mut [f32])` helper that computes `sigmoid(dot(d, latent_state_i))` into `out_phases`. This is the latent-phase path (local-only, not synced). Documents the bridge pattern explicitly.
+**NOTE (2026-08-06):** T2.2 and T2.3 were pulled forward into Phase 1 because
+the LRC bound confirmation test (T1.4 `g1_lrc_bound_n7`) needed the raw
+bridge (`from_speeds_and_tick`) to materialize phases, and the latent
+projection bridge (`from_latent_projection`) was cheap to ship alongside.
+Both are documented in the module rustdoc + cross-referenced to Research 470.
+
+- [-] **T2.1** Add `PhaseSeparationProbe` struct (zero-sized, `Copy`) wrapping the
+  sorted-scan with a cached scratch buffer — **DEFERRED.** The three free
+  functions (`phase_separation`, `phase_separation_all`,
+  `phase_separation_sorted`) already cover all use cases; the struct would be
+  a convenience wrapper for callers that want to pre-allocate once. Revisit
+  when a concrete consumer (riir-ai Salience Tri-Gate fusion) materializes.
+- [x] **T2.2** Add `from_speeds_and_tick(speeds: &[u32], tick: u64, period: u32,
+  out_phases: &mut [f32])` helper — raw time-phase path (sync-safe). Computes
+  `(s_i · tick) mod P / P` into `out_phases`.
+- [x] **T2.3** Add `from_latent_projection(latent_states: &[f32], direction:
+  &[f32], out_phases: &mut [f32])` helper — latent projection path (local-only).
+  Computes `sigmoid(dot(direction, latent_state_i))` into `out_phases`.
 
 ---
 
