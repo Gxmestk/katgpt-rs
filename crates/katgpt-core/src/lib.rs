@@ -1647,6 +1647,8 @@ pub use set_attention::{
     SetAttentionConfig, SetAttentionError, identity, identity_into, identity_projection,
     identity_projection_into, set_sigmoid_attention_into,
 };
+#[cfg(feature = "clr_weighted_set_attention")]
+pub use set_attention::{clr_reliability_scores, clr_weighted_set_attention_into};
 
 // Depth-Invariance Diagnostic + Magnitude-Regularized Residual — the
 // root-cause counterpart to four symptom-only detectors (BeliefRankPruner,
