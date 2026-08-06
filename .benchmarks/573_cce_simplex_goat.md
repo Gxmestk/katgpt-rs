@@ -94,6 +94,6 @@ Nash equilibrium, and the moderator objective γ₀ = 0 at Nash.
 ## Cross-references
 
 - [Plan 572](../.plans/572_cce_simplex_solver_at_scale.md) — the execution plan.
-- [Issue 575](../.issues/575_set_attention_feedback_payoff_fusion.md) — RPS artifact closure (verify-only at NA=81; this plan adds solve).
+- Issue 575 (removed) — RPS artifact closure (verify-only at NA=81; this plan adds solve). Verdict captured in Research 468 §9.
 - [Plan 569](../.plans/569_transition_kernel_cce.md) — transition-kernel CCE (predecessor).
 - `.docs/04_calibration/cce_moderator.md` — API reference (updated by T6).
