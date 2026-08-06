@@ -591,6 +591,10 @@ pub fn kda_core_backward(
         grads.a_log[head] += clamp_f64_to_f32(dalpha_head_f64 * (ha.alpha_head as f64));
 
         // g_plus → g_raw + dt_bias
+        // NOTE: NOT a pure copy — this loop does copy (dg_raw) AND accumulate
+        // (grads.dt_bias +=). clippy::manual_memcpy suggests copy_from_slice,
+        // which would silently drop the dt_bias gradient. Do NOT "fix".
+        #[allow(clippy::manual_memcpy)]
         for i in 0..dk {
             dg_raw[off + i] = dg_plus[i];
             grads.dt_bias[off + i] += dg_plus[i];
