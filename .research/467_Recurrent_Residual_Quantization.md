@@ -144,7 +144,9 @@ The reframing that gives RRQ a Super-GOAT angle would be: **freeze/thaw versioni
 
 ### 3.1 RRQ × `simd_lut_dequant` — fused multi-stage dequant+dot kernel
 
-Each RRQ stage is a 2-bit RTN quantized tensor. The natural kernel: **one fused dequant+dot per stage, summed in registers**. This is a direct extension of `dequant_dot_via_lut` (Plan 452) to a 4-stage sum. The LUT is per-stage (each stage has its own scale/zero-point), the accumulator is shared. **Hypothesis:** at 8-bit prefix, the 4-stage LUT path is at parity with a single 8-bit LUT path because the LUT cost is amortized across the same SIMD gather, only the scale+sum differs. Untestable without the kernel — tracked as Plan 568 Phase 3.
+Each RRQ stage is a 2-bit RTN quantized tensor. The natural kernel: **one fused dequant+dot per stage, summed in registers**. This is a direct extension of `dequant_dot_via_lut` (Plan 452) to a 4-stage sum. The LUT is per-stage (each stage has its own scale/zero-point), the accumulator is shared.
+
+**Hypothesis (TESTED + REFUTED, Plan 568 Phase 3, 2026-08-07):** the hypothesis was that at the 8-bit prefix, the 4-stage LUT path is at parity with a single 8-bit LUT path because the LUT cost is amortized across the same SIMD gather, only the scale+sum differs. **This is FALSE on current CPUs.** The fused multi-stage kernel (`dequant_dot_via_lut_multi_stage_slice` + RRQ integration `prefix_dot_lut_into`) was implemented in Phase 3 and is **5.6×–6.4× slower** than the single-8-bit LUT path at parity (gate was ≤1.05×; rrq_4stage ≈ 70–85 µs vs single_8bit ≈ 12–13 µs on Apple Silicon NEON, 256×256/gs=128, 4 stages). Root cause: the 4× code-read + 4× gather overhead dominates the L1-residency benefit, and the 8-bit LUTs (only 2 KB total at this tile scale) do NOT spill L1 — so there is no spilling to amortize. The negative is structural, not parametric: the only regime where the hypothesis could hold (>32 KB of LUT data → tens of thousands of groups) requires matrices far larger than any realistic single-layer tile, and at that scale cold-LUT gather latency hurts both paths equally. The kernel ships as correct opt-in substrate (G1 PASS) for consumers whose LUT construction is already amortized (e.g. a future hardware StreamDQ analog where the gather is near-memory); the arithmetic `prefix_dot_into` (Phase 1) remains the recommended hot path. See [Bench 568](../.benchmarks/568_rrq_phase3_lut_negative.md) for the full measurement + root-cause.
 
 ### 3.2 RRQ × KS D-statistic — load-time layer-strategy router
 
@@ -197,7 +199,7 @@ Each RRQ stage is a self-contained `NeuronShard` candidate. The prefix-t view is
 |---|---|---|---|
 | Additive residual weight representation (`W̃ = Σ stages`) | katgpt-rs | Modelless inference primitive | Plan 568 Phase 1 |
 | PMR-based load-time quant-strategy selector | katgpt-rs | Modelless infra | Plan 568 Phase 2 |
-| Fused multi-stage LUT dequant+dot kernel | katgpt-rs | SIMD kernel (extends Plan 452) | Plan 568 Phase 3 |
+| Fused multi-stage LUT dequant+dot kernel | katgpt-rs | SIMD kernel (extends Plan 452) | Plan 568 Phase 3 — **TESTED, G2 NEGATIVE** (5.6×–6.4× slower at parity; correct substrate ships opt-in) |
 | Prefix-t view as runtime precision tier | katgpt-rs | Tier dispatch | Plan 568 Phase 4 (stretch) |
 
 | Don't take | Why not |
