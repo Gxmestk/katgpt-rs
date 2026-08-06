@@ -117,6 +117,16 @@ The cost tensor. **Cost convention**: minimize.
 | `gamma0(ρ) -> f32` | Moderator objective `Γ₀`. **Required.** |
 | `gamma0_coeff(s, a) -> f32` (default) | Per-index coefficient of `Γ₀` (default: `= reward_follow`). |
 
+#### `trait TransitionKernel<N, A>` (Plan 569)
+
+MDP transition dynamics for the transition-kernel-constrained CCE. Provides
+`P(s'|s,a)` — the transition kernel. Used by `CceLp::solve_with_dynamics` to
+add balance-equation rows enforcing stationary MDP consistency.
+
+| Method | Description |
+|---|---|
+| `transition(s, a, s') -> f32` | `P(s'\|s,a)` — MUST sum to 1 over `s'` for each `(s, a)`. **Required.** |
+
 ### `ExternalRegret` (`external_regret.rs`)
 
 Stateless regret evaluator. All methods take `&D` and `&P` per call.
@@ -141,10 +151,17 @@ LP-CCE solver via BFS enumeration.
 | Method | Returns | Notes |
 |---|---|---|
 | `solve(d, p)` | `Result<OccupationMeasure, CceLpError>` | Optimal `ρ⋆ = argmin γ₀`. |
+| `solve_with_dynamics(d, p, k)` | `Result<OccupationMeasure, CceLpError>` | Transition-kernel-constrained CCE (Plan 569). Adds `N-1` balance rows. |
 | `is_cce(ρ, d, p, ε)` | `bool` | Verify `ER(ρ) ≤ ε`. |
 
 **Complexity**: `O(C(N·A + |D|, 1 + |D|) · m³)` where `m = 1 + |D|`. Exact for
 `N·A + |D| ≤ ~25` (emission-abatement N=4,A=4: `C(20, 5) = 15504` candidates, <1ms).
+
+**`solve_with_dynamics`** (Plan 569) adds `N-1` balance-equation rows enforcing
+stationary MDP consistency: `ν(s') = Σ_{s,a} ρ(s,a)·P(s'|s,a)`. This closes the
+free-state-distribution artifact (Issue 574 T4 PASS): on a 2-state MDP with
+action-dependent transitions, the constrained CCE recovers the exact true MDP
+optimum. Requires a `TransitionKernel<N, A>` impl providing `P(s'|s,a)`.
 
 ### `CcePrimalDual` (`primal_dual.rs`)
 
@@ -232,7 +249,7 @@ See `.benchmarks/029_cce_convergence.md` for G2 details, `tests/cce_vs_nash.rs` 
 ## Limitations
 
 1. **Player-1-only CCE.** The deviation class `D` models only one player's deviations. Multi-player CCE (both players' constraints) requires extending `D` — deferred to riir-ai Plan 325.
-2. **No dynamics.** The LP treats the state distribution as free. MFG dynamics (occupation-measure flow constraints) are a Plan 325 follow-up.
+2. **~~No dynamics~~ Dynamics available via `solve_with_dynamics` (Plan 569).** The base `solve` treats the state distribution as free. The `solve_with_dynamics` variant adds the stationary MDP balance equation (`ν(s') = Σ ρ(s,a)·P(s'|s,a)`), closing the free-state-distribution artifact on games with action-dependent transitions. For games with state-independent transitions (e.g., RPS), the balance equation reduces to a marginal constraint (Issue 573 T4a) — those need a richer deviation class instead.
 3. **BFS enumeration LP.** Exact for `N·A + |D| ≤ ~25`. Larger problems need a real simplex — swap `CceLp::solve` internals when needed.
 4. **Euclidean Bregman only.** KL potential (entropic mirror descent) is implemented in `bregman.rs` but not wired into `CcePrimalDual`.
 

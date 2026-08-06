@@ -27,7 +27,9 @@
 //! sum, one per CCE constraint after slack conversion).
 
 use crate::cce::external_regret::ExternalRegret;
-use crate::cce::types::{DeviationClass, HeterogeneousPayoff, OccupationMeasure, PayoffTensor};
+use crate::cce::types::{
+    DeviationClass, HeterogeneousPayoff, OccupationMeasure, PayoffTensor, TransitionKernel,
+};
 
 /// LP solver error.
 #[derive(Debug)]
@@ -140,6 +142,118 @@ impl CceLp {
         eps: f32,
     ) -> bool {
         ExternalRegret::new().er(rho, d, p) <= eps
+    }
+
+    /// Solve the transition-kernel-constrained CCE LP (Plan 569).
+    ///
+    /// Extends [`solve`](Self::solve) with `N-1` balance-equation rows
+    /// enforcing stationary MDP consistency:
+    ///
+    /// ```text
+    /// ν(s') = Σ_{s,a} ρ(s,a) · P(s'|s,a)     for s' = 0..N-1
+    /// ```
+    ///
+    /// This closes the free-state-distribution artifact (Issue 574 T4 PASS):
+    /// the CCE can no longer freely choose the state distribution to exploit
+    /// favorable `(state, action)` pairs. On a 2-state MDP with
+    /// action-dependent transitions, the constrained CCE recovers the exact
+    /// true MDP optimum (residual gap = 0.0).
+    ///
+    /// **Scope:** closes the artifact for games with action-dependent
+    /// transitions. For games with state-independent transitions, the balance
+    /// equation reduces to a marginal constraint (ν = stationary distribution
+    /// of P) which Issue 573 T4a proved is insufficient.
+    ///
+    /// **Complexity:** `C(N·A + |D|, 1 + |D| + N-1) · m³` where `m = 1 + |D| +
+    /// N-1`. Still exact for `N·A + |D| ≤ ~25`.
+    pub fn solve_with_dynamics<
+        const N: usize,
+        const A: usize,
+        D: DeviationClass<N, A>,
+        P: PayoffTensor<N, A>,
+        K: TransitionKernel<N, A>,
+    >(
+        &self,
+        d: &D,
+        p: &P,
+        kernel: &K,
+    ) -> Result<OccupationMeasure<N, A>, CceLpError> {
+        let na = N * A;
+        let devs = d.deviations();
+        let nd = devs.len();
+        // N-1 independent balance rows (the Nth is implied by normalization).
+        let n_balance = N.saturating_sub(1);
+
+        // Total variables: ρ[0..na] + s[0..nd] (slacks for CCE constraints).
+        let n_vars = na + nd;
+        // Total equality constraints: 1 (sum) + nd (CCE) + n_balance.
+        let n_cons = 1 + nd + n_balance;
+
+        if n_cons == 0 || n_cons > n_vars {
+            return Err(CceLpError::Infeasible);
+        }
+
+        // Build constraint matrix A (n_cons × n_vars) and RHS b (n_cons).
+        let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
+        let mut rhs = vec![0.0_f64; n_cons];
+
+        // Row 0: Σ ρ = 1.
+        for val in &mut mat[0][..na] {
+            *val = 1.0;
+        }
+        rhs[0] = 1.0;
+
+        // Rows 1..=nd: for each κ, g_κ · ρ + s_κ = 0.
+        for (k, kappa) in devs.iter().enumerate() {
+            for s in 0..N {
+                for a in 0..A {
+                    let j = s * A + a;
+                    let g = p.reward_follow(s, a) as f64 - p.reward_deviate(s, kappa) as f64;
+                    mat[1 + k][j] = g;
+                }
+            }
+            mat[1 + k][na + k] = 1.0;
+            rhs[1 + k] = 0.0;
+        }
+
+        // Rows (1+nd)..(1+nd+n_balance): balance equations.
+        // For each s' in 0..N-1:
+        //   Σ_{s,a} ρ(s,a)·P(s'|s,a) − Σ_a ρ(s',a) = 0
+        for s_prime in 0..n_balance {
+            let row = 1 + nd + s_prime;
+            // Inflow: Σ_{s,a} ρ(s,a) · P(s'|s,a)
+            for s in 0..N {
+                for a in 0..A {
+                    let j = s * A + a;
+                    mat[row][j] += kernel.transition(s, a, s_prime) as f64;
+                }
+            }
+            // Outflow: − Σ_a ρ(s',a) = −ν(s')
+            for a in 0..A {
+                let j = s_prime * A + a;
+                mat[row][j] -= 1.0;
+            }
+            rhs[row] = 0.0;
+        }
+
+        // Objective coefficients: γ₀(ρ) = Σ ρ(s,a) · gamma0_coeff(s,a).
+        let mut obj = vec![0.0_f64; n_vars];
+        for s in 0..N {
+            for a in 0..A {
+                obj[s * A + a] = p.gamma0_coeff(s, a) as f64;
+            }
+        }
+
+        let best_rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na);
+        match best_rho_entries {
+            Some(rho_entries) => {
+                let sum: f32 = rho_entries.iter().map(|&v| v as f32).sum();
+                let inv = if sum > 1e-9 { 1.0 / sum } else { 1.0 };
+                let entries_f32: Vec<f32> = rho_entries.iter().map(|&v| (v as f32) * inv).collect();
+                Ok(OccupationMeasure::from_entries_trusted(entries_f32))
+            }
+            None => Err(CceLpError::Infeasible),
+        }
     }
 
     /// Solve the subjective-CCE LP for a heterogeneous player population
@@ -630,5 +744,151 @@ mod tests {
             (mass_low_abate - 1.0).abs() < 1e-3,
             "mass(Low,Abate) = {mass_low_abate}"
         );
+    }
+
+    // ── Plan 569: transition-kernel-constrained CCE ──────────────────────────
+
+    /// MDP game for the transition-kernel PoC (Plan 569 / Issue 574).
+    /// 2 states {LOW, HIGH}, 2 actions {WAIT, INVEST}, action-dependent
+    /// transitions. The unconstrained CCE exploits the free state distribution
+    /// (all mass on (HIGH, WAIT), γ₀ = 0); the constrained CCE recovers the
+    /// true MDP optimum (always WAIT, γ₀ = 5/6).
+    mod transition_kernel {
+        use super::*;
+        use crate::cce::types::TransitionKernel;
+
+        const LOW: usize = 0;
+        const HIGH: usize = 1;
+        const WAIT: usize = 0;
+        const INVEST: usize = 1;
+
+        /// Transition kernel P(s'|s,a).
+        const TRANSITION: [[[f64; 2]; 2]; 2] = [
+            [[0.9, 0.1], [0.4, 0.6]], // s = LOW
+            [[0.5, 0.5], [0.8, 0.2]], // s = HIGH
+        ];
+
+        /// Cost: cost(s, a) — minimize.
+        const COST: [[f64; 2]; 2] = [[1.0, 3.0], [0.0, 2.0]];
+
+        struct MdpGame;
+        impl PayoffTensor<2, 2> for MdpGame {
+            fn reward_follow(&self, state: usize, action: usize) -> f32 {
+                COST[state][action] as f32
+            }
+            fn gamma0(&self, _rho: &OccupationMeasure<2, 2>) -> f32 {
+                0.0 // gamma0_coeff (default = reward_follow) handles the objective
+            }
+        }
+
+        struct MdpKernel;
+        impl TransitionKernel<2, 2> for MdpKernel {
+            fn transition(&self, state: usize, action: usize, next_state: usize) -> f32 {
+                TRANSITION[state][action][next_state] as f32
+            }
+        }
+
+        struct MdpDevs {
+            v: Vec<Deviation<2, 2>>,
+        }
+        impl DeviationClass<2, 2> for MdpDevs {
+            fn deviations(&self) -> &[Deviation<2, 2>] {
+                &self.v
+            }
+        }
+        fn devs() -> MdpDevs {
+            MdpDevs {
+                v: vec![
+                    Deviation::<2, 2>::constant(0, WAIT),
+                    Deviation::<2, 2>::constant(1, INVEST),
+                ],
+            }
+        }
+
+        /// G1: unconstrained CCE exploits the free state distribution.
+        #[test]
+        fn g1a_unconstrained_artifact() {
+            let d = devs();
+            let p = MdpGame;
+            let rho = CceLp::new().solve(&d, &p).expect("unconstrained feasible");
+            // Artifact: all mass on (HIGH, WAIT), γ₀ = 0.
+            assert!((rho.at(HIGH, WAIT) - 1.0).abs() < 0.05, "expected all mass on (HIGH, WAIT)");
+            let mut gamma0 = 0.0_f64;
+            for (s, cost_s) in COST.iter().enumerate() {
+                for (a, &cost_sa) in cost_s.iter().enumerate() {
+                    gamma0 += rho.at(s, a) as f64 * cost_sa;
+                }
+            }
+            assert!(gamma0.abs() < 0.05, "unconstrained γ₀ should be ≈ 0 (artifact), got {gamma0}");
+        }
+
+        /// G1: constrained CCE matches the true MDP optimum (5/6).
+        #[test]
+        fn g1b_constrained_matches_true_optimum() {
+            let d = devs();
+            let p = MdpGame;
+            let k = MdpKernel;
+            let rho = CceLp::new()
+                .solve_with_dynamics(&d, &p, &k)
+                .expect("constrained feasible");
+
+            let mut gamma0 = 0.0_f64;
+            for (s, cost_s) in COST.iter().enumerate() {
+                for (a, &cost_sa) in cost_s.iter().enumerate() {
+                    gamma0 += rho.at(s, a) as f64 * cost_sa;
+                }
+            }
+            // True MDP optimum: always WAIT, γ₀ = 5/6 ≈ 0.833.
+            assert!(
+                (gamma0 - 5.0 / 6.0).abs() < 0.05,
+                "constrained γ₀ should be ≈ 5/6 (artifact closed), got {gamma0}"
+            );
+
+            // ρ should match the optimal policy (always WAIT).
+            assert!((rho.at(LOW, WAIT) - 5.0 / 6.0).abs() < 0.05);
+            assert!((rho.at(HIGH, WAIT) - 1.0 / 6.0).abs() < 0.05);
+        }
+
+        /// G1: the constrained ρ is still a valid CCE (no over-restriction).
+        #[test]
+        fn g1c_constrained_is_valid_cce() {
+            let d = devs();
+            let p = MdpGame;
+            let k = MdpKernel;
+            let rho = CceLp::new()
+                .solve_with_dynamics(&d, &p, &k)
+                .expect("constrained feasible");
+            assert!(
+                CceLp::new().is_cce(&rho, &d, &p, 1e-4),
+                "constrained ρ must still be a valid CCE"
+            );
+        }
+
+        /// G1: balance equation is satisfied for the constrained solution.
+        #[allow(clippy::needless_range_loop)] // 3D TRANSITION[s][a][s'] indexing needs numeric indices
+        #[test]
+        fn g1d_balance_equation_satisfied() {
+            let d = devs();
+            let p = MdpGame;
+            let k = MdpKernel;
+            let rho = CceLp::new()
+                .solve_with_dynamics(&d, &p, &k)
+                .expect("constrained feasible");
+
+            // Check ν(s') = Σ_{s,a} ρ(s,a)·P(s'|s,a) for each state.
+            for s_prime in 0..2 {
+                let mut marginal = 0.0_f64;
+                for a in 0..2 {
+                    marginal += rho.at(s_prime, a) as f64;
+                }
+                let mut inflow = 0.0_f64;
+                for s in 0..2 {
+                    for a in 0..2 {
+                        inflow += rho.at(s, a) as f64 * TRANSITION[s][a][s_prime];
+                    }
+                }
+                assert!((marginal - inflow).abs() < 1e-4, "balance violated for s'={s_prime}: ν={marginal}, inflow={inflow}");
+            }
+        }
     }
 }

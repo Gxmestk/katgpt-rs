@@ -399,6 +399,41 @@ pub trait HeterogeneousPayoff<const N: usize, const A: usize> {
     }
 }
 
+/// MDP transition dynamics for the transition-kernel-constrained CCE (Plan 569).
+///
+/// Provides the transition kernel `P(s' | s, a)` — the probability of
+/// transitioning to `next_state` from `state` under `action`. When passed to
+/// [`crate::cce::CceLp::solve_with_dynamics`], the CCE LP is augmented with
+/// `N-1` balance-equation rows enforcing stationary MDP consistency:
+///
+/// ```text
+/// ν(s') = Σ_{s,a} ρ(s,a) · P(s'|s,a)     for each s'
+/// ```
+///
+/// This closes the free-state-distribution artifact documented in
+/// `.docs/04_calibration/cce_moderator.md` §Limitations #2 — the CCE can no
+/// longer freely choose the state distribution to exploit favorable (state,
+/// action) pairs. Validated by Issue 574 PoC (T4 PASS: constrained CCE
+/// recovers the exact true MDP optimum on a 2-state game with action-dependent
+/// transitions).
+///
+/// **Contract:** for every `(state, action)` pair, the values
+/// `transition(state, action, 0..N)` MUST form a valid probability
+/// distribution (non-negative, sums to 1). Violating this produces an
+/// inconsistent LP.
+///
+/// **Scope:** closes the artifact for games with action-dependent transitions.
+/// For games with state-independent transitions (e.g., RPS where the opponent
+/// draws fresh each round), the balance equation reduces to a marginal
+/// constraint (ν = stationary distribution of P) which Issue 573 T4a proved is
+/// insufficient — those games need the richer-deviation-class fix instead.
+pub trait TransitionKernel<const N: usize, const A: usize> {
+    /// `P(s' | s, a)` — probability of transitioning to `next_state`.
+    ///
+    /// MUST satisfy `Σ_{s'} transition(s, a, s') = 1` for every `(s, a)`.
+    fn transition(&self, state: usize, action: usize, next_state: usize) -> f32;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

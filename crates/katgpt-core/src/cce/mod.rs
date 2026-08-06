@@ -76,5 +76,5 @@ pub use lp::{CceLp, CceLpError};
 pub use primal_dual::{CcePrimalDual, ConvergenceReportRaw, StepReport};
 pub use types::{
     ActionSpace, Deviation, DeviationClass, HeterogeneousPayoff, OccupationMeasure,
-    OccupationMeasureError, PayoffTensor, StateSpace,
+    OccupationMeasureError, PayoffTensor, StateSpace, TransitionKernel,
 };
