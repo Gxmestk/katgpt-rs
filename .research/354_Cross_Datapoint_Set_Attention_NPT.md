@@ -7,6 +7,7 @@
 > **Cross-ref (riir-ai private guide):** [Research 167 — Crowd Joint Inference via Cross-NPC Set Attention](../../riir-ai/.research/167_crowd_joint_inference_cross_npc_set_attention_guide.md)
 > **Cross-ref (riir-chain):** none — this primitive is latent-local, no sync boundary crosses; the Q/K/V projections can be BLAKE3-committed in `NeuronShard` but that is a neuron-db concern, not a chain concern.
 > **Classification:** Public (katgpt-rs/MIT). The NPC selling point stays private in riir-ai/167.
+> **Related-Paper (actionable fusion):** Wang, Su, Wang, Plotkin [PNAS 122(51) e2516535122 "Individual incentives that promote collective intelligence"] (SIAM News summary 2026-07-24) — Gain. The paper's "feedback payoff" $\pi_A = Y_A(Y - \hat{Y})$ (Lyapunov-convergent credit assignment that rewards individuals pulling the collective toward truth, even when their individual prediction is wrong) is **precisely the credit-assignment shape that converts this primitive's plain averaging into amplification** — closing the documented G8 collective-inference failure ("averaging cannot amplify detection"). CLR (P284, `(mean_m v_k,m)^M`, +78pp over majority) is the operational analog. Full distillation: [Research 469](469_collective_intelligence_payoff_schemes.md). PoC to close G8: [Issue 575](../.issues/575_set_attention_feedback_payoff_fusion.md).
 
 ---
 

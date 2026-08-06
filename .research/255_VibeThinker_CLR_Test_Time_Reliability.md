@@ -1,5 +1,7 @@
 # Research 255: VibeThinker-3B — Claim-Level Reliability + Self-Adaptive Test-Time Scaling
 
+<!-- Related-Paper cross-ref (added 2026-08-06): Wang/Su/Wang/Plotkin PNAS 122(51) e2516535122 "Individual incentives that promote collective intelligence" — Gain. Feedback payoff = CLR shape. See Research 469 + Issue 575. -->
+
 > **Source:** [VibeThinker-3B: Exploring the Frontier of Verifiable Reasoning in Small Language Models](https://arxiv.org/pdf/2606.16140) — Sen Xu, Shixi Liu, Wei Wang, Jixin Min, Yingwei Dai, Zhibin Yin, Yirong Chen, Xin Zhou, Junlin Zhang (Sina Weibo Inc.), 15 Jun 2026
 > **Date:** 2026-06-17
 > **Status:** Active — Super-GOAT (open primitive half). Private selling-point moat → `riir-ai/.research/136`.

@@ -1,5 +1,7 @@
 # Research 274: Optimal Coarse Correlated Equilibria (MFG) — LP Relaxation + No-Regret Primal-Dual Moderator
 
+<!-- Related-Paper cross-ref (added 2026-08-06): Wang/Su/Wang/Plotkin PNAS 122(51) e2516535122 "Individual incentives that promote collective intelligence" — Gain. Feedback payoff = CLR shape; niche-expert = Quantile Balance Router + Manifold Bandit; designer Γ₀ = CCE Moderator. See Research 469 + Issue 575. -->
+
 > **Source:** [Optimal Coarse Correlated Equilibria in Mean Field Games: Linear Programming and No-Regret Learning](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas (Bielefeld / Milano), arxiv 2606.20062v1, 18 Jun 2026
 > **Date:** 2026-06-20
 > **Status:** Done
