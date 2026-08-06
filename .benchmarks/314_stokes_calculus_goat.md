@@ -106,7 +106,7 @@ A precomputed vertex-pair → edge index (HashMap or CSR) would make this **O(pa
 | File | Change |
 |------|--------|
 | `katgpt-rs/crates/katgpt-dec/src/stokes_calculus.rs` | Extracted `boundary_flux_mass_only` (mass without hodge_decompose) from `boundary_flux_mass` |
-| `katgpt-rs/crates/katgpt-core/src/dec/mod.rs` | Re-export `boundary_flux_mass_only` |
+| `katgpt-rs/crates/katgpt-dec/src/lib.rs` | Re-export `boundary_flux_mass_only` (via `pub use stokes_calculus::{...}`) |
 | `katgpt-rs/crates/katgpt-core/benches/stokes_calculus_bench.rs` | NEW — criterion bench (5 benchmarks across 4 groups) |
 | `katgpt-rs/crates/katgpt-core/Cargo.toml` | Register `stokes_calculus_bench` under `[[bench]]` with `required-features = ["dec_operators"]` |
 | `katgpt-rs/.benchmarks/314_stokes_calculus_goat.md` | NEW — this file |
