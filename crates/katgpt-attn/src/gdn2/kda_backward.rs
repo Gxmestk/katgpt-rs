@@ -228,8 +228,8 @@ pub fn kda_forward_token_with_saved(
         let mut q_normed = vec![0.0f32; dk];
         q_normed.copy_from_slice(&scratch.z_q_conv[off..off + dk]);
         l2_normalize_eps_kda(&mut q_normed);
-        for i in 0..dk {
-            q_normed[i] *= scale;
+        for q in q_normed.iter_mut() {
+            *q *= scale;
         }
 
         // k_normed: L2Norm(z_k_conv slice), no scale.
@@ -479,9 +479,7 @@ pub fn kda_core_backward(
 
         // ── Step 3 backward: gdn2_recurrent_step ──────────────────────────
         // ds_post = ds_next (incoming from future) + readout contribution.
-        for idx in 0..dk * dk {
-            ds_post[idx] = ds_next[head][idx];
-        }
+        ds_post[..dk * dk].copy_from_slice(&ds_next[head][..dk * dk]);
         // Readout: out[j] = Σ_i S''[i,j] · q_h[i]
         // f64 accumulation for dq_i: dout_raw × s_post products are the primary
         // cross-layer amplification path; f64 prevents overflow when both are
@@ -584,7 +582,7 @@ pub fn kda_core_backward(
         for i in 0..dk {
             let exp_gk = ha.gk[i].exp();
             let mask = if ha.a_decay[i] > config.alpha_eps { 1.0 } else { 0.0 };
-            dgk[i] = clamp_f64_to_f32((da_decay[i] as f64) * (exp_gk as f64) * (mask as f64));
+            dgk[i] = clamp_f64_to_f32((da_decay[i] as f64) * (exp_gk as f64) * mask);
             dalpha_head_f64 += (dgk[i] as f64) * (-softplus(ha.g_plus[i]) as f64);
             dg_plus[i] = clamp_f64_to_f32(
                 (dgk[i] as f64) * (-(ha.alpha_head as f64) * sigmoid(ha.g_plus[i]) as f64),
@@ -632,9 +630,7 @@ pub fn kda_core_backward(
         }
 
         // v path (identity):
-        for i in 0..dk {
-            dz_v_conv[off + i] = dv_h[i];
-        }
+        dz_v_conv[off..off + dk].copy_from_slice(&dv_h[..dk]);
     }
 
     KdaCoreBackwardOutput {
@@ -653,7 +649,7 @@ pub fn kda_core_backward(
 ///
 /// Consumes the [`KdaSavedActivations`] (from [`kda_forward_token_with_saved`])
 /// + upstream `d_output` (= dL/doutput, `[hidden_size]`) + incoming state grad
-/// `ds_next` (= dL/dS_t from the future BPTT step, `[n_heads][dk*dk]`).
+///   `ds_next` (= dL/dS_t from the future BPTT step, `[n_heads][dk*dk]`).
 ///
 /// Produces:
 /// - `grads` — weight gradients (accumulated `+=`).

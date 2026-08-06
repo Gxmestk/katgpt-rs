@@ -456,8 +456,8 @@ mod tests {
         let ranks = load_tiktoken_bpe(data.as_bytes()).unwrap();
 
         assert_eq!(ranks.len(), 2);
-        assert_eq!(ranks.get(&b"a".to_vec()).copied(), Some(0));
-        assert_eq!(ranks.get(&b"b".to_vec()).copied(), Some(1));
+        assert_eq!(ranks.get(b"a".as_slice()).copied(), Some(0));
+        assert_eq!(ranks.get(b"b".as_slice()).copied(), Some(1));
     }
 
     #[test]

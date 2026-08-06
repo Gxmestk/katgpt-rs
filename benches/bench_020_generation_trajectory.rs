@@ -414,7 +414,7 @@ fn gaussian_cdf(x: f32) -> f32 {
     let k2 = k * k;
     let k3 = k2 * k;
     let k4 = k3 * k;
-    let poly = 0.319381530 * k - 0.356563782 * k2 + 1.781477937 * k3 - 1.821255978 * k4 + 1.330274429 * k4 * k;
+    let poly = 0.31938153 * k - 0.35656378 * k2 + 1.781_477_9 * k3 - 1.821_255_9 * k4 + 1.330_274_5 * k4 * k;
     let pdf = (-0.5 * x * x).exp() / (2.0 * core::f32::consts::PI).sqrt();
     1.0 - pdf * poly
 }
@@ -537,7 +537,7 @@ fn run_bench() {
         // IMPORTANT: Model B generates from ITS OWN argmax (different tokens
         // than Model A if σ > 0). This is the realistic scenario.
         let mut gen_b: Vec<Vec<Vec<f32>>> = Vec::with_capacity(N_PROMPTS);
-        for (_prompt_idx, prompt) in prompts.iter().enumerate() {
+        for prompt in prompts.iter() {
             let _toks_b = extract_generation_trajectory(
                 &config,
                 &weights_b,
