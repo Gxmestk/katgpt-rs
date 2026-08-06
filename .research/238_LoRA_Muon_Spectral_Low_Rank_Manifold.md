@@ -7,6 +7,7 @@
 > **Related Plans:** 152 (Newton-Schulz — DONE default-on GOAT 25/25), 254 (Spectral Budget Router), 270 (this doc — Gauge-Invariant Adapter Composition), 094 (Memo Reflections TIES Merge — UNBLOCKED), 201 (Rosetta Pruner — UNBLOCKED), 233 (Rosetta Cross-Game Alignment — UNBLOCKED)
 > **Cross-ref (riir-ai):** Research 124 (LoRA-Muon training integration), Plan 299 (LoRA-Muon optimizer)
 > **Classification:** Public — generic inference engine mechanics (WHAT, not HOW)
+> **PASS-Redirects (synthesis):** CMuon [arXiv:2608.02502 "CMuon: Accelerating and Stabilizing Diffusion Transformer Training via Chunked Momentum Orthogonalization"] — training optimizer that chunks fused QKV/AdaLN/FFN matrices before Newton-Schulz to avoid subspace interference (shared `(GᵀG)^{-1/2}` preconditioner mixes disjoint gradient covariance); no modelless analog at inference (we don't orthogonalize gradient matrices at runtime). Minor design-principle echo: if Plan 152's NS infra is ever applied to a *fused* projection at inference, chunk by functional sub-block first — but this is already implied by our keep-distinct-signals-separate discipline. → riir-train for the optimizer itself.
 
 ---
 
