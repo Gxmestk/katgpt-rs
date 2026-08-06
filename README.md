@@ -2606,6 +2606,18 @@ Feature gate: `latent_confounder_audit` (in katgpt-core, **opt-in / default-off*
 
 ---
 
+### 🧮 RRQ — Recurrent Residual Quantization: Single-Checkpoint Multi-Precision Weights (Plan 568, arxiv 2608.04048)
+
+Distills Luo, Dong, Cheng, Shen (Intel, Aug 2026) into a **modelless, calibration-free single-checkpoint multi-precision weight quantization primitive**. Weights are stored as `W̃(t) = Ŵ0 + Σ_{k=1..t} R̂k` — a 2-bit RTN base plus a sequence of 2-bit RTN residual corrections. Each prefix of stages is a usable model at a distinct effective bit-width: 2-bit base → 2 bits, +1 stage → 4 bits, +2 stages → 6 bits, +3 stages → 8 bits. Inference exploits linearity: `A·W̃(t) = A·Ŵ0 + Σ A·R̂k` — every precision prefix is just a partial sum of stage GEMMs (reuse the same SIMD dequant kernel per stage, sum in registers).
+
+**Novel for our stack (zero prior art):** Research 467 §2.1 confirms zero hits for `RRQ | residual_quant | Matryoshka | MatGPTQ | multi-precision weight` across shipped `*.rs`. Closest cousins: `quant_error_lora.rs` (single SVD correction of `E = W − dequant(W_q)`, Research 463 — same problem, SVD mechanism vs RRQ's iterated RTN); QJL residual in TurboQuant (activation level, not weight); `multi_precision_npc` (FAILED training-time LoRA in riir-train, negative arena result). Three transferable primitives: (1) additive residual weight reconstruction; (2) matmul linearity for stage-wise GEMM (extends `simd_lut_dequant` Plan 452); (3) Peak-to-Mean Ratio (PMR) outlier threshold as load-time quant-strategy selector (sibling to KS D-statistic detector Research 200 — PMR selects RRQ-vs-direct per layer, KS flags security anomalies).
+
+**Verdict: Gain (not Super-GOAT).** Novel mechanism with strong fusion hooks (RRQ × SIMD LUT DeQuant, RRQ × KS, RRQ × quant_error_lora, RRQ × freeze/thaw), but no concrete consumer today. Default-off until a consumer materializes: (a) multi-precision LLM serving, (b) per-NPC expert routing (`quant_expert_goat.rs`) wanting to share a multi-precision base, or (c) the Super-GOAT angle — incremental precision upgrades via freeze/thaw (each stage its own `NeuronShard`, the prefix-t view a runtime composition). Paper §3.4 derives the load-time RRQ-better-than-direct threshold `K > r·(2^(n1+1) − 1)` for outlier magnitude K vs inlier radius r — the modelless per-layer selector. Construction is all-RTN, no Hessian, no calibration (3.3× faster than MatGPTQ on Qwen3-8B per the paper).
+
+Feature gate: `rrq_quant` (in katgpt-core, **opt-in / default-off**). 📖 Plan: [`568`](.plans/568_recurrent_residual_quantization.md), Research: [`.research/467_Recurrent_Residual_Quantization.md`](.research/467_Recurrent_Residual_Quantization.md), Paper: [arXiv:2608.04048](https://arxiv.org/abs/2608.04048).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
