@@ -109,9 +109,9 @@ impl CceLp {
             }
         }
 
-        // Enumerate BFS via the shared helper (Plan 300 T2.1: DRY with
-        // `solve_heterogeneous`).
-        let best_rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na);
+        // Auto-select solver: BFS enumeration for small LPs (exact, fast),
+        // two-phase primal simplex for large LPs (Plan 572).
+        let best_rho_entries = solve_lp_auto(&mat, &rhs, &obj, n_vars, na);
         match best_rho_entries {
             Some(rho_entries) => {
                 // Final normalization to exactly sum = 1 (within f32 tolerance).
@@ -244,7 +244,8 @@ impl CceLp {
             }
         }
 
-        let best_rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na);
+        // Auto-select solver: BFS for small LPs, simplex for large (Plan 572).
+        let best_rho_entries = solve_lp_auto(&mat, &rhs, &obj, n_vars, na);
         match best_rho_entries {
             Some(rho_entries) => {
                 let sum: f32 = rho_entries.iter().map(|&v| v as f32).sum();
@@ -330,7 +331,8 @@ impl CceLp {
             }
         }
 
-        let best_rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na);
+        // Auto-select solver: BFS for small LPs, simplex for large (Plan 572).
+        let best_rho_entries = solve_lp_auto(&mat, &rhs, &obj, n_vars, na);
         match best_rho_entries {
             Some(rho_entries) => {
                 // Final normalization to exactly sum = 1 (within f32 tolerance).
@@ -363,9 +365,203 @@ impl CceLp {
         }
         true
     }
+
+    /// Constraint-generation solver for heterogeneous CCE (Plan 572).
+    ///
+    /// Starts with no deviation constraints (just the sum-to-1 constraint),
+    /// solves the relaxed LP, finds the most-violated deviation constraint via
+    /// the external-regret separation oracle, adds it, and re-solves. Converges
+    /// in `O(|active set|)` iterations — typically far fewer than `Σ_i |D_i|`
+    /// because only the binding deviations end up active.
+    ///
+    /// This is the production path for large heterogeneous games (e.g., the
+    /// N=9, A=9 two-player RPS case from Issue 575) where the full LP has too
+    /// many variables for BFS enumeration.
+    ///
+    /// Returns the same shape as [`solve_heterogeneous`]. The result passes
+    /// [`is_heterogeneous_cce`] at convergence.
+    pub fn solve_heterogeneous_cg<
+        const N: usize,
+        const A: usize,
+        H: HeterogeneousPayoff<N, A>,
+    >(
+        &self,
+        game: &H,
+    ) -> Result<OccupationMeasure<N, A>, CceLpError> {
+        self.solve_heterogeneous_cg_with_tolerance(game, 1e-6)
+    }
+
+    /// Constraint-generation solver with explicit convergence tolerance.
+    ///
+    /// `epsilon` is the violation threshold below which a deviation constraint
+    /// is considered satisfied (not added to the active set).
+    pub fn solve_heterogeneous_cg_with_tolerance<
+        const N: usize,
+        const A: usize,
+        H: HeterogeneousPayoff<N, A>,
+    >(
+        &self,
+        game: &H,
+        epsilon: f64,
+    ) -> Result<OccupationMeasure<N, A>, CceLpError> {
+        let na = N * A;
+        let n_players = game.n_players();
+        if n_players == 0 {
+            return Err(CceLpError::Infeasible);
+        }
+
+        // Upper bound on iterations: every (player, κ) pair could become active.
+        let max_total_devs: usize = (0..n_players).map(|i| game.deviations_for_player(i).len()).sum();
+        let max_iters = max_total_devs + 1;
+
+        // Active constraints: (player_idx, deviation_idx_within_player) pairs.
+        let mut active: Vec<(usize, usize)> = Vec::new();
+
+        // Objective coefficients (constant across iterations).
+        let mut obj_full = vec![0.0_f64; na];
+        for s in 0..N {
+            for a in 0..A {
+                obj_full[s * A + a] = game.gamma0_coeff(s, a) as f64;
+            }
+        }
+
+        for _iter in 0..max_iters {
+            // Build the relaxed LP with the current active set.
+            // Variables: ρ[0..na] + s[0..active.len()].
+            let n_active = active.len();
+            let n_vars = na + n_active;
+            let n_cons = 1 + n_active;
+            let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
+            let mut rhs = vec![0.0_f64; n_cons];
+
+            // Row 0: Σ ρ = 1.
+            mat[0][..na].fill(1.0);
+            rhs[0] = 1.0;
+
+            // Rows 1..=n_active: each active (player, κ) constraint.
+            for (k, &(player, dev_idx)) in active.iter().enumerate() {
+                let kappa = &game.deviations_for_player(player)[dev_idx];
+                for s in 0..N {
+                    for a in 0..A {
+                        let j = s * A + a;
+                        let g = game.reward_follow(player, s, a) as f64
+                            - game.reward_deviate(player, s, kappa) as f64;
+                        mat[1 + k][j] = g;
+                    }
+                }
+                mat[1 + k][na + k] = 1.0; // slack
+                rhs[1 + k] = 0.0;
+            }
+
+            // Objective: γ₀ over ρ only (slacks have zero objective).
+            let mut obj = vec![0.0_f64; n_vars];
+            obj[..na].copy_from_slice(&obj_full);
+
+            // Solve the relaxed LP.
+            let rho_entries = solve_lp_auto(&mat, &rhs, &obj, n_vars, na)
+                .ok_or(CceLpError::Infeasible)?;
+
+            // Convert to OccupationMeasure for the separation oracle.
+            let sum: f32 = rho_entries.iter().map(|&v| v as f32).sum();
+            let inv = if sum > 1e-9 { 1.0 / sum } else { 1.0 };
+            let entries_f32: Vec<f32> =
+                rho_entries.iter().map(|&v| (v as f32) * inv).collect();
+            let rho = OccupationMeasure::from_entries_trusted(entries_f32);
+
+            // Separation oracle: find the most-violated (player, κ) not yet active.
+            let mut worst: Option<(usize, usize, f64)> = None; // (player, dev_idx, violation)
+            for i in 0..n_players {
+                let gamma_i = game.gamma_player(i, &rho);
+                for (di, kappa) in game.deviations_for_player(i).iter().enumerate() {
+                    // Skip if already active.
+                    if active.contains(&(i, di)) {
+                        continue;
+                    }
+                    let gamma_dev_i = game.gamma_dev_player(i, &rho, kappa);
+                    let violation = (gamma_i - gamma_dev_i) as f64;
+                    if violation > epsilon {
+                        match worst {
+                            None => worst = Some((i, di, violation)),
+                            Some((_, _, w)) if violation > w => worst = Some((i, di, violation)),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            match worst {
+                Some((i, di, _v)) => {
+                    active.push((i, di));
+                }
+                None => {
+                    // No violated constraint found — converged.
+                    return Ok(rho);
+                }
+            }
+        }
+
+        // Exhausted iteration budget without convergence — numerical failure.
+        Err(CceLpError::NumericalError("constraint generation did not converge"))
+    }
 }
 
 // -------- Internal helpers --------
+
+/// BFS candidate count threshold: LPs with more than this many BFS candidates
+/// use the two-phase primal simplex instead of exhaustive enumeration. 50_000
+/// candidates is ~1ms of BFS work on a modern CPU; larger LPs benefit from the
+/// simplex's pivot-based search (Plan 572).
+const BFS_CANDIDATE_CUTOFF: u128 = 50_000;
+
+/// Auto-select between BFS enumeration and the two-phase primal simplex based
+/// on the LP size (Plan 572). For small LPs (`C(n_vars, n_cons) ≤ cutoff`),
+/// BFS is exact and fast. For large LPs, the simplex is used instead.
+///
+/// Both solvers return the same shape: `Option<Vec<f64>>` of the first `na`
+/// entries (the `ρ` variables). The caller normalizes to f32.
+fn solve_lp_auto(
+    mat: &[Vec<f64>],
+    rhs: &[f64],
+    obj: &[f64],
+    n_vars: usize,
+    na: usize,
+) -> Option<Vec<f64>> {
+    let n_cons = mat.len();
+    if n_cons == 0 {
+        return None;
+    }
+    // Estimate C(n_vars, n_cons). If it exceeds the cutoff, use simplex.
+    if binomial_exceeds(n_vars, n_cons, BFS_CANDIDATE_CUTOFF) {
+        crate::cce::simplex::solve_simplex(mat, rhs, obj, n_vars, na)
+    } else {
+        enumerate_bfs(mat, rhs, obj, n_vars, na)
+    }
+}
+
+/// Check whether `C(n, k)` exceeds `threshold` without computing the full
+/// binomial (avoids overflow on large values). Returns `true` as soon as the
+/// running product surpasses `threshold`.
+fn binomial_exceeds(n: usize, k: usize, threshold: u128) -> bool {
+    if k > n {
+        return false; // C(n, k) = 0, doesn't exceed anything
+    }
+    let k = k.min(n - k); // symmetry: C(n, k) = C(n, n-k)
+    if k == 0 {
+        return 1 > threshold;
+    }
+    let mut result: u128 = 1;
+    for i in 0..k {
+        // result = result * (n - i) / (i + 1)
+        // To avoid overflow, multiply then divide. If result ever exceeds
+        // threshold, return early.
+        result = result.saturating_mul((n - i) as u128);
+        result /= (i + 1) as u128;
+        if result > threshold {
+            return true;
+        }
+    }
+    result > threshold
+}
 
 /// Shared BFS-enumeration loop (Plan 300 T2.1).
 ///
@@ -890,5 +1086,112 @@ mod tests {
                 assert!((marginal - inflow).abs() < 1e-4, "balance violated for s'={s_prime}: ν={marginal}, inflow={inflow}");
             }
         }
+    }
+
+    // ═══ Plan 572: constraint-generation wrapper tests ═══
+
+    /// Constraint generation must match the direct solve on the emission game.
+    #[test]
+    fn cg_matches_direct_solve_on_emission() {
+        struct Emission;
+        impl PayoffTensor<2, 2> for Emission {
+            fn reward_follow(&self, state: usize, action: usize) -> f32 {
+                const C: [[f32; 2]; 2] = [[1.0, 3.0], [2.0, 5.0]];
+                C[state][action]
+            }
+            fn gamma0(&self, rho: &OccupationMeasure<2, 2>) -> f32 {
+                self.gamma(rho)
+            }
+        }
+        struct EmitDevs {
+            v: Vec<Deviation<2, 2>>,
+        }
+        impl DeviationClass<2, 2> for EmitDevs {
+            fn deviations(&self) -> &[Deviation<2, 2>] {
+                &self.v
+            }
+        }
+        let d = EmitDevs {
+            v: vec![
+                Deviation::<2, 2>::constant(0, 0),
+                Deviation::<2, 2>::constant(1, 1),
+            ],
+        };
+        let p = Emission;
+
+        // Wrap as a 1-player heterogeneous game for the CG path.
+        use crate::cce::heterogeneous::PerPlayerGame;
+        let game = PerPlayerGame::new(vec![(&p, &d)]);
+
+        let rho_cg = CceLp::new()
+            .solve_heterogeneous_cg(&game)
+            .expect("CG feasible");
+        assert!(
+            CceLp::new().is_heterogeneous_cce(&rho_cg, &game, 1e-4),
+            "CG result must be a valid CCE"
+        );
+
+        // Compare γ₀ with direct solve.
+        let rho_direct = CceLp::new()
+            .solve_heterogeneous(&game)
+            .expect("direct feasible");
+        let g_cg = game.gamma0(&rho_cg);
+        let g_direct = game.gamma0(&rho_direct);
+        assert!(
+            (g_cg - g_direct).abs() < 1e-3,
+            "CG γ₀={g_cg} must match direct γ₀={g_direct}"
+        );
+    }
+
+    /// Constraint generation must match the direct solve on a 2-player game.
+    /// Uses the same payoff tensor for both players (homogeneous) to fit the
+    /// `PerPlayerGame<P, D>` shape — the test verifies CG mechanics, not game
+    /// semantics.
+    #[test]
+    fn cg_matches_direct_solve_on_pd() {
+        const R: [[f32; 2]; 2] = [[3.0, 0.0], [5.0, 1.0]];
+        struct Pd;
+        impl PayoffTensor<2, 2> for Pd {
+            fn reward_follow(&self, _s: usize, a: usize) -> f32 {
+                -R[a][0]
+            }
+            fn gamma0(&self, rho: &OccupationMeasure<2, 2>) -> f32 {
+                self.gamma(rho)
+            }
+        }
+        struct TwoDevs {
+            v: Vec<Deviation<2, 2>>,
+        }
+        impl DeviationClass<2, 2> for TwoDevs {
+            fn deviations(&self) -> &[Deviation<2, 2>] {
+                &self.v
+            }
+        }
+        let d = TwoDevs {
+            v: vec![
+                Deviation::<2, 2>::constant(0, 0),
+                Deviation::<2, 2>::constant(1, 1),
+            ],
+        };
+        let p = Pd;
+        use crate::cce::heterogeneous::PerPlayerGame;
+        let game = PerPlayerGame::new(vec![(&p, &d), (&p, &d)]);
+
+        let rho_cg = CceLp::new()
+            .solve_heterogeneous_cg(&game)
+            .expect("CG feasible");
+        let rho_direct = CceLp::new()
+            .solve_heterogeneous(&game)
+            .expect("direct feasible");
+        assert!(
+            CceLp::new().is_heterogeneous_cce(&rho_cg, &game, 1e-4),
+            "CG result must be a valid CCE"
+        );
+        let g_cg = game.gamma0(&rho_cg);
+        let g_direct = game.gamma0(&rho_direct);
+        assert!(
+            (g_cg - g_direct).abs() < 1e-3,
+            "CG γ₀={g_cg} must match direct γ₀={g_direct}"
+        );
     }
 }

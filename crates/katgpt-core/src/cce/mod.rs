@@ -67,6 +67,7 @@ pub mod external_regret;
 pub mod heterogeneous;
 pub mod lp;
 pub mod primal_dual;
+pub mod simplex;
 pub mod types;
 
 pub use bregman::{BregmanPotential, Euclidean, Kl};
