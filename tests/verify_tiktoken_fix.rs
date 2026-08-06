@@ -1,6 +1,10 @@
 //! Verify the fixed TiktokenTokenizer against the real Kimi-K3 model.
 //! Run: cargo test --features kimi_k3_loader --test verify_tiktoken_fix -- --nocapture --ignored
 
+// `kimi_k3::tiktoken` is gated behind `kimi_k3_loader`; without this guard
+// `--all-targets` fails to resolve the import on a default-feature build.
+#![cfg(feature = "kimi_k3_loader")]
+
 use katgpt_rs::kimi_k3::tiktoken::{load_tiktoken_bpe, TiktokenTokenizer};
 
 #[test]
