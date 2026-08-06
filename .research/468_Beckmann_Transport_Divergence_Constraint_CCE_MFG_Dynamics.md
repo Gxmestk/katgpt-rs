@@ -358,3 +358,71 @@ rows to the CCE LP. For the BFS-enumeration solver, the complexity increase is
 [`tests/transition_kernel_cce_poc.rs`](../tests/transition_kernel_cce_poc.rs) —
 6 tests, gated on `cce_moderator`. Kept as a reproducible positive-result
 artifact (the mirror image of Issue 573's negative-result PoC).
+
+---
+
+## 9. PoC Addendum 3 (Issue 575, 2026-08-06)
+
+**Verdict: Option 1 FAIL, Option 3 PASS — the RPS artifact is CLOSED by 2-player CCE.**
+
+This addendum completes the §7 candidate triage. The transition-kernel constraint
+(§8, Plan 569) closed the artifact for games with action-dependent transitions but
+reduces to the marginal constraint for state-independent transitions (RPS). The two
+remaining §7 candidates are now tested:
+
+### Option 1 (richer deviation class) — FAIL
+
+The RPS artifact `ρ(state=Rock, action=Paper) = 1` has `γ(ρ) = −1.0`. For ANY
+deviation class D (including all 27 deterministic state-dependent deviations on
+N=3, A=3):
+
+```
+max_κ ER(ρ, κ) = 0   (the best-response deviation ties)
+```
+
+The artifact IS the best-response strategy. No deviation — constant or
+state-dependent — can make ER > 0. This is a fixed point of best-response play.
+Confirmed empirically: max ER = 0.000000 over all 27 deviations.
+
+### Option 3 (2-player CCE / honest mediator) — PASS
+
+The root cause of the RPS artifact: the N=3 single-player model only constrains
+**player 1's** deviations. Player 2 is assumed honest (always plays the recommended
+state). But in the artifact, player 2 is stuck playing Rock — and player 2 would
+deviate to Scissors (beats Paper) for profit.
+
+Modeling RPS as a true 2-player game via `HeterogeneousPayoff<9, 9>` (state = joint
+recommendation `(s₁, s₂)`, action = joint play `(a₁, a₂)`):
+
+- P1's cost: `cost₁ = −R[a₁][a₂]`. P2's cost: `cost₂ = R[a₁][a₂]` (zero-sum).
+- P1 deviations: replace `a₁` keeping `a₂ = s₂`. P2 deviations: replace `a₂` keeping `a₁ = s₁`.
+- Artifact ρ((P,R), (P,R)) = 1: P2's cost = `R[P][R] = 1` (loses). P2 deviating to
+  Scissors: `cost₂((P,R), (P,S)) = R[P][S] = −1` (wins). `ER₂ = 1 − (−1) = 2 > 0`.
+  **VIOLATED.** The artifact is NOT a 2-player CCE.
+- Nash (uniform honest joint): `γ₁ = γ₂ = 0`, no profitable deviation. ACCEPTED.
+
+### §7 candidate triage — COMPLETE
+
+| Candidate | Status | PoC |
+|---|---|---|
+| 1. Richer deviation class | **FAIL** — fixed point of best-response | Issue 575 Part A |
+| 2. Transition-kernel constraint | **PASS** for action-dependent MDPs; reduces to marginal for RPS | Issue 574 / Plan 569 |
+| 3. 2-player CCE (honest mediator) | **PASS** — P2 deviation rejects artifact | Issue 575 Part B |
+
+**The RPS artifact is CLOSED.** Zero-sum games should use the 2-player CCE path
+(`is_heterogeneous_cce` for verification) rather than the single-player `solve`
+(which produces the trivial artifact). The single-player path remains correct for
+games with a genuine single decision-maker (MDPs).
+
+### Substrate capability + limitation
+
+The existing `is_heterogeneous_cce` CAN VERIFY the closure (rejects artifact,
+accepts Nash). The BFS solver CANNOT SOLVE the 2-player CCE LP at NA=81 (exceeds
+the ~25-variable limit). Production use on larger games needs a real simplex solver
+(pre-existing limitation, cce_moderator §Limitations #3).
+
+### PoC artifact
+
+[`tests/rps_artifact_closure_poc.rs`](../tests/rps_artifact_closure_poc.rs) — 6
+tests, gated on `cce_moderator`. Part A (option 1 FAIL) + Part B (option 3 PASS).
+Completes the Research 468 §7 candidate triage.
