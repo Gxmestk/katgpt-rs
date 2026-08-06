@@ -237,7 +237,9 @@ impl KimiK3Runtime {
 
                 let ffn_scratch = if is_dense {
                     let d_ffn = match &config.dense_ffn_config {
-                        KimiFfnConfig::Dense { intermediate_size, .. } => *intermediate_size,
+                        KimiFfnConfig::Dense {
+                            intermediate_size, ..
+                        } => *intermediate_size,
                         _ => unreachable!(),
                     };
                     KimiFfnScratch {
@@ -278,7 +280,10 @@ impl KimiK3Runtime {
         Self {
             layers,
             block_state: AttnResBlockState::new_with_capacity(d, max_block_entries),
-            output_attn_res_scratch: AttnResScratch::new(&config.attn_res_config, max_block_entries),
+            output_attn_res_scratch: AttnResScratch::new(
+                &config.attn_res_config,
+                max_block_entries,
+            ),
             rope_freqs: RopeFreqs::new_with_theta(
                 config.mla_config.qk_rope_head_dim,
                 config.mla_config.rope_theta,
@@ -339,7 +344,9 @@ pub fn kimi_k3_forward_token<'a>(
     // ── Step 1: Embedding lookup ──────────────────────────────────────────
     let embed_start = (token_id as usize) * d;
     let embed_end = embed_start + d;
-    runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
+    runtime
+        .hidden
+        .copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
 
     // ── Steps 2-5: Decoder core (shared with forward_token_hidden) ────────
     forward_decoder_to_logits(config, weights, runtime)
@@ -423,7 +430,11 @@ fn forward_decoder_to_logits<'a>(
     }
 
     // ── Step 4: Final RMSNorm ─────────────────────────────────────────────
-    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+    rmsnorm_with_gamma_eps(
+        &mut runtime.hidden,
+        &weights.final_norm_weight,
+        config.rms_eps as f64,
+    );
 
     // ── Step 5: LM head projection → logits ───────────────────────────────
     // logits = lm_head_weight · hidden  [vocab_size, hidden_size] × [hidden_size]
@@ -579,9 +590,7 @@ pub fn kimi_k3_inject_pause(
     let mut current = last_logits.to_vec();
     for _ in 0..pause.n_pause {
         let logits = match pause.strategy {
-            PauseStrategy::TokenId(id) => {
-                kimi_k3_forward_token(config, weights, runtime, id)
-            }
+            PauseStrategy::TokenId(id) => kimi_k3_forward_token(config, weights, runtime, id),
             PauseStrategy::RepeatLast => {
                 kimi_k3_forward_token(config, weights, runtime, last_prompt_token)
             }
@@ -641,7 +650,9 @@ pub fn kimi_k3_forward_token_traced<'a>(
     // ── Step 1: Embedding lookup + snapshot ───────────────────────────────
     let embed_start = (token_id as usize) * d;
     let embed_end = embed_start + d;
-    runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
+    runtime
+        .hidden
+        .copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
     traj_out.push(runtime.hidden.clone());
 
     // ── Step 2: Decoder layers + per-layer snapshot ───────────────────────
@@ -679,7 +690,11 @@ pub fn kimi_k3_forward_token_traced<'a>(
     }
 
     // ── Step 4: Final RMSNorm ─────────────────────────────────────────────
-    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+    rmsnorm_with_gamma_eps(
+        &mut runtime.hidden,
+        &weights.final_norm_weight,
+        config.rms_eps as f64,
+    );
 
     // NOTE: Step 5 (LM head) is intentionally skipped — see module comment.
 
@@ -721,7 +736,11 @@ impl ForwardTiming {
     /// Sum of all phases (= total forward time, minus the block_state.clear()
     /// which is negligible).
     pub fn total_us(&self) -> u128 {
-        self.embed_us + self.layers_us + self.output_attn_res_us + self.final_norm_us + self.lm_head_us
+        self.embed_us
+            + self.layers_us
+            + self.output_attn_res_us
+            + self.final_norm_us
+            + self.lm_head_us
     }
 }
 
@@ -750,7 +769,9 @@ pub fn kimi_k3_forward_token_timed<'a>(
     let t = Instant::now();
     let embed_start = (token_id as usize) * d;
     let embed_end = embed_start + d;
-    runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
+    runtime
+        .hidden
+        .copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
     timing.embed_us += t.elapsed().as_micros();
 
     let t = Instant::now();
@@ -789,7 +810,11 @@ pub fn kimi_k3_forward_token_timed<'a>(
     timing.output_attn_res_us += t.elapsed().as_micros();
 
     let t = Instant::now();
-    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+    rmsnorm_with_gamma_eps(
+        &mut runtime.hidden,
+        &weights.final_norm_weight,
+        config.rms_eps as f64,
+    );
     timing.final_norm_us += t.elapsed().as_micros();
 
     let t = Instant::now();
@@ -822,10 +847,16 @@ mod tests {
         let logits = kimi_k3_forward_token(&config, &weights, &mut runtime, 5);
 
         assert_eq!(logits.len(), config.vocab_size);
-        assert!(logits.iter().all(|&l| l.is_finite()), "logits must be finite");
+        assert!(
+            logits.iter().all(|&l| l.is_finite()),
+            "logits must be finite"
+        );
         // Non-trivial: not all zeros (random weights produce non-zero logits).
         let max_abs = logits.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
-        assert!(max_abs > 0.0, "logits must be non-trivial (max_abs={max_abs})");
+        assert!(
+            max_abs > 0.0,
+            "logits must be non-trivial (max_abs={max_abs})"
+        );
     }
 
     /// G2 (forward_token_hidden works): the hidden-direct variant produces finite
@@ -955,5 +986,54 @@ mod tests {
             .map(|(a, b)| (a - b).abs())
             .fold(0.0f32, |a, b| a + b);
         assert!(diff > 0.0, "TokenId(3) must advance KDA state");
+    }
+
+    /// Plan 318 E1 — position-encoding invariant for the Kimi-K3-Linear family.
+    ///
+    /// Both production configs (`kimi_k3_0_40b` + `kimi_k3_4b_a2b`) ship with
+    /// `mla_config.use_nope = true`. This is a deliberate architectural choice:
+    /// the Kimi-K3-Linear model encodes position entirely via KDA recurrence
+    /// (GDN2 delta-rule state) + the local `conv_kernel_size` conv + the
+    /// chunked `attn_res` residual — NOT via RoPE. When `use_nope` is true the
+    /// MLA forward skips `apply_decoupled_rope` entirely (mla.rs:524-531,
+    /// 541-546), so `rope_theta` is dead code and there is no base frequency
+    /// to tune for 256K.
+    ///
+    /// This test is the tripwire for Plan 318 E1 ("RoPE base frequency tuning
+    /// for 256K"): if a future change flips `use_nope` to `false` on either
+    /// config, RoPE becomes active and `rope_theta = 10_000` is far too low for
+    /// 256K context (it causes high-frequency dimension aliasing past ~32K
+    /// positions). The test failure forces the author to either (a) re-enable
+    /// E1 and select an appropriate `rope_theta` / YaRN scale for 256K, or
+    /// (b) update this test + the E1 plan entry documenting the new strategy.
+    #[test]
+    fn e1_position_encoding_is_nope_on_both_configs() {
+        let cfg_040b = KimiK3ModelConfig::kimi_k3_0_40b();
+        assert!(
+            cfg_040b.mla_config.use_nope,
+            "0.40B must use_nope=true: position comes from KDA recurrence, not RoPE. \
+             If you enabled RoPE, rope_theta={} is too low for 256K — revisit Plan 318 E1.",
+            cfg_040b.mla_config.rope_theta,
+        );
+
+        let cfg_4b = KimiK3ModelConfig::kimi_k3_4b_a2b();
+        assert!(
+            cfg_4b.mla_config.use_nope,
+            "4B-A2B must use_nope=true: position comes from KDA recurrence, not RoPE. \\n             If you enabled RoPE, rope_theta={} is too low for 256K — revisit Plan 318 E1.",
+            cfg_4b.mla_config.rope_theta,
+        );
+
+        // Sanity: the KDA layers (the position-carrying layers) are present and
+        // form the majority. 0.40B: 6 KDA / 8 total. 4B: 9 KDA / 12 total.
+        let kda_040b = cfg_040b.num_layers - cfg_040b.mla_layer_indices.len();
+        assert_eq!(
+            kda_040b, 6,
+            "0.40B should have 6 KDA layers carrying position"
+        );
+        let kda_4b = cfg_4b.num_layers - cfg_4b.mla_layer_indices.len();
+        assert_eq!(
+            kda_4b, 9,
+            "4B-A2B should have 9 KDA layers carrying position"
+        );
     }
 }
