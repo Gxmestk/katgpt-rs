@@ -179,3 +179,247 @@ fn g5_modelless_documentation() {
     // If this test compiles, the claim holds.
     let _ = katgpt_core::cce::CceLp::new();
 }
+
+// ===========================================================================
+// Issue 577 — General-sum 2-player CCE GOAT closure.
+//
+// The substrate (`HeterogeneousPayoff<N, A>`, `solve_heterogeneous_cg`) is
+// already general-sum by construction — the LP formulation has no zero-sum
+// assumption. These tests close the GOAT gap: the original gate (G1–G5)
+// only tested zero-sum RPS. These tests verify `solve_heterogeneous_cg`
+// correctly solves general-sum games where P1 and P2 have asymmetric cost
+// tensors.
+//
+// Game model: individual-action model (matches the existing PD/Chicken tests
+// in heterogeneous.rs + external_regret.rs). NOT the joint-action model —
+// the joint-action deviation kernel (state → joint action) cannot express
+// unilateral deviation in general-sum games because it conflates "the other
+// player follows the recommendation" with "the other player's actual play."
+//
+//   State  = joint recommendation (s1, s2) ∈ {0,1}² — N=4 states.
+//   Action = this player's own action a ∈ {0,1} — A=2 actions.
+//   P1 cost(s, a) = -R[a][s2] (other player assumed to follow s2).
+//   P2 cost(s, a) = -R[a][s1] (other player assumed to follow s1; symmetric
+//                   swap: P2 reward at (a_p1, a_p2) = R[a_p2][a_p1]).
+//   Deviation class: constant deviations (always-0, always-1).
+// ===========================================================================
+
+use katgpt_core::cce::{DeviationClass, PayoffTensor, PerPlayerGame};
+
+/// Chicken (Hawk-Dove) reward matrix (P1 perspective).
+/// R[a1][a2] = P1 reward. S=0 (Swerve), T=1 (Tough).
+/// P2 reward at (a1,a2) = R[a2][a1] (symmetric game, role swap).
+///
+/// ```text
+///        S     T
+///    S (3,3) (1,4)
+///    T (4,1) (0,0)
+/// ```
+const CHICKEN_R: [[f32; 2]; 2] = [[3.0, 1.0], [4.0, 0.0]];
+
+/// Prisoners' Dilemma reward matrix (P1 perspective).
+/// R[a1][a2] = P1 reward. C=0 (Cooperate), D=1 (Defect).
+/// P2 reward at (a1,a2) = R[a2][a1] (symmetric game, role swap).
+///
+/// ```text
+///        C     D
+///    C (3,3) (0,5)
+///    D (5,0) (1,1)
+/// ```
+const PD_R: [[f32; 2]; 2] = [[3.0, 0.0], [5.0, 1.0]];
+
+/// Single payoff-tensor type carrying a player role (0 = P1, 1 = P2).
+/// Mirrors the `PdPlayer` pattern in heterogeneous.rs.
+struct SymPlayer {
+    role: usize,
+    r: [[f32; 2]; 2],
+}
+
+impl PayoffTensor<4, 2> for SymPlayer {
+    fn reward_follow(&self, state: usize, action: usize) -> f32 {
+        if self.role == 0 {
+            // P1 (row): cost = -R[action][s2].
+            let s2 = state % 2;
+            -self.r[action][s2]
+        } else {
+            // P2 (col): cost = -R[action][s1].
+            let s1 = state / 2;
+            -self.r[action][s1]
+        }
+    }
+    fn gamma0(&self, rho: &katgpt_core::cce::OccupationMeasure<4, 2>) -> f32 {
+        self.gamma(rho)
+    }
+}
+
+/// Shared deviation class: always-action-0 + always-action-1.
+struct ConstDevs {
+    v: Vec<katgpt_core::cce::Deviation<4, 2>>,
+}
+impl DeviationClass<4, 2> for ConstDevs {
+    fn deviations(&self) -> &[katgpt_core::cce::Deviation<4, 2>] {
+        &self.v
+    }
+}
+
+fn const_devs() -> ConstDevs {
+    ConstDevs {
+        v: vec![
+            katgpt_core::cce::Deviation::<4, 2>::constant(0, 0),
+            katgpt_core::cce::Deviation::<4, 2>::constant(1, 1),
+        ],
+    }
+}
+
+/// Build a 2-player symmetric game from a reward matrix R.
+fn sym_game(r: [[f32; 2]; 2]) -> (SymPlayer, SymPlayer, ConstDevs) {
+    (
+        SymPlayer { role: 0, r },
+        SymPlayer { role: 1, r },
+        const_devs(),
+    )
+}
+
+/// In the individual-action model with shared ρ, the moderator objective
+/// gamma0 is inflated for general-sum games (γ_i assumes the OTHER player
+/// follows, so both players' costs can be very negative simultaneously).
+/// This is a known model property, not a solver bug. The GOAT tests below
+/// verify SOLVER correctness (CG convergence + CCE validity + CG-vs-BFS
+/// parity), NOT game-theoretic welfare bounds.
+///
+/// Cross-check: CG result must match BFS result (both solve the same LP).
+/// This is the strongest correctness assertion — if CG and BFS agree on
+/// the objective value, the CG wrapper is correct even when the model has
+/// known inconsistencies.
+fn assert_cg_matches_bfs(r: [[f32; 2]; 2], label: &str) {
+    let (p1, p2, d) = sym_game(r);
+    let game = PerPlayerGame::new(vec![(&p1, &d), (&p2, &d)]);
+
+    let rho_bfs = CceLp::new()
+        .solve_heterogeneous(&game)
+        .unwrap_or_else(|_| panic!("{label}: BFS must solve"));
+    let rho_cg = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .unwrap_or_else(|_| panic!("{label}: CG must solve"));
+
+    // Both are valid CCEs.
+    assert!(
+        CceLp::new().is_heterogeneous_cce(&rho_bfs, &game, 1e-4),
+        "{label}: BFS result must be a valid CCE"
+    );
+    assert!(
+        CceLp::new().is_heterogeneous_cce(&rho_cg, &game, 1e-4),
+        "{label}: CG result must be a valid CCE"
+    );
+
+    // Objective values match (CG finds the same optimum as BFS).
+    let obj_bfs = game.gamma0(&rho_bfs);
+    let obj_cg = game.gamma0(&rho_cg);
+    assert!(
+        (obj_bfs - obj_cg).abs() < 1e-3,
+        "{label}: CG objective {obj_cg} must match BFS objective {obj_bfs}"
+    );
+
+    eprintln!("{label}: BFS obj = {obj_bfs:.6}, CG obj = {obj_cg:.6} (match)");
+}
+
+/// G1-gen — Chicken (general-sum): CG solver converges and produces a valid CCE.
+/// Verifies CG-vs-BFS parity (the strongest correctness assertion).
+#[test]
+fn g1_gen_chicken_cg_matches_bfs() {
+    assert_cg_matches_bfs(CHICKEN_R, "Chicken");
+}
+
+/// G1-gen-extra — Chicken: the CG result is a valid CCE with correct shape.
+#[test]
+fn g1_gen_chicken_valid_cce() {
+    let (p1, p2, d) = sym_game(CHICKEN_R);
+    let game = PerPlayerGame::new(vec![(&p1, &d), (&p2, &d)]);
+    let rho = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .expect("Chicken CG must converge");
+
+    assert!(
+        CceLp::new().is_heterogeneous_cce(&rho, &game, 1e-4),
+        "Chicken CG result must satisfy the 2-player CCE condition"
+    );
+
+    let sum: f32 = rho.entries.iter().copied().sum();
+    assert!((sum - 1.0).abs() < 1e-3, "rho sums to {sum}");
+
+    // gamma0 is finite and in the cost-tensor range.
+    let gamma0 = game.gamma0(&rho);
+    assert!(gamma0.is_finite(), "gamma0 must be finite, got {gamma0}");
+    assert!(
+        (-6.0..=0.0).contains(&gamma0),
+        "Chicken gamma0 should be in [-6, 0], got {gamma0}"
+    );
+}
+
+/// G3-gen — Chicken: no player has a profitable deviation at the CG result.
+#[test]
+fn g3_gen_chicken_no_profitable_deviation() {
+    let (p1, p2, d) = sym_game(CHICKEN_R);
+    let game = PerPlayerGame::new(vec![(&p1, &d), (&p2, &d)]);
+    let rho = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .expect("Chicken CG feasible");
+
+    for i in 0..2 {
+        let gamma_i = game.gamma_player(i, &rho);
+        for kappa in game.deviations_for_player(i) {
+            let gamma_dev_i = game.gamma_dev_player(i, &rho, kappa);
+            assert!(
+                gamma_i - gamma_dev_i <= 1e-4,
+                "Chicken: player {i} has profitable deviation: gamma={gamma_i}, gamma_dev={gamma_dev_i}"
+            );
+        }
+    }
+}
+
+/// G4-gen — Chicken: determinism (two runs produce bit-identical output).
+#[test]
+fn g4_gen_chicken_deterministic() {
+    let (p1, p2, d) = sym_game(CHICKEN_R);
+    let game = PerPlayerGame::new(vec![(&p1, &d), (&p2, &d)]);
+    let rho1 = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .expect("run 1");
+    let rho2 = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .expect("run 2");
+    assert_eq!(rho1.entries, rho2.entries, "two Chicken CG runs must be bit-identical");
+}
+
+/// G1-pd — Prisoners' Dilemma (general-sum): CG solver converges and matches BFS.
+#[test]
+fn g1_gen_pd_cg_matches_bfs() {
+    assert_cg_matches_bfs(PD_R, "PD");
+}
+
+/// G1-pd-extra — PD: the CG result is a valid CCE.
+#[test]
+fn g1_gen_pd_valid_cce() {
+    let (p1, p2, d) = sym_game(PD_R);
+    let game = PerPlayerGame::new(vec![(&p1, &d), (&p2, &d)]);
+    let rho = CceLp::new()
+        .solve_heterogeneous_cg(&game)
+        .expect("PD CG must converge");
+
+    assert!(
+        CceLp::new().is_heterogeneous_cce(&rho, &game, 1e-4),
+        "PD CG result must satisfy the 2-player CCE condition"
+    );
+
+    let sum: f32 = rho.entries.iter().copied().sum();
+    assert!((sum - 1.0).abs() < 1e-3, "rho sums to {sum}");
+
+    let gamma0 = game.gamma0(&rho);
+    assert!(gamma0.is_finite(), "gamma0 must be finite, got {gamma0}");
+    assert!(
+        (-6.0..=0.0).contains(&gamma0),
+        "PD gamma0 should be in [-6, 0], got {gamma0}"
+    );
+
+    eprintln!("PD CG: gamma0 = {gamma0:.4}");
+}
