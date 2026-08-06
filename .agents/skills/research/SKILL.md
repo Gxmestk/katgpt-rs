@@ -272,7 +272,7 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 **Research note format** (see `katgpt-rs/.research/238_LoRA_Muon_Spectral_Low_Rank_Manifold.md` for a canonical example):
 
 ```markdown
-# Research NNN: <Title>
+# Research NNN: {Title}
 
 > **Source:** <paper title + arxiv link + authors + date>
 > **Date:** YYYY-MM-DD
@@ -462,13 +462,13 @@ Add plan `.md` to `katgpt-rs/.plans/` (modelless), `riir-ai/.plans/` (runtime/ga
 **Plan format** (see `katgpt-rs/.plans/271_attention_matching_compaction.md` for a canonical example):
 
 ```markdown
-# Plan NNN: <Title>
+# Plan NNN: {Title}
 
 **Date:** YYYY-MM-DD
 **Research:** [katgpt-rs/.research/NNN_*.md](../.research/NNN_*.md)
 **Source paper:** [arxiv ID.NNN](https://arxiv.org/abs/ID) — <short cite>
-**Target:** `katgpt-rs/src/<module>/` (new module) + Cargo feature `<feature_name>`
-**Status:** Active — Phase N <state>
+**Target:** `katgpt-rs/src/{module}/` (new module) + Cargo feature `{feature_name}`
+**Status:** Active — Phase N {state}
 
 ---
 
@@ -628,17 +628,7 @@ Reinforce these when designing game systems or chain state:
 **Other reference docs:**
 - `katgpt-rs/.contexts/optimization.md` — perf rules (zero-alloc, SIMD, rayon, caching)
 - `katgpt-rs/.contexts/ibraheemdev-papaya-v0.2.3-examples.md` — papaya lock-free hashmap usage
-- `katgpt-rs/.research/004_LoRA_Architecture_Verdict.md` — LoRA / validator terminology
-- `katgpt-rs/.research/005_Artifact_Definition.md` — artifact terminology
-- `katgpt-rs/.research/238_LoRA_Muon_Spectral_Low_Rank_Manifold.md` — canonical research-note example
-- `katgpt-rs/.plans/271_attention_matching_compaction.md` — canonical plan example
-- `riir-chain/AGENTS.md` — repo-local context for the chain repo
-- `riir-neuron-db/AGENTS.md` — repo-local context for the neuron-db repo
-- `katgpt-rs/.research/219_Topological_Neural_Operators_DEC_Inference.md` — DEC operators distillation (the parent note that shipped the Stokes substrate)
-- `katgpt-rs/.research/271_MIT_6S184_Diffusion_Flow_Textbook_Vocabulary_Crosswalk.md` — diffusion/flow vocabulary crosswalk (also flags Fokker-Planck as a known gap, closed by Research 296)
-- `katgpt-rs/.research/296_Stokes_Calculus_Dec_Vocabulary_Crosswalk.md` — Stokes/Divergence/Hodge vocabulary crosswalk + GOAT verdict for the three wrapper primitives
-- `katgpt-rs/.plans/251_dec_operators_cell_complex.md` — DEC operators (COMPLETE — ships `d`, `δ`, `Δ`, `hodge_decompose`, `DecFlowField`)
-- `katgpt-rs/.plans/314_stokes_calculus_wrappers.md` — Stokes-calculus wrapper primitives (`belief_mass_divergence`, `boundary_flux_mass`, `line_integral`)
+
 
 ## TL;DR
 
