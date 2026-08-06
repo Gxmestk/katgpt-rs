@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:0710.4495](https://arxiv.org/abs/0710.4495) — Barajas & Serra, *The Lonely Runner with Seven Runners* (2007)
 **Private guide:** [riir-ai/.research/334_phase_separation_game_runtime_guide.md](../../riir-ai/.research/334_phase_separation_game_runtime_guide.md)
 **Target:** `katgpt-rs/crates/katgpt-core/src/phase_separation.rs` (new module) + Cargo feature `phase_separation`
-**Status:** Active — Phase 1 + Phase 2 + Phase 3 COMPLETE (2026-08-07). Phase 1 GOAT gate ALL PASS; Phase 2 T2.2 + T2.3 done (T2.1 deferred); Phase 3 docs + example done.
+**Status:** Phase 1 + Phase 2 + Phase 3 COMPLETE (2026-08-07). Phase 1 GOAT gate ALL PASS → **PROMOTED TO DEFAULT-ON** (2026-08-07, commit 6b3f6c2d). See [.benchmarks/571_phase_separation_goat.md](../.benchmarks/571_phase_separation_goat.md). Phase 2 T2.2 + T2.3 done (T2.1 deferred); Phase 3 docs + example done. Cherry-pick clock for riir-ai starts at promotion (7-day window per goat-audit skill).
 
 ---
 
