@@ -65,9 +65,41 @@ Do not implement until a real >8×8 `spectral_rewire` consumer appears. The
 target. Filing this as a captured-for-the-record issue; no plan to be created
 unless T1's precondition is met.
 
+## Re-verification log
+
+### 2026-08-06 — deferral holds even more strongly (no consumer + concentration assumption fails at NPC scale)
+
+Full re-audit of `spectral_rewire` consumers across all 7 repos. Grep for
+`spectral_rewire_with_index_into|spectral_rewire_into` in `**/*.rs` returns matches
+in ONLY four locations:
+
+| Location | Type | Hot-path consumer? |
+|---|---|---|
+| `katgpt-spectral/src/spectral_rewire.rs` | definition + unit tests | N/A (the primitive itself) |
+| `katgpt-spectral/benches/bench_423_spectral_rewire_goat.rs` | GOAT benchmark | No (bench only) |
+| `katgpt-core/src/{manifold_erasure,tilr}.rs` | doc-comment cross-refs (`//!`) | No (prose, not call sites) |
+| `riir-train-engine` (`spectral_concentration` feature, Issue 374) | measurement example | No (measures `on_manifold_fraction`, cold-tier analysis) |
+
+**Zero production hot-path consumers at any scale** (8×8 or 64×64). T1's precondition
+("a real >8×8 `spectral_rewire` consumer emerges") is unmet.
+
+**Additional context strengthening the deferral:** the root `Cargo.toml` feature
+gate comment now documents that riir-train Issue 374 proved the spectral
+concentration assumption (the paper's core prerequisite) FAILS at NPC scale —
+GD-trained LoRA deltas produce `on_manifold_fraction` in [0.27, 0.58], far below
+the SAR threshold > 0.8. The primitive is explicitly marked "Stays cold-tier only".
+This means even if a >8×8 consumer emerged, the primitive would likely be the
+wrong tool for NPC-scale weight purification — making SIMD optimization of its
+hot path doubly unwarranted.
+
+**Verdict:** T1 precondition still unmet. The deferral is correct and now has a
+second independent reason (no consumer AND concentration assumption fails at
+NPC scale). No SIMD work warranted.
+
 ## Cross-references
 
 - `.plans/423_spectral_rewire_primitive.md` — COMPLETE, opt-in
 - `.benchmarks/423_spectral_rewire_goat.md` §G5, §"Open Follow-ups"
 - `.issues/123_fusion_b_two_component_delta_decomposition.md` — CLOSED (file removed per noise-reduction rule; git history preserves content)
 - `.issues/124_spectral_rewire_svd_col_cap.md` — RESOLVED (file removed per noise-reduction rule; git history preserves content)
+- `riir-train/.issues/374` — spectral concentration measurement (GD-trained deltas, `on_manifold_fraction` [0.27, 0.58] < 0.8 threshold)
