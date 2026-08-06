@@ -4,6 +4,7 @@
 **Source:** Gabriel Lespérance, "Going recursive (part I): Applying RLM-GEPA to AppWorld" (X article)
 **Papers:** [RLM arXiv:2512.24601](https://arxiv.org/abs/2512.24601), [GEPA arXiv:2507.19457](https://arxiv.org/abs/2507.19457) (ICLR 2026 Oral)
 **Status:** GOAT Verdict Pending
+**PASS-Redirects (synthesis):** Prime Intellect [arXiv:2512.24601 "Recursive Language Models"] + Prime Agent blog (<https://www.primeintellect.ai/blog/prime-agent>, August 2026) — **PASS, this note already covered it.** Prime Agent's RLM instantiation (persistent IPython REPL as the only tool, subagent delegation as async function calls) is the same RLM mechanism this note verdict'd as "RLM adds nothing new" in 2026-05-31. Our DDTree + LT2 (Plan 108) + SpecHop (Plan 131) + FederationComposer (Plan 231) ship recursive/looped/multi-hop inference modellessly; Prime Agent's IPython-REPL is an LLM-as-REPL instantiation of the same pattern. The Prime Agent verdict also splits off Continual Harness (`/refine` self-improvement = AIDE²-class LLM-dependent per R440; H=(ρ,G,K,M) CRUD state model = narrow Gain, riir-ai Issue 587 deferred). See [riir-ai/.research/333](../../riir-ai/.research/333_prime_agent_rlm_continual_harness_verdict.md) for the full Prime Agent verdict.
 
 ---
 
