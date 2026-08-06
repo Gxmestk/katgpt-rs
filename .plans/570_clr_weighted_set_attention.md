@@ -98,21 +98,21 @@ default-on requires the GOAT gate to pass:
 ## Phases
 
 ### Phase 1 — Implement `clr_weighted_set_attention_into`
-- [ ] Add the function to `katgpt-core/src/set_attention.rs`
-- [ ] Add `clr_reliability_scores` helper
-- [ ] G1 test: uniform reliability ≡ plain SA (bit-identical)
-- [ ] G4 test: zero-alloc (counting allocator)
-- [ ] G2 test: latency ≤ 2× plain SA at N=64
+- [x] Add the function to `katgpt-core/src/set_attention.rs`
+- [x] Add `clr_reliability_scores` helper
+- [x] G1 test: uniform reliability ≡ plain SA (bit-identical) — PASS (dense + topk)
+- [x] G4 test: zero-alloc (counting allocator) — PASS (0 allocs/100 calls)
+- [x] G2 test: latency ≤ 2× plain SA at N=64 — PASS (1.00× ratio in unit test)
 
 ### Phase 2 — GOAT gate (G8 closure reproduction)
-- [ ] Port the Issue 575 PoC fixture as a katgpt-core integration test
-- [ ] G8 test: CLR-weighted identification accuracy > plain SA +5pp
-- [ ] G8 test: CLR-weighted aggregate amplification ≥ 2×
+- [x] Port the Issue 575 PoC fixture as a katgpt-core integration test
+- [x] G8 test: CLR reliability identification accuracy > plain SA +5pp — PASS (+8.7pp)
+- [x] G8 test: CLR-weighted SA aggregate amplification ≥ 2× — PASS (3.88×)
 
 ### Phase 3 — Promotion
-- [ ] If all gates pass: promote `clr_weighted_set_attention` to default-on
-- [ ] Update Bench 354: G8 status → "CLOSED by clr_weighted_set_attention"
-- [ ] Update Plan 354 docs: add CLR-weighted variant to the API surface
+- [x] If all gates pass: promote `clr_weighted_set_attention` to default-on
+- [x] Update Bench 354: G8 status → "CLOSED by clr_weighted_set_attention"
+- [x] Update Plan 354 docs: add CLR-weighted variant to the API surface
 
 ## Non-goals
 

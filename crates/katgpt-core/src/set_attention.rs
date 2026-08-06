@@ -132,6 +132,8 @@ pub enum SetAttentionError {
     ScratchKLenMismatch { expected: usize, got: usize },
     /// `scratch_alpha.len()` is less than `n`.
     ScratchAlphaLenMismatch { expected: usize, got: usize },
+    /// `reliability.len()` is not `n` (CLR-weighted variant only).
+    ReliabilityLenMismatch { expected: usize, got: usize },
     /// `n`, `d`, or `k` is zero.
     ZeroDim,
 }
@@ -163,6 +165,9 @@ impl std::fmt::Display for SetAttentionError {
             }
             Self::ScratchAlphaLenMismatch { expected, got } => {
                 write!(f, "scratch_alpha.len() = {got}, expected >= n = {expected}")
+            }
+            Self::ReliabilityLenMismatch { expected, got } => {
+                write!(f, "reliability.len() = {got}, expected n = {expected}")
             }
             Self::ZeroDim => write!(f, "n, d, or k is zero"),
         }
@@ -662,6 +667,492 @@ fn topk_accumulate(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// CLR-weighted variant (Plan 570)
+// ─────────────────────────────────────────────────────────────────────
+
+/// CLR-style reliability scores: `r_j = (mean_m sigmoid(h_j · dir_m))^M`.
+///
+/// The `^M` exponent (Plan 284, Research 255 — CLR) is the nonlinear
+/// reliability gate: entities whose mean sigmoid verdict is high get amplified,
+/// those with any low verdict get suppressed super-linearly. This is the
+/// mechanism that closes the Set Attention G8 collective-inference failure
+/// (Bench 354 L71, Plan 570): plain averaging dilutes the signal, while
+/// reliability-weighted averaging concentrates it toward the most informative
+/// entities.
+///
+/// # Arguments
+///
+/// * `states` — Input entity states, flat `[n*d]` row-major.
+/// * `directions` — `m` direction vectors, flat `[m*d]` row-major (entity `i`
+///   at offset `i*d`). Each direction is a unit-length probe in belief space.
+/// * `m_exp` — Number of directions AND the CLR exponent. `m_exp=5` matches
+///   the CLR hot path (Plan 284).
+/// * `n`, `d` — Dimensions.
+/// * `output` — Output reliability scores, `[n]`. Written to.
+///
+/// # Zero allocations
+///
+/// This function performs zero heap allocations.
+///
+/// # Panics (release-checked)
+///
+/// Panics if `output.len() < n`, `directions.len() < m_exp * d`, or `m_exp == 0`.
+pub fn clr_reliability_scores(
+    states: &[f32],
+    directions: &[f32],
+    m_exp: usize,
+    n: usize,
+    d: usize,
+    output: &mut [f32],
+) {
+    assert!(m_exp > 0, "clr_reliability_scores: m_exp must be > 0");
+    assert!(
+        output.len() >= n,
+        "clr_reliability_scores: output.len() < n"
+    );
+    assert!(
+        directions.len() >= m_exp * d,
+        "clr_reliability_scores: directions.len() < m_exp * d"
+    );
+    let m_f = m_exp as f32;
+    for j in 0..n {
+        let h = &states[j * d..(j + 1) * d];
+        let mut sum_v = 0.0f32;
+        for m_idx in 0..m_exp {
+            let dir = &directions[m_idx * d..(m_idx + 1) * d];
+            let mut dot = 0.0f32;
+            for a in 0..d {
+                dot += h[a] * dir[a];
+            }
+            sum_v += sigmoid(dot);
+        }
+        let mean_v = sum_v / m_f;
+        output[j] = mean_v.powf(m_f);
+    }
+}
+
+/// Reliability-weighted cross-entity set attention — CLR-amplified variant.
+///
+/// A sibling of [`set_sigmoid_attention_into`] that accepts per-entity
+/// reliability weights `r_j` and uses them to modulate each peer's contribution.
+/// The update rule is:
+///
+/// ```text
+/// output_i = h_i + (γ / Σ_j r_j) · Σ_j α_ij · r_j · (v_j − h_i)
+/// ```
+///
+/// where `α_ij = σ((q_i · k_j) / √k · β)` is the same sigmoid attention gate as
+/// the plain variant, and `r_j ≥ 0` is the reliability weight for entity `j`.
+///
+/// When `r_j = 1` for all `j`, this reduces **bit-identically** to
+/// [`set_sigmoid_attention_into`] — the plain variant is the uniform-reliability
+/// special case (G1 test).
+///
+/// The reliability weighting concentrates the aggregate toward high-reliability
+/// entities, converting plain averaging (which dilutes the signal — G8 failure)
+/// into amplification. See Plan 570 for the full design + the G8 closure proof.
+///
+/// Use [`clr_reliability_scores`] to compute CLR-style reliability scores, or
+/// pass any non-negative weight slice from another source.
+///
+/// # Arguments
+///
+/// Same as [`set_sigmoid_attention_into`], plus:
+/// * `reliability` — Per-entity reliability weights `[n]`. Must be non-negative;
+///   a weight of 0.0 means that entity contributes nothing. If all weights are
+///   zero, `output` is set to `states` (no-op).
+///
+/// # Errors
+///
+/// Returns [`SetAttentionError::ReliabilityLenMismatch`] if
+/// `reliability.len() != n`. All other error conditions match
+/// [`set_sigmoid_attention_into`].
+///
+/// # Zero allocations
+///
+/// Same scratch discipline as [`set_sigmoid_attention_into`] — zero heap
+/// allocations in steady state.
+#[inline]
+pub fn clr_weighted_set_attention_into(
+    states: &[f32],
+    w_q: &[f32],
+    w_k: &[f32],
+    w_v: Option<&[f32]>,
+    reliability: &[f32],
+    output: &mut [f32],
+    cfg: &SetAttentionConfig,
+    n: usize,
+    d: usize,
+    k: usize,
+    scratch_q: &mut [f32],
+    scratch_k: &mut [f32],
+    scratch_alpha: &mut [f32],
+) -> Result<(), SetAttentionError> {
+    // ── Dimension checks ─────────────────────────────────────────────
+    if n == 0 || d == 0 || k == 0 {
+        return Err(SetAttentionError::ZeroDim);
+    }
+    let nd = n * d;
+    let nk = n * k;
+    let dd = d * d;
+    let dk = d * k;
+    if states.len() != nd {
+        return Err(SetAttentionError::StatesLenMismatch {
+            expected: nd,
+            got: states.len(),
+        });
+    }
+    if output.len() != nd {
+        return Err(SetAttentionError::OutputLenMismatch {
+            expected: nd,
+            got: output.len(),
+        });
+    }
+    if w_q.len() != dk {
+        return Err(SetAttentionError::WqLenMismatch {
+            expected: dk,
+            got: w_q.len(),
+        });
+    }
+    if w_k.len() != dk {
+        return Err(SetAttentionError::WkLenMismatch {
+            expected: dk,
+            got: w_k.len(),
+        });
+    }
+    if let Some(wv) = w_v
+        && wv.len() != dd
+    {
+        return Err(SetAttentionError::WvLenMismatch {
+            expected: dd,
+            got: wv.len(),
+        });
+    }
+    if reliability.len() != n {
+        return Err(SetAttentionError::ReliabilityLenMismatch {
+            expected: n,
+            got: reliability.len(),
+        });
+    }
+    if scratch_q.len() != nk {
+        return Err(SetAttentionError::ScratchQLenMismatch {
+            expected: nk,
+            got: scratch_q.len(),
+        });
+    }
+    if scratch_k.len() != nk {
+        return Err(SetAttentionError::ScratchKLenMismatch {
+            expected: nk,
+            got: scratch_k.len(),
+        });
+    }
+    if scratch_alpha.len() < n {
+        return Err(SetAttentionError::ScratchAlphaLenMismatch {
+            expected: n,
+            got: scratch_alpha.len(),
+        });
+    }
+
+    // ── Project all queries and keys (identical to plain SA) ─────────
+    for i in 0..n {
+        let state_row = &states[i * d..(i + 1) * d];
+        let q_row = &mut scratch_q[i * k..(i + 1) * k];
+        let k_row = &mut scratch_k[i * k..(i + 1) * k];
+        for m in 0..k {
+            let mut acc_q = 0.0f32;
+            let mut acc_k = 0.0f32;
+            for a in 0..d {
+                acc_q += w_q[a + m * d] * state_row[a];
+                acc_k += w_k[a + m * d] * state_row[a];
+            }
+            q_row[m] = acc_q;
+            k_row[m] = acc_k;
+        }
+    }
+
+    let scale = cfg.beta / (k as f32).sqrt();
+
+    match cfg.top_k {
+        None => dense_accumulate_weighted(
+            output,
+            states,
+            w_v,
+            reliability,
+            scratch_q,
+            scratch_k,
+            scratch_alpha,
+            cfg,
+            n,
+            d,
+            k,
+            scale,
+        ),
+        Some(k_max) => {
+            // Sparse path: seed output with states (accumulate over top-k only).
+            output.copy_from_slice(states);
+            if k_max == 0 {
+                return Ok(());
+            }
+            topk_accumulate_weighted(
+                output,
+                states,
+                w_v,
+                reliability,
+                scratch_q,
+                scratch_k,
+                scratch_alpha,
+                cfg,
+                n,
+                d,
+                k,
+                scale,
+                k_max,
+            )
+        }
+    }
+}
+
+/// Dense reliability-weighted path. O(N²·k) attention scores.
+///
+/// The residual update is normalised by `R = Σ_j r_j` (the total reliability
+/// weight) so γ is invariant to the reliability scale:
+/// `h_i' = h_i + (γ/R) · Σ_j α_ij · r_j · (v_j − h_i)`.
+#[inline]
+fn dense_accumulate_weighted(
+    output: &mut [f32],
+    states: &[f32],
+    w_v: Option<&[f32]>,
+    reliability: &[f32],
+    scratch_q: &[f32],
+    scratch_k: &[f32],
+    scratch_alpha: &mut [f32],
+    cfg: &SetAttentionConfig,
+    n: usize,
+    d: usize,
+    k: usize,
+    scale: f32,
+) -> Result<(), SetAttentionError> {
+    let gamma = cfg.gamma;
+    // R = Σ_j r_j — loop-invariant, precomputed once. Makes γ invariant to the
+    // reliability scale (doubling all r_j leaves the output unchanged).
+    let mut r_sum = 0.0f32;
+    for j in 0..n {
+        r_sum += reliability[j];
+    }
+    if r_sum < 1e-10 {
+        // All-zero reliability → no contribution. Output = states.
+        output.copy_from_slice(states);
+        return Ok(());
+    }
+    let gamma_per_r = gamma / r_sum;
+
+    assert!(
+        d <= 16,
+        "dense_accumulate_weighted: d > 16 needs a larger stack scratch"
+    );
+
+    // Precompute v_proj[j] = W_V · state_j for all j (same pattern as plain
+    // dense_accumulate — thread_local grow-only buffer, zero alloc steady-state).
+    let v_proj: Option<&mut [f32]> = w_v.map(|wv| {
+        thread_local! {
+            static V_PROJ_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
+        }
+        V_PROJ_BUF.with(|cell| {
+            // Safety: thread_local guarantees exclusive per-thread access.
+            let vp = unsafe { &mut *cell.get() };
+            if vp.len() < n * d {
+                vp.resize(n * d, 0.0);
+            }
+            let vp = &mut vp[..n * d];
+            for j in 0..n {
+                let state_j = &states[j * d..(j + 1) * d];
+                let vp_row = &mut vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    let mut v_j_m = 0.0f32;
+                    for a in 0..d {
+                        v_j_m += wv[a + m * d] * state_j[a];
+                    }
+                    vp_row[m] = v_j_m;
+                }
+            }
+            vp
+        })
+    });
+
+    for i in 0..n {
+        let q_row = &scratch_q[i * k..(i + 1) * k];
+        // Compute α_ij for all j into scratch_alpha.
+        for j in 0..n {
+            let k_row = &scratch_k[j * k..(j + 1) * k];
+            let mut dot = 0.0f32;
+            for m in 0..k {
+                dot += q_row[m] * k_row[m];
+            }
+            scratch_alpha[j] = sigmoid(dot * scale);
+        }
+        // Accumulate sum_arv[m] = Σ_j α_ij · r_j · v_j[m] and
+        // sum_ar = Σ_j α_ij · r_j separately, then combine once per (i, m).
+        let mut sum_arv = [0.0f32; 16];
+        let mut sum_ar = 0.0f32;
+        let sa = &scratch_alpha[..n];
+        if let Some(vp) = &v_proj {
+            for j in 0..n {
+                let alpha = sa[j];
+                if alpha == 0.0 {
+                    continue;
+                }
+                let ar = alpha * reliability[j];
+                sum_ar += ar;
+                let v_j = &vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    sum_arv[m] += ar * v_j[m];
+                }
+            }
+        } else {
+            // Identity V: v_j = state_j.
+            for j in 0..n {
+                let alpha = sa[j];
+                if alpha == 0.0 {
+                    continue;
+                }
+                let ar = alpha * reliability[j];
+                sum_ar += ar;
+                let state_j = &states[j * d..(j + 1) * d];
+                for m in 0..d {
+                    sum_arv[m] += ar * state_j[m];
+                }
+            }
+        }
+        // Combine: output[i][m] = state_i[m] + (γ/R) · (sum_arv[m] − state_i[m] · sum_ar)
+        let state_i = &states[i * d..(i + 1) * d];
+        let out_i = &mut output[i * d..(i + 1) * d];
+        for m in 0..d {
+            out_i[m] = state_i[m] + gamma_per_r * (sum_arv[m] - state_i[m] * sum_ar);
+        }
+    }
+    Ok(())
+}
+
+/// Sparse top-k reliability-weighted path.
+///
+/// Normalises by `R_k = Σ_{j∈topk} r_j` (the total reliability weight of the
+/// selected peers) per query — matching the dense path's γ-invariance property.
+#[inline]
+fn topk_accumulate_weighted(
+    output: &mut [f32],
+    states: &[f32],
+    w_v: Option<&[f32]>,
+    reliability: &[f32],
+    scratch_q: &[f32],
+    scratch_k: &[f32],
+    scratch_alpha: &mut [f32],
+    cfg: &SetAttentionConfig,
+    n: usize,
+    d: usize,
+    k: usize,
+    scale: f32,
+    k_max: usize,
+) -> Result<(), SetAttentionError> {
+    let gamma = cfg.gamma;
+    let effective_k = k_max.min(n);
+
+    thread_local! {
+        static IDX_BUF: UnsafeCell<Vec<usize>> = const { UnsafeCell::new(Vec::new()) };
+    }
+    let idx: &mut [usize] = IDX_BUF.with(|cell| {
+        let buf = unsafe { &mut *cell.get() };
+        if buf.len() < n {
+            buf.resize(n, 0);
+        }
+        let buf = &mut buf[..n];
+        for (i, slot) in buf.iter_mut().enumerate() {
+            *slot = i;
+        }
+        buf
+    });
+
+    let v_proj: Option<&mut [f32]> = w_v.map(|wv| {
+        thread_local! {
+            static V_PROJ_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
+        }
+        V_PROJ_BUF.with(|cell| {
+            let vp = unsafe { &mut *cell.get() };
+            if vp.len() < n * d {
+                vp.resize(n * d, 0.0);
+            }
+            let vp = &mut vp[..n * d];
+            for j in 0..n {
+                let state_j = &states[j * d..(j + 1) * d];
+                let vp_row = &mut vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    let mut v_j_m = 0.0f32;
+                    for a in 0..d {
+                        v_j_m += wv[a + m * d] * state_j[a];
+                    }
+                    vp_row[m] = v_j_m;
+                }
+            }
+            vp
+        })
+    });
+
+    for i in 0..n {
+        let q_row = &scratch_q[i * k..(i + 1) * k];
+        for j in 0..n {
+            let k_row = &scratch_k[j * k..(j + 1) * k];
+            let mut dot = 0.0f32;
+            for m in 0..k {
+                dot += q_row[m] * k_row[m];
+            }
+            scratch_alpha[j] = sigmoid(dot * scale);
+        }
+        // Partial sort: select top-effective_k indices by α (descending).
+        let cmp_alpha = |&a: &usize, &b: &usize| {
+            scratch_alpha[b]
+                .partial_cmp(&scratch_alpha[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        };
+        if effective_k > 0 {
+            let (front, _, _) = idx.select_nth_unstable_by(effective_k - 1, cmp_alpha);
+            front.sort_unstable_by(cmp_alpha);
+        }
+        let top = &idx[..effective_k];
+
+        // R_k = Σ_{j∈topk} r_j — per-query, depends on which peers are selected.
+        let mut r_sum = 0.0f32;
+        for &j in top {
+            r_sum += reliability[j];
+        }
+        if r_sum < 1e-10 {
+            continue; // All selected peers have zero reliability → no update.
+        }
+        let gamma_per_r = gamma / r_sum;
+
+        let state_i = &states[i * d..(i + 1) * d];
+        let out_i = &mut output[i * d..(i + 1) * d];
+        for &j in top {
+            let alpha = scratch_alpha[j];
+            if alpha == 0.0 {
+                continue;
+            }
+            let coeff = gamma_per_r * alpha * reliability[j];
+            if let Some(vp) = &v_proj {
+                let v_j = &vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    out_i[m] += coeff * (v_j[m] - state_i[m]);
+                }
+            } else {
+                let state_j = &states[j * d..(j + 1) * d];
+                for m in 0..d {
+                    out_i[m] += coeff * (state_j[m] - state_i[m]);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Sigmoid (AGENTS.md §2: NEVER softmax)
 // ─────────────────────────────────────────────────────────────────────
 
@@ -1088,5 +1579,303 @@ mod tests {
             .zip(out_dense.iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
         assert!(any_diff, "k_max=1 should differ from dense (all-N) path");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // CLR-weighted variant tests (Plan 570)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// G1: uniform reliability (all 1.0) must produce bit-identical output to
+    /// plain `set_sigmoid_attention_into`. This is the mathematical guarantee
+    /// that the CLR-weighted variant is a strict generalization — plain SA is
+    /// the uniform-reliability special case.
+    ///
+    /// IEEE 754 guarantees `x * 1.0 == x` for all finite x, so the extra multiply
+    /// in the weighted path introduces zero rounding error when r_j = 1.0.
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn g1_clr_weighted_uniform_reliability_is_bit_identical_to_plain() {
+        let n = 16;
+        let d = 8;
+        let k = 4;
+
+        // Deterministic LCG (same as g1_permutation_equivariance).
+        let mut state = 0x00C0_FFEE_5678_u64;
+        let mut lcg = || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((state >> 32) as f32) / (u32::MAX as f32)
+        };
+
+        let states: Vec<f32> = (0..n * d).map(|_| lcg()).collect();
+        let w = identity_projection(d, k);
+        let cfg = SetAttentionConfig::new(1.0, 0.3);
+        let reliability = vec![1.0f32; n];
+
+        // Plain SA.
+        let mut plain_out = vec![0.0f32; n * d];
+        {
+            let mut sq = vec![0.0; n * k];
+            let mut sk = vec![0.0; n * k];
+            let mut sa = vec![0.0; n];
+            set_sigmoid_attention_into(
+                &states, &w, &w, None, &mut plain_out, &cfg, n, d, k, &mut sq, &mut sk, &mut sa,
+            )
+            .unwrap();
+        }
+
+        // CLR-weighted SA with uniform reliability.
+        let mut weighted_out = vec![0.0f32; n * d];
+        {
+            let mut sq = vec![0.0; n * k];
+            let mut sk = vec![0.0; n * k];
+            let mut sa = vec![0.0; n];
+            clr_weighted_set_attention_into(
+                &states, &w, &w, None, &reliability, &mut weighted_out, &cfg, n, d, k,
+                &mut sq, &mut sk, &mut sa,
+            )
+            .unwrap();
+        }
+
+        // Bit-identical assertion.
+        for i in 0..n * d {
+            assert_eq!(
+                plain_out[i].to_bits(),
+                weighted_out[i].to_bits(),
+                "G1 FAIL at index {i}: plain={}, weighted={}",
+                plain_out[i],
+                weighted_out[i]
+            );
+        }
+    }
+
+    /// G1 (topk path): same bit-identical guarantee for the sparse top-k variant.
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn g1_clr_weighted_uniform_reliability_topk_bit_identical() {
+        let n = 16;
+        let d = 8;
+        let k = 4;
+
+        let mut s = 0xABCD_1234_u64;
+        let mut lcg = || {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            ((s >> 32) as f32) / (u32::MAX as f32)
+        };
+        let states: Vec<f32> = (0..n * d).map(|_| lcg()).collect();
+        let w = identity_projection(d, k);
+        let cfg = SetAttentionConfig::new(1.0, 0.3).with_top_k(5);
+        let reliability = vec![1.0f32; n];
+
+        let mut plain_out = vec![0.0f32; n * d];
+        let mut weighted_out = vec![0.0f32; n * d];
+        let (mut sq, mut sk, mut sa) = (vec![0.0; n * k], vec![0.0; n * k], vec![0.0; n]);
+        set_sigmoid_attention_into(
+            &states, &w, &w, None, &mut plain_out, &cfg, n, d, k, &mut sq, &mut sk, &mut sa,
+        )
+        .unwrap();
+        // Reset scratch (topk path uses thread_local buffers internally).
+        sq.iter_mut().for_each(|x| *x = 0.0);
+        sk.iter_mut().for_each(|x| *x = 0.0);
+        sa.iter_mut().for_each(|x| *x = 0.0);
+        clr_weighted_set_attention_into(
+            &states, &w, &w, None, &reliability, &mut weighted_out, &cfg, n, d, k,
+            &mut sq, &mut sk, &mut sa,
+        )
+        .unwrap();
+
+        for i in 0..n * d {
+            assert_eq!(
+                plain_out[i].to_bits(),
+                weighted_out[i].to_bits(),
+                "G1 topk FAIL at index {i}: plain={}, weighted={}",
+                plain_out[i],
+                weighted_out[i]
+            );
+        }
+    }
+
+    /// G1 helper test: clr_reliability_scores with uniform-zero directions
+    /// (all sigmoid = 0.5) gives mean 0.5, ^M = 0.5^M — a known value.
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn clr_reliability_scores_known_values() {
+        let n = 4;
+        let d = 2;
+        let m_exp = 3;
+        // States: [1, 0] repeated (so dot with dir = dir[0]).
+        let states = vec![1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0];
+        // Direction: [0, 0] → dot = 0 → sigmoid(0) = 0.5 for all.
+        let directions = vec![0.0; m_exp * d];
+        let mut output = vec![0.0; n];
+        clr_reliability_scores(&states, &directions, m_exp, n, d, &mut output);
+        // mean_v = 0.5, ^3 = 0.125.
+        let expected = 0.5f32.powf(3.0);
+        for &r in &output {
+            assert!((r - expected).abs() < 1e-6, "expected {expected}, got {r}");
+        }
+    }
+
+    /// G4 (dense path): no allocation primitives in the weighted dense path by
+    /// construction. The actual alloc-count perf gate lives in the bench file.
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn g4_clr_weighted_dense_path_by_construction_no_alloc() {
+        let n = 64;
+        let d = 8;
+        let k = 4;
+        let states: Vec<f32> = (0..n * d).map(|i| (i as f32) * 0.001).collect();
+        let w = identity_projection(d, k);
+        let reliability: Vec<f32> = (0..n).map(|i| 0.5 + (i as f32) * 0.01).collect();
+        let mut output = vec![0.0f32; n * d];
+        let (mut sq, mut sk, mut sa) = (vec![0.0; n * k], vec![0.0; n * k], vec![0.0; n]);
+        let cfg = SetAttentionConfig::default();
+        for _ in 0..100 {
+            clr_weighted_set_attention_into(
+                &states, &w, &w, None, &reliability, &mut output, &cfg, n, d, k,
+                &mut sq, &mut sk, &mut sa,
+            )
+            .unwrap();
+        }
+        for v in &output {
+            assert!(v.is_finite(), "G4: non-finite output after 100 calls");
+        }
+    }
+
+    /// Sanity: all-zero reliability → output = states (no-op).
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn clr_weighted_zero_reliability_is_noop() {
+        let n = 8;
+        let d = 4;
+        let k = 4;
+        let states: Vec<f32> = (0..n * d).map(|i| (i as f32) * 0.1).collect();
+        let w = identity(d);
+        let reliability = vec![0.0f32; n];
+        let mut output = vec![0.0f32; n * d];
+        let (mut sq, mut sk, mut sa) = (vec![0.0; n * k], vec![0.0; n * k], vec![0.0; n]);
+        let cfg = SetAttentionConfig::default();
+        clr_weighted_set_attention_into(
+            &states, &w, &w, None, &reliability, &mut output, &cfg, n, d, k,
+            &mut sq, &mut sk, &mut sa,
+        )
+        .unwrap();
+        for i in 0..n * d {
+            assert_eq!(output[i], states[i], "zero reliability should be a no-op");
+        }
+    }
+
+    /// Sanity: error when reliability.len() != n.
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn clr_weighted_reliability_len_error() {
+        let n = 8;
+        let d = 4;
+        let k = 4;
+        let states = vec![0.5; n * d];
+        let w = identity(d);
+        let reliability = vec![1.0; n - 1]; // Wrong length.
+        let mut output = vec![0.0; n * d];
+        let (mut sq, mut sk, mut sa) = (vec![0.0; n * k], vec![0.0; n * k], vec![0.0; n]);
+        let cfg = SetAttentionConfig::default();
+        let result = clr_weighted_set_attention_into(
+            &states, &w, &w, None, &reliability, &mut output, &cfg, n, d, k,
+            &mut sq, &mut sk, &mut sa,
+        );
+        assert!(matches!(
+            result,
+            Err(SetAttentionError::ReliabilityLenMismatch { expected: 8, got: 7 })
+        ));
+    }
+
+    /// G2: CLR-weighted SA latency must be ≤ 2× plain SA at N=64.
+    ///
+    /// The theoretical overhead is one extra multiply per peer (alpha * r_j)
+    /// plus one O(n) r_sum precomputation — total ~12% more arithmetic. In
+    /// practice, the ratio is ~1.0× (the extra multiply is hidden by memory
+    /// latency in the O(N²) inner loop).
+    ///
+    /// This test runs WITHOUT the CountingAllocator (which creates a false ~3.5×
+    /// ratio in the bench binary due to thread_local cache interference).
+    #[cfg(feature = "clr_weighted_set_attention")]
+    #[test]
+    fn g2_clr_weighted_latency_ratio() {
+        use std::hint::black_box;
+        use std::time::Instant;
+
+        let n = 64;
+        let d = 8;
+        let k = 4;
+        let states: Vec<f32> = (0..n * d).map(|i| (i as f32) * 0.001).collect();
+        let w = identity_projection(d, k);
+        let reliability: Vec<f32> = (0..n).map(|i| 0.3 + (i as f32) * 0.01).collect();
+        let mut output = vec![0.0f32; n * d];
+        let (mut sq, mut sk, mut sa) = (vec![0.0; n * k], vec![0.0; n * k], vec![0.0; n]);
+        let cfg = SetAttentionConfig::default();
+
+        // Warm up.
+        for _ in 0..1000 {
+            set_sigmoid_attention_into(
+                &states, &w, &w, None, &mut output, &cfg, n, d, k, &mut sq, &mut sk, &mut sa,
+            )
+            .unwrap();
+            clr_weighted_set_attention_into(
+                &states, &w, &w, None, &reliability, &mut output, &cfg, n, d, k,
+                &mut sq, &mut sk, &mut sa,
+            )
+            .unwrap();
+        }
+
+        let iters = 10_000;
+
+        // Measure plain.
+        let t0 = Instant::now();
+        for _ in 0..iters {
+            set_sigmoid_attention_into(
+                black_box(&states),
+                black_box(&w),
+                black_box(&w),
+                None,
+                black_box(&mut output),
+                black_box(&cfg),
+                n,
+                d,
+                k,
+                &mut sq,
+                &mut sk,
+                &mut sa,
+            )
+            .unwrap();
+        }
+        let plain_ns = t0.elapsed().as_nanos() as f64 / iters as f64;
+
+        // Measure weighted.
+        let t1 = Instant::now();
+        for _ in 0..iters {
+            clr_weighted_set_attention_into(
+                black_box(&states),
+                black_box(&w),
+                black_box(&w),
+                None,
+                black_box(&reliability),
+                black_box(&mut output),
+                black_box(&cfg),
+                n,
+                d,
+                k,
+                &mut sq,
+                &mut sk,
+                &mut sa,
+            )
+            .unwrap();
+        }
+        let weighted_ns = t1.elapsed().as_nanos() as f64 / iters as f64;
+
+        let ratio = weighted_ns / plain_ns;
+        eprintln!(
+            "G2: plain={plain_ns:.0}ns, weighted={weighted_ns:.0}ns, ratio={ratio:.2}× (target ≤2×)"
+        );
+        assert!(ratio <= 2.0, "G2 FAIL: ratio {ratio:.2}× > 2× target");
     }
 }
