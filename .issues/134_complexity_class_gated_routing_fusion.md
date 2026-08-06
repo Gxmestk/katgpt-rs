@@ -2,7 +2,7 @@
 
 **Filed:** 2026-07-12
 **Priority:** P3 (track-only — blocked on a missing complexity-class classifier)
-**Related:** `.research/411_CoT_vs_Latent_Thought_Formal_Comparison.md`, `.research/241_swir.md` (Plan 275), `.research/218_breakeven_complexity_router.md` (Plan 250), `.research/344_implicit_fp_rnn.md`, Plan 318 (k_selector), Plan 251 (DEC operators), Plan 281 (BoMSampler), `.research/367_quasimotto.md`
+**Related:** `.research/411_CoT_vs_Latent_Thought_Formal_Comparison.md`, `.research/241_SwiReasoning_Explicit_Latent_Switch.md` (Plan 275), `.research/218_Breakeven_Complexity_Inference_Router.md` (Plan 250), `.research/344_Implicit_Fixed_Point_RNN_Convergence_Halting.md`, riir-ai Plan 318 (k_selector), Plan 251 (DEC operators), Plan 281 (BoMSampler), `.research/367_QuasiMoTTo_QMC_Test_Time_Scaling.md`
 **Origin:** Research 411 §2.6 (fusion candidate) + §3 (routing table) — deferred T7. **Issue 135 (FPRAS routing criterion) consolidated into this issue 2026-07-25** — both are blocked on the same open research problem (a runtime complexity-class / self-reducibility detector); maintaining two parallel P3-track-only issues was noise without signal.
 
 ## Context
