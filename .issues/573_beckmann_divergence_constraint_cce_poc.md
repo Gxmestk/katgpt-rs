@@ -4,7 +4,45 @@
 **Research:** [`katgpt-rs/.research/468_Beckmann_Transport_Divergence_Constraint_CCE_MFG_Dynamics.md`](../.research/468_Beckmann_Transport_Divergence_Constraint_CCE_MFG_Dynamics.md)
 **Source paper:** [arXiv:2608.01692](https://arxiv.org/abs/2608.01692) — Beckmann Transport Models (Lee et al., May 2026)
 **Blocks:** Promoting the CCE moderator's "MFG dynamics" limitation from documented-gap to closed
-**Status:** Open
+**Status:** RESOLVED — T4 FAIL (verdict reached 2026-08-06)
+
+## PoC Verdict: T4 FAIL — Beckmann divergence constraint does NOT close the RPS trivial-CCE artifact
+
+The PoC definitively proves that the Beckmann divergence feasibility constraint
+`δ(j) = μ₀ − ν` does not close the RPS trivial-CCE artifact for any natural
+topology. Per T6 verdict branch: **the gap needs the discrete transition-kernel
+form (Campi et al.), not the Beckmann OT feasibility formulation (BTM).**
+
+### Root cause
+
+The Beckmann constraint operates on the **state marginal** `ν(s) = Σ_a ρ(s,a)`,
+restricting which state distributions are transport-reachable from `μ₀`. It does
+NOT restrict the **action distribution within each state**. The CCE LP
+can still independently optimize each state's action distribution — concentrating
+on the best-response action — which is the actual exploitation mechanism.
+
+- On a connected graph: any ν is transport-reachable → the constraint is **vacuous**
+  (T4b confirms: `γ₀ = -1.0`, identical to unconstrained).
+- On isolated vertices: `ν = μ₀` (marginal constraint), but per-state action
+   concentration persists → `γ₀ = -1.0` (T4a confirms).
+
+### What WOULD close the artifact
+
+1. Richer deviation class (state-dependent best-response deviations)
+2. Transition-kernel constraint: `ρ(s',a') = Σ_s ρ(s,a)·P(s'|s,a)`
+3. Honest-mediator constraint (both players' deviations)
+
+### BTM's retained value
+
+Per Research 468 §2.7: BTM's value for our stack is the **theoretical lens**
+(DEC/Stokes vocabulary for MFG dynamics — `codifferential` IS the divergence
+operator, verified in T4c), NOT the specific Beckmann OT feasibility formulation.
+
+### PoC artifact
+
+[`tests/beckmann_cce_poc.rs`](../tests/beckmann_cce_poc.rs) — 6 tests, gated on
+`cce_moderator + dec_operators`. Kept as a reproducible negative-result artifact
+(mirrors Plan 410's Go-arena failure pattern).
 
 ## Context
 
@@ -24,15 +62,18 @@ The constraint: candidate `ρ` must be transport-feasible from initial `μ₀` �
 
 ## Tasks
 
-- [ ] **T1** Build a minimal `CellComplex` over the CCE state-action space (RPS: 3 states × 3 actions = 9 cells, or a 3×3 grid).
-- [ ] **T2** For the RPS game, compute the current (unconstrained) CCE via `CceLp::solve` — verify the trivial-CCE artifact (γ₀ < 0 for player 1's cost = exploits free state distribution).
-- [ ] **T3** Add a linear feasibility constraint row: `codifferential(j) = μ₀ − ρ` for some edge-flow variable `j`. This makes `j` an auxiliary LP variable, with the divergence equation as a constraint.
-- [ ] **T4** Re-solve the constrained CCE LP. Verify: does the constraint eliminate the trivial-CCE artifact (γ₀ ≈ 0 for the zero-sum RPS case)?
-- [ ] **T5** Honest negative control: does the constraint over-restrict the feasible set on chicken / BoS (where a real Pareto-dominant CCE exists)? If the constraint makes these infeasible or degenerate, the Beckmann formulation is too restrictive and the transition-kernel form (Campi et al.) is needed instead.
-- [ ] **T6** Record verdict in Research 468 §PoC Addendum:
-  - If T4 PASS + T5 PASS → Gain confirmed; open a plan for `BeckmannFeasibleCce` behind a feature flag.
-  - If T4 FAIL → Beckmann formulation doesn't close the artifact; the gap needs the discrete transition-kernel form. BTM's value is the theoretical lens (DEC/Stokes vocabulary for MFG dynamics), not the specific formulation.
-  - If T4 PASS + T5 FAIL → Beckmann closes the artifact but over-restricts the feasible set; investigate whether a relaxed formulation (partial transport, soft penalty) preserves the fix without the restriction.
+- [x] **T1** Build a minimal `CellComplex` over the CCE state-action space (RPS: 3 states × 3 actions = 9 cells, or a 3×3 grid).
+  - Used N=3 (opponent's action), A=3. CellComplex::grid_2d(3,1) verified in T4c (3 vertices, 2 edges).
+- [x] **T2** For the RPS game, compute the current (unconstrained) CCE via `CceLp::solve` — verify the trivial-CCE artifact (γ₀ < 0 for player 1's cost = exploits free state distribution).
+  - γ₀ = -1.000000, ρ concentrated on ρ(R,P)=1.0. Cross-checked with shipped CceLp::solve.
+- [x] **T3** Add a linear feasibility constraint row: `codifferential(j) = μ₀ − ρ` for some edge-flow variable `j`. This makes `j` an auxiliary LP variable, with the divergence equation as a constraint.
+  - Two variants: T4a (marginal constraint on isolated vertices) + T4b (full edge-flow with j⁺/j⁻ split on path graph).
+- [x] **T4** Re-solve the constrained CCE LP. Verify: does the constraint eliminate the trivial-CCE artifact (γ₀ ≈ 0 for the zero-sum RPS case)?
+  - **FAIL**: γ₀ = -1.000000 for BOTH variants. Marginal forces ν=uniform but per-state action concentration persists. Edge-flow is vacuous on connected graph.
+- [x] **T5** Honest negative control: does the constraint over-restrict the feasible set on chicken / BoS (where a real Pareto-dominant CCE exists)?
+  - **PASS**: chicken welfare unchanged (5.5 → 5.5). The constraint does NOT over-restrict — it simply has no effect (vacuous on connected graphs; the marginal variant doesn't reduce chicken welfare because chicken's CCE already has uniform-ish marginals).
+- [x] **T6** Record verdict in Research 468 §PoC Addendum:
+  - T4 FAIL → Beckmann formulation doesn't close the artifact; the gap needs the discrete transition-kernel form. BTM's value is the theoretical lens (DEC/Stokes vocabulary for MFG dynamics), not the specific formulation.
 
 ## What this PoC does NOT test
 

@@ -218,3 +218,71 @@ The Beckmann constraint `δ(νb) = μ₀ − μ₁` says: the divergence of the 
 - **CCE moderator:** Plan 295 (LP-CCE primitive), Plan 300 (Subjective-CCE), riir-ai Plan 325 (runtime — shipped COMPLETE without MFG dynamics)
 - **Mean-field:** Research 371 / Plan 371 (Mean-Field Regime Classifier)
 - **Beckmann OT:** Beckmann, M. (1952) *A continuous model of transportation*, Econometrica 20(4):643–660; Santambrogio, F. (2015) *Optimal Transport for Applied Mathematicians* §4.4
+
+---
+
+## 7. PoC Addendum (Issue 573, 2026-08-06)
+
+**Verdict: T4 FAIL — the Beckmann divergence feasibility constraint does NOT
+close the RPS trivial-CCE artifact.**
+
+### PoC setup
+
+- RPS as MFG: N=3 states (opponent's action), A=3 actions (player 1's action).
+- Unconstrained CCE LP reproduces the artifact: γ₀ = −1.0, ρ concentrated on
+  the single most-favorable (state, action) pair.
+- Two Beckmann constraint variants tested:
+  - **T4a (marginal, isolated vertices):** forces ν = μ₀ = uniform. γ₀ = −1.0 —
+    artifact persists. ρ spreads across all states (ν=1/3 each) but concentrates
+    action mass on the best-response per state (R→P, P→S, S→R).
+  - **T4b (edge-flow, connected path graph):** adds j⁺/j⁻ edge-flow variables +
+    divergence constraint rows. γ₀ = −1.0 — artifact persists, ρ identical to
+    unconstrained (the constraint is vacuous: any ν is transport-reachable on a
+    connected graph).
+- **T4c:** DEC `codifferential` on `CellComplex::grid_2d(3,1)` verified correct —
+  δ(j=(1,0)) = [−1, 1, 0], sums to 0 (mass conservation). The operator is right;
+  the formulation (feasibility vs cost) is the issue.
+- **T5 (chicken):** marginal constraint does NOT over-restrict — welfare
+  unchanged (5.5 → 5.5). The constraint simply has no effect on chicken's CCE.
+
+### Root cause analysis
+
+The Beckmann divergence constraint `δ(j) = μ₀ − ν` operates on the **state
+marginal** `ν(s) = Σ_a ρ(s,a)`, not on the full occupation measure `ρ(s,a)`. It
+restricts which state distributions are transport-reachable from `μ₀`, but does
+NOT restrict the action distribution within each state. The CCE LP independently
+optimizes each state's action distribution, concentrating on the best-response
+action — which is the actual exploitation mechanism that no state-marginal
+transport constraint can prevent.
+
+The original hypothesis (§2.4) was wrong: it claimed "a degenerate ρ
+concentrated on one point is NOT transport-feasible from a uniform μ₀." In fact,
+on any connected graph, ALL probability distributions are mutually
+transport-reachable — the edge flow just routes mass to the target.
+
+### What WOULD close the artifact
+
+1. **Richer deviation class** — state-dependent deviations that play
+   best-response: "when state = Scissors, play Rock." The CCE constraint
+   would then catch the best-response exploitation.
+2. **Transition-kernel constraint** (Campi et al.) — `ρ(s',a') =
+   Σ_s ρ(s,a)·P(s'|s,a)`. This couples state and action, preventing independent
+   per-state optimization.
+3. **Honest-mediator constraint** — both players' deviation classes, not just
+   player 1's.
+
+### Verdict per T6 branch
+
+**T4 FAIL → Beckmann formulation doesn't close the artifact; the gap needs the
+discrete transition-kernel form.** BTM's value for our stack is the **theoretical
+lens** (DEC/Stokes vocabulary for MFG dynamics — `codifferential` IS the
+divergence operator, T4c-verified), NOT the specific Beckmann OT feasibility
+formulation. No plan for `BeckmannFeasibleCce` — the constraint is vacuous or
+insufficient depending on topology.
+
+### PoC artifact
+
+[`tests/beckmann_cce_poc.rs`](../tests/beckmann_cce_poc.rs) — 6 tests, gated on
+`cce_moderator + dec_operators`. Kept as a reproducible negative-result artifact
+(mirrors Plan 410's Go-arena failure pattern: a falsified hypothesis is still a
+valuable research outcome).
