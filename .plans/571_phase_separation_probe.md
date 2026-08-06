@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:0710.4495](https://arxiv.org/abs/0710.4495) — Barajas & Serra, *The Lonely Runner with Seven Runners* (2007)
 **Private guide:** [riir-ai/.research/334_phase_separation_game_runtime_guide.md](../../riir-ai/.research/334_phase_separation_game_runtime_guide.md)
 **Target:** `katgpt-rs/crates/katgpt-core/src/phase_separation.rs` (new module) + Cargo feature `phase_separation`
-**Status:** Active — Phase 1 COMPLETE (skeleton + GOAT gate ALL PASS, 2026-08-06)
+**Status:** Active — Phase 1 + Phase 2 + Phase 3 COMPLETE (2026-08-07). Phase 1 GOAT gate ALL PASS; Phase 2 T2.2 + T2.3 done (T2.1 deferred); Phase 3 docs + example done.
 
 ---
 
@@ -121,15 +121,31 @@ Both are documented in the module rustdoc + cross-referenced to Research 470.
 
 ### Tasks
 
-- [ ] **T3.1** Module-level rustdoc with:
+- [x] **T3.1** Module-level rustdoc with:
   - The LRC citation + scope caveat (N≤7 proven, N>7 conjectured).
   - The raw-vs-latent boundary (per AGENTS.md).
   - The bridge pattern (raw time-phase → latent-projected phase → separation scalar).
   - Cross-ref to Research 470 + private guide 334.
-- [ ] **T3.2** Example in `katgpt-rs/crates/katgpt-core/examples/phase_separation_demo.rs`:
+
+  **Done in Phase 1/2 (2026-08-06):** the module rustdoc was written
+  alongside the code. It satisfies all four requirements: LRC citation +
+  scope caveat (N≤7 proven / N>7 conjectured), raw-vs-latent boundary, the
+  bridge pattern (zero-alloc + gateable + no sync dependency), and the
+  cross-references block (Research 470 + private guide 334 + Research 056).
+  Checkbox closed 2026-08-07 on audit.
+- [x] **T3.2** Example in `katgpt-rs/crates/katgpt-core/examples/phase_separation_demo.rs`
+  (done 2026-08-07):
   - 7 entities with integer speeds `{1,2,3,4,5,6,7}`.
-  - Scan 1000 ticks, print the tick where each entity hits max separation.
-  - Confirm the LRC bound (every entity hits ≥ 1/7).
+  - Scans the full discrete orbit k=0..420 (period = lcm(1..=7)), records
+    the loneliest tick per entity + max separation.
+  - Prints a table; confirms the LRC bound (every entity hits ≥ 1/7).
+    **LRC CONFIRMED** — all 7 entities reached phase_separation ≥ 1/7 (eps
+    slack ±5/420 for discrete sampling). The slowest entity (s=1, s=7) hits
+    exactly 1/7 at k=60; the fastest-to-lonely (s=4) hits 0.25 at k=105.
+  - Uses only the public API (`from_speeds_and_tick` +
+    `phase_separation_sorted`); caller-provided scratch, zero allocation.
+  - Gated `required-features = ["phase_separation"]` in Cargo.toml.
+  - Clippy zero warnings; 1853 lib tests pass with the feature on.
 
 ---
 

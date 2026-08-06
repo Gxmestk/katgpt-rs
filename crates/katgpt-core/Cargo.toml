@@ -663,6 +663,13 @@ required-features = ["geometric_product"]
 name = "subspace_phase_gate_goat"
 required-features = ["subspace_phase_gate"]
 
+# Plan 571 Phase 3 T3.2 — Lonely Runner Conjecture demonstration. 7 entities
+# with integer speeds {1..7}, scans the full orbit k=0..420, prints the
+# loneliest tick per entity + confirms every entity hits phase_separation ≥ 1/7.
+[[example]]
+name = "phase_separation_demo"
+required-features = ["phase_separation"]
+
 # Plan 301 T4.1 — jacobian_svd_at_into zero-allocation gate. Separate test
 # binary (matches karc_alloc_check / analytic_lattice_alloc_check convention):
 # #[global_allocator] is crate-binary-unique and would collide with other
