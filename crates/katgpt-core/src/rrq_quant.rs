@@ -482,6 +482,170 @@ impl RrqWeights {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Load-time quant-strategy router (Phase 2 — paper §3 PMR + Research 200 KS)
+// ──────────────────────────────────────────────────────────────────────────
+
+/// PMR threshold for the default 2-bit base + 2-bit residual split (paper §3
+/// Table 3, B=4, r=0.5: `K > 9r`). A group whose peak-to-mean ratio exceeds
+/// this benefits from RRQ (the residual stage's finer step size wins once an
+/// outlier forces the base step size wide). Below this, direct fixed-bit RTN
+/// is at least as accurate at the same total bits and cheaper.
+///
+/// This is the value for the **default `BITS_PER_STAGE = 2`** config. Other
+/// splits have different thresholds (1+3 → 3.29r, 3+1 → 29r); callers pass the
+/// matching threshold explicitly to [`select_quant_strategy`].
+pub const PMR_THRESHOLD_2_2: f32 = 9.0;
+
+/// KS D-statistic above which a layer is flagged for security review
+/// regardless of its PMR (Research 200: attacked layers show D > 0.25 vs
+/// < 0.1 for clean layers). Computed by `katgpt_spectral::ks_d_statistic`
+/// (Plan 224 OAQG substrate) — NOT recomputed here; the caller passes the
+/// scalar. `katgpt-core` is the leaf and must not depend on `katgpt-spectral`,
+/// so the router consumes the value via parameter (dependency inversion).
+pub const KS_FLAG_THRESHOLD: f32 = 0.25;
+
+/// Default target bit-width when the router recommends direct fixed-bit RTN
+/// (the standard LLM serving point).
+pub const DEFAULT_DIRECT_RTN_BITS: u8 = 4;
+
+/// Peak-to-Mean Ratio — paper §3 outlier-severity metric.
+///
+/// For each group of `group_size` consecutive weights, computes
+/// `max|x| / mean|x|` (the inlier radius `r` ≈ mean|x|, the outlier magnitude
+/// `K` ≈ max|x|). Returns the **max across groups** — the worst-case group.
+///
+/// The paper's outlier threshold analysis (Research 467 §1.2, Table 3) shows
+/// RRQ (2-bit base + 2-bit residual) beats direct 4-bit RTN once `K > 9r`,
+/// i.e. once PMR exceeds [`PMR_THRESHOLD_2_2`]. Qwen3 profiles (PMR ≈ 28)
+/// cross this; Llama profiles (mean PMR ≈ 5–7) do not.
+///
+/// **Degenerate groups** (all-zero): return `1.0` (no outlier structure; the
+/// minimum since `max|x| ≥ mean|x|` always). A group with one spike among
+/// zeros has PMR = `group_size` (finite).
+///
+/// **Allocation:** zero — single pass over `weights`, no scratch.
+///
+/// **Aggregation note:** the plan returns max-across-groups (the conservative
+/// worst case — flag a layer if ANY group has severe outliers). The paper also
+/// reports *mean*-across-groups PMR (more forgiving: a few outlier groups get
+/// averaged out). Callers wanting the mean can compute it themselves; this
+/// function deliberately exposes the conservative scalar for the security-adjacent
+/// decision in [`select_quant_strategy`].
+pub fn peak_to_mean_ratio(weights: &[f32], group_size: usize) -> f32 {
+    assert!(group_size > 0, "peak_to_mean_ratio: group_size must be > 0");
+    let n = weights.len();
+    if n == 0 {
+        return 1.0;
+    }
+    let n_groups = n.div_ceil(group_size);
+    let mut worst = 1.0_f32;
+    for g in 0..n_groups {
+        let start = g * group_size;
+        let end = (start + group_size).min(n);
+        let mut max_abs = 0.0_f32;
+        let mut sum_abs = 0.0_f32;
+        for &v in &weights[start..end] {
+            let a = v.abs();
+            if a > max_abs {
+                max_abs = a;
+            }
+            sum_abs += a;
+        }
+        let count = (end - start) as f32;
+        let mean_abs = sum_abs / count;
+        // PMR = max|x| / mean|x|. Guard 0/0 (all-zero group): treat as flat.
+        let pmr = if mean_abs > 0.0 {
+            max_abs / mean_abs
+        } else {
+            1.0
+        };
+        if pmr > worst {
+            worst = pmr;
+        }
+    }
+    worst
+}
+
+/// Per-layer load-time quantization strategy recommendation.
+///
+/// Combines the paper's PMR outlier metric (§3 — does RRQ help at this layer?)
+/// with the Research 200 KS D-statistic (is this layer's weight distribution
+/// anomalous enough to suggest tampering?). The KS check is a security
+/// override: a tampered layer goes to review regardless of how RRQ-friendly
+/// its outlier profile looks.
+///
+/// See [`select_quant_strategy`] for the decision table.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum QuantStrategy {
+    /// Outlier-heavy (PMR > threshold) AND not flagged (KS ≤ flag threshold).
+    /// RRQ's residual stage pays off: its finer step size recovers the
+    /// outlier-forced base error. `n_stages` defaults to [`DEFAULT_N_STAGES`]
+    /// (3 → 2/4/6/8-bit prefixes); callers with a specific target width can
+    /// adjust.
+    Rrq {
+        /// Number of residual stages recommended (default
+        /// [`DEFAULT_N_STAGES`]).
+        n_stages: usize,
+    },
+    /// Flat distribution (PMR ≤ threshold) AND not flagged. Direct fixed-bit
+    /// RTN is at least as accurate as RRQ at the same total bits and cheaper
+    /// (no per-stage metadata overhead). `bits` defaults to
+    /// [`DEFAULT_DIRECT_RTN_BITS`] (4).
+    DirectRtn {
+        /// Target bit-width recommended (default [`DEFAULT_DIRECT_RTN_BITS`]).
+        bits: u8,
+    },
+    /// KS D-statistic exceeds [`KS_FLAG_THRESHOLD`] — the weight distribution
+    /// is anomalous enough to suggest outlier injection (Research 200).
+    /// **Do not quantize until reviewed.** The PMR reading is still available
+    /// via [`peak_to_mean_ratio`] for the reviewer; the router deliberately
+    /// refuses to recommend a quantization path for a flagged layer.
+    FlagForReview,
+}
+
+/// Load-time quant-strategy router. Decision table (Research 467 §3.2):
+///
+/// | KS D-stat | PMR | Strategy |
+/// |---|---|---|
+/// | > [`KS_FLAG_THRESHOLD`] (0.25) | any | [`QuantStrategy::FlagForReview`] (security override) |
+/// | ≤ flag threshold | > `pmr_threshold` | [`QuantStrategy::Rrq`] (outlier-heavy → RRQ) |
+/// | ≤ flag threshold | ≤ `pmr_threshold` | [`QuantStrategy::DirectRtn`] (flat → direct fixed-bit) |
+///
+/// `ks_d_stat` is the Kolmogorov-Smirnov D-statistic of this layer's weight
+/// distribution against a Gaussian reference, computed by
+/// `katgpt_spectral::ks_d_statistic` (Plan 224 OAQG substrate). It is passed
+/// in as a scalar because `katgpt-core` (leaf) must not depend on
+/// `katgpt-spectral` — the caller bridges the value.
+///
+/// `pmr_threshold` is the RRQ-beneficial threshold for the caller's chosen
+/// base/residual bit split. Use [`PMR_THRESHOLD_2_2`] for the default
+/// 2-bit base + 2-bit residual config (paper §3.4, `K > 9r`).
+///
+/// **Allocation:** zero.
+pub fn select_quant_strategy(
+    weights: &[f32],
+    group_size: usize,
+    ks_d_stat: f32,
+    pmr_threshold: f32,
+) -> QuantStrategy {
+    // Security override first — a flagged layer never gets a quantization
+    // recommendation regardless of how benign its outlier profile looks.
+    if ks_d_stat > KS_FLAG_THRESHOLD {
+        return QuantStrategy::FlagForReview;
+    }
+    let pmr = peak_to_mean_ratio(weights, group_size);
+    if pmr > pmr_threshold {
+        QuantStrategy::Rrq {
+            n_stages: DEFAULT_N_STAGES,
+        }
+    } else {
+        QuantStrategy::DirectRtn {
+            bits: DEFAULT_DIRECT_RTN_BITS,
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Tests (G1 correctness + G4 alloc-free regression)
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -816,5 +980,168 @@ mod tests {
         // Sanity: out is not all zeros (the weights + x are nontrivial).
         let sum: f32 = out.iter().copied().sum();
         assert!(sum.abs() > 0.0, "out sum should be nonzero, got {sum}");
+    }
+
+    // ─── G1: peak_to_mean_ratio on known distributions ─────────────────────
+
+    #[test]
+    fn g1_pmr_uniform_distribution_is_one() {
+        // All |x| equal → max|x| == mean|x| → PMR == 1.
+        let weights = [0.5_f32; 128];
+        let pmr = peak_to_mean_ratio(&weights, 128);
+        assert!(
+            approx_eq(pmr, 1.0, 1e-5),
+            "uniform PMR should be 1.0, got {pmr}"
+        );
+    }
+
+    #[test]
+    fn g1_pmr_single_spike_equals_group_size() {
+        // One spike of magnitude `spike` among `n-1` zeros:
+        //   mean|x| = spike/n, max|x| = spike → PMR = n.
+        let n = 64_usize;
+        let mut weights = vec![0.0_f32; n];
+        weights[0] = 10.0;
+        let pmr = peak_to_mean_ratio(&weights, n);
+        assert!(
+            approx_eq(pmr, n as f32, 1e-3),
+            "single-spike PMR should be n={n}, got {pmr}"
+        );
+    }
+
+    #[test]
+    fn g1_pmr_all_zero_group_is_flat() {
+        // All-zero group → degenerate (0/0) → treat as flat (PMR = 1).
+        let weights = [0.0_f32; 32];
+        let pmr = peak_to_mean_ratio(&weights, 32);
+        assert_eq!(pmr, 1.0, "all-zero PMR should be 1.0, got {pmr}");
+    }
+
+    #[test]
+    fn g1_pmr_takes_max_across_groups() {
+        // Two groups of 4: group 0 flat (PMR 1), group 1 has a spike (PMR 4).
+        // Worst-case (max across groups) should report group 1's PMR.
+        let weights = [
+            // group 0: uniform
+            1.0_f32, 1.0, 1.0, 1.0,
+            // group 1: one spike among 3 zeros → PMR = 4
+            5.0, 0.0, 0.0, 0.0,
+        ];
+        let pmr = peak_to_mean_ratio(&weights, 4);
+        assert!(
+            approx_eq(pmr, 4.0, 1e-5),
+            "max-across-groups PMR should be 4.0 (the spike group), got {pmr}"
+        );
+    }
+
+    // ─── G1: select_quant_strategy classifies Llama vs Qwen profiles ────────
+
+    /// Build a synthetic weight block of `n_groups` groups × `group_size`
+    /// weights. If `outlier_factor` > 0, inject one outlier of magnitude
+    /// `outlier_factor * inlier` into each group; otherwise draw flat inliers.
+    fn synthetic_weights(n_groups: usize, group_size: usize, inlier: f32, outlier_factor: f32) -> Vec<f32> {
+        let n = n_groups * group_size;
+        let mut w = vec![0.0_f32; n];
+        let mut seed: u64 = 0x1234_5678_9ABC_DEF0;
+        for g in 0..n_groups {
+            for j in 0..group_size {
+                // Small deterministic jitter around `inlier` (pseudo-noise so
+                // mean|x| ≈ inlier, not exactly — realistic).
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                let jitter = ((seed >> 40) as f32 / (1u64 << 40) as f32) * 0.2 - 0.1;
+                let sign = if (seed >> 20) & 1 == 0 { -1.0 } else { 1.0 };
+                w[g * group_size + j] = sign * (inlier + jitter);
+            }
+            if outlier_factor > 0.0 {
+                // Inject one outlier at the group's first slot.
+                w[g * group_size] = inlier * outlier_factor;
+            }
+        }
+        w
+    }
+
+    #[test]
+    fn g1_pmr_classifies_llama_vs_qwen() {
+        // Llama-like: mild outliers (PMR ~5, below the 2+2 threshold of 9)
+        // → DirectRtn. Qwen-like: severe outliers (PMR ~30, well above 9)
+        // → Rrq. The synthetic distributions are tuned to our PMR scale; the
+        // paper's Table 9 Llama/Qwen K/MAE numbers (26.5 / 116) are a
+        // different normalization and serve as context, not exact targets.
+        let group_size = 128;
+
+        // Llama-like: flat inliers, tiny outlier factor 5.
+        let llama = synthetic_weights(8, group_size, 0.5, 5.0);
+        let llama_pmr = peak_to_mean_ratio(&llama, group_size);
+        let llama_strat = select_quant_strategy(&llama, group_size, 0.05, PMR_THRESHOLD_2_2);
+        // Llama PMR should be ~5 (one 2.5 outlier among ~0.5 inliers).
+        assert!(
+            llama_pmr < PMR_THRESHOLD_2_2,
+            "Llama-like PMR {llama_pmr:.2} should be < threshold {}, got DirectRtn expected",
+            PMR_THRESHOLD_2_2
+        );
+        assert_eq!(
+            llama_strat,
+            QuantStrategy::DirectRtn {
+                bits: DEFAULT_DIRECT_RTN_BITS,
+            },
+            "Llama-like (PMR {llama_pmr:.2}) should select DirectRtn"
+        );
+
+        // Qwen-like: severe outliers (factor 30 → PMR ~30).
+        let qwen = synthetic_weights(8, group_size, 0.5, 30.0);
+        let qwen_pmr = peak_to_mean_ratio(&qwen, group_size);
+        let qwen_strat = select_quant_strategy(&qwen, group_size, 0.05, PMR_THRESHOLD_2_2);
+        assert!(
+            qwen_pmr > PMR_THRESHOLD_2_2,
+            "Qwen-like PMR {qwen_pmr:.2} should be > threshold {}, got Rrq expected",
+            PMR_THRESHOLD_2_2
+        );
+        assert_eq!(
+            qwen_strat,
+            QuantStrategy::Rrq {
+                n_stages: DEFAULT_N_STAGES,
+            },
+            "Qwen-like (PMR {qwen_pmr:.2}) should select Rrq"
+        );
+    }
+
+    #[test]
+    fn g1_ks_overrides_pmr() {
+        // KS D-statistic > flag threshold → FlagForReview regardless of PMR.
+        // Use a Qwen-like profile (would otherwise select Rrq) but a high KS.
+        let group_size = 128;
+        let qwen = synthetic_weights(8, group_size, 0.5, 30.0);
+        let pmr = peak_to_mean_ratio(&qwen, group_size);
+        assert!(pmr > PMR_THRESHOLD_2_2, "precondition: Qwen-like PMR {pmr:.2}");
+
+        // High KS (tampered) → FlagForReview, even though PMR says Rrq.
+        let strat = select_quant_strategy(&qwen, group_size, 0.40, PMR_THRESHOLD_2_2);
+        assert_eq!(strat, QuantStrategy::FlagForReview);
+
+        // Sanity: same weights, low KS → Rrq (the override is KS-gated, not
+        // PMR-gated).
+        let strat_clean = select_quant_strategy(&qwen, group_size, 0.05, PMR_THRESHOLD_2_2);
+        assert_eq!(
+            strat_clean,
+            QuantStrategy::Rrq {
+                n_stages: DEFAULT_N_STAGES,
+            }
+        );
+    }
+
+    #[test]
+    fn g1_router_boundary_ks_exactly_at_threshold_is_not_flagged() {
+        // KS == KS_FLAG_THRESHOLD exactly → NOT flagged (strict > ). The
+        // boundary goes to the PMR decision.
+        let flat = [0.5_f32; 128];
+        let strat = select_quant_strategy(&flat, 128, KS_FLAG_THRESHOLD, PMR_THRESHOLD_2_2);
+        assert_eq!(
+            strat,
+            QuantStrategy::DirectRtn {
+                bits: DEFAULT_DIRECT_RTN_BITS,
+            }
+        );
     }
 }

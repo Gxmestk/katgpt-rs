@@ -2231,8 +2231,9 @@ pub use phase_separation::{
 pub mod rrq_quant;
 #[cfg(feature = "rrq_quant")]
 pub use rrq_quant::{
-    BITS_PER_STAGE, CODES_PER_BYTE, DEFAULT_GROUP_SIZE, DEFAULT_N_STAGES, LEVELS_PER_STAGE,
-    RrqStage, RrqWeights,
+    peak_to_mean_ratio, select_quant_strategy, BITS_PER_STAGE, CODES_PER_BYTE,
+    DEFAULT_DIRECT_RTN_BITS, DEFAULT_GROUP_SIZE, DEFAULT_N_STAGES, KS_FLAG_THRESHOLD,
+    LEVELS_PER_STAGE, PMR_THRESHOLD_2_2, QuantStrategy, RrqStage, RrqWeights,
 };
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running

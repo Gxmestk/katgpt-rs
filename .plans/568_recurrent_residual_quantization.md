@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/467_Recurrent_Residual_Quantization.md](../.research/467_Recurrent_Residual_Quantization.md)
 **Source paper:** [arXiv:2608.04048](https://arxiv.org/abs/2608.04048) — Luo, Dong, Cheng, Shen (Intel), "Recurrent Residual Quantization: A Progressive Multi-Precision Representation for LLMs", Aug 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/rrq_quant.rs` (new module) + Cargo feature `rrq_quant`
-**Status:** Active — Phase 1 COMPLETE (skeleton + G1/G3/G4 ALL PASS, 2026-08-06); Phases 2–4 are P1–P3 (no concrete consumer today)
+**Status:** Active — Phase 1 + Phase 2 COMPLETE (2026-08-07); Phase 3 is P2, Phase 4 is P3 (no concrete consumer today)
 
 ---
 
@@ -15,7 +15,7 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 **Why now, why default-off:** zero shipped multi-precision weight representation exists in our stack (Research 467 §2.1 confirms zero prior art for `RRQ | residual_quant | Matryoshka | MatGPTQ | multi-precision weight`). The closest cousins — `quant_error_lora.rs` (single SVD correction), QJL residual in TurboQuant (activation level), and `multi_precision_npc` (FAILED training-time, now in riir-train) — all cover related but distinct problems. **No concrete consumer needs this today.** Ship the primitive + benchmark, default-off, revisit when (a) we serve a multi-precision LLM at runtime, (b) per-NPC expert routing (`quant_expert_goat.rs`) wants to share a multi-precision base, or (c) the §3.4 freeze/thaw incremental-upgrade fusion finds a consumer.
 
 **GOAT gate (promotion criterion):**
-- **G1** (correctness): prefix-t reconstruction is bit-identical to a reference sum-of-stages; load-time PMR selector classifies Llama (mild) vs Qwen (severe) outlier profiles correctly.
+- **G1** (correctness): prefix-t reconstruction is bit-identical to a reference sum-of-stages; load-time PMR selector classifies Llama (mild) vs Qwen (severe) outlier profiles correctly. **Phase 1 + Phase 2 DONE.**
 - **G2** (perf): fused 4-stage LUT dequant+dot at parity (within 1.05×) with single-stage 8-bit LUT path at the 8-bit prefix.
 - **G3** (no-regression): default features + `--features rrq_quant` both build clean; clippy zero warnings; existing tests unchanged.
 - **G4** (alloc-free): prefix-t reconstruction + dot have 0 steady-state allocations.
@@ -51,29 +51,17 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 
 ### Tasks
 
-- [ ] **T2.1** Implement `peak_to_mean_ratio(weights: &[f32], group_size: usize) -> f32` — paper §3 PMR metric: `max|x| / mean|x|` per group, max across groups.
-- [ ] **T2.2** Implement the strategy router:
-  ```rust
-  /// Per-layer load-time decision: RRQ vs direct quantization.
-  /// Combines PMR (outlier severity for quant-strategy) with KS D-statistic
-  /// (Research 200 OAQG, security anomaly flag).
-  pub enum QuantStrategy {
-      Rrq { n_stages: usize },  // PMR > threshold → RRQ beneficial
-      DirectRtn { bits: u8 },    // PMR < threshold → direct fixed-bit
-      FlagForReview,             // KS > 0.25 → security review regardless
-  }
-
-  pub fn select_quant_strategy(
-      weights: &[f32],
-      group_size: usize,
-      ks_d_stat: f32,
-      pmr_threshold: f32,  // paper §3.4 default ~9r for 2+2 split
-  ) -> QuantStrategy { ... }
-  ```
-- [ ] **T2.3** **G1 gate test** for the selector:
-  - `g1_pmr_classifies_llama_vs_qwen`: synthetic flat distribution (PMR ~5) → `DirectRtn`; synthetic outlier-heavy (PMR ~30) → `Rrq`. Reproduce paper Table 9 numbers (Llama mean K/MAE 26.5 → DirectRtn; Qwen3 max K/MAE 116 → Rrq).
-  - `g1_ks_overrides_pmr`: KS > 0.25 → `FlagForReview` regardless of PMR.
-- [ ] **T2.4** Commit on `develop`.
+- [x] **T2.1** Implement `peak_to_mean_ratio(weights: &[f32], group_size: usize) -> f32` — paper §3 PMR metric: `max|x| / mean|x|` per group, **max across groups** (the conservative worst case — flag a layer if ANY group has severe outliers). Degenerate all-zero group → 1.0 (flat). Zero allocation (single pass, no scratch). Also ships `PMR_THRESHOLD_2_2 = 9.0` (paper §3.4 default for the 2-bit base + 2-bit residual split, `K > 9r`).
+- [x] **T2.2** Implement the strategy router (`QuantStrategy` enum + `select_quant_strategy`). **DEVIATION (documented):** the KS D-statistic is **consumed as a scalar parameter**, NOT recomputed here. Substrate-first gate found the existing `katgpt_spectral::ks_d_statistic` (Plan 224 OAQG substrate, Research 200) — `katgpt-core` is the leaf and must not depend on `katgpt-spectral`, so the router takes `ks_d_stat: f32` as input and the caller bridges the value (dependency inversion). Ships `KS_FLAG_THRESHOLD = 0.25` + `DEFAULT_DIRECT_RTN_BITS = 4`. Decision table: KS > 0.25 → FlagForReview (security override); else PMR > threshold → Rrq { n_stages: DEFAULT_N_STAGES }; else DirectRtn { bits: 4 }.
+- [x] **T2.3** **G1 gate test** for the selector (7 new lib unit tests):
+  - `g1_pmr_uniform_distribution_is_one`: all |x| equal → PMR = 1.
+  - `g1_pmr_single_spike_equals_group_size`: one spike among zeros → PMR = n (finite, = group size).
+  - `g1_pmr_all_zero_group_is_flat`: 0/0 → 1.0.
+  - `g1_pmr_takes_max_across_groups`: flat group (PMR 1) + spike group (PMR 4) → max = 4.
+  - `g1_pmr_classifies_llama_vs_qwen`: synthetic Llama-like (outlier factor 5, PMR ~5 < 9) → DirectRtn; synthetic Qwen-like (outlier factor 30, PMR ~24 > 9) → Rrq. The paper's Table 9 K/MAE numbers (26.5 / 116) are a different normalization and serve as context, not exact targets — the synthetic distributions are tuned to our PMR scale.
+  - `g1_ks_overrides_pmr`: KS > 0.25 → FlagForReview regardless of PMR (Qwen-like profile, would otherwise be Rrq).
+  - `g1_router_boundary_ks_exactly_at_threshold_is_not_flagged`: KS == 0.25 (strict `>`) → falls through to the PMR decision.
+- [x] **T2.4** Commit on `develop`. **G3:** 1840 (off) / 1854 (on, +14 new = 7 Phase 1 + 7 Phase 2), zero regressions; clippy zero warnings (off + on). **G4:** the existing Phase 1 alloc-check test still passes; the router + PMR run once at load (not hot path), so G4 alloc-free does not strictly apply, but both functions are zero-allocation by construction (single pass over the slice, no Vec growth).
 
 ---
 
