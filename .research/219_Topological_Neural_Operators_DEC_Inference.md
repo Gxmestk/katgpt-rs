@@ -4,6 +4,7 @@
 **Status:** 🟢 GAIN — Modelless DEC operators for game AI spatial reasoning
 **Paper:** [Topological Neural Operators (arXiv:2606.09806)](https://arxiv.org/abs/2606.09806)
 **Context:** katgpt-rs modelless inference, flow fields, spectral hierarchy, Dirichlet energy
+> **PASS-Redirects (synthesis):** Lee/Coeurdoux/Potaptchik/Du/Albergo/Vanden-Eijnden [arXiv:2608.01692 "Beckmann Transport Models: From Autonomous Flows to One-Step Maps"] — generative-modeling theory paper whose core equation `∇·(νb)=μ0−μ1` is the divergence `δ` (= `codifferential`, this note's DEC substrate). BTM interprets it as a flux constraint giving a dynamic realization of Beckmann's transportation problem; the autonomous flow `Ẋ_t=b(X_t)` transports μ0→μ1 when the target is singular (lower-dim manifold). The DEC `δ` operator IS the modelless analog of the divergence in BTM's equation — but BTM's value is the *training* (regression loss for `b`, map loss for `T`) and the image-generation application; no modelless consumer in our 7-repo stack needs autonomous-flow transport. Learning `b`/`T` → riir-train. See Research 296 for the explicit Stokes/DEC vocabulary crosswalk. No new plan.
 
 ---
 
