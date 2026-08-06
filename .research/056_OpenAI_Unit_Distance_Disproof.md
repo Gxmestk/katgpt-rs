@@ -5,6 +5,7 @@
 > **Date:** 2025-07
 > **Related:** Plan 090 (unit_distance_goat), Research 21 (G-Zero), Research 37 (REAP), Research 51 (Deep Manifold)
 > **Supersedes:** None — new domain
+> **PASS-Redirects (synthesis):** Barajas & Serra [arXiv:0710.4495 "The Lonely Runner with Seven Runners"] — PASS (2026-08-06): pure existence theorem in additive combinatorics proving the Lonely Runner Conjecture for k=6 (7 runners) via the Prime Filtering Lemma. Non-constructive — no algorithm to find the lonely time, just a proof it exists (case analysis + computer search for the m=1 residue). No modelless inference analog: the "lonely region" on the unit torus T^k doesn't map to our latent-space ops, DEC/Stokes operators, freeze/thaw cycles, or CCE/LP coordination. Reverse-grep (§1.55.2) found no documented gap in `.docs/`/`.benchmarks/` about phase coverage / torus spread / guaranteed NPC separation that the LRC would fix — the only "lonely" hits are cosmetic (sigmoid gates let an entity attend to 0 peers, Plan 354). Closest cousin: this note's "chromatic number lower bounds" reusable pattern (L114-117) — the LRC's regular chromatic number χ_r(D) of distance graphs is the same combinatorial family, but the LRC's value is the *bound itself* (χ_r(D) ≤ |D|+1 for |D|=6), not a computational primitive we can ship.
 
 ## Executive Summary
 
