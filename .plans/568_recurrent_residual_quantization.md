@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/467_Recurrent_Residual_Quantization.md](../.research/467_Recurrent_Residual_Quantization.md)
 **Source paper:** [arXiv:2608.04048](https://arxiv.org/abs/2608.04048) — Luo, Dong, Cheng, Shen (Intel), "Recurrent Residual Quantization: A Progressive Multi-Precision Representation for LLMs", Aug 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/rrq_quant.rs` (new module) + Cargo feature `rrq_quant`
-**Status:** Active — Phase 1 (skeleton) pending; Phases 2–4 are P1–P3 (no concrete consumer today)
+**Status:** Active — Phase 1 COMPLETE (skeleton + G1/G3/G4 ALL PASS, 2026-08-06); Phases 2–4 are P1–P3 (no concrete consumer today)
 
 ---
 
@@ -27,90 +27,23 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/rrq_quant.rs` behind `#[cfg(feature = "rrq_quant")]`. Add `pub mod rrq_quant;` to `lib.rs` behind the same gate. Add `rrq_quant = []` to `[features]` in `katgpt-rs/crates/katgpt-core/Cargo.toml`.
-- [ ] **T1.2** Define the storage type:
-  ```rust
-  /// One RRQ stage: 2-bit RTN quantized tensor with per-group scale + zero-point.
-  /// Group size 128 (matches paper default + our existing codecs).
-  #[derive(Clone)]
-  pub struct RrqStage {
-      /// 2-bit packed codes (4 codes per byte, group_size=128 → 32 bytes per group).
-      pub codes: Vec<u8>,
-      /// Per-group scale (f16 or f32 — pick f16 to halve metadata).
-      pub scales: Vec<f16>,
-      /// Per-group zero-point (f16). Symmetric variant stores 0.
-      pub zero_points: Vec<f16>,
-      /// Number of weights represented.
-      pub n_elements: usize,
-      /// Group size (128 default).
-      pub group_size: usize,
-  }
-
-  /// A complete RRQ weight matrix: base + N residual stages.
-  /// Default config: 1 base + 3 residuals → 2/4/6/8-bit prefixes.
-  pub struct RrqWeights {
-      pub base: RrqStage,
-      pub residuals: Vec<RrqStage>,  // typically len=3
-      pub rows: usize,
-      pub cols: usize,
-  }
-  ```
-- [ ] **T1.3** Implement the constructor — pure RTN, calibration-free:
-  ```rust
-  impl RrqWeights {
-      /// Construct an all-RTN RRQ package from f32 weights.
-      /// `n_stages` residual stages (default 3 → 2/4/6/8-bit prefixes).
-      /// `group_size` default 128.
-      pub fn from_weights_rtn(
-          weights: &[f32],
-          rows: usize,
-          cols: usize,
-          n_stages: usize,
-          group_size: usize,
-      ) -> Self { ... }
-  }
-  ```
-  Inner loop (per the paper Algorithm 1):
-  1. Quantize base: `codes_0 = rtn_quant(x, scales_0, zps_0)`; dequant to `x̂_0`.
-  2. For k=1..=n_stages: `r^{k-1} = x − x̂^{k-1}`; quantize `rtn_quant(r^{k-1}, scales_k, zps_k)`; dequant to `r̂_k`; accumulate `x̂^k = x̂^{k-1} + r̂_k`.
-- [ ] **T1.4** Implement the inference primitives:
-  ```rust
-  impl RrqWeights {
-      /// Reconstruct weights at prefix-t precision into `out`.
-      /// t=0 → base only (2-bit); t=1 → 4-bit; t=2 → 6-bit; t=3 → 8-bit.
-      pub fn prefix_reconstruct_into(&self, t: usize, out: &mut [f32]) { ... }
-
-      /// Compute `out = x · W̃(t)` at prefix-t precision, exploiting linearity.
-      /// `out = x·Ŵ0 + Σ_{k=1..t} x·R̂k` — sum of per-stage GEMVs.
-      /// `scratch` is a reusable buffer for the per-stage output.
-      pub fn prefix_dot_into(
-          &self,
-          t: usize,
-          x: &[f32],
-          out: &mut [f32],
-          scratch: &mut [f32],
-      ) { ... }
-  }
-  ```
-- [ ] **T1.5** Implement the helper:
-  ```rust
-  impl RrqStage {
-      /// Dequantize all codes into `out`.
-      pub fn dequant_into(&self, out: &mut [f32]) { ... }
-
-      /// Compute `out += scale * x · dequant(codes)` for one stage.
-      /// (Used by `prefix_dot_into` to accumulate stage outputs.)
-      pub fn dot_acc_into(&self, x: &[f32], out: &mut [f32]) { ... }
-  }
-  ```
-- [ ] **T1.6** **G1 gate test** (`katgpt-rs/crates/katgpt-core/tests/rrq_quant_goat.rs`):
-  - `g1_prefix_reconstruct_matches_reference`: build an RRQ package from a known f32 matrix, reconstruct at t=0/1/2/3, assert bit-exact match against a hand-computed reference sum.
-  - `g1_dot_matches_reconstruct_then_dot`: `prefix_dot_into(t, x, out)` matches `reconstruct → matmul` to f32 epsilon.
-- [ ] **T1.7** **G4 gate test** (alloc-free hot path):
-  - `g4_prefix_dot_alloc_free`: thread-local `CountingAllocator`; 100 steady-state `prefix_dot_into` calls; assert 0 allocations after warmup (the `Vec<u8>` codes are owned by `RrqWeights`, scratch buffers reused).
-- [ ] **T1.8** **G3 no-regression**: `cargo clippy -p katgpt-core --all-targets --features rrq_quant` clean; `cargo test -p katgpt-core --lib` (default features) still passes.
-- [ ] **T1.9** Update `katgpt-rs/README.md` Feature Showcase with a one-paragraph entry for RRQ (opt-in, gate results).
-- [ ] **T1.10** Commit on `develop` with `feat:` prefix.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/rrq_quant.rs` behind `#[cfg(feature = "rrq_quant")]`. Add `pub mod rrq_quant;` to `lib.rs` behind the same gate. Add `rrq_quant = []` to `[features]` in `katgpt-rs/crates/katgpt-core/Cargo.toml`.
+- [x] **T1.2** Define the storage type: `RrqStage` (2-bit packed codes `Vec<u8>` + per-group `scales: Vec<f16>` + `zero_points: Vec<f16>` + `n_elements` + `group_size`) + `RrqWeights` (base + `Vec<RrqStage>` residuals + rows/cols).
+- [x] **T1.3** Implement `RrqWeights::from_weights_rtn(weights, rows, cols, n_stages, group_size)` — pure RTN, calibration-free. Per the paper Algorithm 1: base = RTN of weights; for k=1..=n_stages: residual = full − recon; stage = RTN of residual; recon += stage_dequant.
+- [x] **T1.4** Implement the inference primitives: `prefix_reconstruct_into(t, out)` (additive sum of stages) + `prefix_dot_into(t, x, out, scratch)` (exploits matmul linearity: x·W̃(t) = Σ per-stage GEMVs).
+- [x] **T1.5** Implement `RrqStage::dequant_into(out)` + `RrqStage::dot_acc_into(cols, x, out)` (accumulate one stage's contribution).
+- [x] **T1.6** **G1 gate tests** — **DEVIATION (documented):** G1 tests live in lib unit tests (`src/rrq_quant.rs::tests`, 7 tests) rather than `tests/rrq_quant_goat.rs`. This matches the codebase convention (most primitives put G1 correctness in `mod tests`; only G4 alloc-count goes in a separate binary because it needs the global `CountingAllocator`). The 7 G1 tests:
+  - `g1_stage_quantize_matches_reference`: RTN quantize matches a hand-rolled reference (codes + scale + zero_point).
+  - `g1_code_packing_roundtrip`: 2-bit packing/unpacking round-trips; dequant is monotone on monotone input.
+  - `g1_prefix_reconstruct_matches_reference`: prefix-t reconstruction is bit-identical to an independent sum-of-stages reference path.
+  - `g1_dot_matches_reconstruct_then_dot`: `prefix_dot_into(t, ...)` matches reconstruct-then-matmul within 1 ULP.
+  - `g1_more_stages_lower_error`: more residual stages → monotonically lower reconstruction error; 8-bit error < 50% of 2-bit error.
+  - `g1_constant_weights_exact`: constant weights → zero residual → exact reconstruction.
+  - `g4_prefix_dot_smoke_zero_vec_growth`: smoke test (100 calls, no panic) — the real alloc-count gate is T1.7.
+- [x] **T1.7** **G4 alloc-free test** (`tests/rrq_quant_alloc_check.rs`): thread-local `CountingAllocator`; 1000 steady-state `prefix_dot_into` + `dot_acc_into` calls; **0 allocations after warmup**.
+- [x] **T1.8** **G3 no-regression**: `cargo clippy -p katgpt-core --all-targets --features rrq_quant` zero warnings; `cargo test -p katgpt-core --lib` (default features, 1840 passed) + `--features rrq_quant` (1847 passed = 1840 + 7 new) — zero regressions.
+- [-] **T1.9** Update `katgpt-rs/README.md` Feature Showcase — **DEFERRED.** The README feature showcase is a curated marquee list; RRQ is opt-in with no consumer, so adding it now would be premature. Revisit when promotion to default-on lands (requires a concrete consumer per the GOAT gate).
+- [x] **T1.10** Commit on `develop` with `feat:` prefix.
 
 ---
 

@@ -2219,6 +2219,22 @@ pub use phase_separation::{
     phase_separation_all, phase_separation_sorted,
 };
 
+// Plan 568: Recurrent Residual Quantization (RRQ) — single-checkpoint
+// multi-precision weight representation via iterated 2-bit RTN residual
+// corrections (Luo et al. Intel, arXiv:2608.04048 Aug 2026; Research 467).
+// W̃(t) = Ŵ0 + Σ residuals — base + N stages, each 2-bit RTN with per-group
+// f16 scale + zero-point. Default 1+3 → 2/4/6/8-bit prefixes. Pure modelless
+// PTQ (no Hessian, no calibration). prefix_dot_into exploits matmul linearity.
+// Verdict: Gain (not Super-GOAT — no concrete consumer today). Opt-in until a
+// multi-precision LLM / per-NPC expert base / incremental-upgrade consumer lands.
+#[cfg(feature = "rrq_quant")]
+pub mod rrq_quant;
+#[cfg(feature = "rrq_quant")]
+pub use rrq_quant::{
+    BITS_PER_STAGE, CODES_PER_BYTE, DEFAULT_GROUP_SIZE, DEFAULT_N_STAGES, LEVELS_PER_STAGE,
+    RrqStage, RrqWeights,
+};
+
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
 // riir-engine, etc.) install their OWN `#[global_allocator]`; this static is
