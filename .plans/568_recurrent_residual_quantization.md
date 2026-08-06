@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/467_Recurrent_Residual_Quantization.md](../.research/467_Recurrent_Residual_Quantization.md)
 **Source paper:** [arXiv:2608.04048](https://arxiv.org/abs/2608.04048) — Luo, Dong, Cheng, Shen (Intel), "Recurrent Residual Quantization: A Progressive Multi-Precision Representation for LLMs", Aug 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/rrq_quant.rs` (new module) + Cargo feature `rrq_quant`
-**Status:** Active — Phase 1 + Phase 2 COMPLETE (2026-08-07); Phase 3 is P2, Phase 4 is P3 (no concrete consumer today)
+**Status:** Active — Phase 1 + Phase 2 + Phase 3 COMPLETE (2026-08-07); Phase 3 G2 = honest negative (fused LUT kernel is correct substrate but not a perf win); Phase 4 is P3 (no concrete consumer today)
 
 ---
 
@@ -16,7 +16,7 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 
 **GOAT gate (promotion criterion):**
 - **G1** (correctness): prefix-t reconstruction is bit-identical to a reference sum-of-stages; load-time PMR selector classifies Llama (mild) vs Qwen (severe) outlier profiles correctly. **Phase 1 + Phase 2 DONE.**
-- **G2** (perf): fused 4-stage LUT dequant+dot at parity (within 1.05×) with single-stage 8-bit LUT path at the 8-bit prefix.
+- **G2** (perf): fused 4-stage LUT dequant+dot at parity (within 1.05×) with single-stage 8-bit LUT path at the 8-bit prefix. **Phase 3 HONEST NEGATIVE — FAILS at 6.374×** (4× gather overhead dominates the L1-residency benefit at realistic LLM-tile scale). The arithmetic `prefix_dot_into` remains the recommended hot path; the LUT kernel stays as correct substrate (G1 PASS).
 - **G3** (no-regression): default features + `--features rrq_quant` both build clean; clippy zero warnings; existing tests unchanged.
 - **G4** (alloc-free): prefix-t reconstruction + dot have 0 steady-state allocations.
 - **Promotion to default-on: REQUIRES a concrete consumer.** Default-off until then.
@@ -69,9 +69,9 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 
 ### Tasks
 
-- [ ] **T3.1** Extend `simd_lut_dequant` (Plan 452) with a multi-stage variant: `dequant_dot_via_lut_multi_stage(codes_per_stage: &[&[u8]], luts: &[QuantLut], scales: &[f32], x: &[f32]) -> f32` — sums 4 stage contributions in registers, single SIMD gather pass per stage.
-- [ ] **T3.2** **G2 latency gate**: `g2_4stage_lut_at_parity_with_single_8bit` — at the 8-bit prefix (4 stages × 2-bit), the fused LUT path is within 1.05× of a single 8-bit LUT path. Hypothesis: amortized gather; if it FAILS, document as honest negative (the LUT cost compounds and multi-stage is slower than single-stage at same total bits).
-- [ ] **T3.3** Commit on `develop`.
+- [x] **T3.1** Extend `simd_lut_dequant` (Plan 452) with a multi-stage variant: `dequant_dot_via_lut_multi_stage_slice` (slice-based core) + `dequant_dot_via_lut_multi_stage<L: QuantLut>` (typed-LUT wrapper) + scalar/NEON/AVX2 backends. The kernel sums N stage contributions in registers: `acc += (Σ_k lut_k[code_k[i]]) · x[i]` — single FMA per element after summing stages. Codes are pre-unpacked raw indices (no shift/mask); the caller (RRQ) unpacks 2-bit packed codes once at load via `RrqStage::codes_unpacked_into`. Also shipped: `RrqStage::group_lut_at(g) -> [f32; 4]` (builds the RRQ-affine LUT: `lut[code] = zp + code·scale`, handling the degenerate `scale=0` case naturally unlike `QuantLut::build`) + `RrqWeights::prefix_dot_lut_into` (gated by BOTH `rrq_quant` + `simd_lut_dequant`; requires `cols` divisible by `group_size` — the common LLM case; falls back to `prefix_dot_into` otherwise).
+- [x] **T3.2** **G2 latency gate — HONEST NEGATIVE RESULT.** The test `g2_4stage_lut_vs_single_8bit_documented_negative` measures the 4-stage 2-bit LUT path vs single-8-bit LUT path at the 8-bit prefix (256×256 matrix, gs=128, 200 iterations, release mode, Apple Silicon NEON). **Result: 4-stage LUT is ~6× SLOWER** (84560ns vs 13266ns; ratio 6.374×; gate was ≤ 1.05×). Root cause: the 4× code-read + 4× gather overhead dominates the L1-residency benefit. At gs=128, a 256×256 matrix needs only 2 LUTs per row (2KB total) — well within L1, so there is no spilling to amortize. The hypothesis ("amortized gather from tiny 4-entry LUTs staying hot in L1 while the 1KB 8-bit LUT spills") fails because the 8-bit LUTs DON'T spill at realistic tile scales. The negative is structural: the only regime where the hypothesis could hold (>32KB of LUT data → tens of thousands of groups) requires matrices far larger than any single-layer tile, and at that scale cold-LUT gather latency hurts both paths equally. **Consequence:** the fused multi-stage kernel is correct substrate (G1 PASS: 5 new tests — multi-stage matches scalar reference, single-stage≡single-stage-kernel, zero-stages→0, empty→0, alignment boundaries) but NOT a perf win. `prefix_dot_into` (arithmetic path from Phase 1) remains the recommended hot path. The LUT path stays available as opt-in substrate for consumers whose LUT construction is already amortized (e.g. a future hardware StreamDQ analog where the gather is near-memory). The G2 test passes (documents the negative rather than panicking) so the ratio is visible in CI logs. This matches the plan's risk-table mitigation: "Honest negative result. Phase 1 still ships the additive primitive (just not the fused kernel)."
+- [x] **T3.3** Commit on `develop`. **G1:** 5 new simd_lut_dequant tests + 3 new rrq_quant tests (group_lut_matches_rrq_affine, codes_unpacked_roundtrip, prefix_dot_lut_matches_arithmetic). **G3:** 1845 (default) / 1862 (rrq_quant+simd_lut_dequant) lib tests pass, zero regressions; clippy zero warnings. **G4:** existing alloc-check still passes; the LUT path is zero-alloc by construction (per-group `[f32;4]` LUTs on stack, kernel accumulator register-resident).
 
 ---
 

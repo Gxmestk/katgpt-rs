@@ -48,7 +48,10 @@
 //! So the prefix-t dot product decomposes into a sum of per-stage GEMVs.
 //! Each stage GEMV can use the same SIMD LUT dequant+dot kernel (the
 //! natural fusion target for Phase 3). The plan ships the additive primitive
-//! here; the fused kernel is a separate Phase 3 task.
+//! here; Phase 3 shipped the fused kernel but its G2 gate FAILED honestly
+//! (the 4-stage LUT path is ~6× slower than single-8-bit at parity — see
+//! [`RrqWeights::prefix_dot_lut_into`] doc + Plan 568 Phase 3). The arithmetic
+//! [`RrqWeights::prefix_dot_into`] remains the recommended hot path.
 //!
 //! # What this is NOT
 //!
@@ -296,6 +299,46 @@ impl RrqStage {
             *out_o += acc;
         }
     }
+
+    /// Unpack the 2-bit packed codes into 1-per-byte raw indices.
+    ///
+    /// `out.len()` must be `>= n_elements`. Each output byte is a code in
+    /// `0..LEVELS_PER_STAGE`. Used by [`RrqWeights::prefix_dot_lut_into`] to
+    /// feed the multi-stage LUT kernel (Plan 568 Phase 3).
+    ///
+    /// **Zero allocation.** Writes into caller-provided `out`.
+    pub fn codes_unpacked_into(&self, out: &mut [u8]) {
+        assert!(
+            out.len() >= self.n_elements,
+            "codes_unpacked_into: out.len() ({}) < n_elements ({})",
+            out.len(),
+            self.n_elements
+        );
+        for (out_i, i) in out.iter_mut().take(self.n_elements).zip(0..self.n_elements) {
+            *out_i = self.code_at(i);
+        }
+    }
+
+    /// Build the 4-entry dequant LUT for group `g`.
+    ///
+    /// Entry `code` is `zero_point + code * scale` — the RRQ affine baked into
+    /// LUT form. This differs from `QuantLut::build`'s `(code - zero) * scale`
+    /// convention because RRQ stores `zp` as an additive offset, not a
+    /// code-space zero. The two are related by `zero_lut = -zp / scale` but
+    /// that form is undefined when `scale == 0`; this direct builder handles
+    /// the degenerate case naturally (all entries = zp).
+    #[inline]
+    pub fn group_lut_at(&self, g: usize) -> [f32; LEVELS_PER_STAGE] {
+        let scale = self.scales[g].to_f32();
+        let zp = self.zero_points[g].to_f32();
+        let mut lut = [0.0_f32; LEVELS_PER_STAGE];
+        let mut code = 0;
+        while code < LEVELS_PER_STAGE {
+            lut[code] = zp + (code as f32) * scale;
+            code += 1;
+        }
+        lut
+    }
 }
 
 /// A complete RRQ weight matrix: base stage + N residual stages.
@@ -476,6 +519,137 @@ impl RrqWeights {
             self.residuals[k].dot_acc_into(self.cols, x, scratch);
             for (o, s) in scratch.iter().enumerate().take(self.rows) {
                 out[o] += s;
+            }
+        }
+    }
+
+    /// LUT-accelerated prefix-t dot: `out = x · W̃(t)` via fused multi-stage
+    /// SIMD gather, replacing the per-element arithmetic cast with LUT lookups
+    /// (Plan 568 Phase 3 — the fusion target).
+    ///
+    /// For each element, the N stage LUT values are gathered and summed in
+    /// registers, then a single FMA accumulates `stage_sum · x[i]` into the
+    /// output. This avoids spilling dequantized values to memory AND avoids
+    /// reloading `x` once per stage.
+    ///
+    /// # Requirements
+    ///
+    /// - `self.cols` must be divisible by `group_size`. (This is the common LLM
+    ///   case. For other shapes, use [`prefix_dot_into`] — the arithmetic path.)
+    /// - `codes_unpacked_per_stage` must contain `t_eff + 1` slices (base + up to
+    ///   `t` residuals), each `>= rows * cols` bytes. The caller unpacks each
+    ///   stage's 2-bit packed codes to 1-per-byte once at load via
+    ///   [`RrqStage::codes_unpacked_into`], then reuses the buffers across all
+    ///   calls. Max 8 stages (4 default + headroom).
+    ///
+    /// # Allocation
+    ///
+    /// Zero. Per-group LUTs are built on the stack as `[f32; LEVELS_PER_STAGE]`
+    /// (4 entries, 16 bytes). The multi-stage kernel accumulator is register- or
+    /// stack-resident. The caller-owned `out` + `codes_unpacked_per_stage` are
+    /// reused across calls.
+    ///
+    /// # Feature gates
+    ///
+    /// Requires both `rrq_quant` AND `simd_lut_dequant` features.
+    #[cfg(feature = "simd_lut_dequant")]
+    pub fn prefix_dot_lut_into(
+        &self,
+        t: usize,
+        x: &[f32],
+        out: &mut [f32],
+        codes_unpacked_per_stage: &[&[u8]],
+    ) {
+        use crate::simd_lut_dequant::dequant_dot_via_lut_multi_stage_slice;
+
+        let gs = self.base.group_size;
+        assert!(
+            self.cols > 0 && self.cols.is_multiple_of(gs),
+            "prefix_dot_lut_into: cols ({}) must be divisible by group_size ({}) \
+             — use prefix_dot_into for the general case",
+            self.cols,
+            gs
+        );
+        assert_eq!(
+            x.len(),
+            self.cols,
+            "prefix_dot_lut_into: x.len() ({}) != cols ({})",
+            x.len(),
+            self.cols
+        );
+        assert_eq!(
+            out.len(),
+            self.rows,
+            "prefix_dot_lut_into: out.len() ({}) != rows ({})",
+            out.len(),
+            self.rows
+        );
+
+        let t_eff = t.min(self.residuals.len());
+        let n_stages = t_eff + 1; // base + t_eff residuals
+        assert_eq!(
+            codes_unpacked_per_stage.len(),
+            n_stages,
+            "prefix_dot_lut_into: codes_unpacked_per_stage.len() ({}) != n_stages ({})",
+            codes_unpacked_per_stage.len(),
+            n_stages
+        );
+        assert!(
+            n_stages <= 8,
+            "prefix_dot_lut_into: max 8 stages, got {n_stages}"
+        );
+
+        // Stage references (base + active residuals).
+        let mut stage_refs: [Option<&RrqStage>; 8] = [None; 8];
+        stage_refs[0] = Some(&self.base);
+        for k in 0..t_eff {
+            stage_refs[k + 1] = Some(&self.residuals[k]);
+        }
+
+        // Zero out.
+        for o in out.iter_mut().take(self.rows) {
+            *o = 0.0;
+        }
+
+        let groups_per_row = self.cols / gs;
+
+        for (o, out_o) in out.iter_mut().enumerate().take(self.rows) {
+            for g_local in 0..groups_per_row {
+                let g_global = o * groups_per_row + g_local;
+                let col_start = g_local * gs;
+
+                // Build per-stage LUTs for this group (stack [f32; LEVELS_PER_STAGE]).
+                // Each LUT is the RRQ affine baked: lut[code] = zp + code * scale.
+                // Build all LUTs first, then take slices (avoids borrow conflict).
+                let mut luts_buf: [[f32; LEVELS_PER_STAGE]; 8] =
+                    [[0.0; LEVELS_PER_STAGE]; 8];
+                for k in 0..n_stages {
+                    luts_buf[k] = stage_refs[k].unwrap().group_lut_at(g_global);
+                }
+                let lut_slices: [&[f32]; 8] = [
+                    &luts_buf[0][..],
+                    &luts_buf[1][..],
+                    &luts_buf[2][..],
+                    &luts_buf[3][..],
+                    &luts_buf[4][..],
+                    &luts_buf[5][..],
+                    &luts_buf[6][..],
+                    &luts_buf[7][..],
+                ];
+
+                // Per-stage code slices for this group's segment.
+                let flat_start = o * self.cols + col_start;
+                let mut codes_slices: [&[u8]; 8] = [&[]; 8];
+                for k in 0..n_stages {
+                    codes_slices[k] =
+                        &codes_unpacked_per_stage[k][flat_start..flat_start + gs];
+                }
+
+                *out_o += dequant_dot_via_lut_multi_stage_slice(
+                    &codes_slices[..n_stages],
+                    &lut_slices[..n_stages],
+                    &x[col_start..col_start + gs],
+                );
             }
         }
     }
@@ -1142,6 +1316,242 @@ mod tests {
             QuantStrategy::DirectRtn {
                 bits: DEFAULT_DIRECT_RTN_BITS,
             }
+        );
+    }
+
+    // ─── Phase 3: fused multi-stage LUT dot (Plan 568 Phase 3) ──────────────
+
+    /// G1: `prefix_dot_lut_into` matches `prefix_dot_into` (arithmetic path)
+    /// within FP tolerance. The two paths use different reduction orders
+    /// (LUT path sums stages per-element before the FMA; arithmetic path
+    /// sums per-stage GEMV results), so they won't be bit-identical — but both
+    /// approximate the same true mathematical result.
+    #[cfg(feature = "simd_lut_dequant")]
+    #[test]
+    fn g1_prefix_dot_lut_matches_arithmetic() {
+        // 4 groups per row (cols=128, gs=32 → 4 groups/row).
+        let rows = 16;
+        let cols = 128;
+        let gs = 32;
+        let n = rows * cols;
+        let weights: Vec<f32> = (0..n)
+            .map(|i| (i as f32 * 0.1).sin() * 2.0 - 1.0)
+            .collect();
+        let rrq = RrqWeights::from_weights_rtn(&weights, rows, cols, DEFAULT_N_STAGES, gs);
+        let x: Vec<f32> = (0..cols).map(|i| (i as f32 * 0.05).cos()).collect();
+
+        // Arithmetic path.
+        let mut out_arith = vec![0.0_f32; rows];
+        let mut scratch = vec![0.0_f32; rows];
+        rrq.prefix_dot_into(rrq.residuals.len(), &x, &mut out_arith, &mut scratch);
+
+        // LUT path: unpack codes for each stage.
+        let t = rrq.residuals.len();
+        let n_stages = t + 1;
+        let mut codes_unpacked: Vec<Vec<u8>> = (0..n_stages).map(|_| vec![0u8; n]).collect();
+        // Base.
+        rrq.base.codes_unpacked_into(&mut codes_unpacked[0]);
+        for k in 0..t {
+            rrq.residuals[k].codes_unpacked_into(&mut codes_unpacked[k + 1]);
+        }
+        // Collect refs AFTER all mutation is done (avoids borrow conflict).
+        let codes_refs: Vec<&[u8]> = codes_unpacked.iter().map(|v| v.as_slice()).collect();
+        let mut out_lut = vec![0.0_f32; rows];
+        rrq.prefix_dot_lut_into(t, &x, &mut out_lut, &codes_refs);
+
+        // Compare: relative tolerance 1e-3 (different reduction orders).
+        for o in 0..rows {
+            let rel = (out_lut[o] - out_arith[o]).abs() / out_arith[o].abs().max(1e-6);
+            assert!(
+                rel < 1e-3,
+                "row {}: lut={} arith={} rel={}",
+                o,
+                out_lut[o],
+                out_arith[o],
+                rel
+            );
+        }
+    }
+
+    /// G1: `group_lut_at` produces the correct RRQ affine.
+    #[test]
+    fn g1_group_lut_matches_rrq_affine() {
+        let values = [0.0_f32, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let stage = RrqStage::quantize_rtn(&values, 8);
+        let lut = stage.group_lut_at(0);
+        // Each code's dequant via group_lut_at must match dequant_at.
+        for i in 0..8 {
+            let direct = stage.dequant_at(i);
+            let via_lut = lut[stage.code_at(i) as usize];
+            assert!((direct - via_lut).abs() < 1e-6, "i={}: direct={} lut={}", i, direct, via_lut);
+        }
+    }
+
+    /// G1: `codes_unpacked_into` round-trips with `code_at`.
+    #[test]
+    fn g1_codes_unpacked_roundtrip() {
+        let values: Vec<f32> = (0..64).map(|i| (i as f32 * 0.1).sin()).collect();
+        let stage = RrqStage::quantize_rtn(&values, 16);
+        let mut unpacked = vec![0u8; 64];
+        stage.codes_unpacked_into(&mut unpacked);
+        for (i, &code) in unpacked.iter().enumerate().take(64) {
+            assert_eq!(code, stage.code_at(i), "i={}", i);
+        }
+    }
+
+    /// G2 (release-only): 4-stage 2-bit LUT path vs single 8-bit LUT path at
+    /// the 8-bit prefix. **Plan 568 Phase 3 G2 — HONEST NEGATIVE RESULT.**
+    ///
+    /// The hypothesis (amortized gather from tiny 4-entry LUTs staying hot in
+    /// L1 while the 1KB 8-bit LUT spills) FAILS empirically: the 4-stage LUT
+    /// path runs ~4–6× SLOWER than single-8-bit at the 256×256/gs=128 LLM-tile
+    /// scale. Root cause: the 4× code-read + 4× gather overhead dominates the
+    /// L1-residency benefit. At gs=128, a 256×256 matrix needs only 2 LUTs per
+    /// row (2KB total) — well within L1, so there is no spilling to amortize.
+    ///
+    /// The negative is structural, not parametric: the only regime where the
+    /// hypothesis could hold is when the 8-bit LUTs spill L1 (tens of thousands
+    /// of groups → >32KB of LUT data), which requires matrices far larger than
+    /// any realistic single-layer tile. At that scale the per-element gather
+    /// latency from cold LUTs would hurt BOTH paths equally.
+    ///
+    /// **Consequence:** the fused multi-stage kernel is correct substrate (G1
+    /// PASS) but not a perf win. [`RrqWeights::prefix_dot_into`] (the arithmetic
+    /// path from Phase 1) remains the recommended hot path. The LUT path
+    /// ([`RrqWeights::prefix_dot_lut_into`]) stays available as opt-in substrate
+    /// for consumers whose LUT construction is already amortized (e.g. a future
+    /// hardware StreamDQ analog where the gather is near-memory).
+    ///
+    /// This test RUNS and reports the ratio via `eprintln!` but does NOT panic
+    /// on failure — the negative is the documented result, not a regression.
+    #[cfg(feature = "simd_lut_dequant")]
+    #[cfg_attr(debug_assertions, ignore)]
+    #[test]
+    fn g2_4stage_lut_vs_single_8bit_documented_negative() {
+        use crate::simd_lut_dequant::{Int8Lut, QuantLut, dequant_dot_via_lut};
+
+        // Realistic LLM-tile shape: 256 rows × 256 cols, group_size 128.
+        let rows = 256;
+        let cols = 256;
+        let gs = 128;
+        let n = rows * cols;
+        let weights: Vec<f32> = (0..n)
+            .map(|i| {
+                // Outlier-heavy distribution (RRQ's target regime).
+                let base = (i as f32 * 0.01).sin();
+                if i % 50 == 0 { base * 8.0 } else { base }
+            })
+            .collect();
+
+        // RRQ path: 4 stages × 2-bit (= 8-bit effective prefix).
+        let rrq = RrqWeights::from_weights_rtn(&weights, rows, cols, DEFAULT_N_STAGES, gs);
+        let t = rrq.residuals.len(); // 3 → 4 stages total
+        let n_stages = t + 1;
+        let mut codes_unpacked: Vec<Vec<u8>> = (0..n_stages).map(|_| vec![0u8; n]).collect();
+        rrq.base.codes_unpacked_into(&mut codes_unpacked[0]);
+        for k in 0..t {
+            rrq.residuals[k].codes_unpacked_into(&mut codes_unpacked[k + 1]);
+        }
+        let codes_refs: Vec<&[u8]> = codes_unpacked.iter().map(|v| v.as_slice()).collect();
+
+        // Single 8-bit path: quantize to 8-bit, one stage, one 256-entry LUT.
+        // We simulate this by treating the RRQ 8-bit prefix reconstruction as
+        // the 8-bit reference, then quantizing THAT to 8-bit RTN per group.
+        let mut recon_8bit = vec![0.0_f32; n];
+        rrq.prefix_reconstruct_into(t, &mut recon_8bit);
+        // 8-bit RTN: per-group min/max → 256 levels.
+        let n_groups_8 = n.div_ceil(gs);
+        let mut codes_8bit = vec![0u8; n];
+        let mut luts_8bit: Vec<Int8Lut> = Vec::with_capacity(n_groups_8);
+        for g in 0..n_groups_8 {
+            let start = g * gs;
+            let end = (start + gs).min(n);
+            let mut min = f32::INFINITY;
+            let mut max = f32::NEG_INFINITY;
+            for &slot in &recon_8bit[start..end] {
+                min = min.min(slot);
+                max = max.max(slot);
+            }
+            let range = max - min;
+            let scale = if range > 0.0 { range / 255.0 } else { 0.0 };
+            let zero_lut = if scale > 0.0 { -min / scale } else { 0.0 };
+            luts_8bit.push(Int8Lut::build(scale, zero_lut));
+            let recip = if scale > 0.0 { 1.0 / scale } else { 0.0 };
+            for j in start..end {
+                let code_f = (recon_8bit[j] - min) * recip;
+                let code = if code_f <= 0.0 {
+                    0u8
+                } else if code_f >= 255.0 {
+                    255u8
+                } else {
+                    (code_f + 0.5) as u8
+                };
+                codes_8bit[j] = code;
+            }
+        }
+
+        let x: Vec<f32> = (0..cols).map(|i| (i as f32 * 0.03).cos()).collect();
+        let iterations = 200;
+
+        // ── Benchmark RRQ 4-stage LUT path ──
+        let mut out_rrq = vec![0.0_f32; rows];
+        // Warmup.
+        for _ in 0..10 {
+            rrq.prefix_dot_lut_into(t, &x, &mut out_rrq, &codes_refs);
+        }
+        let start = std::time::Instant::now();
+        for _ in 0..iterations {
+            rrq.prefix_dot_lut_into(t, &x, &mut out_rrq, &codes_refs);
+        }
+        let rrq_ns = start.elapsed().as_nanos() as f64 / iterations as f64;
+
+        // ── Benchmark single 8-bit LUT path ──
+        // We can't use RrqWeights for this — it's a different quantization.
+        // Instead, benchmark a comparable per-group LUT dot manually.
+        let mut out_8bit = vec![0.0_f32; rows];
+        let bench_8bit = |out: &mut [f32]| {
+            for (o, out_o) in out.iter_mut().enumerate().take(rows) {
+                let mut acc = 0.0_f32;
+                for g in 0..(cols / gs) {
+                    let g_global = o * (cols / gs) + g;
+                    let col_start = g * gs;
+                    let flat_start = o * cols + col_start;
+                    acc += dequant_dot_via_lut(
+                        &codes_8bit[flat_start..flat_start + gs],
+                        &luts_8bit[g_global],
+                        &x[col_start..col_start + gs],
+                        0,
+                        0xFF,
+                    );
+                }
+                *out_o = acc;
+            }
+        };
+        // Warmup.
+        for _ in 0..10 {
+            bench_8bit(&mut out_8bit);
+        }
+        let start = std::time::Instant::now();
+        for _ in 0..iterations {
+            bench_8bit(&mut out_8bit);
+        }
+        let single_8bit_ns = start.elapsed().as_nanos() as f64 / iterations as f64;
+
+        let ratio = rrq_ns / single_8bit_ns;
+        eprintln!(
+            "g2_4stage_lut_vs_single_8bit: rrq_4stage={:.1}ns single_8bit={:.1}ns ratio={:.3}x \
+             (HONEST NEGATIVE — documented, gate was ≤ 1.05x)",
+            rrq_ns, single_8bit_ns, ratio
+        );
+        // Document the negative: the 4-stage LUT path is slower (ratio > 1.05).
+        // This is the expected possible outcome per Plan 568 risk table.
+        // The test passes (does not panic) so the ratio is visible in CI logs;
+        // the arithmetic `prefix_dot_into` remains the recommended path.
+        assert!(
+            ratio > 1.0,
+            "expected the 4-stage LUT path to be slower (documented negative); \
+             ratio={:.3} is unexpectedly faster — re-evaluate the G2 verdict",
+            ratio
         );
     }
 }

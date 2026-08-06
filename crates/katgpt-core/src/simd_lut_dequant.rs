@@ -712,6 +712,380 @@ unsafe fn dequant_dot_via_lut_avx2(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Fused Multi-Stage LUT DeQuant + Dot (Plan 568 Phase 3 — RRQ fusion target)
+// ──────────────────────────────────────────────────────────────────────────
+// When a weight matrix is represented as a sum of N independently-quantized
+// stages (Recurrent Residual Quantization, Plan 568), the prefix-t dot product
+// is `x · (Σ_k stage_k) = Σ_k x · stage_k`. The naive approach runs N separate
+// single-stage dots and sums — reloading `x` from memory N times. The fused
+// multi-stage kernel keeps `x[i]` in a register across all N stages, gathering
+// each stage's LUT value into a per-element stage-sum before a single FMA:
+//
+//   acc += (Σ_k lut_k[code_k[i]]) · x[i]
+//
+// For 2-bit RRQ stages, each LUT is only 4 entries (16 bytes) — all N LUTs fit
+// in a handful of registers / one cache line. The G2 gate (Plan 568 Phase 3)
+// tests whether 4×(4-entry gather) reaches parity with 1×(256-entry gather) at
+// the 8-bit prefix — the hypothesis is that the tiny 2-bit LUTs stay hot in L1
+// while the 1KB 8-bit LUT spills.
+//
+// Unlike the single-stage kernel, codes here are **pre-unpacked raw indices**
+// (1 code per byte, already shifted + masked out of any packed format). This
+// keeps the kernel format-agnostic — RRQ unpacks once at load time and passes
+// flat index slices. No `shift`/`mask` parameters.
+
+/// Fused multi-stage LUT dequantize + dot product (slice-based core).
+///
+/// Computes `Σ_{i} x[i] · (Σ_{k} lut_slices[k][codes_per_stage[k][i]])` — for
+/// each position `i`, the N stage LUT values are gathered and summed in
+/// registers, then a single FMA accumulates into the output. This avoids
+/// spilling intermediate dequantized values to memory AND avoids reloading `x`
+/// once per stage.
+///
+/// `codes_per_stage[k][i]` is a **raw code index** (0..LUT_LEN), already
+/// unpacked from any packed format. The caller is responsible for unpacking
+/// (e.g. RRQ's 2-bit packed codes → 1-per-byte).
+///
+/// Returns `0.0` for empty inputs or zero stages. All stage code slices must
+/// have equal length. Processes `min(codes_per_stage[0].len(), x.len())`
+/// elements.
+///
+/// # Allocation discipline
+///
+/// Zero allocations. All intermediate values stay in registers (SIMD paths) or
+/// a 4-accumulator stack array (scalar path).
+///
+/// # See also
+///
+/// - [`dequant_dot_via_lut`] — the single-stage fused kernel (Plan 452 Phase 3).
+/// - `RrqWeights::prefix_dot_lut_into` (Plan 568 Phase 3) — the RRQ consumer.
+#[inline]
+#[allow(clippy::needless_return)] // return is needed for cfg-gated arch dispatch
+pub fn dequant_dot_via_lut_multi_stage_slice(
+    codes_per_stage: &[&[u8]],
+    lut_slices: &[&[f32]],
+    x: &[f32],
+) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { dequant_dot_via_lut_multi_stage_neon(codes_per_stage, lut_slices, x) };
+    }
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    {
+        return unsafe { dequant_dot_via_lut_multi_stage_avx2(codes_per_stage, lut_slices, x) };
+    }
+    #[cfg(not(any(
+        target_arch = "aarch64",
+        all(target_arch = "x86_64", target_feature = "avx2")
+    )))]
+    {
+        dequant_dot_via_lut_multi_stage_scalar(codes_per_stage, lut_slices, x)
+    }
+}
+
+/// Generic typed-LUT convenience wrapper for [`dequant_dot_via_lut_multi_stage_slice`].
+///
+/// Extracts raw `&[f32]` slices from typed LUTs and delegates to the slice-based
+/// core. Supports up to 8 stages (sufficient for RRQ's default 4 = 1 base + 3
+/// residuals).
+///
+/// # Example
+///
+/// ```
+/// use katgpt_core::simd_lut_dequant::{UInt4Lut, QuantLut, dequant_dot_via_lut_multi_stage};
+///
+/// let lut0 = UInt4Lut::build(1.0, 0.0); // lut[i] = i
+/// let lut1 = UInt4Lut::build(10.0, 0.0); // lut[i] = 10*i
+/// let codes0 = [0u8, 1, 2, 3];
+/// let codes1 = [3u8, 2, 1, 0];
+/// let x = [1.0_f32, 2.0, 3.0, 4.0];
+/// // ref: (0+30)*1 + (1+20)*2 + (2+10)*3 + (3+0)*4 = 30 + 42 + 36 + 12 = 120
+/// let dot = dequant_dot_via_lut_multi_stage(&[&codes0, &codes1], &[lut0, lut1], &x);
+/// assert_eq!(dot, 120.0);
+/// ```
+#[inline]
+pub fn dequant_dot_via_lut_multi_stage<L: QuantLut>(
+    codes_per_stage: &[&[u8]],
+    luts: &[L],
+    x: &[f32],
+) -> f32 {
+    let n = luts.len();
+    assert_eq!(
+        codes_per_stage.len(),
+        n,
+        "dequant_dot_via_lut_multi_stage: codes/stage count mismatch"
+    );
+    if n == 0 || codes_per_stage[0].is_empty() {
+        return 0.0;
+    }
+    assert!(
+        n <= 8,
+        "dequant_dot_via_lut_multi_stage: max 8 stages, got {n}"
+    );
+    let mut buf: [&[f32]; 8] = [&[]; 8];
+    for k in 0..n {
+        buf[k] = luts[k].as_f32_slice();
+    }
+    dequant_dot_via_lut_multi_stage_slice(codes_per_stage, &buf[..n], x)
+}
+
+/// Scalar fused multi-stage dequant+dot — portable reference and correctness oracle.
+///
+/// Uses 4 independent accumulators with `mul_add` to match the SIMD path's
+/// FMA semantics (single-rounding multiply-add), same pattern as
+/// `dequant_dot_via_lut_scalar`.
+#[inline]
+pub fn dequant_dot_via_lut_multi_stage_scalar(
+    codes_per_stage: &[&[u8]],
+    lut_slices: &[&[f32]],
+    x: &[f32],
+) -> f32 {
+    let n_stages = codes_per_stage.len();
+    debug_assert_eq!(n_stages, lut_slices.len());
+    if n_stages == 0 {
+        return 0.0;
+    }
+    let n = codes_per_stage[0].len().min(x.len());
+    let mut acc = [0.0_f32; 4];
+    let chunks = n / 4;
+    let mut i = 0;
+    for _ in 0..chunks {
+        unsafe {
+            for (lane, acc_lane) in acc.iter_mut().enumerate() {
+                let idx = i + lane;
+                let mut stage_sum = 0.0_f32;
+                for k in 0..n_stages {
+                    let code = *codes_per_stage[k].get_unchecked(idx) as usize;
+                    stage_sum += *lut_slices[k].get_unchecked(code);
+                }
+                *acc_lane = stage_sum.mul_add(*x.get_unchecked(idx), *acc_lane);
+            }
+        }
+        i += 4;
+    }
+    let mut sum = acc.iter().sum::<f32>();
+    while i < n {
+        unsafe {
+            let mut stage_sum = 0.0_f32;
+            for k in 0..n_stages {
+                let code = *codes_per_stage[k].get_unchecked(i) as usize;
+                stage_sum += *lut_slices[k].get_unchecked(code);
+            }
+            sum = stage_sum.mul_add(*x.get_unchecked(i), sum);
+        }
+        i += 1;
+    }
+    sum
+}
+
+// ── NEON fused multi-stage dequant+dot ──────────────────────────────────
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn dequant_dot_via_lut_multi_stage_neon(
+    codes_per_stage: &[&[u8]],
+    lut_slices: &[&[f32]],
+    x: &[f32],
+) -> f32 {
+    use core::arch::aarch64::{vaddq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32, vaddvq_f32};
+
+    unsafe {
+        let n_stages = codes_per_stage.len();
+        debug_assert_eq!(n_stages, lut_slices.len());
+        if n_stages == 0 {
+            return 0.0;
+        }
+        let n = codes_per_stage[0].len().min(x.len());
+
+        // 4 independent accumulators (float32x4_t each) to hide FMA latency.
+        let mut acc0 = vdupq_n_f32(0.0);
+        let mut acc1 = vdupq_n_f32(0.0);
+        let mut acc2 = vdupq_n_f32(0.0);
+        let mut acc3 = vdupq_n_f32(0.0);
+
+        let mut i = 0;
+        // Process 16 elements per iteration (4 × float32x4_t FMA).
+        while i + 16 <= n {
+            for &(off, slot) in &[(0usize, 0usize), (4, 1), (8, 2), (12, 3)] {
+                // Sum stage contributions into stage_sum.
+                let mut stage_sum = vdupq_n_f32(0.0);
+                for k in 0..n_stages {
+                    let codes_ptr = codes_per_stage[k].as_ptr().add(i + off);
+                    let c0 = *codes_ptr as usize;
+                    let c1 = *codes_ptr.add(1) as usize;
+                    let c2 = *codes_ptr.add(2) as usize;
+                    let c3 = *codes_ptr.add(3) as usize;
+                    let gathered = [
+                        *lut_slices[k].get_unchecked(c0),
+                        *lut_slices[k].get_unchecked(c1),
+                        *lut_slices[k].get_unchecked(c2),
+                        *lut_slices[k].get_unchecked(c3),
+                    ];
+                    let gathered_vec = vld1q_f32(gathered.as_ptr());
+                    stage_sum = vaddq_f32(stage_sum, gathered_vec);
+                }
+                let x_vec = vld1q_f32(x.as_ptr().add(i + off));
+                match slot {
+                    0 => acc0 = vfmaq_f32(acc0, stage_sum, x_vec),
+                    1 => acc1 = vfmaq_f32(acc1, stage_sum, x_vec),
+                    2 => acc2 = vfmaq_f32(acc2, stage_sum, x_vec),
+                    3 => acc3 = vfmaq_f32(acc3, stage_sum, x_vec),
+                    _ => unreachable!(),
+                }
+            }
+            i += 16;
+        }
+
+        // Reduce 4 accumulators to 1.
+        let mut acc = vaddq_f32(acc0, acc1);
+        acc = vaddq_f32(acc, acc2);
+        acc = vaddq_f32(acc, acc3);
+
+        // Process remaining 4-element chunks.
+        while i + 4 <= n {
+            let mut stage_sum = vdupq_n_f32(0.0);
+            for k in 0..n_stages {
+                let codes_ptr = codes_per_stage[k].as_ptr().add(i);
+                let c0 = *codes_ptr as usize;
+                let c1 = *codes_ptr.add(1) as usize;
+                let c2 = *codes_ptr.add(2) as usize;
+                let c3 = *codes_ptr.add(3) as usize;
+                let gathered = [
+                    *lut_slices[k].get_unchecked(c0),
+                    *lut_slices[k].get_unchecked(c1),
+                    *lut_slices[k].get_unchecked(c2),
+                    *lut_slices[k].get_unchecked(c3),
+                ];
+                let gathered_vec = vld1q_f32(gathered.as_ptr());
+                stage_sum = vaddq_f32(stage_sum, gathered_vec);
+            }
+            let x_vec = vld1q_f32(x.as_ptr().add(i));
+            acc = vfmaq_f32(acc, stage_sum, x_vec);
+            i += 4;
+        }
+
+        // Horizontal sum of float32x4_t.
+        let mut sum = vaddvq_f32(acc);
+
+        // Tail (1–3 remaining elements): scalar.
+        while i < n {
+            let mut stage_sum = 0.0_f32;
+            for k in 0..n_stages {
+                let code = *codes_per_stage[k].get_unchecked(i) as usize;
+                stage_sum += *lut_slices[k].get_unchecked(code);
+            }
+            sum = stage_sum.mul_add(*x.get_unchecked(i), sum);
+            i += 1;
+        }
+        sum
+    }
+}
+
+// ── AVX2 fused multi-stage dequant+dot ──────────────────────────────────
+
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+#[inline]
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn dequant_dot_via_lut_multi_stage_avx2(
+    codes_per_stage: &[&[u8]],
+    lut_slices: &[&[f32]],
+    x: &[f32],
+) -> f32 {
+    use core::arch::x86_64::{
+        _mm256_add_ps, _mm256_fmadd_ps, _mm256_i32gather_ps, _mm256_loadu_ps, _mm256_setzero_ps,
+    };
+
+    unsafe {
+        let n_stages = codes_per_stage.len();
+        debug_assert_eq!(n_stages, lut_slices.len());
+        if n_stages == 0 {
+            return 0.0;
+        }
+        let n = codes_per_stage[0].len().min(x.len());
+
+        // 2 independent accumulators (float32x8_t each) to hide FMA latency.
+        let mut acc0 = _mm256_setzero_ps();
+        let mut acc1 = _mm256_setzero_ps();
+
+        let mut i = 0;
+        // Process 16 elements per iteration (2 × float32x8_t FMA).
+        while i + 16 <= n {
+            for &(off, slot) in &[(0usize, 0usize), (8, 1)] {
+                // Load 8 code bytes → zero-extend to 8× i32 indices.
+                let raw = core::arch::x86_64::_mm_cvtepu8_epi32(
+                    core::arch::x86_64::_mm_loadl_epi64(
+                        codes_per_stage[0].as_ptr().add(i + off) as *const _
+                    )
+                );
+                // Stage 0 contributes via gather from its own LUT.
+                // We reuse the i32 index vector across stages since codes differ
+                // per stage — load each stage's codes separately.
+                let mut stage_sum = _mm256_setzero_ps();
+                for k in 0..n_stages {
+                    let idx_vec = core::arch::x86_64::_mm_cvtepu8_epi32(
+                        core::arch::x86_64::_mm_loadl_epi64(
+                            codes_per_stage[k].as_ptr().add(i + off) as *const _
+                        )
+                    );
+                    let gathered = _mm256_i32gather_ps(lut_slices[k].as_ptr(), idx_vec, 4);
+                    stage_sum = _mm256_add_ps(stage_sum, gathered);
+                }
+                let _ = raw; // (unused — kept for structural symmetry documentation)
+                let x_vec = _mm256_loadu_ps(x.as_ptr().add(i + off));
+                match slot {
+                    0 => acc0 = _mm256_fmadd_ps(stage_sum, x_vec, acc0),
+                    1 => acc1 = _mm256_fmadd_ps(stage_sum, x_vec, acc1),
+                    _ => unreachable!(),
+                }
+            }
+            i += 16;
+        }
+
+        // Process remaining 8-element chunk.
+        let mut acc = _mm256_add_ps(acc0, acc1);
+        if i + 8 <= n {
+            let mut stage_sum = _mm256_setzero_ps();
+            for k in 0..n_stages {
+                let idx_vec = core::arch::x86_64::_mm_cvtepu8_epi32(
+                    core::arch::x86_64::_mm_loadl_epi64(
+                        codes_per_stage[k].as_ptr().add(i) as *const _
+                    )
+                );
+                let gathered = _mm256_i32gather_ps(lut_slices[k].as_ptr(), idx_vec, 4);
+                stage_sum = _mm256_add_ps(stage_sum, gathered);
+            }
+            let x_vec = _mm256_loadu_ps(x.as_ptr().add(i));
+            acc = _mm256_fmadd_ps(stage_sum, x_vec, acc);
+            i += 8;
+        }
+
+        // Horizontal sum of __m256.
+        let mut sum = {
+            let lo = core::arch::x86_64::_mm256_castps256_ps128(acc);
+            let hi = core::arch::x86_64::_mm256_extractf128_ps(acc, 1);
+            let sum128 = core::arch::x86_64::_mm_add_ps(lo, hi);
+            let shuf = core::arch::x86_64::_mm_movehdup_ps(sum128);
+            let sums = core::arch::x86_64::_mm_add_ps(sum128, shuf);
+            let shuf2 = core::arch::x86_64::_mm_movehl_ps(sums, sums);
+            let total = core::arch::x86_64::_mm_add_ss(sums, shuf2);
+            core::arch::x86_64::_mm_cvtss_f32(total)
+        };
+
+        // Tail (1–7 remaining elements): scalar.
+        while i < n {
+            let mut stage_sum = 0.0_f32;
+            for k in 0..n_stages {
+                let code = *codes_per_stage[k].get_unchecked(i) as usize;
+                stage_sum += *lut_slices[k].get_unchecked(code);
+            }
+            sum = stage_sum.mul_add(*x.get_unchecked(i), sum);
+            i += 1;
+        }
+        sum
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Scalar reference arithmetic dequantize — the "current path" comparator.
 ///
 /// Computes `(signed(code) − zero) · scale` per element, matching the arithmetic
@@ -1154,6 +1528,100 @@ mod tests {
                 simd,
                 scalar,
                 rel_diff
+            );
+        }
+    }
+
+    // ── Multi-stage fused kernel (Plan 568 Phase 3) ────────────────────────
+
+    /// G1: multi-stage kernel matches a hand-rolled scalar reference.
+    /// `ref = Σ_i x[i] · (Σ_k lut_k[code_k[i]])`.
+    #[test]
+    fn g1_multi_stage_matches_scalar_reference() {
+        // 2 stages, distinct LUTs.
+        let lut0 = [0.0_f32, 1.0, 2.0, 3.0];
+        let lut1 = [10.0_f32, 20.0, 30.0, 40.0];
+        let codes0 = [0u8, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3];
+        let codes1 = [3u8, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1, 0];
+        let x: Vec<f32> = (0..16).map(|i| (i as f32 * 0.3).sin()).collect();
+
+        // Reference.
+        let ref_dot: f32 = (0..16)
+            .map(|i| x[i] * (lut0[codes0[i] as usize] + lut1[codes1[i] as usize]))
+            .sum();
+
+        let codes: [&[u8]; 2] = [&codes0, &codes1];
+        let luts: [&[f32]; 2] = [&lut0, &lut1];
+        let result = dequant_dot_via_lut_multi_stage_slice(&codes, &luts, &x);
+        assert!((result - ref_dot).abs() < 1e-4, "result={} ref={}", result, ref_dot);
+    }
+
+    /// G1: single-stage multi-stage kernel matches the single-stage kernel.
+    /// At n_stages=1, the multi-stage kernel should give the same result as
+    /// `dequant_dot_via_lut` (modulo reduction-order rounding).
+    #[test]
+    fn g1_multi_stage_single_stage_matches_single_stage_kernel() {
+        let lut = UInt4Lut::build(1.0, 0.0); // lut[i] = i
+        let codes: Vec<u8> = (0..32u32).map(|i| (i % 16) as u8).collect();
+        let x: Vec<f32> = (0..32).map(|i| (i as f32 * 0.1).sin()).collect();
+
+        let single = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+
+        let codes_ref: [&[u8]; 1] = [&codes[..]];
+        let luts: [UInt4Lut; 1] = [lut];
+        let multi = dequant_dot_via_lut_multi_stage(&codes_ref, &luts, &x);
+
+        let rel = (multi - single).abs() / single.abs().max(1e-10);
+        assert!(rel < 1e-5, "multi={} single={} rel={}", multi, single, rel);
+    }
+
+    /// G1: zero stages → 0.0 (degenerate case, no panic).
+    #[test]
+    fn g1_multi_stage_zero_stages_returns_zero() {
+        let result = dequant_dot_via_lut_multi_stage_slice(&[], &[], &[1.0, 2.0, 3.0]);
+        assert_eq!(result, 0.0);
+    }
+
+    /// G1: empty codes → 0.0.
+    #[test]
+    fn g1_multi_stage_empty_codes_returns_zero() {
+        let lut = [0.0_f32, 1.0, 2.0, 3.0];
+        let luts: [&[f32]; 1] = [&lut];
+        let codes: [&[u8]; 1] = [&[]];
+        let result = dequant_dot_via_lut_multi_stage_slice(&codes, &luts, &[]);
+        assert_eq!(result, 0.0);
+    }
+
+    /// G1: alignment boundaries (tail-handling correctness at 1,3,4,7,8,15,16,17).
+    #[test]
+    fn g1_multi_stage_alignment_boundaries() {
+        let lut0 = UInt4Lut::build(0.5, 2.0);
+        let lut1 = UInt4Lut::build(1.5, 1.0);
+        for &n in &[1usize, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33] {
+            let codes0: Vec<u8> = (0..n as u32).map(|i| (i * 7 % 16) as u8).collect();
+            let codes1: Vec<u8> = (0..n as u32).map(|i| (i * 13 % 16) as u8).collect();
+            let x: Vec<f32> = (0..n).map(|i| (i as f32 * 0.2).sin()).collect();
+
+            // Reference.
+            let ref_dot: f32 = (0..n)
+                .map(|i| {
+                    let s0 = lut0.lookup(codes0[i]);
+                    let s1 = lut1.lookup(codes1[i]);
+                    x[i] * (s0 + s1)
+                })
+                .sum();
+
+            let codes: [&[u8]; 2] = [&codes0, &codes1];
+            let luts_arr: [&[f32]; 2] = [lut0.as_f32_slice(), lut1.as_f32_slice()];
+            let result = dequant_dot_via_lut_multi_stage_slice(&codes, &luts_arr, &x);
+            let rel = (result - ref_dot).abs() / ref_dot.abs().max(1e-10);
+            assert!(
+                rel < 1e-3 || result.abs() < 1e-10,
+                "n={}: result={} ref={} rel={}",
+                n,
+                result,
+                ref_dot,
+                rel
             );
         }
     }
