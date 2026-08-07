@@ -220,6 +220,7 @@ pub fn kda_forward_token_with_saved(
 
     // Reconstruct per-head activations from the now-filled scratch + saved S_{t-1}.
     let mut head_acts = Vec::with_capacity(n_h);
+    #[allow(clippy::needless_range_loop)] // head indexes s_prev_per_head + weights.a_log + cache.heads + scratch.beta + stride offset
     for head in 0..n_h {
         let off = head * dk;
         let s_prev = &s_prev_per_head[head];
@@ -664,6 +665,7 @@ pub fn kda_core_backward(
 /// BPTT. The conv backward propagates ONLY the k=0 tap (current-token
 /// contribution) — for multi-token sequences with conv cross-token propagation,
 /// use [`kda_backward_sequence`] instead.
+#[allow(clippy::too_many_arguments)]
 pub fn kda_backward_token(
     config: &KdaConfig,
     weights: &KdaWeights,

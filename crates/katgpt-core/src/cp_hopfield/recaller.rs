@@ -570,15 +570,15 @@ pub(crate) fn normalize_qudit<const D: usize>(q: &[C32; D]) -> [C32; D] {
 /// minimal shift gives `(4/3, 1/3, 1/3)` (ratio 1/4).
 pub(crate) fn hermitian_top_eigenvector<const D: usize>(k: &[[C32; D]; D]) -> ([C32; D], f32) {
     let mut lower = f32::INFINITY;
-    for r in 0..D {
-        let off: f32 = (0..D).filter(|&c| c != r).map(|c| k[r][c].norm()).sum();
-        lower = lower.min(k[r][r].re - off);
+    for (r, k_row) in k.iter().enumerate() {
+        let off: f32 = (0..D).filter(|&c| c != r).map(|c| k_row[c].norm()).sum();
+        lower = lower.min(k_row[r].re - off);
     }
     let shift = if lower >= 0.0 { 0.0 } else { -lower };
 
     let mut shifted = *k;
-    for i in 0..D {
-        shifted[i][i] = shifted[i][i].add(C32::real(shift));
+    for (i, row) in shifted.iter_mut().enumerate() {
+        row[i] = row[i].add(C32::real(shift));
     }
 
     let mut rng = SplitMix64::new(POWER_ITER_SEED);

@@ -95,20 +95,19 @@ impl CapacityCurve {
         let inv_n = 1.0 / self.n_neurons as f32;
         let mut prev: Option<&CapacityPoint> = None;
         for pt in &self.points {
-            if let Some(lo) = prev {
-                if lo.n_memories != pt.n_memories
-                    && lo.mean_overlap >= self.threshold
-                    && pt.mean_overlap < self.threshold
-                {
-                    let lo_load = lo.n_memories as f32 * inv_n;
-                    let hi_load = pt.n_memories as f32 * inv_n;
-                    let span = lo.mean_overlap - pt.mean_overlap;
-                    if span.abs() < 1e-9 {
-                        return Some(lo_load);
-                    }
-                    let t = (lo.mean_overlap - self.threshold) / span;
-                    return Some(lo_load + t * (hi_load - lo_load));
+            if let Some(lo) = prev
+                && lo.n_memories != pt.n_memories
+                && lo.mean_overlap >= self.threshold
+                && pt.mean_overlap < self.threshold
+            {
+                let lo_load = lo.n_memories as f32 * inv_n;
+                let hi_load = pt.n_memories as f32 * inv_n;
+                let span = lo.mean_overlap - pt.mean_overlap;
+                if span.abs() < 1e-9 {
+                    return Some(lo_load);
                 }
+                let t = (lo.mean_overlap - self.threshold) / span;
+                return Some(lo_load + t * (hi_load - lo_load));
             }
             prev = Some(pt);
         }

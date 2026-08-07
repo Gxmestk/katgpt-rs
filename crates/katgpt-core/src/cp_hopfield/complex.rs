@@ -16,8 +16,16 @@ pub struct C32 {
     pub im: f32,
 }
 
+/// Arithmetic on `C32` ships as inherent methods (`add`/`sub`/`mul`/`scale`/
+/// `mul_add`) rather than `std::ops` trait impls: this is a deliberately minimal
+/// leaf type (see the module docs), every call site uses method-call syntax,
+/// and the method names mirror the math notation used in the SU(d) basis + LLG
+/// derivations. Implementing `Add`/`Sub`/`Mul` would be a larger, no-value
+/// change with call-site churn, so the std-trait confusion lint is suppressed
+/// here rather than the methods renamed.
+#[allow(clippy::should_implement_trait)]
 impl C32 {
-    /// Additive identity `0 + 0i`.
+    /// Additive identity `0 + 0i`."
     pub const ZERO: Self = Self { re: 0.0, im: 0.0 };
     /// Multiplicative identity `1 + 0i`.
     pub const ONE: Self = Self { re: 1.0, im: 0.0 };

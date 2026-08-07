@@ -210,9 +210,8 @@ impl<const D: usize, const D2: usize> CpHopfieldRecaller<D, D2> {
             self.n_neurons()
         );
         let mut total = 0.0f32;
-        for i in 0..self.n_neurons() {
-            let b = bias[i];
-            total += self.llg_step_neuron_driven(i, cfg, Some(&b));
+        for (i, b) in bias.iter().enumerate() {
+            total += self.llg_step_neuron_driven(i, cfg, Some(b));
         }
         total / self.n_neurons() as f32
     }

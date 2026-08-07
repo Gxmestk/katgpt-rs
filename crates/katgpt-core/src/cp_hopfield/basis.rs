@@ -213,8 +213,8 @@ impl<const D: usize> GellMannBasis<D> {
         );
         let mut rho = [[C32::ZERO; D]; D];
         let inv_d = 1.0 / D as f32;
-        for i in 0..D {
-            rho[i][i] = C32::real(inv_d);
+        for (i, row) in rho.iter_mut().enumerate() {
+            row[i] = C32::real(inv_d);
         }
         for (a, &s_a) in bloch.iter().enumerate() {
             if s_a == 0.0 {
@@ -267,6 +267,7 @@ impl StructureConstants {
                 // M = λ_a λ_b
                 let mut m = [[C32::ZERO; D]; D];
                 for r in 0..D {
+                    #[allow(clippy::needless_range_loop)] // indexes dense[a][r][t] + dense[b][t][c]
                     for t in 0..D {
                         let art = dense[a][r][t];
                         if art == C32::ZERO {
