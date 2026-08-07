@@ -437,7 +437,41 @@ pub trait GameState: Clone {
     }
 
     /// Apply action, return successor state. Does NOT mutate `self`.
-    fn advance(&self, action: &Self::Action, player_id: u8) -> Self;
+    ///
+    /// Default implementation clones `self` then calls
+    /// [`advance_inplace()`](Self::advance_inplace). Override `advance_inplace`
+    /// (NOT this method) to make the clone-free path available to callers that
+    /// can mutate in place (MCTS rollouts, tree descent).
+    ///
+    /// Callers that need a fresh owned successor (tree-node expansion, test
+    /// assertions) use this. Callers that discard the parent state should call
+    /// [`advance_inplace()`](Self::advance_inplace) instead.
+    ///
+    /// **Implementor contract (recursion trap):** every concrete impl MUST
+    /// override at least one of `advance` / `advance_inplace`. The defaults
+    /// delegate to each other; an impl that overrides NEITHER infinite-recurses
+    /// (`advance` → `advance_inplace` → `advance` → ...). All existing impls
+    /// define `advance`, so they are safe. Mirrors the
+    /// `available_actions` / `available_actions_into` mutual-default pair.
+    fn advance(&self, action: &Self::Action, player_id: u8) -> Self {
+        let mut next = self.clone();
+        next.advance_inplace(action, player_id);
+        next
+    }
+
+    /// Apply action, mutating `self` in place. The clone-free path.
+    ///
+    /// Default implementation delegates to [`advance()`](Self::advance) (which
+    /// clones). Override this to avoid the allocation when `self` owns heap
+    /// data (e.g. `Vec` fields like `FrameSnapshot::nearby_entities` /
+    /// `threats`). Callers that discard the parent state (MCTS rollouts, path
+    /// descent) should call this instead of `advance`.
+    ///
+    /// **Implementor contract (recursion trap):** see `advance` — every impl
+    /// must override at least one of the pair.
+    fn advance_inplace(&mut self, action: &Self::Action, player_id: u8) {
+        *self = self.advance(action, player_id);
+    }
 
     /// Is the game over?
     fn is_terminal(&self) -> bool;

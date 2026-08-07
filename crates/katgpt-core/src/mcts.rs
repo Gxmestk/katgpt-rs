@@ -349,9 +349,13 @@ fn select_inline<S: GameState>(
             })
             .expect("children non-empty");
 
-        // Advance state to the selected child using parent's action list
+        // Advance state to the selected child using parent's action list.
+        // `advance_inplace` is safe here: `state` is owned + the previous value
+        // is discarded as the descent continues. Avoids the clone that `advance`
+        // would do (Issue 571) — matters for `FrameSnapshot`-like impls with
+        // `Vec` fields.
         let action_idx = nodes[best_child].action_index.unwrap();
-        state = state.advance(&action_buf[action_idx], player_id);
+        state.advance_inplace(&action_buf[action_idx], player_id);
         state.available_actions_into(player_id, action_buf);
         idx = best_child;
     }
@@ -445,7 +449,11 @@ fn rollout<S: GameState>(
         }
 
         let pick = policy.select(&current, action_buf, player_id, rng);
-        current = current.advance(&action_buf[pick], player_id);
+        // `advance_inplace` is safe here: `current` is owned + the previous
+        // state is discarded each iteration. This is the hot rollout path
+        // (Issue 571) — avoiding the clone saves ~63 ns/call on `FrameSnapshot`
+        // (~315 µs over a 10K-tick run).
+        current.advance_inplace(&action_buf[pick], player_id);
         *fm_calls += 1;
     }
 
