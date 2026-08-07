@@ -11,6 +11,7 @@
 **Context:** katgpt-rs + anyrag neuro-symbolic architecture
 **Paper:** "Raven: High-Recall Sequence Modeling with Sparse Memory Routing" (Afzal, Bick, Xing, Cevher, Gu — 2025)
 **Source:** https://github.com/goombalab/raven
+**PASS-Redirects (synthesis):** Wang et al. "Zero Train-Inference Mismatch — now for linear attention, and under async RL" [blog https://yichuan-w.github.io/blog/GDN-train-inference-mismatch-asyncRL/ — Gated DeltaNet bitwise trainer/generator parity on TorchTitan RL + vLLM] — PASS 2026-08-07: training-infrastructure paper for the FLA-family linear attention kernel Raven builds on; our modelless runtime has no trainer/generator split to drift (freeze/thaw is bit-identical by BLAKE3 construction; HLA inference runs the intrinsically batch-invariant recurrent form). Conditional future Plan in riir-train if async RL training of an FLA-family model comes online. See `.research/028` (HLA) for the closer cousin.
 
 ---
 
