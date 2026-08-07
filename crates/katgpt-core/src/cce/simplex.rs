@@ -427,9 +427,7 @@ mod tests {
         let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
         let mut rhs = vec![0.0_f64; n_cons];
         // row 0: sum = 1
-        for j in 0..na {
-            mat[0][j] = 1.0;
-        }
+        mat[0][..na].fill(1.0);
         rhs[0] = 1.0;
         // rows 1..=nd: g_κ · ρ + s_κ = 0 where g_κ(s,a) = cost(s,a) - cost(s, κ_target)
         let dev_targets = [0, 1];
@@ -479,9 +477,7 @@ mod tests {
         let n_cons = 1 + nd;
         let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
         let mut rhs = vec![0.0_f64; n_cons];
-        for j in 0..na {
-            mat[0][j] = 1.0;
-        }
+        mat[0][..na].fill(1.0);
         rhs[0] = 1.0;
         let dev_targets = [0, 1];
         for (k, &kt) in dev_targets.iter().enumerate() {
@@ -520,9 +516,7 @@ mod tests {
         let n_cons = 1 + nd;
         let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
         let mut rhs = vec![0.0_f64; n_cons];
-        for j in 0..na {
-            mat[0][j] = 1.0;
-        }
+        mat[0][..na].fill(1.0);
         rhs[0] = 1.0;
         for (k, kt) in [0, 1].iter().enumerate() {
             let kt = *kt;
@@ -560,9 +554,7 @@ mod tests {
         let mut mat = vec![vec![0.0_f64; n_vars]; n_cons];
         let mut rhs = vec![0.0_f64; n_cons];
         // row 0: sum ρ = 1
-        for j in 0..na {
-            mat[0][j] = 1.0;
-        }
+        mat[0][..na].fill(1.0);
         rhs[0] = 1.0;
         // cost(s,a) = ((s * 7 + a * 3) % 11) as f64 — deterministic pseudo-random.
         let cost = |s: usize, a: usize| ((s * 7 + a * 3) % 11) as f64;
