@@ -7,13 +7,17 @@
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity_inference/` (new module) + Cargo feature `similarity_inference`
 **Status:** Active — Phase 1 (skeleton)
 
+**Verdict note (post-revision):** GOAT, not Super-GOAT. The equilibrium *concept* is covered by shipped CCE (`CceLp<N,A>`, Plan 295, DEFAULT-ON, +37.5%/+108% over Nash). The novelty is the *mechanism* — similarity-inferred **endogenous correlation device** for the CCE substrate. Plan 526 ships the mechanism; the gain is the **endogenous moderator fusion** (R143 × R471). **Phase 7 (conditional)** opens a separate scoped Super-GOAT claim for **indirect inference** (zero-shot cooperation from third-party observation) IF G5 PoC passes — that subset is genuinely new capability, the direct-inference mechanism is not.
+
 ---
 
 ## Goal
 
 Ship a generic, modelless, leaf-clean open primitive that maintains a **similarity posterior** `ω ∈ [0,1]` between a focal decision-maker and each partner, updated from joint-action history, and a **cooperation gate** (`embedded_best_response`) that switches from competitive-best-response to cooperative-best-response when `ω` crosses a payoff-derived threshold. The primitive composes a Bayesian posterior update + a sigmoid cooperation threshold + a best-response comparator — zero game semantics, zero entity-kind assumptions, pure math.
 
-This is the open half of the Super-GOAT pair (R471 + riir-ai R335). The closed-form math is from arXiv:2608.03958 §H + §I; the modelless composition is the invention.
+This is the open half of the GOAT pair (R471 + riir-ai R335). The closed-form math is from arXiv:2608.03958 §H + §I; the modelless composition is the invention.
+
+**Honest scope:** the equilibrium *concept* is covered by shipped CCE (`CceLp<N,A>`, Plan 295, DEFAULT-ON, +37.5%/+108% over Nash). This plan ships the *mechanism* — an **endogenous correlation device** inferred from interaction history, which composes with the existing CCE substrate to produce an **endogenous moderator fusion gain** (R143 × R471). The direct-inference mechanism is GOAT-tier (new mechanism, not new capability); the indirect-inference mechanism is a **conditional Super-GOAT-capability subset** (zero-shot cooperation from third-party observation — Phase 7 opens the scoped claim if G5 passes).
 
 **GOAT gate (G1–G7):**
 - G1 closed-form reproduction (`ω_T` matches `α/(α+(1−α)·2^(−T))` to f32 epsilon).
@@ -101,8 +105,32 @@ If G2 fails (cooperation does not emerge, or emerges for random pairs too), the 
 - [ ] **T6.3** If ALL gates pass (G1–G7): promote `similarity_inference` to `default` in `katgpt-core/Cargo.toml`. Record promotion in the benchmark file.
 - [ ] **T6.4** If G2 (emergent cooperation) FAILS: keep opt-in, document the failure in the benchmark, do NOT promote. The architectural coverage (closed-form math is correct) stands; the quality claim (emergent cooperation on this domain) is unproven.
 - [ ] **T6.5** If G7 (UQ floor) FAILS: keep opt-in, document that the Bayesian posterior does not beat a single-direction projection on this domain. Consider whether a richer prior (beyond the paper's constructed one) would help — but that's a follow-up, not this plan.
-- [ ] **T6.6** Cross-ref: add a one-line note to `katgpt-rs/.research/274` (CCE Moderator) pointing to this primitive as the *similarity-inferred* cousin.
+- [ ] **T6.6** Cross-ref: add a one-line note to `katgpt-rs/.research/274` (CCE Moderator) pointing to this primitive as the *endogenous-correlation-device* companion.
 - [ ] **T6.7** Commit on `develop` (per AGENTS.md global rule — commit at task completion).
+
+---
+
+## Phase 7 — Conditional Scoped Super-GOAT Claim for Indirect Inference
+
+**Trigger:** only runs if Phase 3 G5 (indirect inference) PASSES.
+
+### Rationale
+
+The direct-inference mechanism (Phase 2) is GOAT-tier: new mechanism (endogenous correlation device), not new capability (the equilibrium reached is still CCE). The indirect-inference mechanism (Phase 3) is potentially Super-GOAT-tier: **zero-shot cooperation from third-party observation** is a genuinely new capability class — no shipped primitive produces cooperation on first direct encounter from parallel third-party observation alone.
+
+If G5 passes, the indirect-inference capability warrants a separate scoped Super-GOAT claim, NOT bundled with the direct-inference mechanism. The scoped claim would be: "zero-shot cooperation from third-party observation" only.
+
+### Tasks (only if G5 passes)
+
+- [ ] **T7.1** Confirm G5 passed with margin (shared-policy primary entities cooperate at >70%; random-policy at <25%).
+- [ ] **T7.2** Re-run the §1.5 novelty gate scoped to indirect inference ONLY: grep `indirect.*inference|third.party.*observation|zero.shot.*cooperat|parallel.*encounter` across all 7 repos. If zero prior-art hits → scoped novelty claim is defensible.
+- [ ] **T7.3** Open a new scoped research note (next free number in katgpt-rs/.research/) titled `Indirect_Similarity_Inference_Zero_Shot_Cooperation` with the scoped Super-GOAT claim — indirect inference ONLY, not direct inference, not the equilibrium concept.
+- [ ] **T7.4** Open a new scoped private guide in riir-ai/.research/ for the indirect-inference selling point ("two merchants who've both traded with the same customers cooperate on first meeting — zero-shot emergent social structure from third-party observation").
+- [ ] **T7.5** Do NOT claim the scoped Super-GOAT until T7.2 grep confirms zero prior art AND T7.3/T7.4 guides are written. Per skill §1.5 "no candidate escape hatch": writing the claim triggers the mandatory guide outputs in the same session.
+
+### If G5 FAILS
+
+- [ ] **T7.6** Document the failure honestly. Indirect inference is not a new-capability claim on this domain. The plan stays GOAT-tier (direct inference endogenous-correlation-device mechanism only). The conditional Super-GOAT branch closes without opening.
 
 ---
 

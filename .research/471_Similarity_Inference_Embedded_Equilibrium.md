@@ -2,7 +2,18 @@
 
 > **Source:** [A game theory for foundation models shows new paths to rational cooperation through similarity inference (arxiv 2608.03958)](https://arxiv.org/pdf/2608.03958) — Meulemans, Wołczyk, Weis, Nasser, et al. (Google Paradigms of Intelligence + Mila + ETH + DeepMind), 4 Aug 2026. **Nature-format manuscript with extended SI.**
 > **Date:** 2026-08-07
-> **Status:** Active — Super-GOAT (open half)
+> **Status:** Active — **GOAT** (revised down from Super-GOAT after user §1.55.2 reverse-grep pushback: we ship CCE + Nash + Bayes-CCE surveyed; the equilibrium *concept* is covered, the *mechanism* is novel)
+>
+> **Verdict revision log (2026-08-07, same session):**
+> - Initial verdict: Super-GOAT (all 4 novelty-gate YES).
+> - User pushback: "we do have **equilibrium** aren't we?"
+> - Reverse-grep (§1.55.2 mandatory before PASS/PASS-equivalent): `equilibrium|Equilibrium|nash|Nash|cce|Cce|CCE|correlation.device|correlation.signal` returns PRIOR ART — `PayoffTable<N>::nash_equilibrium` (R026) + LP-CCE Moderator `CceLp<N,A>` (R274/Plan 295, DEFAULT-ON, +37.5%/+108% over Nash) + EqR convergence (R079/Plan 119, DEFAULT-ON) + Bayes-CCE literature search (Doc 61 in R143, 14 cousins).
+> - Honest re-assessment: the paper's "embedded equilibrium" is structurally a **correlated equilibrium with an endogenous correlation device**. We ship CCE with an *exogenous* designer-set correlation signal ζ. The paper's agents *infer* the correlation structure from interaction history. **The solution concept is covered; the mechanism (similarity-inferred endogenous correlation) is novel.**
+> - **Q1 (no prior art for the solution concept): NO** — CCE/Nash/Bayes-CCE cover it. The paper itself states "When q(λ) encodes strictly decoupled relationships ... this concept perfectly reduces to the classical Nash equilibrium"; the correlated case reduces to CCE.
+> - **Q1 (no prior art for the mechanism): YES** — similarity-inferred endogenous correlation is not shipped.
+> - **Q2 (new class of behavior): PARTIAL** — direct inference = CCE via inferred correlation (new mechanism, not new capability); indirect inference (zero-shot from third-party observation) = genuinely new capability.
+> - Per skill §1.5: Q1-NO → **not Super-GOAT**. Revised verdict: **GOAT** (new mechanism producing an endogenous correlation device for the CCE substrate we ship) + one **Super-GOAT-capability subset** (indirect inference — separate narrower claim if G5 PoC passes).
+> - The private guide R335 + Plan 526 are revised in lockstep.
 > **Private half:** [`riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md`](../../riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md)
 > **Related Research (katgpt-rs):** 274 (CCE Moderator — the *designer-steered* cousin; this note is the *similarity-inferred* cousin), 242 (MicroRecurrentBeliefState — the per-NPC posterior over universes IS the belief), 111 (Analogical Reasoning — the closest latent-similarity cousin), 156 (Clifford Wedge — the *complementarity* cousin; this is the *similarity* cousin), 284 (CLR — the reliability vote cousin), 469 (Collective Intelligence Payoff — the credit-assignment cousin)
 > **Related Research (riir-ai):** 335 (private Super-GOAT guide — NPC emergent cooperation), 158 (Per-NPC Committed Personality Blend — the shared-shard that grounds functional similarity), 143 (Latent CCE Moderator — designer-steered crowd coordination), 133 (NPC Mind-Reading — predictive channel substrate), 167 (Crowd Joint Inference — crowd similarity aggregation), 123 (Latent Functor Runtime — relational stance blend)
@@ -13,13 +24,13 @@
 
 ## TL;DR
 
-The paper proves that **rational agents that share functional structure (shared weights, identical algorithms) cooperatively converge in social dilemmas WITHOUT reciprocity, designer signals, or training** — by *inferring* behavioral similarity from interaction history and treating their own contemplated action as Bayesian evidence about a similar partner. This contradicts classical game theory's strict-defection prediction and produces a new solution concept, the **embedded equilibrium**. The mechanism is **predictive similarity** `S_pred(a₁) := ρ(a₂=C | æ, a₁=C) − ρ(a₂=C | æ, a₁=D)`, which equals the posterior belief `ω_T` that the partner shares the focal agent's policy.
+The paper proves that **rational agents that share functional structure (shared weights, identical algorithms) cooperatively converge in social dilemmas WITHOUT reciprocity, designer signals, or training** — by *inferring* behavioral similarity from interaction history and treating their own contemplated action as Bayesian evidence about a similar partner. This contradicts classical game theory's strict-defection prediction and produces a new solution concept, the **embedded equilibrium** — which is structurally a **correlated equilibrium with an endogenous (inferred) correlation device**, vs our shipped CCE moderator (R143/Plan 295) which uses an *exogenous* designer-set correlation signal ζ. The mechanism is **predictive similarity** `S_pred(a₁) := ρ(a₂=C | æ, a₁=C) − ρ(a₂=C | æ, a₁=D)`, which equals the posterior belief `ω_T` that the partner shares the focal agent's policy.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-A generic primitive that maintains a **similarity posterior** `ω ∈ [0, 1]` between a focal decision-maker and each partner, updated from joint-action history, and a **cooperation gate** that switches from competitive-best-response to cooperative-best-response when `ω > threshold`. The primitive has zero game semantics: it composes a Bayesian posterior update + a sigmoid cooperation threshold + a best-response comparator. The partner can be any latent-space-aligned agent (NPC-to-NPC, NPC-to-player, router-to-arm, freeze/thaw snapshot pair). The key insight is that *contemplating action `a` updates the posterior over what a similar partner will do* — the focal agent's own action is Bayesian evidence about the partner.
+A generic primitive that maintains a **similarity posterior** `ω ∈ [0, 1]` between a focal decision-maker and each partner, updated from joint-action history, and a **cooperation gate** that switches from competitive-best-response to cooperative-best-response when `ω > threshold`. **The equilibrium concept is covered** (we ship CCE + Nash + Bayes-CCE surveyed); **the mechanism is novel** — an *endogenous* correlation device inferred from interaction history, vs the *exogenous* designer-set ζ in our CCE moderator. The primitive composes with the existing `CceLp<N,A>` substrate to produce an endogenous-moderator fusion gain. The partner can be any latent-space-aligned agent (NPC-to-NPC, NPC-to-player, router-to-arm, freeze/thaw snapshot pair).
 
-This is a **new modelless primitive** because (i) the posterior update on shared history is a belief-state kernel we already ship (`MicroRecurrentBeliefState` R242, `sense::ReconstructionState::belief`), (ii) the predictive similarity is a dot-product difference we ship everywhere, (iii) the cooperation threshold is a sigmoid gate we ship in CCE/CLR/etc., but (iv) **NO existing primitive composes these three into "infer similarity → switch best-response regime"**. The composition is the invention.
+**Verdict: GOAT** (revised down from initial Super-GOAT — see §3 + header revision log). The gain is architectural: the CCE moderator becomes endogenous (driven by inferred similarity rather than designer signal). **One Super-GOAT-capability subset** (conditional): indirect inference (zero-shot cooperation from third-party observation) is genuinely new — separate scoped Super-GOAT claim if G5 PoC passes.
 
 ---
 
@@ -137,40 +148,61 @@ Secondary fusions:
 
 ---
 
-## 3. Verdict: **Super-GOAT**
+## 3. Verdict: **GOAT** (revised down from initial Super-GOAT claim — see header revision log)
 
-### 3.1 Novelty gate (§1.5)
+### 3.1 Novelty gate (§1.5) — honest re-assessment after §1.55.2 reverse-grep
 
-- **Q1 (no prior art)?** YES. Grep across all 7 repos for `similarity.inference|embedded.equilibrium|embedded.agent|functional.similarity|behavioral.similar|kin.selection|greenbeard|correlated.equilibrium|evidential.decision|tag.based.cooperat|superrational|newcomb` returns ZERO prior-art hits for the *mechanism*. The closest cousins (R143 CCE Moderator, R156 Clifford Wedge, R158 Committed Personality, R167 Crowd Joint Inference, R469 Collective Payoff) each ship a related-but-distinct primitive; none composes "infer similarity → switch best-response regime". The CCE Moderator (R143) is *designer-steered*; this is *similarity-inferred*. The Clifford Wedge (R156) detects *complementarity*; this detects *similarity*. The Committed Personality (R158) ships the *shared shard*; this consumes it as the functional-identity substrate. Doc 61 (in R143) surveys 14 Bayes-CCE cousins — none is the embedded equilibrium; Bayes-CCE decouples agents, embedded equilibrium couples them.
-- **Q2 (new class of behavior)?** YES. Emergent cooperation from similarity inference — not reciprocity, not designer signal, not RL training, not kin-selection hardcoding. NPCs form cooperative factions *purely* from inferring they share an archetype shard. Indirect inference (zero-shot cooperation from third-party observation) is an entirely new capability class — no shipped primitive produces it.
-- **Q3 (product selling point)?** YES. "Our NPCs form emergent cooperative factions purely from inferring they share the same archetype shard — no faction setup, no designer signal, no training. Two merchants who have both traded with the same customers cooperate on first meeting. AI NPCs form solidarity networks distinct from human societies." See private guide R335 for the full selling-point framing.
-- **Q4 (force multiplier)?** YES. Connects ≥6 existing systems: R158 (committed personality = the shared shard), R143 (CCE moderator = the cooperation equilibrium target), R133 (mind-reading = the predictive channel), R167 (crowd set attention = similarity aggregation), R156 (complementarity = the orthogonal cousin), R123 (latent functor = relational stance), KG triple emission (encounter evidence), Lean 4 FV (cooperation threshold theorem).
+**The reverse-grep that should have run before the initial verdict:** `equilibrium|Equilibrium|nash|Nash|cce|Cce|CCE|correlation.device|correlation.signal|EqR` across `*.rs` + `*.md` in all 7 repos. Returns heavy prior art:
 
-**All 4 YES → Super-GOAT.** Mandatory outputs (per skill §1.5) produced in this session:
-1. Open primitive → this note (`katgpt-rs/.research/471`).
-2. Private selling-point guide → `riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md` (produced in this session).
-3. Plan → `katgpt-rs/.plans/526_similarity_inference_primitive.md` (produced in this session); riir-ai runtime plan deferred to follow-up (TBD number — open after P0 of the open primitive lands).
+- `PayoffTable<N>::nash_equilibrium` (R026) — explicit Nash solver, used as head-to-head baseline in Bench 029.
+- **LP-CCE Moderator** `CceLp<N,A>` + `CcePrimalDual` (R274 / Plan 295, **DEFAULT-ON**) — Coarse Correlated Equilibrium with **external correlation device** ζ broadcast via LatCal. Bench 029: +37.5% (chicken) / +108% (BoS) over Nash.
+- **EqR Equilibrium Reasoners** (R079 / Plan 119, `eqr_convergence` feature, **DEFAULT-ON**) — equilibrium-finding via residual convergence (Top1Converged rollout selection).
+- **Bayes-CCE** literature search (Doc 61 in R143, 14 cousins surveyed: Bergemann–Morris, Hartline–Syrgkanis–Tardos, Fujii, Peng–Rubinstein, Koessler–Scarsini–Tomala, Campi–Cannerozzi–Tzoumas, etc.).
+- **Ruliology PD arena** (R168 / Plan 213) — explicit PD equilibrium search over FSM strategies (grim trigger wins among 2-state FSMs).
 
-### 3.2 MOAT gate per domain (§1.6)
+**Honest assessment of the paper's "embedded equilibrium" against shipped prior art:**
 
-- **katgpt-rs (public engine)**: ✅ **in-scope, paper-derived fundamental primitive**. The similarity posterior + cooperation threshold + embedded best-response comparator is a generic modelless primitive (Bayesian update + sigmoid gate + comparator). No game semantics, no entity-kind assumptions. Pure math. The open primitive lands here.
-- **riir-ai (private runtime)**: ✅ **in-scope, pillar-level Super-GOAT**. The selling-point guide (R335) connects ≥4 pillars: committed personality (R158 = the shared shard that grounds functional similarity), crowd coordination (R143 = the equilibrium target), mind-reading (R133 = the predictive channel), KG triple emission (encounter evidence). Fusion-GOAT connecting multiple pillars → pillar-level by §1.6 MOAT bar.
+The paper itself states (§"A new game theory for modern AI agents"): *"When `q(λ)` encodes strictly decoupled relationships between agents' policies, this concept perfectly reduces to the classical Nash equilibrium."* The coupled case is structurally a **correlated equilibrium with an endogenous correlation device** — the correlation structure is *inferred* from interaction history rather than *designed* (as in our R143 moderator's ζ signal). But mathematically, an embedded equilibrium IS a correlated equilibrium where the correlation device happens to be the agents' shared posterior over functional identity.
 
-### 3.3 Why this is NOT covered by R143 (Latent CCE Moderator)
+We ship correlated equilibrium (CCE). We ship the LP solver (`CceLp<N,A>`). We ship the primal-dual iterator (`CcePrimalDual`). We ship external correlation devices (designer-set ζ). What we DON'T ship is an **endogenous** correlation device inferred from interaction history.
 
-Honest defense of the novelty claim against the closest cousin. R143 ships:
+### 3.2 Revised novelty-gate scoring
+
+- **Q1 (no prior art for the *solution concept*)?** **NO.** CCE/Nash/Bayes-CCE surveyed cover the equilibrium concept. Embedded equilibrium reduces to Nash (decoupled case) or correlated equilibrium (coupled case) — both shipped/surveyed.
+- **Q1 (no prior art for the *mechanism*)?** **YES.** Similarity-inferred endogenous correlation device (the `ω` posterior update from joint-action history) is not shipped. Our CCE moderator uses an *exogenous* designer-set ζ; the paper's agents *infer* the correlation structure.
+- **Q2 (new class of behavior)?** **PARTIAL.**
+  - **Direct similarity inference** = "CCE reached via inferred correlation instead of designer signal" — **new mechanism, NOT new capability**. The equilibrium reached is still a CCE; the difference is how the correlation device gets there (endogenous vs exogenous).
+  - **Indirect similarity inference** (zero-shot cooperation from third-party observation) = **genuinely new capability**. No shipped primitive produces zero-shot cooperation from parallel third-party observation without direct interaction.
+- **Q3 (product selling point)?** YES — "endogenous moderator" + "zero-shot cooperation from third-party observation" are real selling points.
+- **Q4 (force multiplier)?** YES — connects R158 (committed personality = shard substrate), R143 (CCE moderator = equilibrium target, made endogenous), R133 (mind-reading = predictive channel), R167 (crowd set attention = similarity aggregation).
+
+### 3.3 Verdict
+
+Per skill §1.5: **Q1-NO on the solution concept → NOT Super-GOAT.**
+
+**Revised verdict: GOAT** — a new *mechanism* (similarity-inferred endogenous correlation device) producing a *gain* over the existing CCE substrate (which uses exogenous designer-set correlation). The gain is architectural: the moderator becomes endogenous (driven by inferred similarity rather than designer signal), which is a real fusion improvement but not a new capability class.
+
+**Super-GOAT-capability subset (conditional):** if the G5 PoC (Plan 526 Phase 3 — indirect inference) passes, **indirect similarity inference alone** is a genuinely new capability class worth a separate narrower Super-GOAT claim. That claim would be scoped to "zero-shot cooperation from third-party observation" only, NOT to the equilibrium concept or the direct-inference mechanism. Tracked as a follow-up in Plan 526 Phase 7 — if G5 passes, open a new scoped Super-GOAT guide for indirect inference specifically.
+
+### 3.4 MOAT gate per domain (§1.6)
+
+- **katgpt-rs (public engine)**: ✅ **in-scope, GOAT-tier primitive**. The similarity posterior + cooperation threshold + best-response comparator is a generic modelless primitive that *composes with* the existing CCE substrate (`CceLp<N,A>`) to produce an endogenous correlation device. No game semantics. Open primitive lands here.
+- **riir-ai (private runtime)**: ✅ **in-scope, fusion-GOAT** (not pillar-level Super-GOAT). The selling-point guide (R335) connects the new primitive to existing pillars (committed personality R158, crowd coordination R143, mind-reading R133). Fusion-GOAT, not new-pillar-tier.
+
+### 3.5 Why this is NOT covered by R143 (Latent CCE Moderator) — the mechanism-level distinction
+
+R143 ships:
 - Designer-steered `Γ₀` per game mode (economy / faction / narrative).
 - External moderator broadcasts correlation signal `ζ` via LatCal.
 - Pareto-dominant CCE achieved by LP solver.
 - Crowd-scale (thousands of NPCs, 20Hz tick).
 
-This paper ships:
-- *No designer objective* — cooperation emerges from agent-internal posterior.
-- *No external moderator broadcast* — each agent maintains its own `ω` posterior from encounter history.
-- *Embedded equilibrium*, a different solution concept than CCE (CCE allows correlation via external signal; embedded equilibrium allows correlation via shared functional structure inferred from history).
+This paper ships (the novel mechanism):
+- *Endogenous* correlation device — each agent infers `ω` from encounter history, no external broadcast.
+- The inferred `ω` can *drive* the R143 moderator's `Γ₀` switch — making the moderator endogenous.
 - **Per-agent, not per-zone**: `ω` is pairwise per (self, partner); CCE moderator is per-zone.
 
-The two are *complementary*: when pairwise `ω` crowd-crosses threshold, the CCE moderator can switch `Γ₀` endogenously. But the primitives are distinct.
+**The two compose:** when pairwise `ω` crowd-crosses threshold, the CCE moderator can switch `Γ₀` endogenously. This composition (R143 × R471) is the actual gain — the moderator becomes self-steering. But the equilibrium concept itself is shared (both reach CCE).
 
 ### 3.4 Defend-wrong PoC requirement (§3.6)
 
