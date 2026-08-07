@@ -8,6 +8,8 @@
 > **Related Plans:** katgpt-rs 303 (this primitive), riir-ai 330 (runtime integration), riir-ai 311 (mind-reading runtime), riir-ai 313 (SwiR validation), katgpt-rs 299 (Engram primitive)
 > **Classification:** Public (open primitive). Private selling-point guide lives in `riir-ai/.research/148_Per_Tick_Emit_Salience_NPC_Guide.md`.
 > **Verdict: Super-GOAT — the per-tick autonomous emit decision is a new capability class with zero prior art in the corpus.**
+>
+> **PASS-Redirects (synthesis):** Chen, Lin, Wang [arXiv:2607.28457 "SVR: Self-Verifying Refinement via Joint Verdict–Confidence Reinforcement Learning for Adaptive Test-Time Compute"] — PASS on the modelless side. SVR's 3-way verdict {Correct, Incorrect, Unsure} + confidence-gated stopping rule is architecturally covered by this note's `SalienceDecision::Silent / Speak / Delegate` (3-way gate with confidence-like `c` input) + `EarlyStopGate<P, confidence_threshold>` (the γ=0.85 threshold analog). SVR's value is the TRAINING recipe (multi-turn GRPO with Joint Verdict–Confidence RL) — the Brier calibration + asymmetric overconfidence + stop-readiness rewards all require ground-truth `y`, unavailable modellessly. §3.5 Path 0 decomposition: inference rule decomposes (shipped here), training objective does NOT. Per Path 0.5 → Plan in riir-train/.plans/328. SVR's `Silent ≈ Unsure`, `Speak ≈ Correct`, `Delegate ≈ Incorrect-then-refine` mapping confirms the SalienceTriGate's verdict shape is the right runtime contract; the trained SVR weights, if the GOAT gate passes, flow into the runtime via freeze/thaw and consume this gate's `decide(a, z, c, payload, tick)` interface unchanged.
 
 ---
 
