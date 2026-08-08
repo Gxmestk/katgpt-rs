@@ -1,3 +1,17 @@
 # Lean 4 build artifacts (Lake)
 .lake/
-lake-manifest.json
+
+# `lake-manifest.json` is deliberately NOT ignored.
+#
+# It was, and that made the proofs unreproducible. `lakefile.toml` requires
+# Mathlib without a revision, so Lake resolves it to `master`. With the
+# manifest ignored, a fresh checkout (CI, or a new machine) resolves `master`
+# to whatever is newest *at that moment* — not the revision these theorems
+# were actually checked against. Mathlib's master moves daily and does not
+# stay compatible with a pinned older toolchain, so "the proofs type-check"
+# would have meant different things on different days.
+#
+# The manifest records the exact resolved revision of Mathlib and its
+# transitive dependencies. Committing it is what makes `scripts/proof_gate.sh`
+# reproducible, and it is what upstream Mathlib and downstream projects do.
+# Update it deliberately with `lake update`, then re-run the proof gate.
