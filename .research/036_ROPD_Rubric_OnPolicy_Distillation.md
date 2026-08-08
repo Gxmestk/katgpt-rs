@@ -4,6 +4,7 @@
 > **Source:** `.raw/ROPD_official/` — full codebase + paper audited
 > **Date:** 2025-06-01
 > **Related Plans:** Plan 071 (katgpt-rs, modelless), Plan 072 (riir-ai, model-based)
+> **PASS-Redirects (synthesis):** U-OPSD [arXiv:2608.06296 "On-Policy Self-Distillation without Any Supervision"] — unsupervised OPSD variant using majority-vote consensus as pseudo-labels. The inference-time consensus machinery (Components 1-4: G-rollout sampling via BoMSampler, plurality vote, self-consistency threshold via SalienceTriGate, teacher conditioning via Latent Field Steering) already ships modellessly; the forward-KL gradient update (Component 5) is genuinely training-only → riir-train Plan 329. ROPD's rubric-based scoring is the modelless analog of U-OPSD's consensus-based teacher signal.
 
 ## Executive Summary
 
