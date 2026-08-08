@@ -887,7 +887,7 @@ unsafe fn dequant_dot_via_lut_multi_stage_neon(
     lut_slices: &[&[f32]],
     x: &[f32],
 ) -> f32 {
-    use core::arch::aarch64::{vaddq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32, vaddvq_f32};
+    use core::arch::aarch64::{vaddq_f32, vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
 
     unsafe {
         let n_stages = codes_per_stage.len();
@@ -1012,20 +1012,21 @@ unsafe fn dequant_dot_via_lut_multi_stage_avx2(
         while i + 16 <= n {
             for &(off, slot) in &[(0usize, 0usize), (8, 1)] {
                 // Load 8 code bytes → zero-extend to 8× i32 indices.
-                let raw = core::arch::x86_64::_mm_cvtepu8_epi32(
-                    core::arch::x86_64::_mm_loadl_epi64(
-                        codes_per_stage[0].as_ptr().add(i + off) as *const _
-                    )
-                );
+                let raw =
+                    core::arch::x86_64::_mm_cvtepu8_epi32(core::arch::x86_64::_mm_loadl_epi64(
+                        codes_per_stage[0].as_ptr().add(i + off) as *const _,
+                    ));
                 // Stage 0 contributes via gather from its own LUT.
                 // We reuse the i32 index vector across stages since codes differ
                 // per stage — load each stage's codes separately.
                 let mut stage_sum = _mm256_setzero_ps();
                 for k in 0..n_stages {
-                    let idx_vec = core::arch::x86_64::_mm_cvtepu8_epi32(
+                    // _mm256_cvtepu8_epi32: widen 8 uint8 → 8 int32 (__m256i).
+                    // (_mm_cvtepu8_epi32 only widens 4 → __m128i, wrong for the 256-bit gather.)
+                    let idx_vec = core::arch::x86_64::_mm256_cvtepu8_epi32(
                         core::arch::x86_64::_mm_loadl_epi64(
-                            codes_per_stage[k].as_ptr().add(i + off) as *const _
-                        )
+                            codes_per_stage[k].as_ptr().add(i + off) as *const _,
+                        ),
                     );
                     let gathered = _mm256_i32gather_ps(lut_slices[k].as_ptr(), idx_vec, 4);
                     stage_sum = _mm256_add_ps(stage_sum, gathered);
@@ -1046,11 +1047,10 @@ unsafe fn dequant_dot_via_lut_multi_stage_avx2(
         if i + 8 <= n {
             let mut stage_sum = _mm256_setzero_ps();
             for k in 0..n_stages {
-                let idx_vec = core::arch::x86_64::_mm_cvtepu8_epi32(
-                    core::arch::x86_64::_mm_loadl_epi64(
-                        codes_per_stage[k].as_ptr().add(i) as *const _
-                    )
-                );
+                let idx_vec =
+                    core::arch::x86_64::_mm256_cvtepu8_epi32(core::arch::x86_64::_mm_loadl_epi64(
+                        codes_per_stage[k].as_ptr().add(i) as *const _,
+                    ));
                 let gathered = _mm256_i32gather_ps(lut_slices[k].as_ptr(), idx_vec, 4);
                 stage_sum = _mm256_add_ps(stage_sum, gathered);
             }
@@ -1553,7 +1553,12 @@ mod tests {
         let codes: [&[u8]; 2] = [&codes0, &codes1];
         let luts: [&[f32]; 2] = [&lut0, &lut1];
         let result = dequant_dot_via_lut_multi_stage_slice(&codes, &luts, &x);
-        assert!((result - ref_dot).abs() < 1e-4, "result={} ref={}", result, ref_dot);
+        assert!(
+            (result - ref_dot).abs() < 1e-4,
+            "result={} ref={}",
+            result,
+            ref_dot
+        );
     }
 
     /// G1: single-stage multi-stage kernel matches the single-stage kernel.
