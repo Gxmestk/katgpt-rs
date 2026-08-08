@@ -6,6 +6,7 @@
 **Verdict:** ✅ GOAT as modelless fusion — recovers 30-70% adapter memory, sharper retrieval, automatic rank. Public (engine mechanics, no IP leak).
 **Related Plans:** 264 (this research's implementation plan, katgpt-rs); 296 (riir-ai model-based counterpart)
 **Related Research:** 003 (commercial strategy), 125 (weight norm = Kolmogorov), 122 (EDGE-OPD), 201 (RAT+ train dense infer sparse), 230 (SSD), 132 (LoRAPrune), 098 (lottery ticket), 162 (Trust Region), 178 (Rosetta cross-game alignment)
+> **PASS-Redirects (synthesis):** Fu et al. [arXiv:2608.03913 "Sparse Weight Decomposition for Efficient Circuit Extraction"] — PASS. SWD factorizes each *full* weight matrix W into two sparse factors S₁·S₂ whose shared intermediate coordinates serve as addressable circuit units (mechanistic interpretability). The sparse two-factor decomposition *mechanism* already ships here as `SparseTaskVector`'s documented natural rank-`nnz` factorization `ΔW = A·B^T` (one-hot sparse factors) — but for weight *deltas*, not full base weights, and for adapter storage/retrieval/composition, not circuit extraction. SWD's primary value (mech-interp circuit extraction) is not our commercial domain (not a pillar); the closest mech-interp cousin is IMIR (R444 — a STRONGER closed-form commutant-basis auto-circuit-detection). SWD's training application (pretrain with sparse-factor parameterization, e.g. veri-safe/SWD on FineWeb-Edu) does NOT match any riir-train pipeline (all LoRA-adapter-based, not base-weight-reparameterization). No documented gap filled.
 
 ---
 
