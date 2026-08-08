@@ -736,6 +736,13 @@ mod sliding_bounded_tests {
             bounded_bytes, expected_bytes,
             "bounded bytes should match expected: 2 sliding + 1 full layer"
         );
+
+        // The claim in the test's name — `naive_bytes` was computed above but
+        // never checked, so G1's actual premise went unasserted.
+        assert!(
+            bounded_bytes < naive_bytes,
+            "sliding-bounded ({bounded_bytes} B) should allocate less than naive ({naive_bytes} B)"
+        );
     }
 
     #[test]
