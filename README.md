@@ -2618,6 +2618,37 @@ Feature gate: `rrq_quant` (in katgpt-core, **opt-in / default-off**). 📖 Plan:
 
 ---
 
+### 🌀 Phase Separation Probe — Lonely Runner Coverage Guarantee (Plan 571, arxiv 0710.4495)
+
+Distills Barajas & Serra 2007 (*The Lonely Runner with Seven Runners*) into a **modelless per-entity minimum circular distance on a phase circle** — a coverage guarantee no existing primitive provides. For N entities each with a phase `φ_i ∈ [0, 1)`, the probe computes
+
+```text
+phase_separation(i) = min_{j ≠ i} ‖φ_i − φ_j‖ mod 1     ∈ [0, 0.5]
+```
+
+where `‖x‖ mod 1` is the circular distance on the unit torus. The **Lonely Runner Conjecture** (proven for N ≤ 7 by Barajas & Serra 2007) guarantees that, for N entities with integer cycle speeds {s_1, ..., s_N} (gcd = 1), every entity i has some tick t where `phase_separation(i) ≥ 1/N` — a *guaranteed-peak* property justifying its use as a behavior driver ("has this entity been far enough from the crowd recently?").
+
+Three modelless paths over `&[f32]`, all writing into caller-provided `&mut [f32]` (zero allocation):
+- `phase_separation(phases, i)` — O(N) single entity (small N + correctness testing).
+- `phase_separation_all(phases, out)` — O(N²) all-pairs (correctness testing).
+- `phase_separation_sorted(phases, scratch_perm, out)` — O(N log N) sort + adjacent-neighbor scan (**production**).
+
+Two bridge helpers cross the raw→latent boundary per AGENTS.md: `from_speeds_and_tick` (raw time-phase, sync-safe) + `from_latent_projection` (latent `σ(d·z)` bridge, local-only).
+
+**GOAT status (G1–G4 ALL PASS, [Bench 571](.benchmarks/571_phase_separation_goat.md), 2026-08-07):**
+- **G1** (determinism + LRC bound): 8/8 lib tests PASS. `g1_lrc_bound_n7` scans the discrete orbit k=0..420 (period = lcm(1..7)) and confirms every entity hits `phase_separation ≥ 1/7` — the LRC theorem confirmation. Integer-phase output is bit-identical across all three paths.
+- **G2** (perf @ N=1000): `phase_separation_sorted` **7947 ns/call** (< 10µs target). O(N log N) scaling confirmed: N=10000/N=1000 = 12.49× (theory predicts ~13×; gate target < 20×).
+- **G3** (no-regression): 1845 → 1853 lib tests (+8 new, 0 regressions, feature on vs off).
+- **G4** (alloc-free): 0 allocations / 1000 calls at N=1000 (CountingAllocator; caller-owned `scratch_perm` buffer reused in place).
+
+> **Scale caveat (honest):** the LRC is *proven* for N ≤ 7 and *conjectured* for N > 7. The primitive computes the scalar correctly for any N; only the *peak guarantee* is conjectural at scale. Think-brain primitive (latent, local-only) suitable for zone-attention routing or curiosity/coverage scoring.
+
+**Decision: `phase_separation` DEFAULT-ON** (Plan 571 Phase 1, 2026-08-07). Pure modelless (closed-form modular arithmetic + sigmoid + dot-product, no training). Zero runtime cost unless invoked. The private game-runtime fusion (Salience Tri-Gate × Sleep-Time × KARC × feeling brain) is an riir-ai task tracked in the private guide.
+
+Feature gate: `phase_separation` (**DEFAULT-ON** since 2026-08-07; zero runtime cost unless a caller invokes the probe). 📖 Plan: [`571`](.plans/571_phase_separation_probe.md), Research: [`.research/470_Lonely_Runner_Phase_Separation_Probe.md`](.research/470_Lonely_Runner_Phase_Separation_Probe.md), GOAT bench: [`.benchmarks/571_phase_separation_goat.md`](.benchmarks/571_phase_separation_goat.md), Phase 3 demo: `crates/katgpt-core/examples/phase_separation_demo.rs`. Paper: [arXiv:0710.4495](https://arxiv.org/abs/0710.4495).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
