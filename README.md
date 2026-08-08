@@ -30,7 +30,7 @@ Inspired by [Andrej Karpathy's microgpt](https://karpathy.github.io/2026/02/12/m
 | **Renoise-CE Self-Verifier** | **renoise=1.000 vs plurality=0.000** (100pp), **+30.5pp** CLR fusion (6× target) | Perturb-output + re-resolve + measure-drift, operator-agnostic (Plan 406, DEFAULT-ON) |
 | **Velocity Field Ensemble** | **beats conformal-naive floor** (Plan 340); ridge-solved η weights regression-optimal | Algebraic combination of P frozen velocity fields (Plan 376, DEFAULT-ON) |
 | **Local Branch Routing** | **+9pp to +26pp** quality gain (K=3 candidates), argmax **51ns** / sampled **69ns** | Post-candidate-set attention + relative routing (Plan 377, DEFAULT-ON) |
-| **Set Attention (NPT half)** | **75.7µs/tick @ 100 NPCs** (6.6× headroom), G1–G5 PASS | Permutation-equivariant sigmoid-gated cross-entity attention (Plan 354, DEFAULT-ON) |
+| **Set Attention (NPT half)** | **75.7µs/tick @ 100 NPCs** (6.6× headroom), G1–G5 PASS, G8 **CLOSED** by CLR-weighted sibling (+8.7pp ID, 3.88× amplification) | Permutation-equivariant sigmoid-gated cross-entity attention (Plan 354 + Plan 570 CLR-weighted sibling, DEFAULT-ON) |
 | **Step Attribution Qualifier** | **81.6% drift reduction** (riir-ai PoC), 13ns aggregate @ W=64 | Δ≥0 commit gate (SkillAdaptor eq.8) + StepLocalizer (Plan 381, DEFAULT-ON) |
 | **Heat Kernel Trajectory** | **exact at long horizons** vs O(T·dt²) Euler error | Single-shot DEC cochain field prediction via operator exponential (Plan 359, DEFAULT-ON) |
 | **QMC Belief Sampling** | **G1–G6 ALL PASS** (Lattice/Stratified/Sobol drop-in for iid) | QuasiMoTTo QMC uniform sources in K-rollout paths (Plan 367, DEFAULT-ON) |
@@ -485,7 +485,8 @@ graph LR
 | **Tropical (max,+) Algebra** (`tropical_algebra`) | 337 | Super-GOAT ✅ | (max,+) tropical semiring matvec + DEC wrappers for worst-case/bottleneck aggregation (arxiv 2403.04807). D=64 matvec **0.96× of simd_matvec** (NEON); 3/3 fusion gates PASS. Default-on. |
 | **Temp-Loss Fingerprint Selector** (`temp_loss_fingerprint`) | 341 | G1 ✅ | Perturbed-loss-vector diversity selector via Lipschitz gradient bounds (arxiv 2606.26797). G1 **15.44× diversity ratio**; select_diverse_subset 130µs (<1ms); cross-repo neuron-db gain +0.1672. Default-on. |
 | **Zone Density Routing** (`zone_density_routing`) | 351 | G5a/b/c ✅ | Density-aware zone routing: classify + outer-first schedule + papaya LRU cache with 3 invalidation rules. G5a **+41.54% routing**, G5b **99.1% cache hit**, G5c 0 stale reads. Default-on. |
-| **Set Attention (NPT half)** (`set_attention`) | 354 | G1–G5 ✅ (G8 FAIL) | Permutation-equivariant sigmoid-gated cross-entity set attention (arxiv 2106.02584). Production **75.7µs/tick @ 100 NPCs** (6.6× headroom). G8 collective inference FAILED (Super-GOAT→GOAT, use-case limit). Default-on. |
+| **Set Attention (NPT half)** (`set_attention`) | 354 | G1–G5 ✅ (G8 CLOSED) | Permutation-equivariant sigmoid-gated cross-entity set attention (arxiv 2106.02584). Production **75.7µs/tick @ 100 NPCs** (6.6× headroom). G8 collective inference closed by the CLR-weighted sibling (Plan 570). Default-on. |
+| **CLR-Weighted Set Attention** (`clr_weighted_set_attention`) | 570 | G1/G2/G4/G8 ✅ | Reliability-weighted sibling of `set_sigmoid_attention_into` — `output_i = h_i + (γ/Σ r_j)·Σ α_ij·r_j·(v_j−h_i)`, uniform `r_j=1` reduces bit-identically to plain SA. CLR `^M` reliability gate converts averaging into amplification: **+8.7pp** identification accuracy + **3.88×** aggregate amplification over plain SA on the N=64 crowd threat-detection fixture (Issue 575 PoC). Default-on. |
 | **Heat Kernel Trajectory** (`heat_kernel_trajectory`) | 359 | All 5 phases ✅ | Single-shot DEC cochain field prediction via operator exponential (arxiv 2606.27364) — exact at long horizons vs O(T·dt²) Euler error. Default-on (katgpt-dec). |
 | **QMC Belief Sampling** (`qmc_sampling`) | 367 | G1–G6 ✅ | QuasiMoTTo — QMC uniform sources (Lattice/Stratified/Sobol) + arithmetic-coding descend, drop-in for iid in K-rollout paths (arxiv 2607.01179). 850/850 lib tests, 26 bootstrap tests. Default-on. |
 | **Manifold Bandit Latent Task Tree** (`manifold_bandit`) | 370 | G1/G3/G4/G5 ✅ | LatentTaskTree + HierarchicalThompsonSampler + BayesianFilterArm (arxiv 2606.19750). G1-real **0.740 ratio**; R279 N≥d phase gate ships opt-in (+11% convergence). Default-on. |
@@ -2016,7 +2017,19 @@ Density-aware zone routing for crowd NPC navigation: classify zone density → o
 
 The open half of the NPT (Non-Parametric Transformers) ABD primitive: permutation-equivariant cross-entity attention where each entity attends to all other entities' latent states via a sigmoid gate (never softmax). `SetAttention<N,D>` with `set_attention_into` zero-alloc hot path.
 
-**G1–G5 PASS** (equivariance tested under all permutations, sigmoid-gate bit-stable). Production: **75.7µs/tick @ 100 NPCs** (6.6× headroom vs the 500µs budget). **G8 collective-inference gate FAILED** — the selling point (emergent collective reasoning beyond per-entity attention) did not reproduce on the synthetic scenario; demoted Super-GOAT→GOAT and documented as a use-case limitation. The primitive itself stays default-on. Feature gate: `set_attention` (**default-ON**). 📖 Plan: [`.plans/354_cross_datapoint_set_attention_primitive.md`](.plans/354_cross_datapoint_set_attention_primitive.md), Benchmark: [`.benchmarks/354_set_attention_goat.md`](.benchmarks/354_set_attention_goat.md), Paper: [arXiv:2106.02584](https://arxiv.org/abs/2106.02584).
+**G1–G5 PASS** (equivariance tested under all permutations, sigmoid-gate bit-stable). Production: **75.7µs/tick @ 100 NPCs** (6.6× headroom vs the 500µs budget). **G8 collective-inference gate CLOSED by the CLR-weighted sibling** (Plan 570, 2026-08-06) — the original G8 failure ("averaging cannot amplify detection") was a use-case limit of plain averaging, not a primitive defect; the CLR-weighted variant below closes it. Feature gate: `set_attention` (**default-ON**). 📖 Plan: [`.plans/354_cross_datapoint_set_attention_primitive.md`](.plans/354_cross_datapoint_set_attention_primitive.md), Benchmark: [`.benchmarks/354_set_attention_goat.md`](.benchmarks/354_set_attention_goat.md), Paper: [arXiv:2106.02584](https://arxiv.org/abs/2106.02584).
+
+#### CLR-Weighted Sibling — Reliability-Amplified Set Attention (Plan 570, 2026-08-06)
+
+A sibling of `set_sigmoid_attention_into` that accepts per-entity reliability weights `r_j` and modulates the attention contribution:
+
+```text
+output_i = h_i + (γ / Σ_j r_j) · Σ_j α_ij · r_j · (v_j − h_i)
+```
+
+The `r_j` weighting concentrates the aggregate toward high-reliability entities, converting plain averaging (which dilutes signal — the original G8 failure) into amplification. When `r_j = 1` for all `j`, this reduces **bit-identically** to plain SA (G1 special case). The companion `clr_reliability_scores` helper computes `r_j = (mean_m sigmoid(h_j · dir_m))^M` — the CLR headline formula (Plan 284), distilled from Wang/Plotkin PNAS 2025 feedback-payoff theory (Research 469).
+
+**G8 closure** (the quality gate the sibling targets): CLR reliability identification **17.6%** vs plain SA **8.9%** (Δ+8.7pp ≥ 5pp target); CLR-weighted aggregate amplification **3.88×** (≥ 2× target) on the Issue 575 N=64 crowd threat-detection fixture. **G1/G2/G4 ALL PASS**: uniform≡plain SA bit-identical (dense+topk), latency ratio 1.00× (≤ 2× target — one extra multiply per peer), 0 allocs/100 calls. Feature gate: `clr_weighted_set_attention` (**default-ON**). 📖 Plan: [`.plans/570_clr_weighted_set_attention.md`](.plans/570_clr_weighted_set_attention.md), PoC: [Issue 575](.issues/575_set_attention_feedback_payoff_fusion.md), Research: [469 §PoC Addendum](.research/469_collective_intelligence_payoff_schemes.md).
 
 ---
 
