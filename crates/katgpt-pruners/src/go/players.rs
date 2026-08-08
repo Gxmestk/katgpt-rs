@@ -16,7 +16,7 @@ use fastrand::Rng;
 use super::state::{GoHeuristic, GoState};
 use super::types::{GoAction, GoCell, GoFrozenBandit, GoFrozenTemplates};
 use crate::bandit::BanditStats;
-use crate::game_state::{GameState, StateHeuristic, mcts_search};
+use crate::game_state::{GameState, MctsSearchBudget, StateHeuristic, mcts_search_with};
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -26,8 +26,11 @@ pub const HEURISTIC_WEIGHT: f32 = 0.8;
 pub const BANDIT_WEIGHT: f32 = 0.2;
 const NUM_CATEGORIES: usize = 8;
 const NUM_TEMPLATES: usize = 4;
-const DEFAULT_MCTS_BUDGET: usize = 200;
-const DEFAULT_MCTS_ROLLOUT_DEPTH: usize = 50;
+/// Go-tuned MCTS search budget. Deliberately *not*
+/// `MctsSearchBudget::default()` (512/40, the Warm-tier game-server profile) —
+/// Go's branching factor is 82–362 actions at the root, so it wants a deeper
+/// rollout than a game-server NPC tick and can afford a smaller budget per move.
+const DEFAULT_MCTS_SEARCH: MctsSearchBudget = MctsSearchBudget::new(200, 50);
 /// Recency decay half-life for credit assignment (in moves).
 /// With ~302 moves/game, half_life=50 means the last ~50 moves get most credit.
 const HL_RECENCY_HALF_LIFE: f32 = 50.0;
@@ -1027,37 +1030,47 @@ impl GoPlayer for GoGZeroPlayer {
 
 /// MCTS player wrapping `mcts_search` with `GoHeuristic`.
 ///
-/// Configurable budget and rollout depth. Uses `GoHeuristic` for
+/// Search is sized by a [`MctsSearchBudget`]. Uses `GoHeuristic` for
 /// non-terminal state evaluation during rollouts.
 pub struct GoMctsPlayer {
-    budget: usize,
-    rollout_depth: usize,
+    search: MctsSearchBudget,
 }
 
 impl GoMctsPlayer {
     /// Create MCTS player with custom parameters.
+    ///
+    /// Prefer [`Self::with_search`] — this takes the two knobs positionally and
+    /// so is transposable at the call site.
     pub fn new(budget: usize, rollout_depth: usize) -> Self {
-        Self {
-            budget,
-            rollout_depth,
-        }
+        Self::with_search(MctsSearchBudget::new(budget, rollout_depth))
+    }
+
+    /// Create MCTS player from an explicit search budget.
+    pub fn with_search(search: MctsSearchBudget) -> Self {
+        Self { search }
     }
 
     /// Create MCTS player with default parameters (budget=200, depth=50).
     pub fn default_player() -> Self {
-        Self::new(DEFAULT_MCTS_BUDGET, DEFAULT_MCTS_ROLLOUT_DEPTH)
+        Self::with_search(DEFAULT_MCTS_SEARCH)
+    }
+
+    /// Current search budget.
+    #[inline]
+    pub fn search(&self) -> MctsSearchBudget {
+        self.search
     }
 
     /// Current budget.
     #[inline]
     pub fn budget(&self) -> usize {
-        self.budget
+        self.search.budget
     }
 
     /// Current rollout depth.
     #[inline]
     pub fn rollout_depth(&self) -> usize {
-        self.rollout_depth
+        self.search.rollout_depth
     }
 }
 
@@ -1088,14 +1101,7 @@ impl GoPlayer for GoMctsPlayer {
         let heuristic = GoHeuristic;
         let heuristic_fn = |s: &GoState, pid: u8| heuristic.evaluate(s, pid);
 
-        mcts_search(
-            state,
-            player_id,
-            self.budget,
-            self.rollout_depth,
-            &heuristic_fn,
-            rng,
-        )
+        mcts_search_with(state, player_id, self.search, &heuristic_fn, rng)
     }
 
     fn name(&self) -> &'static str {
@@ -1854,8 +1860,9 @@ mod tests {
     #[test]
     fn mcts_default_values() {
         let player = GoMctsPlayer::default();
-        assert_eq!(player.budget(), DEFAULT_MCTS_BUDGET);
-        assert_eq!(player.rollout_depth(), DEFAULT_MCTS_ROLLOUT_DEPTH);
+        assert_eq!(player.search(), DEFAULT_MCTS_SEARCH);
+        assert_eq!(player.budget(), DEFAULT_MCTS_SEARCH.budget);
+        assert_eq!(player.rollout_depth(), DEFAULT_MCTS_SEARCH.rollout_depth);
     }
 
     #[test]

@@ -31,7 +31,9 @@ use crate::bandit::BanditStats;
 // `mcts_search` and `mcts_search_informed` are the public algorithm entry
 // points. Moved verbatim to katgpt-core; resolved through this shim so the
 // existing `crate::game_state::mcts::*` import paths keep working.
-pub use katgpt_core::mcts::{mcts_search, mcts_search_informed};
+pub use katgpt_core::mcts::{
+    MctsSearchBudget, mcts_search, mcts_search_informed, mcts_search_with,
+};
 
 // ── Bandit Rollout Policy (composition) ─────────────────────────────────
 

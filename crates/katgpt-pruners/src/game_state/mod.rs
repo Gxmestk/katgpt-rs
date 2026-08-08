@@ -28,6 +28,7 @@ mod mcts;
 
 pub use mcts::mcts_search;
 pub use mcts::mcts_search_informed;
+pub use mcts::{MctsSearchBudget, mcts_search_with};
 
 #[cfg(feature = "bandit")]
 pub use mcts::BanditRolloutPolicy;
