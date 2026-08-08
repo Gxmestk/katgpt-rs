@@ -90,8 +90,11 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             parallax_gate_scale: 0.0,
             parallax_zero_init: true,
             emotion_desperation_threshold: 0.5,
+            #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
+            #[cfg(feature = "rim_slots")]
             rim_tokens_per_block: 2,
+            #[cfg(feature = "rim_slots")]
             rim_buffer_token: 0,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: vec![],
@@ -117,6 +120,18 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             belief_drafter_entropy_threshold: 2.0,
             #[cfg(feature = "loop_stability_fix")]
             loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: vec![],
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 

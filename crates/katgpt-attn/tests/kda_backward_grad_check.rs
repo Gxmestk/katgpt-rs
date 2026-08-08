@@ -53,9 +53,9 @@ fn run_forward_sequence(
     let mut all_outputs = Vec::with_capacity(l);
     let mut loss = 0.0f32;
 
-    for t in 0..l {
+    for h in h_seq.iter().take(l) {
         let (output, saved) =
-            kda_forward_token_with_saved(config, weights, &mut cache, &mut fwd_scratch, &h_seq[t]);
+            kda_forward_token_with_saved(config, weights, &mut cache, &mut fwd_scratch, h);
         all_outputs.push(output.clone());
         all_saved.push(saved);
         for &v in &output {
@@ -366,13 +366,13 @@ fn gradient_check_state_bptt_seam() {
     let t_mid = l / 2; // = 2
     let mut cache = KdaLayerCache::new(&config);
     let mut fwd_scratch = KdaForwardScratch::new(&config);
-    for t in 0..t_mid {
+    for h in h_seq.iter().take(t_mid) {
         let _ = katgpt_attn::gdn2::kda_forward::kda_forward_token(
             &config,
             &weights,
             &mut cache,
             &mut fwd_scratch,
-            &h_seq[t],
+            h,
         );
     }
     // cache.heads[h].s now holds S_{t_mid - 1} (the state going INTO token t_mid).
@@ -417,26 +417,26 @@ fn gradient_check_state_bptt_seam() {
         let mut cache2 = KdaLayerCache::new(&config);
         // Replay 0..t_mid to rebuild conv buffers (they affect t_mid forward).
         let mut fwd2 = KdaForwardScratch::new(&config);
-        for t in 0..t_mid {
+        for h in h_seq.iter().take(t_mid) {
             let _ = katgpt_attn::gdn2::kda_forward::kda_forward_token(
                 &config,
                 &weights,
                 &mut cache2,
                 &mut fwd2,
-                &h_seq[t],
+                h,
             );
         }
         // Override S for `head`.
         cache2.heads[head].s.copy_from_slice(s_override);
         // Run t_mid..L.
         let mut loss = 0.0f32;
-        for t in t_mid..l {
+        for h in h_seq.iter().take(l).skip(t_mid) {
             let out = katgpt_attn::gdn2::kda_forward::kda_forward_token(
                 &config,
                 &weights,
                 &mut cache2,
                 &mut fwd2,
-                &h_seq[t],
+                h,
             );
             for v in out.iter() {
                 loss += *v * *v;

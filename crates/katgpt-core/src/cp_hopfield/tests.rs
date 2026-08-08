@@ -38,9 +38,9 @@ fn basis_is_orthonormal() {
         for a in 0..n {
             for bb in 0..n {
                 let mut tr = C32::ZERO;
-                for r in 0..D {
-                    for c in 0..D {
-                        tr = tr.mul_add(dense[a][r][c], dense[bb][c][r]);
+                for (r, row_a) in dense[a].iter().enumerate().take(D) {
+                    for (c, elem_a) in row_a.iter().enumerate().take(D) {
+                        tr = tr.mul_add(*elem_a, dense[bb][c][r]);
                     }
                 }
                 let expected = if a == bb { 2.0 } else { 0.0 };

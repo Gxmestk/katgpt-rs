@@ -136,8 +136,8 @@ fn gate_g2_capacity() -> GateResult {
         ALPHA_SWEEP
     );
     println!(
-        "\n    {:>3} {:>6} {:>12} {:>12} {:>10} {:>9}  {}",
-        "d", "N", "α_c measured", "α_c paper", "m̄ @ α_lo", "min P/N", "note"
+        "\n    {:>3} {:>6} {:>12} {:>12} {:>10} {:>9}  note",
+        "d", "N", "α_c measured", "α_c paper", "m̄ @ α_lo", "min P/N"
     );
 
     let mut cells = Vec::new();
