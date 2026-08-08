@@ -4,6 +4,7 @@
 > Date: 2025-04, distilled 2025-07
 > Raw code: `.raw/turboquant/`
 > **Verdict: HIGH VALUE — KV Cache Compression for Production Inference, Direct Fit for katgpt-rs and riir-gpu**
+> **PASS-Redirects (synthesis):** Qdrant Team [https://qdrant.tech/blog/qdrant-1.19.x/ "Qdrant 1.19 - TurboQuant Datatype & Memory Tiers"] (2026-08-05) — vector-DB release. Turbo4 datatype (4-bit-only storage, no full-precision copy, no rescoring, 9× storage cut) is a storage-tier-mode variant of the TurboQuant MSE quantizer this note already covers; our `katgpt-quant::TurboQuantKVCache` ships the same Lloyd-Max-on-Beta codebook. The no-rescore tradeoff is a storage-config choice (acceptable recall loss for disk savings), not a new quantization mechanism. The blog's Memory Tiers (`pinned`/`cached`/`cold`) map to our architecturally-fixed Plasma/Hot/Warm/Cold/Freeze tiering (constraint #9) — our tiers are fixed by the sync boundary semantics, not a per-component knob a general-purpose DB needs. PASS: mechanism ships, product release not research.
 
 ## Summary
 
