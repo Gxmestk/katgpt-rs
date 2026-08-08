@@ -7,6 +7,7 @@
 > **Related Plans:** 376 (this primitive — open), riir-ai 385 (runtime wiring), 308 (KARC), 321 (CommittedFieldBlend), 310 (Cross-Resolution), 286 (FuncAttn)
 > **Cross-ref (riir-ai):** Research 170 (Per-NPC Velocity-Field Ensemble Composition Guide)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Tong et al. [arXiv:2608.05811 "Energy-Guided Flow Matching"](https://arxiv.org/abs/2608.05811) — PASS. Pixel-space image generation training recipe — replaces the fixed clean endpoint with a heat-kernel-filtered moving endpoint `y_t(x) = F⁻¹(exp(-a·h(x,t)·ρ²)·b_x)` releasing low→high image-frequency content via sample-adaptive spectral-energy scheduling. Mechanism is entirely training-time velocity-target construction (Eq. 16: `v_t = y_t - ε + t·∂_t y_t`); the paper explicitly states inference uses the same solver with no FFT/heat-kernel/bisection at runtime. Out of scope for our model-based track too (Plan 318/059/066 train LLM/game-AI/linear-attention, not image DiT). No modelless primitive to extract (there is nothing at inference). Closest cousins: this note (stochastic interpolant integrator), R150 (RecFM cross-scale flow matching), R369 (renoise-CE flow reasoning verifier) — all latent-reasoning, none pixel-space.
 
 ---
 
