@@ -463,7 +463,13 @@ fn forward_decoder_to_logits<'a>(
 // **Honest expectation:** on an SFT model never trained with pause tokens,
 // the GOAT gate (G5-K3: does N>0 pause tokens improve compile rate vs N=0?)
 // is the empirical question. This primitive provides the mechanism; the gate
-// example (plan318_pause_token_gate) measures whether it helps.
+// **Gate:** the checkpoint-gated G5-K3 gate lives at
+// `riir-train/crates/riir-train-engine/examples/plan318_pause_token_gate.rs`
+// (NOT in katgpt-rs — katgpt-rs cannot depend on riir-train). The modelless
+// re-scope (T4, 2026-08-09) lives at
+// `riir-train/crates/riir-train-engine/examples/plan318_pause_modelless_ksweep.rs`
+// — zero GPU, zero checkpoints, measures depth→discrimination on random weights.
+// G5-K3 Modelless PASS: KDA state preserves signal through pause steps.
 
 /// Strategy for pause-token "thinking" (Issue 407 T2).
 ///
