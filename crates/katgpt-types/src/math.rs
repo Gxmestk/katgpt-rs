@@ -153,10 +153,18 @@ pub fn gegelu_tanh(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         i += CHUNK;
     }
     // Scalar remainder
+    // NOTE: uses standard `tanh`, NOT `fast_tanh`. The analytic backward
+    // (`gemma2_train::gegelu_backward_into`) also uses standard `tanh`, so they
+    // MUST match for FD gradient checks to pass. The chunked path above
+    // computes tanh exactly via exp(2x)/(exp(2x)+1), which also matches.
+    // `fast_tanh` (Padé [2/2], ~2.5% worst-case) was a perf shortcut that
+    // broke analytic-vs-FD agreement on the scalar path; the scalar path is
+    // cold in production (mlp_hidden is always a multiple of 64) so this
+    // costs nothing.
     for i in i..hidden.len() {
         let g = gate[i];
         let inner = SQRT_2_OVER_PI * (g + 0.044715 * g * g * g);
-        let gelu_val = 0.5 * g * (1.0 + crate::simd::fast_tanh(inner));
+        let gelu_val = 0.5 * g * (1.0 + inner.tanh());
         hidden[i] = gelu_val * up[i];
     }
 }
