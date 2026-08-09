@@ -145,22 +145,19 @@ Distill into:
 
 ### 0. Read & classify the paper
 
-Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop itself (optimizer / loss / schedule / RL algorithm), or in the math the training computes (closed-form drift, conditional score, Riemannian correction, steering formula)?* If optimizer/loss/schedule → riir-train. **If the math → run §3.5 Path 0 (training-target decomposition) FIRST**: decompose the math into components and grep for the modelless analog of EACH (see §1 step 2 standing training-math vocabulary) before redirecting. Only if no component has a modelless analog → riir-train.
+Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop itself (optimizer / loss / schedule / RL algorithm), or in the math the training computes (closed-form drift, conditional score, Riemannian correction, steering formula)?* If optimizer/loss/schedule → riir-train. **If the math → run §3.5 Path 0 (training-target decomposition) FIRST**: decompose the math into components and grep for the modelless analog of EACH before redirecting. Only if no component has a modelless analog → riir-train.
 
-**Training-math papers are NOT automatically → riir-train (Flow Sampling lesson, arxiv 2605.03984):** a paper framed as "train a drift network via backprop" decomposed into primitives we ALREADY ship (dllm interpolant + Latent Field Steering Plan 309 + freeze/thaw replay buffer). Run §3.5 Path 0 FIRST — decompose the math, grep for modelless analog of each component. **Do NOT claim the Riemannian extension (parallel transport + Jacobian correction) is a "refinement of Slerp"** — Slerp IS the geodesic; the Riemannian machinery is for sampling from a sphere distribution, a problem we DON'T have (our vMF usage Plan 405 is a deterministic sigmoid gate, not density sampling). **PTRM caution (Research 049):** gradient-guided Langevin gave zero gain in PTRM's use case. **Lesson: a modelless analog that ships is necessary but NOT sufficient; there must also be a use case that needs it.**
+**Five "not automatically PASS/redirect" lessons — always ask the key question before classifying:**
 
-**Hardware / accelerator / NMP / ASIC papers are NOT automatically PASS (R418 lesson, StreamDQ arxiv 2607.08993):** a paper framed in HBM/RTL/CMOS/NMP vocabulary was initially PASS'd as "hardware-only" — wrong. The *value* was the **technique** (LUT INT→FP, shared ALU, sideband-tag dispatch), substrate-independent. We simulate hardware dequant via software SIMD (Research 110 Ciot — Plasma tier = ternary SIMD, Cold tier = Q4_K dequant-on-read). Revised verdict Gain; shipped 2.3× speedup.
+| Paper class | Lesson | Key question before PASS/redirect |
+|---|---|---|
+| **Training-math** (Flow Sampling, arxiv 2605.03984) | "train via backprop" decomposed into shipped primitives (dllm + Latent Field Steering Plan 309 + freeze/thaw) | Does the math decompose into modelless components? (§3.5 Path 0). **PTRM caution (R049):** a shipped modelless analog is necessary but NOT sufficient — there must also be a use case. |
+| **Hardware/accelerator/NMP/PIM/ASIC** (R418 StreamDQ arxiv 2607.08993) | "hardware-only" was wrong — value was the technique (LUT INT→FP, shared ALU, sideband-tag dispatch), substrate-independent. Shipped 2.3×. | What is the *technique* stripped of the hardware substrate? Grep `simd_*`, `ternary`, `Plasma`, `Q4_K`, `LUT`, `from_bits` for the software analog. (Research 110 Ciot proves we simulate hardware in software.) |
+| **Database/systems/storage** (R300 Trellis arxiv 2606.29823) | "no database engine" was wrong — `riir-neuron-db` IS a database (Pod + ShardIndex + Merkle + MAPE-K + Raven/δ-Mem + vibe KG). Value was the access pattern. | What is the *access pattern*? Grep `riir-neuron-db/src/` + `episode_buffer.rs` + `cgsp_runtime/persistence.rs`. **Conflating "no fused query planner" with "no database" is the false-PASS root cause.** |
+| **Pure math/combinatorics/game theory** (Lonely Runner, arxiv 0710.4495, R470) | "non-constructive proof, no algorithm" was wrong — value was guaranteed-peak property on a per-entity scalar (`phase_separation`), modelless, sync-safe. | What per-entity scalar does this theorem BOUND, and can it drive a game-system behavior? See §1 step 4 for the MANDATORY game-context reframe. |
+| **System/kernel/scheduler/OS** (io_uring, DPDK, RDMA) | Substrate (Linux kernel) is not the value; the technique (lock-free queue, batching, zero-copy, prefetch) often is. | What is the *technique* stripped of the OS substrate? |
 
-**Database / systems / storage / agent-infrastructure papers are NOT automatically PASS (R300 lesson, Trellis arxiv 2606.29823):** a SQL/Cypher/Vector query planner paper was initially PASS'd as "we don't ship a database engine" — wrong. `riir-neuron-db` IS a database (Pod + lock-free `ShardIndex` + Merkle + MAPE-K + Raven/δ-Mem + `ItemEmbedIndex` + vibe KG). The *value* was the **access pattern** (AS-OF temporal query, vector-seeded graph traversal, materialized views), substrate-independent. **Conflating "we don't have a fused query planner" with "we don't have a database" is the false-PASS root cause.** Grep `riir-neuron-db/src/` + `riir-games/trial_log.rs` + `riir-engine/episode_buffer.rs` + `riir-engine/cgsp_runtime/persistence.rs` for the access-pattern analog before any PASS.
-
-**Pure math / combinatorics / number theory / game theory / graph theory papers are NOT automatically PASS (Lonely Runner lesson, arXiv:0710.4495, Research 470):** a non-constructive existence theorem was initially PASS'd as "pure math, no algorithm" — wrong. The *value* was the **guaranteed-peak property on a per-entity scalar** (`phase_separation`), modelless (closed-form modular arithmetic), sync-safe, theorem-backed. Application: per-NPC behavior signal (drives 5 pillars). **Conflating "non-constructive proof" with "no shippable primitive" is the false-PASS root cause.** First question: "what per-entity scalar does this theorem BOUND, and can it drive a game-system behavior?" See §1 step 4 for the MANDATORY game-context reframe.
-
-**Hard rule — substrate ≠ value:** Before PASS-ing on ANY paper whose abstract contains hardware vocabulary (HBM, ASIC, RTL, NMP, PE, DQB, tensor-core, TPU, FPGA, accelerator, near-memory, in-memory compute, Processing-In-Memory, PIM), you MUST:
-1. Ask: "What is the *technique* here, stripped of the hardware substrate?" (e.g., "LUT-based type conversion", "shared ALU across formats", "co-located metadata buffer", "runtime dispatch tag").
-2. Grep the codebase for the software-SIMD analog: `simd_*`, `ternary`, `Plasma`, `Cold tier`, `Q4_K`, `quant/`, `LUT`, `gather`, `shuffle`, `bit_cast`, `from_bits`. **Research 110 (Ciot) is the canonical proof we simulate hardware techniques in software — grep it explicitly.**
-3. Only if BOTH (a) the technique has no software SIMD analog AND (b) the codebase has no existing simulation pattern → PASS with explicit documentation of both checks.
-
-The same rule applies to **system / kernel / scheduler / OS papers** — the substrate (Linux kernel, io_uring, DPDK, RDMA) is not the value; the technique (lock-free queue, batching, zero-copy, prefetch hint) often is. Translate the substrate before PASS-ing.
+**Hard rule — substrate ≠ value:** Before PASS-ing on ANY paper whose abstract contains hardware vocabulary (HBM, ASIC, RTL, NMP, PE, DQB, tensor-core, TPU, FPGA, accelerator, near-memory, in-memory compute, PIM): (1) identify the technique stripped of the substrate, (2) grep for the software-SIMD analog, (3) PASS ONLY if both checks confirm no analog exists.
 
 ### 1. Distill fundamentally — fuse, don't just direct-map
 
@@ -189,79 +186,7 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 
 2. **MANDATORY — vocabulary translation before grepping.** Papers and our codebase use different words for the same mechanism. Before any grep, list the paper's 3–5 key mechanism terms, then for EACH, brainstorm ≥2 codebase-equivalent terms by asking: "if we shipped this, what would we call it?" Then grep BOTH sets.
 
-   **Standing latent-state vocabulary (ALWAYS include, even for non-latent papers — most architecture/training papers have a latent-space reframing):**
-   - "residual stream" / "hidden state" / "activation" → "belief state", "latent subspace", "sense projection"
-   - "layer" / "depth" / "stage" → "decision stage", "functor application", "cgsp cycle", "consolidation tick"
-   - "width" / "dimension" / "capacity" → "latent subspace", "active projection channel", "sense channel"
-   - "carry-forward" / "bypass" / "skip" → "leaky integrator", "dormant subspace", "decay gate", "persistence"
-   - "collapse" / "degeneration" / "valley" → "coherence decay", "re-estimation trigger", "staleness"
-   - "bottleneck" / "narrowing" → "subspace projection", "channel selection", "zone gating"
-   - "fixed-point" / "deterministic" / "committed" → "LatCal", "lattice calculus", "BLAKE3 commitment", "raw scalar bridge"
-   - "divergence" / "flux" / "∇·F" / "density change" → "codifferential", "δ", "DEC divergence", "belief_mass_divergence"
-   - "curl" / "vorticity" / "∇×F" / "circulation" → "d₁", "DEC curl", "exterior_derivative rank 1→2"
-   - "boundary" / "∂M" / "frontier" / "perimeter" → "exterior_derivative", "d", "coboundary operator", "boundary_flux_mass"
-   - "line integral" / "trajectory energy" / "path cost" / "geodesic cost" → "line_integral", "edge field sum", "rank-1 cochain path sum"
-   - "Stokes theorem" / "divergence theorem" / "Green's theorem" / "Gauss" / "generalized Stokes" → "DEC identity d∘d=0", "curl(grad)=0", "div(curl)=0", "hodge_decompose"
-   - "Hodge decomposition" / "exact/coexact/harmonic" / "Helmholtz" / "conservative/solenoidal" → "hodge_decompose", "DecFlowField", "exact_flow/coexact_flow/harmonic_flow"
-   - "Fokker-Planck" / "continuity equation" / "mass conservation" / "probability flow" → "belief_mass_divergence", "codifferential on belief cochain"
-   - "cell complex" / "mesh" / "simplicial" / "cubical" → "CellComplex", "CochainField", "grid_2d"
-
-   **Standing per-NPC runtime / freeze-thaw / personality vocabulary (ALWAYS include when the paper touches per-entity state, memory, personality, swap, evaluator/judge/critic, or selective erasure/forgetting — the `riir-ai/.research/` guide corpus is SATURATED in this space, so paper-vocabulary-only greps produce false novelty claims; see R320 failure below):**
-   - "personality swap" / "personality drift" / "character shift" / "persona change" → "committed personality", "freeze/thaw cadence", "direction vectors versioned via freeze/thaw", `ArchetypeBlendShard`, `KarcShard`
-   - "selective forgetting" / "memory erasure on swap" / "dependent record invalidation" / "forget on swap" → "non-interference branches", "branch-local", `BranchBank`, "orthogonal subspace projection"
-   - "survives swap" / "invariant to observation gaps" / "replay-deterministic personality" → "sampling invariance", "quorum-verifiable", "bit-identical across nodes", "FAME Proposition 3"
-   - "epoch boundary" / "controlled utility evolution" / "checkpoint replacement" / "non-stationary utility" → "freeze/thaw cadence", "consolidation sleep-cycle", `tau_reest`, "re-estimation trigger", "coherence < tau"
-   - "co-evolution" / "evaluator replacement" / "moving target" → "personality divergence", "direction vector drift", "emergent personality at crowd scale"
-   - "evaluator" / "judge" / "critic" / "verifier" (per-entity) → "claim verifier", "CLR vote", "direction vector projection", "Salience Tri-Gate", `ConstraintPruner`
-   - "frozen snapshot" / "frozen artifact" (generic) → NAME THE CONCRETE TYPE: `KarcShard`, `ArchetypeBlendShard`, `BranchBank` snapshot, `ZoneGeometryPod`, `MerkleFrozenEnvelope`, `SleepAnticipationShard`. Never use the generic "frozen snapshot" in a selling-point sentence — grep `riir-neuron-db/src/shard.rs` + `riir-neuron-db/src/freeze.rs` for the concrete subtype.
-   - "cache invalidation on swap" / "dependent records" / "criterion consistency" → `DecCache::mark_face_destroyed`, `ZoneGeometryCache::invalidate(zone, new_version)`, `topology_version` bump, `SourceShardHashMismatch`
-
-   **Standing compute-unit translation (MANDATORY for agent/LLM papers — the R368 lesson):** Papers increasingly use "LLM forward pass" / "LLM call" as the compute unit for a decision. Our codebase uses different compute units for the same decisions. ALWAYS translate the compute unit, not just the semantic name:
-   - "LLM decides what to write/record" → `SpeculativeGenerator` (draft) + `ScreeningPruner` (relevance) + `ConstraintPruner` (validity)
-   - "LLM decides what to retrieve/read" → `SpeculativeGenerator` + `ScreeningPruner` + AnyRAG escalation gate
-   - "LLM judges/verifies/critiques a claim" → CLR vote + SalienceTriGate + Claim Rubric L1/L2/L3
-   - "LLM reviews trajectory + rewrites code/prompts" → Raven/δ-Mem consolidation + MAPE-K self-healing (architectural analog; quality parity needs PoC per §3.6)
-   - "meta-LLM generates novel semantic content" → **NO modelless analog** — genuine NO-GAIN if the value IS the generation
-
-   **Standing substrate-translation vocabulary (MANDATORY for hardware / accelerator / NMP / PIM / ASIC / system papers — the R418 lesson):** Papers framed in hardware vocabulary (HBM, RTL, CMOS, NMP, PE, DQB, TPU, FPGA, accelerator) describe techniques whose *implementation substrate* is hardware, but whose *value* is substrate-independent. We simulate hardware dequant / accelerator techniques in software SIMD (Research 110 Ciot). ALWAYS translate the substrate. Before PASS-ing on a hardware paper, grep BOTH sets:
-   - DQB / near-memory processing unit / PE → SIMD dequant fn, `dequant_via_lut`, `simd_lut_dequant`
-   - HBM / pseudo-channel / memory controller → L1 cache, register file, SIMD lane
-   - channel-aware layout / interleaved → cache-line-aligned, `AlignedWeightMatrix`, struct-of-arrays
-   - wire-mapping FP-to-FP / 2:1 mux type conversion → bit-cast, `f16::from_bits`, SIMD shuffle/permute
-   - LUT-based INT-to-FP / sign extension → pre-computed lookup table, `[f32; 256]`, SIMD gather
-   - sideband tag / 3-bit tag / mode select → `QuantFormat` enum, runtime dispatch, `match` on format
-   - S/Z buffer / scaling-factor cache → L1-resident scale cache, `BlockQ4K { d, dmin, scales, qs }`
-   - fused DQ-GEMM kernel → fused dequantize-matmul, `simd_dot_f16_f32`, dequant-in-register
-   - kernel selection / batch threshold → breakeven routing, Plan 218, memory-bound vs compute-bound
-   - tensor core / CUDA core / SM → CPU SIMD lane, FPU, NEON/AVX2 lane (the *role*, not hardware)
-   - io_uring / DPDK / RDMA / zero-copy bypass → zero-allocation hot path, `_buf` pattern, `pool.rs`
-   - TPU systolic array / PE mesh → blocked matmul, `simd_matmul_rows`, tiled GEMM
-
-   **Unified decision rule — substrate-as-instantiation vs mechanism-as-value (prevents false-PASS/false-redirect — covers R418 hardware + R368 LLM + R300 database + Flow Sampling training-math):**
-   - **Value = technique/access-pattern/decision-structure/math** (not the substrate) → substrate is one *instantiation* → translate to our substrate → GOAT/Gain candidate.
-     - **R418 hardware:** LUT lookup / shared ALU / co-located layout / dispatch tag (StreamDQ — DQB-in-HBM is instantiation, SIMD dequant is ours; shipped 2.3×).
-     - **R368 LLM:** decision structure (AutoMem LOG/PLAN — LLM is instantiation, probe/draft/pruner is ours). **When you see "N LLM calls/step", FIRST ask "what decision is each call computing?" — not "violates 20Hz budget, NO-GAIN".** R169 guard applies ONLY to genuine LLM-dependent process (semantic code generation, NL verification) — NOT to decision structures.
-     - **R300 database:** access pattern (Trellis — Axiom/Velox is instantiation, `riir-neuron-db` Pod + Merkle + vibe KG is ours). `riir-neuron-db` IS a database; prefer latent-first + neuro-symbolic translations over `AnyRAG` external escalation.
-     - **Flow Sampling training-math:** closed-form drift / conditional score / Riemannian correction / regression target (training loop is instantiation, dllm + Latent Field Steering + freeze/thaw is ours).
-   - **Value = substrate-fabrication-advance itself** (new transistor geometry, new query optimizer algorithm, new optimizer like Muon, new loss function, new RL algorithm, semantic code generation) → no modelless analog → PASS or → riir-train.
-
-   **Standing database-substrate translation vocabulary (MANDATORY for database / systems / storage / agent-state / query-planner papers — the R300 lesson):** Papers framed in database-engine vocabulary (SQL, Cypher, Axiom, Velox, query planner, materialized view, OLTP/OLAP, vector store, experience graph, bi-temporal) describe **access patterns** whose *implementation substrate* is a database engine, but whose *value* is the access pattern. We ship a **database substrate** (`riir-neuron-db`: Pod + lock-free `ShardIndex` + Merkle + MAPE-K + Raven/δ-Mem + `ItemEmbedIndex` + vibe KG) WITHOUT a SQL/Cypher engine. **Conflating "we don't have a fused query planner" with "we don't have a database" is the R300 false-PASS root cause.** Translate the access pattern to **latent-first + neuro-symbolic** primitives. Before PASS-ing on a database paper, grep BOTH sets:
-   - experience graph / reward-bearing search tree / UCB node → `NeuronShard` + lineage, `TrialRecord`, `KarcShard`, `ArchetypeBlendShard`, `EpisodeBuffer`
-   - materialized view / training-data extraction → `consolidation.rs` Raven/δ-Mem output, `ShardCompactor` cold-tier product
-   - vector-seeded graph traversal / ANN + relational + graph → `ItemEmbedIndex::query` (latent cosine ANN) **composed with** `vibe.rs` KgTripleTemplate edges. Latent-first: cosine seed IS the latent op; KG edges ARE the neuro-symbolic structure. `AnyRagGateway` is optional + preprocess-only.
-   - AS-OF temporal query / bi-temporal / time travel → `MerkleFrozenEnvelope` version chain, `PersonalityLedger` ring, `AuditLog` backward replay
-   - frontier selection / UCB / visit_count + reward → `BanditPruner`, `ManifoldBandit` (Plan 370), `MCTS`, `GZeroPlayer`
-   - governed view maintenance / retraction / invalidate derived → `MapeKLoop` self-heal cascade, `BackupMirror::integrity_check_3way`, `ChainDivergenceDetector`
-   - change log / CDC / logical step number → `PersonalityLedger` ring, `AuditLog` entries, `TrialLog` hash chain
-   - concurrent tree search atomicity / MCTS backprop race → `FunctorEntry` atomic Arc-swap, `LoRAWeightVersion` lock-free read
-   - episode buffer / experience replay → `EpisodeBuffer` FIFO, Raven/δ-Mem input queue
-   - unified query planner / SQL/Cypher/Vector fused → **NO direct analog** — but individual access patterns map to latent ops + neuro-symbolic edges + raw commitment. The planner is the paper's instantiation; the access patterns are ours.
-
-   **Decision rule — database-engine-as-substrate ≠ database-access-pattern-as-mechanism:** See the **unified decision rule above**. `riir-neuron-db` IS a database; the gap is individual access patterns, NOT the substrate. Prefer latent-first (cosine + dot-projection) + neuro-symbolic (KG triples) translations over `AnyRAG` external escalation (optional + preprocess-only).
-
-   Example (DiPOD paper → riir-ai code): paper-vocabulary grep misses `latent_functor/reestimation.rs` which ships DiPOD's "interleave self-distillation when ELBO drifts" as "coherence-driven re-estimation scheduler when coherence < tau_reest". **Vocabulary translation is the only defense — notes framing can use codebase vocabulary that paper-vocabulary grep misses on BOTH layers.**
-
-   Example (Stokes paper → katgpt-rs DEC code): paper-vocabulary grep for `stokes|divergence theorem|fokker-planck` returns ZERO hits. Codebase-vocabulary grep for `codifferential|exterior_derivative|hodge_decompose|DecFlowField` hits `katgpt-dec/src/operators.rs`, `katgpt-dec/src/hodge.rs`, `katgpt-dec/src/flow.rs`. The Generalized Stokes' theorem machinery ships as DEC operators but no note framed it in Stokes vocabulary.
+   **`read_file` `vocab.md`** (this skill's sibling file) for the 6 standing vocabulary tables + unified decision rule + worked examples. The tables cover: (1) latent-state, (2) per-NPC runtime/freeze-thaw/personality, (3) compute-unit translation (for agent/LLM papers — R368 lesson), (4) substrate-translation (for hardware/accelerator/NMP/PIM papers — R418 lesson), (5) database-substrate translation (R300 lesson), (6) the unified substrate-as-instantiation-vs-mechanism-as-value decision rule. Always include table (1) latent-state even for non-latent papers; include the domain-specific tables (2–5) when the paper touches that domain.
 
 3. **MANDATORY — latent-space reframing before verdict.** Before any verdict, re-cast the paper's core mechanism as a latent-to-latent operation on the codebase's latent-state kernels (the seven Super-GOAT factory modules above). Ask explicitly: "How does this mechanism look when operating on (a) per-NPC belief latent state, (b) `latent_functor/` operations, (c) `cgsp_runtime/` curiosity signals, (d) LatCal fixed-point commitment (in `riir-chain/src/encoding/`), (e) `NeuronShard` style_weights / dendritic branch / `MerkleFrozenEnvelope` / Raven consolidation / AnyRAG escalation (in `riir-neuron-db/src/`), (f) DEC Stokes-calculus operators (`katgpt-rs/crates/katgpt-dec/src/` — `exterior_derivative` d, `codifferential` δ, `hodge_decompose`, `DecFlowField` exact/coexact/harmonic)?" If your fusion idea only touches adapter routing / KV compression / speculative decode without a latent-state reframing, you are likely in GOAT territory and have probably missed the Super-GOAT angle. If you find yourself reaching for an adapter-routing framing, treat it as a symptom that the stronger latent-functor / belief / neuron-shard / LatCal reframing is still unfound — adapter routing is the fallback, never the primary Super-GOAT framing. The latent reframing is mandatory even for papers that look pure-training/architecture — most have a latent subspace / stage-gating / persistence / memory-consolidation / manifold-geometry angle that lands in belief/functor/neuron-shard/DEC.
 
@@ -278,51 +203,9 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 7. Verdict by the commercial strategy tiers (see §Cross-references for the strategy doc): **Super-GOAT** > GOAT > Gain > Pass (see §Verdict tiers below). **A fusion that produces a new capability class is a strong Super-GOAT candidate — check the novelty gate (§1.5).**
 8. Create research `.md` at the right repo (see table above).
 
-**File naming:** `{NNN}_{Short_Title_with_Underscores}.md` where NNN is the next free number (zero-padded to 3 digits, e.g. `239_`, `240_`). Check the folder first — numbers may be non-contiguous; pick the next free slot.
+**File naming:** `{NNN}_{Short_Title_with_Underscores}.md` where NNN is the next free number (zero-padded to 3 digits). Numbers are monotonic and never reused.
 
-**Research note format** (see `katgpt-rs/.research/238_LoRA_Muon_Spectral_Low_Rank_Manifold.md` for a canonical example):
-
-```markdown
-# Research NNN: {Title}
-
-> **Source:** <paper title + arxiv link + authors + date>
-> **Date:** YYYY-MM-DD
-> **Status:** Active | Done | Shelved
-> **Related Research:** NNN (short note), ...
-> **Related Plans:** NNN (short note), ...
-> **Cross-ref (riir-ai / riir-chain / riir-neuron-db):** Research NNN, Plan NNN   ← only if cross-repo (game runtime → riir-ai; chain/LatCal → riir-chain; shards/freeze/consolidation/AnyRAG/vibe → riir-neuron-db)
-> **Classification:** Public | Private   ← katgpt-rs notes are always Public
-
----
-
-## TL;DR
-
-<2-4 sentences: the distilled primitive, why it matters here, what it unblocks>
-
-**Distilled for katgpt-rs (modelless, inference-time):**
-<the transferable insight, stripped of training setup>
-
----
-
-## 1. Paper Core Findings
-...
-## 2. Distillation
-...
-## 3. Verdict
-
-**Tiers (high → low):**
-
-| Tier | Criteria | Routing |
-|------|----------|--------|
-| **Super-GOAT** | Novel mechanism (no prior art) + new capability class + product selling point + force multiplier (≥2 pillars). Creates a moat. | Open primitive → katgpt-rs. **Architectural guide → riir-ai/.research/ (game runtime) OR riir-chain/.research/ (chain/LatCal) OR riir-neuron-db/.research/ (shards/freeze/consolidation/AnyRAG/vibe/Merkle)**. Plans → appropriate repo(s) as needed. |
-| **GOAT** | Provable gain (latency/quality/security) over existing approach, but not a new class of capability. Promotes to default if it wins. | Plan + implement → appropriate repo. Feature flag + benchmark. |
-| **Gain** | Incremental improvement, useful but not headline-worthy. | Plan only, behind feature flag. |
-| **Pass** | Mechanism already ships OR not relevant OR training-only AND genuinely out of scope for our model-based track (explicit justification required per §3.5 Path 0.5). | **No new research/plan files.** Verdict + one-line reason + closest shipped cousin, in conversation only. If the paper has actionable improvements (config contradiction, unmitigated failure mode, unblocker), that's **Gain**, not Pass — see §1.55. **§1.55.2 reverse-grep (MANDATORY before PASS):** grep `.docs/` + `.benchmarks/` + `.rs` comments for documented limitations / deferred tasks / known artifacts the paper could fix — if any hit maps to the paper's mechanism, it's Gain, not Pass (BTM lesson: PASS was premature). **Training-efficiency papers applicable to our model-based track (ALL training pipelines in `riir-train/`, not just Plan 318 SFT — GDN-blog lesson 2026-08-07) are NEVER Pass** — they're Gain → Plan in `riir-train/.plans/` per §3.5 Path 0.5 (as of 2026-08-06: modelless track near limit, model-based track actively pursued). **MANDATORY §1.55.1: add a `PASS-Redirects:` cross-reference line to the 1–3 closest shipped cousin `.research/` notes** so future greps for the arxiv ID / paper title hit the existing note instead of returning zero results. |
-
-**One-line reasoning required for each verdict.** For Super-GOAT: state the selling point explicitly.
-
-**After the tier verdict, run the MOAT gate per domain (§1.6)** — a tier verdict without a domain-fit check can land a great primitive in the wrong repo and dilute the moat. The tier answers "how strong?"; the MOAT gate answers "does this strengthen THIS repo's moat, and is this the right repo?".
-```
+**Research note format:** `read_file` `templates.md` (this skill's sibling file) for the canonical research note + plan format templates, the verdict tier table, and the UQ-bearing "Report the Floor" GOAT gate rule. Canonical example: `katgpt-rs/.research/238_LoRA_Muon_Spectral_Low_Rank_Manifold.md`.
 
 ### 1.5. Novelty gate — is this Super-GOAT?
 
@@ -373,49 +256,29 @@ There is no "PASS-with-gains". There is no middle tier. If the paper produces so
 
 #### 1.55.1. PASS cross-reference rule (MANDATORY) — future-proofing grep
 
-**PASS verdicts must still update the closest shipped cousin's `.research/` note with a one-line `PASS-Redirects:` reference to the paper.** No new file, but the existing note gains a line. Rationale: the #4 failure mode (after vocabulary mismatch / notes-only grep / skipping factory modules) is **paper-number invisibility** — a future session greps for `arxiv:XXXX.XXXXX` or the paper title, finds nothing, and re-distills the same paper from scratch because the PASS verdict left zero grep trail.
+**PASS verdicts must still update the 1–3 closest shipped cousin `.research/` notes with a one-line `PASS-Redirects:` reference.** No new file — the existing note gains a line. This prevents **paper-number invisibility** (the #4 false-novelty failure mode): a future session greps for `arxiv:XXXX.XXXXX` or the paper title, finds nothing, and re-distills from scratch.
 
-**Format (add to the closest shipped cousin note's header, near `Related Research:`):**
-
+**Format** (add to cousin note header near `Related Research:`):
 ```
-> **PASS-Redirects (synthesis):** <Author_or_Short_Title> [arXiv:XXXX.XXXXX "<Full Title>"] — <one-line reason why PASS: which shipped primitive covers it, why the paper's value is training-only, etc.>. <If split-stage: which stage → which repo.>
+> **PASS-Redirects (synthesis):** <Author_or_Short_Title> [arXiv:XXXX.XXXXX "<Full Title>"] — <one-line reason: which shipped primitive covers it, why training-only, etc.>. <If split-stage: which stage → which repo.>
 ```
+The line MUST include both the arxiv ID AND the full title (so both `grep arxiv:ID` AND `grep "Title"` hit). If no shipped cousin exists (genuinely out of scope), add to the closest **topic-adjacent** note.
 
-**Rules:**
-1. Pick the **1–3 closest shipped cousin notes** across the 7-repo stack (use the same fusion-protocol grep — both paper and codebase vocabulary — that identified the cousin in the first place).
-2. Add the line to each cousin note's header (not to a new file).
-3. The line MUST include both the arxiv ID and the full paper title (so `grep arxiv:XXXX.XXXXX` AND `grep "Full Title"` both hit).
-4. The line MUST include a one-line reason (so the next reader knows why it was PASS without re-doing the analysis).
-5. If the paper split into modelless (covered) + training-only stages, name both stages and their routing. NOTE (2026-08-06): if the training-only stage is applicable to our model-based track, it gets a Plan in `riir-train/.plans/` — NOT a one-line redirect. The cross-ref line should note the Plan number if one was created.
-6. If the PASS was "mechanism does not ship AND genuinely out of scope training-only" (no shipped cousin AND no model-based-track applicability), add the line to the closest **topic-adjacent** note instead (e.g. D-OPSD has no direct cousin in our stack because we don't ship image diffusion — added to SDAR `038` + GDSD `151` + riir-train GDSD `039` as the closest topic-adjacent notes).
-
-**Why this matters:** the cost of a PASS cross-ref is 1 line × 1–3 files. The cost of a missing grep trail is a future session re-running the entire pre-flight + distillation workflow on a paper we already verdicted — wasted tokens + risk of a different verdict on the second pass. The cross-ref is the defensive anchor that prevents this.
-
-**Canonical examples (added 2026-07-21):**
-- Loopie [arXiv:2607.16051] → cross-refs added to `katgpt-rs/.research/073` (LT2), `097` (Training-Free Loop), `273` (ELT), `414` (Fully Looped) — covers all four looped-transformer cousin notes.
-- D-OPSD [arXiv:2605.05204] → cross-refs added to `katgpt-rs/.research/038` (SDAR), `151` (GDSD), `riir-train/.research/039` (GDSD) — closest topic-adjacent notes for OPSD+privileged-context-teacher.
-- S-TTT [arXiv:2607.09415] → cross-refs added to `katgpt-rs/.research/255` (VibeThinker CLR), `024` (δ-Mem), `042` (SP-KV) — three of the five shipped selective-write primitives.
-
-**What counts as actionable (Gain):** (a) paper data **contradicts** a current config default (grep-confirmed); (b) exposes a failure mode in shipped code with **no existing mitigation**; (c) unblocks a known deferred task or open issue.
-
-**What does NOT count as actionable (Pass):** "validates our design" / "design principle" / "theoretical lens" / "empirical validation target" / "composition schedule" / "regime insight" / "could inform a future config" (speculative). If unsure → it's not actionable. Default to Pass.
+**Actionable = Gain, not Pass.** Actionable: (a) paper data **contradicts** a current config default (grep-confirmed); (b) exposes a failure mode with **no existing mitigation**; (c) unblocks a known deferred task. NOT actionable: "validates our design" / "theoretical lens" / "could inform a future config". If unsure → not actionable → Pass.
 
 #### 1.55.2. Documented-limitation reverse-grep (MANDATORY before PASS)
 
-**The BTM lesson (arXiv:2608.01692, 2026-08-06):** a generative-modeling paper was PASS'd because "we don't ship generative image models." The user pushed back ("we do have game theory nash Equilibrium?") — revealing that the paper's core equation (`∇·(νb)=μ₀−μ₁`, the Beckmann OT flux constraint) was the EXACT primitive our shipped CCE Moderator (Plan 295) documents as missing: *"No dynamics. The LP treats the state distribution as free. MFG dynamics (occupation-measure flow constraints) are a Plan 325 follow-up."* Plan 325 shipped COMPLETE without closing the gap. Verdict revised PASS→Gain (Research 468).
+**The BTM lesson (arXiv:2608.01692):** a paper PASS'd as "we don't ship generative image models" was actually Gain — its core equation (`∇·(νb)=μ₀−μ₁`) was the EXACT primitive our shipped CCE Moderator (Plan 295) documented as missing. §1.55's actionable scan was one-directional (paper → codebase); it must be **bidirectional**.
 
-**Root cause:** §1.55's "actionable" scan was one-directional (paper → codebase). It must be **bidirectional** — also scan the codebase's documented gaps for things the paper could fill.
+**Before any PASS verdict, reverse-grep the codebase for documented gaps the paper could fill:**
+1. Grep `.docs/` for `Limitation|deferred|follow.up|TODO|FIXME|gap|pending|not.yet` near the paper's domain.
+2. Grep `.benchmarks/` for `Caveat|deferred|artifact|known.*limitation|pending`.
+3. Grep shipped `.rs` comments for `TODO|FIXME|deferred|follow.up|limitation` near the paper's mechanism vocabulary.
+4. If ANY hit maps to the paper's mechanism → **Gain**, not Pass.
 
-**Before any PASS verdict, reverse-grep the codebase for documented limitations the paper could address:**
+**Compact heuristic:** before PASS, ask: *"Is there any documented limitation, deferred task, or known artifact that this paper could fix?"* If you can't answer "no, I checked" with evidence → don't PASS.
 
-1. Grep `.docs/` across all repos for `Limitation|deferred|follow.up|TODO|FIXME|gap|pending|not.yet` — read any hit near the paper's domain.
-2. Grep `.benchmarks/` for `Caveat|deferred|artifact|known.*limitation|pending|Plan.*follow` — the BTM miss was hiding in Bench 029's "RPS trivial-CCE artifact" + "MFG dynamics" notes.
-3. Grep shipped `.rs` comments for `TODO|FIXME|deferred|follow.up|limitation` near the paper's mechanism vocabulary (after vocabulary translation, §1 step 2).
-4. **Cross-check:** does the paper's mechanism map to ANY documented gap, deferred task, or known artifact? If yes → it's **Gain**, not Pass — create the `.issues/` and/or research note.
-
-**Compact heuristic:** before PASS, ask: *"Is there any documented limitation, deferred task, or known artifact in our shipped code that this paper's mechanism could fix?"* If you can't answer "no, I checked" with evidence (grep commands run + gaps reviewed) → don't PASS.
-
-**Third defense — the training-pipeline-exists check (the GDN-blog lesson, 2026-08-07):** for TRAINING papers specifically, both defenses above can return clean and still produce a false PASS. The GDN train-inference mismatch blog had zero documented gaps to fill AND no new game-context capability — but it WAS applicable to two existing training pipelines the agent didn't know about (Plan 059 GRPO + Plan 066 HLA distillation). The root cause: the agent narrowed "model-based track" to "Plan 318 SFT" without reading `riir-train/.docs/02_pipelines/training_data_pipeline.md`. **Before PASS-ing any training paper, `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` + `list_directory riir-train/crates/riir-train-gpu/src/` and ask: "does a training pipeline for this paper's domain (RL, distillation, linear attention, trajectory collection, etc.) already exist in `riir-train/`?"** If yes → the paper is applicable to the model-based track → Gain (Plan in `riir-train/.plans/`), NOT Pass. **All three defenses are mandatory before PASS on training papers**: reverse-grep for gap-fillers (§1.55.2), game-context reframe for new-capability papers (§1 step 4), training-pipeline-exists check for training papers (this defense).
+**Third defense (training papers — GDN-blog lesson 2026-08-07):** both defenses above can return clean and still produce a false PASS if the agent narrows "model-based track" to "Plan 318 SFT". Before PASS-ing any training paper, `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` + `list_directory riir-train/crates/riir-train-gpu/src/` and ask: "does a training pipeline for this paper's domain already exist in `riir-train/`?" (RL, distillation, linear attention, trajectory collection). If yes → Gain, NOT Pass. **All three defenses mandatory before PASS on training papers.**
 
 ### 1.6. MOAT gate per domain
 
@@ -463,38 +326,9 @@ Add plan `.md` to `katgpt-rs/.plans/` (modelless), `riir-ai/.plans/` (runtime/ga
 
 > Super-GOAT plans should be created AFTER the riir-ai guide. The guide is the strategy; the plan is the execution.
 
-**Plan format** (see `katgpt-rs/.plans/271_attention_matching_compaction.md` for a canonical example):
+**Plan format:** `read_file` `templates.md` (this skill's sibling file) for the canonical plan format template + the GOAT gate rule + the UQ-bearing "Report the Floor" extension (Research 322). Canonical example: `katgpt-rs/.plans/271_attention_matching_compaction.md`.
 
-```markdown
-# Plan NNN: {Title}
-
-**Date:** YYYY-MM-DD
-**Research:** [katgpt-rs/.research/NNN_*.md](../.research/NNN_*.md)
-**Source paper:** [arxiv ID.NNN](https://arxiv.org/abs/ID) — <short cite>
-**Target:** `katgpt-rs/src/{module}/` (new module) + Cargo feature `{feature_name}`
-**Status:** Active — Phase N {state}
-
----
-
-## Goal
-
-<one paragraph: what ships, what it enables, GOAT gate>
-
-## Phase 1 — Unblocking Skeleton (CORE)
-
-### Tasks
-
-- [ ] **T1.1** <concrete, verifiable task>
-- [ ] **T1.2** ...
-```
-
-**GOAT gate rule** (AGENTS.md): every plan that introduces a new technique must have a feature flag and a benchmark proving the gain before promoting to default. Demote the loser if the new technique wins.
-
-**UQ-bearing primitive GOAT gate extension (the "Report the Floor" rule, adopted 2026-06-28 per Research 322):** Any primitive that claims a probability distribution, predictive interval, quantile, coverage guarantee, confidence score, or calibrated uncertainty (collectively: **UQ-bearing**) MUST include a benchmark against the **conformal-naive floor** in its GOAT gate. The floor is `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (Plan 340 with `m=1`, which degenerates to plain split conformal prediction over 1-step residuals). The primitive must beat the floor on CRPS / empirical coverage / Winkler interval score (whichever applies). If it cannot beat the floor, it is not a UQ primitive — it is noise, and the GOAT gate FAILS.
-
-**Retroactive application (existing UQ-bearing primitives; per-policy retroactive audit COMPLETE 2026-06-30, consolidated in `.benchmarks/010_report_the_floor_consolidated.md`):** BoMSampler (Plan 281), Sleep-Time Query Anticipator (Plan 334), Best-Belief Beta Selector (Plan 336), and KARC+conformal-overlay (Plan 308+340) were grandfathered at their current promotion state and have all passed their floor comparison. Future UQ-bearing primitives MUST include the floor from initial GOAT gate (no grandfathering). The floor shipped in Plan 340 Phase 1 (2026-06-30); the rule is now **enforceable**.
-
-**Why:** Manokhin's companion paper *Report the Floor* (arXiv:2606.09473) proves that a trivial training-free conformal interval is a mandatory baseline — any probabilistic forecaster that can't beat it is not adding value over the floor. Adopting this as policy prevents future UQ claims that are actually just the floor in disguise.
+**Compact GOAT gate rule:** every plan introducing a new technique needs a feature flag + a benchmark proving the gain before promoting to default. Demote the loser if the new technique wins the same slot. UQ-bearing primitives (probability distributions, predictive intervals, coverage guarantees) MUST additionally benchmark against the conformal-naive floor (`ConformalIntervalCalibrator<SeasonalNaiveForecaster>`, Plan 340) — if they can't beat it on CRPS / coverage / Winkler score, the GOAT gate FAILS. See `templates.md` for the full rule.
 
 ### 3. Implement to unblock
 
