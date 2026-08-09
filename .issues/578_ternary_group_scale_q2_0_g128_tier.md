@@ -151,6 +151,62 @@ vector. Stable across a 10x range of shapes, so it is the arithmetic cost, not a
 0.35-0.45x dense f32 NEON. Timings are wall-clock on a working developer machine — treat <15%
 as noise; the 2.6-2.9x dense advantage is far outside that.
 
+### Format VERIFIED against the real file + the PrismML fork source (2026-08-09)
+
+Read from `PrismML-Eng/llama.cpp` @ `9ca265a` and from the real
+`Ternary-Bonsai-27B-Q2_0.gguf` (7,165,121,600 B) via HTTP range requests.
+
+**The container geometry is confirmed exactly.** The fork's on-disk block is:
+
+```c
+#define QK2_0 128
+typedef struct {
+    ggml_half d;            // f16 scale
+    uint8_t   qs[QK2_0/4];  // 2 bits/weight -> 32 B
+} block_q2_0;               // 34 B per 128 weights = 2.125 bits/weight
+```
+
+That is precisely `TernaryGroupWeights`' geometry (`groups_per_row = cols/128`,
+`group_scale: Vec<f16>`), and 7.165 GB / (2.125/8) = **26.97B params** — the derivation in this
+issue matched the real artifact before either was seen.
+
+**Symmetry with Issue 145 confirmed:** the fork also defines `block_q1_0` = `f16 + qs[128/8]` =
+18 B per 128 = **1.125 bits/weight**, which is exactly `BinaryWeights`. The two shipped plasma
+tiers map 1:1 onto the fork's two custom types — Issue 145 modelled `Q1_0`, this issue models
+`Q2_0`. Type IDs: `GGML_TYPE_Q1_0 = 41`, `GGML_TYPE_Q2_0 = 42`, `GGML_TYPE_COUNT = 43`.
+
+**Decode mapping for T3.1b** (`dequantize_row_q2_0`), 2 bits LSB-first within each byte:
+
+```c
+q = (qs[j/4] >> ((j%4)*2)) & 0x03;   y[j] = ((int)q - 1) * d;
+```
+
+#### ⚠️ The format has a FOURTH state that two bit-planes cannot represent
+
+`11` decodes to **+2**, not +1. `TernaryGroupWeights` stores `pos`/`neg` bit-planes and can
+represent exactly `{-1, 0, +1}` — **a `+2` weight cannot be held.** Two facts make this safe for
+this checkpoint but not unconditionally:
+
+1. **Unreachable via the reference encoder.** `quantize_row_q2_0_ref` sets `d = amax` (block
+   max-abs), so `w/d ∈ [-1,+1]` and `round(w*id)+1 ∈ {0,1,2}`. The `if (q > 3) q = 3` clamp is
+   dead code. Any encoder choosing `d < amax` (e.g. an error-minimising fit) *would* reach it.
+2. **Measured absent in the real weights.** Scanning 30,720,000 weights across two structurally
+   different tensors:
+
+| Tensor | `-1` | `0` | `+1` | **`+2`** |
+|---|---|---|---|---|
+| `blk.32.ffn_up.weight` | 35.183% | 29.788% | 35.029% | **0** |
+| `output.weight` | 35.053% | 30.066% | 34.881% | **0** |
+| **total (30.72M)** | 35.118% | 29.927% | 34.955% | **0 (0.000%)** |
+
+**Verdict: the container is sufficient for Ternary-Bonsai-27B-Q2_0.** But T3.1b's parser MUST
+reject code `11` loudly rather than silently folding it to `+1` — a future Prism-ML checkpoint, or
+the `Q2_g64` / `PQ2_0` variants in the same repo, may use it. Added as a T3.1b requirement.
+
+**Also note `Ternary-Bonsai-27B-Q2_g64.gguf` exists in the same repo** — group size **64**, not
+128. `GROUP_SIZE` is a compile-time constant shared with `binary_plasma`; supporting g64 would
+need it parameterised. Out of scope here, recorded so it is not discovered late.
+
 ### Bug found while writing the G4 harness (fixed here)
 
 `simd_ternary_matmul_batch` was **broken for every `batch >= 2`** — both its sub-threshold loop
