@@ -282,7 +282,13 @@ pub fn simd_ternary_group_matmul_batch(
         for b in 0..batch {
             let x_off = b * w.cols;
             let y_off = b * w.rows;
-            simd_ternary_group_matvec(w, &x[x_off..], &mut y[y_off..]);
+            // Slice EXACTLY — the matvec asserts x.len() == w.cols, so an
+            // open-ended `&x[x_off..]` panics for 2 <= batch < 4.
+            simd_ternary_group_matvec(
+                w,
+                &x[x_off..x_off + w.cols],
+                &mut y[y_off..y_off + w.rows],
+            );
         }
         return;
     }

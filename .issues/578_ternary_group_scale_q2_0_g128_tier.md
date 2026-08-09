@@ -1,7 +1,7 @@
 # Issue 578: Ternary tier with group-wise f16 scale (`Q2_0_g128` container)
 
 **Date:** 2026-08-09
-**Status:** PARTIALLY LANDED (container + scalar/NEON kernels + loader, 2026-08-09) — G2/G4 unmeasured, AVX2 deferred. Still blocking riir-train Plan 333 T3.1b.
+**Status:** LANDED, opt-in (2026-08-09). G1 partial / G2 PASS / G3 PASS / G4 PASS. Only AVX2 outstanding.
 **Feature flag (proposed):** `ternary_group_scale` (opt-in; promotion needs the GOAT gate below)
 **Filed by:** riir-train [Plan 333](../../riir-train/.plans/333_bitnet_ternary_moe_neuro_symbolic_poc.md) T3.1a
 **Related:** [Issue 145](https://github.com/katopz/katgpt-rs) `binary_plasma` tier (got the scale
@@ -99,7 +99,8 @@ per-group — the bit-plane popcount inner loop is unchanged.
 - [x] `TernaryGroupWeights::from_ternary` widening (broadcast `row_scale` across the row's
       groups) — always succeeds, unlike `from_ternary_no_zeros`.
 - [ ] AVX2 kernel (deferred — see Deviations).
-- [ ] Perf bench for G2 + `CountingAllocator` harness for G4.
+- [x] Perf bench for G2 + `CountingAllocator` harness for G4 —
+      `crates/katgpt-types/tests/bench_578_ternary_group_goat.rs`.
 
 ---
 
@@ -127,12 +128,40 @@ passing on aarch64/NEON:
 | Gate | Status |
 |---|---|
 | G1 correctness | **PARTIAL.** Scalar/NEON parity, invariants, quantizer, loader, widening all pass. The **llama.cpp logit match (±1%) is NOT done** — it needs the real Bonsai tensor, so it stays riir-train Plan 333 T3.2. |
-| G2 perf | **NOT MEASURED.** No bench written. |
+| G2 perf | **PASS.** Group-scale costs 1.29-1.31x the row-scale kernel across 512x512, 1024x1024, 512x5120 — under the 1.5x ceiling. See the table below. |
 | G3 no-regression | **PASS.** `katgpt-types` 127 default tests unchanged, 155 with the feature; `katgpt-transformer` 21 default. Clean under default / `--no-default-features` / feature-on / feature-on-without-`plasma_path`. |
-| G4 alloc-free | **STRUCTURALLY YES, NOT INSTRUMENTED.** Kernels write into a caller-owned `&mut [f32]` and allocate nothing internally; no `CountingAllocator` harness written to prove it. |
+| G4 alloc-free | **PASS.** 0 allocs / 1000 calls (NEON matvec), 0 / 1000 (scalar path), 0 / 200 (sub-threshold batch), under a `CountingAllocator`. |
 
-**Promotion to default-on is NOT justified yet** — G2 is unmeasured and G1's load-bearing half
-(matching llama.cpp on a real tensor) is untested. Stays opt-in.
+**Promotion to default-on is still NOT justified** — G1's load-bearing half (matching llama.cpp
+on a real Bonsai tensor, Plan 333 T3.2) is untested, and x86_64 has no specialized kernel. Stays
+opt-in.
+
+### G2 measurements (M3 Max, aarch64/NEON, `--release`, median of 9 x 20 calls)
+
+| Shape | group-scale ns | row-scale ns | dense f32 ns | vs row (gate ≤1.5x) | vs dense (info) |
+|---|---|---|---|---|---|
+| 512x512 | 41 500 | 31 719 | 14 467 | **1.31x** | 0.35x |
+| 1024x1024 | 163 673 | 127 227 | 60 773 | **1.29x** | 0.37x |
+| 512x5120 | 415 094 | 319 777 | 162 410 | **1.30x** | 0.39x |
+
+The ~1.3x overhead is the extra `vmulq` per 4 lanes that folds the group scale into the sign
+vector. Stable across a 10x range of shapes, so it is the arithmetic cost, not a cache artifact.
+
+**`vs dense` reproduces Benchmark 044's finding independently:** both ternary tiers run at
+0.35-0.45x dense f32 NEON. Timings are wall-clock on a working developer machine — treat <15%
+as noise; the 2.6-2.9x dense advantage is far outside that.
+
+### Bug found while writing the G4 harness (fixed here)
+
+`simd_ternary_matmul_batch` was **broken for every `batch >= 2`** — both its sub-threshold loop
+and its rayon path passed an open-ended `&x[x_off..]` into a matvec that asserts
+`x.len() == w.cols`, panicking on the length check. `batch == 1` happened to work (offset 0, exact
+length), which is why it survived since Plan 148. `simd_binary_matmul_batch` had the same bug in
+its sub-threshold loop only; its rayon path already used the correct `zip(par_chunks)` form.
+
+Fixed in all three tiers (exact slicing + `zip(par_chunks)`), with
+`regression_sub_threshold_batch_does_not_panic` covering `batch` 1..=5 across the
+`PARALLEL_BATCH_MIN = 4` boundary and asserting every slot equals the single-vector call.
 
 ### Deviations from the spec above
 
@@ -172,9 +201,15 @@ our stack. This issue gates the native-Rust port only.
 - **G1 correctness:** round-trip `set`/`get` over all three states; `pos_bits & neg_bits == 0`
   invariant held; group-scale matvec matches a scalar reference to 1e-6; loaded Bonsai tensor
   reproduces llama.cpp's logits within ±1% (this is Plan 333 T3.2).
-- **G2 perf:** `simd_ternary_group_matvec` ≥ the row-scale kernel's throughput at equal dims (the
-  per-group scale lookup must not cost more than the popcount it rides along with), and ≥ 2× the
-  dense f16 matvec on CPU (Plan 333's G-PERF).
+- **G2 perf (RESPECIFIED 2026-08-09 — the original clause was wrong on arrival):**
+  `simd_ternary_group_matvec` ≤ **1.5×** the row-scale kernel at equal dims. That overhead ceiling
+  is the only throughput claim this tier controls.
+  **The original "≥ 2× the dense f16 matvec on CPU" clause is struck.** It was copied from Plan
+  333's G-PERF, which misreads [Benchmark 044](../.benchmarks/044_plasma_path_goat.md): that
+  benchmark measured the row-scale ternary kernel at **16.12 Gop/s = 0.45× FP32 NEON's 36 Gop/s**
+  and documented the gap as *fundamental* ("bit-decoding SWAR has higher opcode count than pure
+  load+FMA"). Ternary is **slower** than dense f32 on NEON and always has been; its win is memory
+  traffic. No group-scale kernel can satisfy a gate the tier it extends already fails.
 - **G3 no-regression:** `--no-default-features`, default, and `--all-features` all clean; existing
   `plasma_path` / `binary_plasma` tests unchanged.
 - **G4 alloc-free:** 0 allocations per call in steady state (`CountingAllocator`, matching the

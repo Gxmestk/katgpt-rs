@@ -106,3 +106,9 @@ gpart_pruning = []
 # Depth-Invariance Diagnostic + MagnitudeRegularizedResidual (Plan 306).
 # Gates the depth_invariance module. Pure math (simd-only deps).
 depth_invariance = []
+
+# Issue 578 GOAT gates G2 (perf) + G4 (alloc-free) for the Q2_0_g128 tier.
+# Needs plasma_path too: G2 compares against the row-scale ternary kernel.
+[[test]]
+name = "bench_578_ternary_group_goat"
+required-features = ["ternary_group_scale", "plasma_path"]
