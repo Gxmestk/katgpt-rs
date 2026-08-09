@@ -55,10 +55,11 @@ Seven repos (see §Repos). Tier model:
 
 ## Read first (grounding) — MANDATORY pre-flight
 
-**Hard rule:** before any distillation/verdict/file creation, do **all three**:
+**Hard rule:** before any distillation/verdict/file creation, do **all four**:
 1. **`read_file` 5 READMEs + `riir-ai/.docs/README.md`** — defines repo purpose, moat map, raw-vs-latent sync boundary, AND the training scope boundary (riir-train/README.md — what trains vs what stays runtime). Skipping = #1 cause of false Super-GOAT claims AND false PASS on training papers (the EG-FM lesson, arXiv:2608.05811, 2026-08-08: an agent PASS'd a training paper without reading `riir-train/README.md`, didn't know the full training-methods inventory, and had to be pushed back by the user to re-check).
 2. **`list_directory` all 5 `.research/` folders** (katgpt-rs, riir-ai, riir-chain, riir-neuron-db, **riir-train** — create `riir-chain/.research/` + `riir-neuron-db/.research/` on first use; `riir-train/.research/` already exists with 100+ training-method notes).
 3. **`list_directory` 4 runtime/chain/neuron-db src trees** — module names are codebase vocabulary. Skipping = #2 cause of false Super-GOAT claims.
+4. **`web_search` for published prior art** on the paper's headline technique (see §4 for the full protocol). Skipping = #4 cause of false novelty claims (the MoTE lesson, Research 411, 2026-08-09: an agent claimed "ternary MoE is novel" without searching the web for "mixture of ternary experts" — MoTE, arXiv:2506.14435, published exactly that technique in June 2025. The user had to manually prompt "search web for more paper" to catch it.)
 
 **Reads:** `katgpt-rs/README.md`, `riir-ai/README.md`, `riir-chain/README.md`, `riir-neuron-db/README.md`, **`riir-train/README.md`** (the 5th README — defines the Issue 004 scope boundary: adapter training methods / optimizers / losses / DPO/GRPO/SFT/RL pipelines MOVE here; freeze/thaw runtime / adapter routing / game+chain+validator+inference engines STAY in riir-ai; the producer/consumer contract is train here → `lora.bin` (BLAKE3) → freeze/thaw consume in riir-ai), `riir-ai/.docs/README.md` (+ `03_pillars/README.md` + `04_supergoat_candidates/README.md` before any Super-GOAT gate — claiming novelty over a moat that ships is the worst false-positive). **MANDATORY for training-paper classification (the GDN-blog lesson, 2026-08-07 + the EG-FM lesson, 2026-08-08):** also `read_file` `riir-train/.docs/02_pipelines/training_data_pipeline.md` + `riir-train/.docs/02_pipelines/gpu_training.md` + `riir-train/.docs/01_orientation/training_topology.md` — these define the ACTUAL model-based track (Plan 423 Gemma-2-2B LoRA SFT [PRODUCTION], Plan 318 SFT/LoRA [retired], Plan 059 G-Zero GRPO/DPO, Plan 066 HLA distillation, Plan 501–505 trajectory collection). Skipping these = false PASS on training papers by narrowing 'model-based track' to just Plan 318 SFT. The model-based track is broader than one plan.
 
@@ -70,7 +71,7 @@ Seven repos (see §Repos). Tier model:
 - `riir-neuron-db/src/` — `shard.rs`, `index.rs`, `merkle.rs`, `freeze.rs`, `mape_k.rs`, `consolidation.rs`, `gateway.rs`, `vibe.rs`, `spectral_flatness.rs`, `shard_compactor.rs`
 - **`riir-train/crates/riir-train-gpu/src/` + `riir-train/crates/riir-train-engine/src/`** — training vocab (`distill_attention.rs`, `loss_grpo.rs`, `loss_dpo.rs`, `delta_filter.rs`, optimizer kernels). Skipping = false PASS on training papers (the GDN-blog lesson: an agent PASS'd a paper touching HLA distillation + GRPO without knowing these files existed).
 
-Do NOT create any file until all three done. Plans (`.plans/`) are grepped during fusion search (§1), not pre-flight.
+Do NOT create any file until all four done. Plans (`.plans/`) are grepped during fusion search (§1), not pre-flight.
 
 ## Primary focus (distill HERE in katgpt-rs / riir-ai)
 
@@ -170,7 +171,7 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 - **Multi-primitive:** Collapse-aware × bandit coverage × sigmoid margin → `katgpt-rs/.plans/212_*` × `157_*` × `061_*` (three inference primitives fused into one collapse-recovery gate)
 
 **Fusion protocol:**
-1. **MANDATORY — grep ALL SEVEN repos in this session, BOTH layers (notes AND code). Do NOT stop after the first repo or the first layer.** Run keyword / paper-title / author / primitive-name grep across:
+1. **MANDATORY — grep ALL SEVEN repos in this session, BOTH layers (notes AND code). Do NOT stop after the first repo or the first layer. Do NOT wait for the user to prompt you repo-by-repo — run ALL greps in one pass, preferably in parallel via subagents.** (The Research 411 lesson, 2026-08-09: the agent only grepped the home repo (riir-train/.research) on the initial pass, then waited for the user to manually prompt "grep katgpt-rs/.research", "grep riir-ai/.research" — three separate user turns. ALL THREE greps were mandatory by this instruction and should have run unprompted in the initial pass. The riir-ai grep later found Research 328 — the transformer-layer MoE substrate — which materially changed the verdict.) Run keyword / paper-title / author / primitive-name grep across:
    - `katgpt-rs/.research/` + `katgpt-rs/.plans/` (intent — what we planned)
    - `riir-ai/.research/` + `riir-ai/.plans/` (intent — runtime/game)
    - `riir-chain/.research/` + `riir-chain/.plans/` (intent — current chain research; `.research/` may need creating on first use)
@@ -583,9 +584,25 @@ If path 0 + 1–3 all fail → Plan in riir-train (if applicable) or redirect wi
 
 **Canonical example (Research 360, AdaJEPA, 2026-07-01):** verdict claimed "parity" between shipped `ReestimationScheduler` and AdaJEPA's per-MPC-step GD loop based on architectural coverage alone. The PoC at `riir-ai/crates/riir-poc/benches/adajepa_modelless_goat.rs` confirmed latency parity (~940 ns/replan) + architectural coverage, but **refuted quality parity** — the coherence trigger was too conservative for mild shifts, and all adaptation strategies diverged on overshoot shifts. Verdict honestly revised in §9 PoC Addendum; follow-ups tracked in `riir-ai/.issues/363`. **Architectural coverage ≠ quality parity** — grep proved the loop existed, the PoC proved it didn't perform.
 
-### 4. Search if curious
+### 4. Published prior-art search — MANDATORY before any novelty verdict (the MoTE lesson, Research 411, 2026-08-09)
 
-Use web search mcp for that.
+**This is NOT optional. This is NOT "search if curious". This is a hard gate.** Before claiming ANY novelty (Q1 in §1.5), you MUST search the web for published prior art on the paper's headline technique. The canonical failure: Research 411 (BitNet Ternary MoE) claimed "ternary MoE is novel" — a single web search for "mixture of ternary experts" would have found **MoTE (arXiv:2506.14435, June 2025)** which publishes exactly that technique. The miss happened because the agent only read the paper's own references + grepped the codebase, never searching the broader literature for published work threatening the novelty claim. The user had to manually prompt "search web for more paper on this" to catch it.
+
+**MANDATORY web searches (run ALL before any novelty claim):**
+1. Search the paper's **headline technique** verbatim (e.g., `"mixture of ternary experts"`, `"ternary weight MoE"`, `"BitNet distillation recipe"`).
+2. Search **2–3 component techniques** (e.g., `"ternary expert up-cycling"`, `"1.58-bit MoE"`, `"sparse ternary routing"`).
+3. Search the **selling-point framing** you're about to claim (e.g., `"neuro-symbolic game AI ternary"`, `"cheaper symbolic reasoning LLM"`).
+4. Search for **recent (last 2 years) surveys** on the paper's topic — these name the competitive landscape.
+
+**If any published paper does what the note claims is novel → downgrade Q1 (novelty) BEFORE writing the verdict.** Cite the prior art explicitly. Do NOT write the Super-GOAT/GOAT verdict and then discover the prior art in a later pass — that's how mis-citations + overclaimed novelty ship.
+
+**Use subagents to parallelize.** Spawn 2–3 `spawn_agent` calls in parallel: one for the headline-technique web search, one for the component-technique web search, one for the all-repos codebase grep (§1 step 1). The web searches catch published prior art; the codebase grep catches shipped prior art. Both are mandatory; neither substitutes for the other. The Research 411 failure was doing ONLY the codebase grep (which found local notes) and skipping the web search (which would have found MoTE).
+
+**Re-run after corrections.** If you discover prior art in a later pass (user-prompted or self-caught), the refinement is NOT complete until you've: (a) updated the novelty verdict in the note, (b) re-checked whether the surviving novelty claim still holds, (c) committed the correction. Do not leave the note in an overclaimed state.
+
+### 4.5. Optional deeper search
+
+If the mandatory prior-art search (§4) surfaces a rich landscape, use web search for deeper exploration of specific papers, authors, or follow-up work. This is the "curious" tier — not mandatory, but valuable when the prior-art landscape is dense.
 
 ## Constraints (non-negotiable)
 
