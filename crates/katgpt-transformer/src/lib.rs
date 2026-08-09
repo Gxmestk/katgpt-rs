@@ -60,6 +60,9 @@ pub use contiguous::load_ternary_bits;
 // Contiguous binary loader (Issue 145, gated `binary_plasma`).
 #[cfg(feature = "binary_plasma")]
 pub use contiguous::load_binary_bits;
+// Contiguous group-scale ternary loader — the Q2_0_g128 container (Issue 578).
+#[cfg(feature = "ternary_group_scale")]
+pub use contiguous::load_ternary_group_bits;
 
 // Decode stage for specialized forward paths (Plan 102: TileRT pipeline).
 /// Different stages have different optimization opportunities:

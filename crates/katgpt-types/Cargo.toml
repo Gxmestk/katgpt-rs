@@ -72,6 +72,10 @@ plasma_path = []
 # + 1.82× storage (PASSES). Conjunction fails → binary remains opt-in for
 # memory-constrained edge deployments.
 binary_plasma = []
+# Issue 578: ternary {-1,0,+1} bit-planes with per-128 f16 group scale — the
+# Q2_0_g128 container (Ternary-Bonsai-27B). Implies binary_plasma for the shared
+# GROUP_SIZE convention (single source of truth for the 128-weight group).
+ternary_group_scale = ["binary_plasma"]
 
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []

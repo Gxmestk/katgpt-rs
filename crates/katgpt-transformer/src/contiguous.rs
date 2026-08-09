@@ -423,10 +423,234 @@ pub fn load_binary_bits(path: &std::path::Path) -> std::io::Result<katgpt_core::
     })
 }
 
+/// Load a `TGPLSMA1`-format ternary weight file with group-wise scale (Issue 578).
+///
+/// The `Q2_0_g128` container: two bit-planes (so the zero state survives) plus
+/// one f16 scale per 128 weights. Header layout mirrors `BNPLSMA1`, with a
+/// second bit-plane added:
+///
+/// ```text
+///   magic           8 bytes  b"TGPLSMA1"  (Ternary Group Plasma 1)
+///   rows            u32
+///   cols            u32
+///   blocks64        u32
+///   groups_per_row  u32
+///   group_scale     rows x groups_per_row x f16  (2 bytes each)
+///   pos_bits        rows x blocks64 x u64        (8 bytes each)
+///   neg_bits        rows x blocks64 x u64        (8 bytes each)
+/// ```
+///
+/// Validation follows `load_binary_bits`: magic, then both derived dimensions
+/// cross-checked against the header, then a total-length check, then bulk
+/// little-endian copies. The `pos & neg == 0` representation invariant is
+/// verified after load — a mis-parsed `Q2_0_g128` tensor almost always violates
+/// it, which makes this a cheap corruption check.
+#[cfg(feature = "ternary_group_scale")]
+pub fn load_ternary_group_bits(
+    path: &std::path::Path,
+) -> std::io::Result<katgpt_core::TernaryGroupWeights> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(path)?;
+    let file_len = f.metadata()?.len() as usize;
+    let mut buf = Vec::with_capacity(file_len);
+    f.read_to_end(&mut buf)?;
+
+    let invalid = |msg: String| std::io::Error::new(std::io::ErrorKind::InvalidData, msg);
+
+    if buf.len() < 24 {
+        return Err(invalid("file too small for header".to_string()));
+    }
+    if &buf[0..8] != b"TGPLSMA1" {
+        return Err(invalid("invalid magic".to_string()));
+    }
+
+    let rows = u32::from_le_bytes(buf[8..12].try_into().expect("header validated")) as usize;
+    let cols = u32::from_le_bytes(buf[12..16].try_into().expect("header validated")) as usize;
+    let blocks64 = u32::from_le_bytes(buf[16..20].try_into().expect("header validated")) as usize;
+    let groups_per_row =
+        u32::from_le_bytes(buf[20..24].try_into().expect("header validated")) as usize;
+
+    let expected_blocks = cols.div_ceil(64);
+    if blocks64 != expected_blocks {
+        return Err(invalid(format!(
+            "blocks64 mismatch: header={blocks64}, expected={expected_blocks}"
+        )));
+    }
+    let expected_groups = cols.div_ceil(katgpt_core::BINARY_GROUP_SIZE);
+    if groups_per_row != expected_groups {
+        return Err(invalid(format!(
+            "groups_per_row mismatch: header={groups_per_row}, expected={expected_groups}"
+        )));
+    }
+
+    let n_scales = rows * groups_per_row;
+    let n_plane = rows * blocks64;
+    let expected_len = 24 + n_scales * 2 + n_plane * 8 * 2;
+    if buf.len() < expected_len {
+        return Err(invalid("file truncated".to_string()));
+    }
+
+    let mut off = 24;
+
+    // group_scale: f16 values, bulk-copied (little-endian native).
+    let mut group_scale = vec![half::f16::ZERO; n_scales];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            buf[off..].as_ptr(),
+            group_scale.as_mut_ptr() as *mut u8,
+            n_scales * 2,
+        );
+    }
+    off += n_scales * 2;
+
+    let mut pos_bits = vec![0u64; n_plane];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            buf[off..].as_ptr(),
+            pos_bits.as_mut_ptr() as *mut u8,
+            n_plane * 8,
+        );
+    }
+    off += n_plane * 8;
+
+    let mut neg_bits = vec![0u64; n_plane];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            buf[off..].as_ptr(),
+            neg_bits.as_mut_ptr() as *mut u8,
+            n_plane * 8,
+        );
+    }
+
+    let w = katgpt_core::TernaryGroupWeights {
+        rows,
+        cols,
+        blocks64,
+        groups_per_row,
+        pos_bits,
+        neg_bits,
+        group_scale,
+    };
+    if !w.invariant_holds() {
+        return Err(invalid(
+            "pos_bits & neg_bits overlap: a weight is both +1 and -1 (corrupt or mis-parsed)"
+                .to_string(),
+        ));
+    }
+    Ok(w)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use katgpt_core::types::{Config, Rng};
+
+    /// Serialize a `TernaryGroupWeights` into the `TGPLSMA1` wire format that
+    /// `load_ternary_group_bits` reads. Test-only writer — the production
+    /// producer is the GGUF `Q2_0_g128` repacker (riir-train Plan 333 T3.1b).
+    #[cfg(feature = "ternary_group_scale")]
+    fn encode_tgplsma1(w: &katgpt_core::TernaryGroupWeights) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"TGPLSMA1");
+        buf.extend_from_slice(&(w.rows as u32).to_le_bytes());
+        buf.extend_from_slice(&(w.cols as u32).to_le_bytes());
+        buf.extend_from_slice(&(w.blocks64 as u32).to_le_bytes());
+        buf.extend_from_slice(&(w.groups_per_row as u32).to_le_bytes());
+        for s in &w.group_scale {
+            buf.extend_from_slice(&s.to_bits().to_le_bytes());
+        }
+        for v in &w.pos_bits {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
+        for v in &w.neg_bits {
+            buf.extend_from_slice(&v.to_le_bytes());
+        }
+        buf
+    }
+
+    #[cfg(feature = "ternary_group_scale")]
+    fn sample_group_weights() -> katgpt_core::TernaryGroupWeights {
+        // 300 cols exercises a ragged final group (300 = 2*128 + 44).
+        let (rows, cols) = (3usize, 300usize);
+        let mut w = katgpt_core::TernaryGroupWeights::new(rows, cols);
+        for r in 0..rows {
+            for c in 0..cols {
+                let v = match (r + c) % 3 {
+                    0 => 1i8,
+                    1 => -1i8,
+                    _ => 0i8,
+                };
+                w.set(r, c, v);
+            }
+            for g in 0..w.groups_per_row {
+                w.set_scale(r, g, 0.25 + 0.5 * (g as f32) + r as f32);
+            }
+        }
+        w
+    }
+
+    #[cfg(feature = "ternary_group_scale")]
+    #[test]
+    fn tgplsma1_roundtrips_through_the_loader() {
+        let w = sample_group_weights();
+        let dir = std::env::temp_dir().join(format!("kat578_rt_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("w.tgbits");
+        std::fs::write(&path, encode_tgplsma1(&w)).expect("write");
+
+        let got = load_ternary_group_bits(&path).expect("load");
+        assert_eq!(got.rows, w.rows);
+        assert_eq!(got.cols, w.cols);
+        assert_eq!(got.blocks64, w.blocks64);
+        assert_eq!(got.groups_per_row, w.groups_per_row);
+        assert_eq!(got.pos_bits, w.pos_bits);
+        assert_eq!(got.neg_bits, w.neg_bits);
+        assert_eq!(got.group_scale, w.group_scale);
+        // All three states survive the round-trip, including the zero the
+        // binary tier cannot represent.
+        for r in 0..w.rows {
+            for c in 0..w.cols {
+                assert_eq!(got.get(r, c), w.get(r, c), "r={r} c={c}");
+            }
+        }
+        assert!(got.get(0, 2) == 0, "zero state must survive");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(feature = "ternary_group_scale")]
+    #[test]
+    fn loader_rejects_bad_magic_truncation_and_plane_overlap() {
+        let w = sample_group_weights();
+        let dir = std::env::temp_dir().join(format!("kat578_bad_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+
+        // Bad magic.
+        let mut bad = encode_tgplsma1(&w);
+        bad[0] = b'X';
+        let p1 = dir.join("magic.tgbits");
+        std::fs::write(&p1, &bad).expect("write");
+        assert!(load_ternary_group_bits(&p1).is_err(), "bad magic must fail");
+
+        // Truncated payload.
+        let full = encode_tgplsma1(&w);
+        let p2 = dir.join("trunc.tgbits");
+        std::fs::write(&p2, &full[..full.len() - 16]).expect("write");
+        assert!(load_ternary_group_bits(&p2).is_err(), "truncation must fail");
+
+        // Representation-invariant violation: same bit set in both planes.
+        let mut overlap = w.clone();
+        overlap.pos_bits[0] |= 1;
+        overlap.neg_bits[0] |= 1;
+        let p3 = dir.join("overlap.tgbits");
+        std::fs::write(&p3, encode_tgplsma1(&overlap)).expect("write");
+        let err = load_ternary_group_bits(&p3).expect_err("overlap must fail");
+        assert!(
+            err.to_string().contains("overlap"),
+            "unexpected error: {err}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn make_weights() -> (Config, TransformerWeights) {
         let config = Config::micro();

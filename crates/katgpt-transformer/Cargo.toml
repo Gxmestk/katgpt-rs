@@ -56,6 +56,8 @@ plasma_path = []
 # Binary plasma loader (Issue 145, Bonsai 27B). Gates: load_binary_bits in contiguous.rs.
 # Forwards to katgpt-core so BinaryWeights resolves.
 binary_plasma = ["katgpt-core/binary_plasma"]
+# Issue 578: the Q2_0_g128 container (ternary bit-planes + per-128 f16 scale).
+ternary_group_scale = ["katgpt-core/ternary_group_scale", "binary_plasma"]
 
 # ── Phase 9 absorptions (Proposal 003) — modules moved from katgpt-rs root ──
 

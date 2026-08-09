@@ -51,6 +51,9 @@ mod maxsim;
 mod research;
 mod sparse;
 mod ternary;
+/// Group-scale ternary matvec kernels (`ternary_group_scale`, Issue 578).
+#[cfg(feature = "ternary_group_scale")]
+pub mod ternary_group;
 
 #[cfg(test)]
 mod tests;
@@ -106,6 +109,10 @@ pub use elementwise::{
 // the underlying items so `cargo check --no-default-features` stays green.
 #[cfg(feature = "binary_plasma")]
 pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
+#[cfg(feature = "ternary_group_scale")]
+pub use ternary_group::{
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, ternary_group_matvec_scalar,
+};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{

@@ -1,7 +1,7 @@
 # Issue 578: Ternary tier with group-wise f16 scale (`Q2_0_g128` container)
 
 **Date:** 2026-08-09
-**Status:** OPEN — blocking riir-train Plan 333 Phase 2/3
+**Status:** PARTIALLY LANDED (container + scalar/NEON kernels + loader, 2026-08-09) — G2/G4 unmeasured, AVX2 deferred. Still blocking riir-train Plan 333 T3.1b.
 **Feature flag (proposed):** `ternary_group_scale` (opt-in; promotion needs the GOAT gate below)
 **Filed by:** riir-train [Plan 333](../../riir-train/.plans/333_bitnet_ternary_moe_neuro_symbolic_poc.md) T3.1a
 **Related:** [Issue 145](https://github.com/katopz/katgpt-rs) `binary_plasma` tier (got the scale
@@ -85,17 +85,68 @@ per-group — the bit-plane popcount inner loop is unchanged.
 
 ### Work items
 
-- [ ] `TernaryGroupWeights` in `crates/katgpt-types/src/ternary.rs` (or a sibling module) behind
-      `ternary_group_scale`, with `new` / `set` / `get` / `checksum` mirroring the existing tiers.
-- [ ] `simd_ternary_group_matvec` + `simd_ternary_group_matmul_batch` in
-      `crates/katgpt-types/src/simd/ternary.rs`, NEON + AVX2 + scalar, signature matching the
-      shipped kernels: `(&TernaryGroupWeights, &[f32], &mut [f32])`.
-- [ ] Re-export through `crates/katgpt-types/src/simd/mod.rs` under the matching `#[cfg(feature)]`,
-      and through `katgpt-core` (feature forward, same shape as `plasma_path` / `binary_plasma`).
-- [ ] Loader: follow `load_binary_bits`' validation idiom (`contiguous.rs:338`) — magic → dims →
-      `blocks64` / `groups_per_row` cross-check → length check → bulk `copy_nonoverlapping`.
-- [ ] `TernaryWeights → TernaryGroupWeights` widening (broadcast `row_scale` across that row's
-      groups) — the lossless direction, unlike `from_ternary_no_zeros`.
+- [x] `TernaryGroupWeights` in `crates/katgpt-types/src/ternary_group.rs` behind
+      `ternary_group_scale`: `new` / `set` / `get` / `scale_at` / `set_scale` / `checksum` /
+      `encoded_bytes` / `invariant_holds` / `quantize_from_f32` (group-wise error feedback).
+- [x] `ternary_group_matvec_scalar` + `simd_ternary_group_matvec` +
+      `simd_ternary_group_matmul_batch` in `crates/katgpt-types/src/simd/ternary_group.rs`.
+      **Scalar + NEON only — AVX2 deferred** (see Deviations).
+- [x] Re-exported through `simd/mod.rs`, `katgpt-types/src/lib.rs`, and `katgpt-core` (feature
+      forward `ternary_group_scale = ["katgpt-types/ternary_group_scale", "binary_plasma"]`).
+- [x] Loader `load_ternary_group_bits` (`TGPLSMA1` magic) in
+      `crates/katgpt-transformer/src/contiguous.rs`, following `load_binary_bits`' validation
+      idiom + an added `pos & neg == 0` invariant check on load.
+- [x] `TernaryGroupWeights::from_ternary` widening (broadcast `row_scale` across the row's
+      groups) — always succeeds, unlike `from_ternary_no_zeros`.
+- [ ] AVX2 kernel (deferred — see Deviations).
+- [ ] Perf bench for G2 + `CountingAllocator` harness for G4.
+
+---
+
+## Implementation status (2026-08-09)
+
+**Landed.** 9 unit tests in `simd/ternary_group.rs` + 2 loader tests in `contiguous.rs`, all
+passing on aarch64/NEON:
+
+| Test | Covers |
+|---|---|
+| `set_get_roundtrips_all_three_states` | all 3 states + overwrite clears the other plane |
+| `group_geometry_matches_group_size` | `BLOCKS_PER_GROUP == 2`; 2.125 bits/weight footprint |
+| `neon_matches_scalar_reference` | 6 shapes incl. ragged group / block / sub-4 tail, rel < 1e-6 |
+| `zero_state_is_actually_skipped` | all-zero weights → exactly 0 at scale 3.0 |
+| `per_group_scale_is_applied_not_per_row` | distinct per-group scales; a row-scale impl fails it |
+| `group_scale_tracks_varying_magnitude_better_than_row_scale` | the format's reason to exist |
+| `quantize_from_f32_holds_invariant_and_tracks_signs` | invariant + large magnitudes not zeroed |
+| `batch_matches_per_row_calls` | batch == per-row, exactly |
+| `widening_from_row_scale_ternary_preserves_result` | bit-planes verbatim, matvec within 1e-3 |
+| `tgplsma1_roundtrips_through_the_loader` | wire format, ragged 300-col case, zero state survives |
+| `loader_rejects_bad_magic_truncation_and_plane_overlap` | 3 corruption modes |
+
+**Gate status — honest:**
+
+| Gate | Status |
+|---|---|
+| G1 correctness | **PARTIAL.** Scalar/NEON parity, invariants, quantizer, loader, widening all pass. The **llama.cpp logit match (±1%) is NOT done** — it needs the real Bonsai tensor, so it stays riir-train Plan 333 T3.2. |
+| G2 perf | **NOT MEASURED.** No bench written. |
+| G3 no-regression | **PASS.** `katgpt-types` 127 default tests unchanged, 155 with the feature; `katgpt-transformer` 21 default. Clean under default / `--no-default-features` / feature-on / feature-on-without-`plasma_path`. |
+| G4 alloc-free | **STRUCTURALLY YES, NOT INSTRUMENTED.** Kernels write into a caller-owned `&mut [f32]` and allocate nothing internally; no `CountingAllocator` harness written to prove it. |
+
+**Promotion to default-on is NOT justified yet** — G2 is unmeasured and G1's load-bearing half
+(matching llama.cpp on a real tensor) is untested. Stays opt-in.
+
+### Deviations from the spec above
+
+1. **AVX2 not implemented.** `simd_ternary_group_matvec` falls back to scalar on x86_64. The
+   development machine is aarch64 (M3 Max), so a hand-written AVX2 intrinsics kernel could not be
+   executed or validated here — an unvalidated AVX2 kernel is worse than a correct scalar one.
+   The dispatcher has the arm shape ready for it.
+2. **Scalar and NEON are close, not bit-identical** (~1e-6 relative). They associate the scale
+   differently: scalar applies it once per group (matching how `Q2_0_g128` is defined and how
+   llama.cpp dequantizes), NEON folds it per element so the 4 accumulators can span the whole row
+   without per-group horizontal sums — the same trick Issue 145's binary kernel uses. Documented
+   at the top of `simd/ternary_group.rs`.
+3. **`ternary_group_scale` implies `binary_plasma`**, to reuse `GROUP_SIZE` as a single source of
+   truth for the 128-weight group rather than declaring a second constant.
 
 ---
 

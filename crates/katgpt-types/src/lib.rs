@@ -82,6 +82,10 @@ pub mod simd;
 pub mod slod;
 pub mod temporal;
 mod ternary;
+/// Ternary `{-1,0,+1}` bit-planes with per-128 f16 group scale — the
+/// `Q2_0_g128` container (Issue 578, `ternary_group_scale` feature).
+#[cfg(feature = "ternary_group_scale")]
+pub mod ternary_group;
 
 #[cfg(test)]
 mod tests_types;
@@ -91,6 +95,8 @@ mod tests_types;
 // underlying items.
 #[cfg(feature = "binary_plasma")]
 pub use binary::{BinaryWeights, GROUP_SIZE};
+#[cfg(feature = "ternary_group_scale")]
+pub use ternary_group::TernaryGroupWeights;
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]
 pub use domain::DomainLatent;

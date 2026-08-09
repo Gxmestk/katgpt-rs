@@ -552,6 +552,17 @@ pub use simd::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matve
 #[cfg(feature = "binary_plasma")]
 pub use types::{BinaryWeights, GROUP_SIZE as BINARY_GROUP_SIZE};
 
+// Issue 578: the Q2_0_g128 container — ternary {-1,0,+1} bit-planes with the
+// per-128 f16 group scale. Neither shipped tier could hold it (plasma_path has
+// the zero state but per-row scale; binary_plasma has the group scale but no
+// zero state).
+#[cfg(feature = "ternary_group_scale")]
+pub use simd::{
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, ternary_group_matvec_scalar,
+};
+#[cfg(feature = "ternary_group_scale")]
+pub use types::TernaryGroupWeights;
+
 #[cfg(feature = "peira_distill")]
 pub mod peira;
 #[cfg(feature = "peira_distill")]
