@@ -29,3 +29,6 @@ __pycache__/
 data/kimi-k3-0.40b/
 # Kimi-K3 layer-diff debug artifacts (regenerable via scripts/kimi_ref/run_reference.py + dump_layer*.py)
 scripts/kimi_ref/ref_output/
+
+# Symlink to AGENTS.md so Claude Code reads the same instructions as Zed's agent
+CLAUDE.md
