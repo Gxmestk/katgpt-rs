@@ -4,6 +4,8 @@
 **Raw:** `.raw/TopK/`
 **Updated:** 2026-05-27 (deep analysis from raw experimental data)
 
+> **Complement (worst-case direction):** Weller et al. [arXiv:2508.21038 "On the Theoretical Limitations of Embedding-Based Retrieval"] (ICLR 2026) — distilled in **Research 472**. This note proves the *positive, k-sparse-conditional* bound `d = Θ(k log n)`; 2508.21038 proves the *negative, worst-case* bound `d ≥ ln C(n,k)/ln(1+1/γ)`, i.e. for any fixed `d` there exist relevance structures no single-vector index can realize. It also supplies the LIMIT adversarial construction protocol and shows lexical/multi-vector/rerank escapes. **The Theoretical Sufficiency Check table below omits every default-on 8-D index** (`ShardIndex` `hla_moments`, `ItemEmbedIndex`, `riir-rag` `LatentQuery`) — tracked in Issue 579; `ItemEmbedIndex` at `d=8`, `n=25,943`, `k=5` is **2.4× under** the worst-case bound.
+
 ## Summary
 
 Proves that near-optimal retrieval margin is achievable in dimension d = O(k log n), where k = query sparsity and n = corpus size. Connects retrieval margin quality to compressed sensing (RIP) and shows sigmoid loss dramatically outperforms InfoNCE for margin.
