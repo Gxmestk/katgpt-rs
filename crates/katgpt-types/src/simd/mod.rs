@@ -121,7 +121,10 @@ pub use research::{
     simd_sum_sq_quartic,
 };
 #[cfg(feature = "sigmoid_margin")]
-pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
+pub use research::{
+    compute_retrieval_margin, dim_capacity_ceiling, dim_capacity_floor, dim_capacity_required,
+    dim_sufficiency_bound, ln_binomial, sigmoid_margin_loss,
+};
 pub use sparse::{simd_sparse_dot_f32, simd_sparse_matmul_rows};
 pub use ternary::simd_ternary_dot_f32;
 #[cfg(feature = "plasma_path")]

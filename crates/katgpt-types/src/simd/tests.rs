@@ -1388,6 +1388,233 @@ mod sigmoid_margin_tests {
         assert_eq!(dim_sufficiency_bound(2, 2), 3, "n=2 → minimal");
     }
 
+    // ── Research 472 worst-case capacity bound (arXiv:2508.21038 Theorem 1) ──
+
+    /// The load-bearing test: `dim_capacity_required` must reproduce the paper's
+    /// Table 1 (γ = 0.1) cell for cell. Every value here is transcribed from the
+    /// published table, not from our own implementation — so this pins us to the
+    /// paper rather than to ourselves.
+    #[test]
+    fn capacity_required_reproduces_paper_table_1() {
+        const G: f64 = 0.1;
+        // (n, k, published d)
+        let table = [
+            (100usize, 2usize, 4usize),
+            (100, 10, 13),
+            (1_000, 2, 6),
+            (1_000, 10, 23),
+            (1_000, 100, 135),
+            (10_000, 2, 8),
+            (10_000, 10, 33),
+            (10_000, 100, 233),
+            (10_000, 1_000, 1_354),
+            (100_000, 2, 10),
+            (100_000, 10, 42),
+            (100_000, 100, 329),
+            (100_000, 1_000, 2_334),
+            (1_000_000, 2, 12),
+            (1_000_000, 10, 52),
+            (1_000_000, 100, 425),
+            (1_000_000, 1_000, 3_296),
+        ];
+        for (n, k, expected) in table {
+            let got = dim_capacity_required(n, k, G);
+            assert_eq!(got, expected, "Table 1 mismatch at n={n}, k={k}");
+        }
+    }
+
+    #[test]
+    fn capacity_required_trivial_cases() {
+        // Paper marks n == k as "trivial": C(n,n) = 1, nothing to separate.
+        assert_eq!(dim_capacity_required(1_000, 1_000, 0.1), 0, "n == k");
+        assert_eq!(dim_capacity_required(10, 20, 0.1), 0, "k > n");
+        assert_eq!(dim_capacity_required(1_000, 0, 0.1), 0, "k == 0");
+        // γ ≤ 0 imposes no margin, so no dimension is required.
+        assert_eq!(dim_capacity_required(1_000, 2, 0.0), 0, "γ = 0");
+    }
+
+    /// Exact ceiling values at d = 8 (our shipped `BELIEF_DIM` / `EMBED_DIM` /
+    /// `ITEM_EMBED_DIM` / `LATENT_DIM`), γ = 0.1. These are the numbers the
+    /// retrieval-capacity audit (Issue 579, Issue 591) is argued from, so they
+    /// are pinned rather than recomputed by hand — an earlier hand-computation
+    /// with a coarse search step underestimated the k=2 and k=4 cells.
+    #[test]
+    fn capacity_ceiling_exact_at_dim_8() {
+        const G: f64 = 0.1;
+        assert_eq!(dim_capacity_ceiling(8, 2, G), 20_706);
+        assert_eq!(dim_capacity_ceiling(8, 4, G), 269);
+        assert_eq!(dim_capacity_ceiling(8, 5, G), 122);
+        assert_eq!(dim_capacity_ceiling(8, 8, G), 44);
+        assert_eq!(dim_capacity_ceiling(8, 10, G), 35);
+        assert_eq!(dim_capacity_ceiling(8, 16, G), 30);
+        assert_eq!(dim_capacity_ceiling(16, 16, G), 82);
+    }
+
+    /// The counterintuitive property, asserted so a future refactor cannot
+    /// silently invert it: through the practical regime `k << n` the ceiling
+    /// SHRINKS as k grows. Widening top-k to improve coverage makes the
+    /// worst-case requirement harder, so coverage cannot be bought with a
+    /// larger k.
+    #[test]
+    fn capacity_ceiling_decreases_with_k_while_k_much_less_than_n() {
+        const G: f64 = 0.1;
+        let mut prev = usize::MAX;
+        for k in [2usize, 3, 4, 5, 8, 10, 16] {
+            let c = dim_capacity_ceiling(8, k, G);
+            assert!(c < prev, "ceiling must shrink as k grows: k={k} gave {c}, prev {prev}");
+            assert!(c > k, "regime check: ceiling {c} must exceed k={k} to be meaningful");
+            prev = c;
+        }
+    }
+
+    /// The ceiling is U-shaped in k, NOT globally monotone: past the minimum it
+    /// rises again because `C(n,k) = C(n,n-k)` makes near-complete subsets easy
+    /// once k approaches n ("retrieve almost everything" needs little
+    /// separating power). Pinned explicitly so the reversal is understood as a
+    /// property of the theorem rather than rediscovered as a bug — and so
+    /// nobody cites the rising branch as extra headroom.
+    #[test]
+    fn capacity_ceiling_is_u_shaped_in_k() {
+        const G: f64 = 0.1;
+        let min_k16 = dim_capacity_ceiling(8, 16, G);
+        assert_eq!(min_k16, 30, "minimum of the curve at d=8");
+        // Rising branch: k comparable to n, degenerate for retrieval.
+        assert_eq!(dim_capacity_ceiling(8, 20, G), 31);
+        assert_eq!(dim_capacity_ceiling(8, 32, G), 40);
+        assert_eq!(dim_capacity_ceiling(8, 40, G), 47);
+
+        // The honest worst case for a given d is the global minimum over k.
+        let global_min = (1usize..=64)
+            .map(|k| dim_capacity_ceiling(8, k, G))
+            .min()
+            .expect("non-empty");
+        assert_eq!(global_min, 30, "d=8 can never represent all top-k subsets of >30 docs");
+    }
+
+    #[test]
+    fn capacity_ceiling_increases_with_dim() {
+        const G: f64 = 0.1;
+        let mut prev = 0usize;
+        for d in [1usize, 2, 4, 8, 16, 32] {
+            let c = dim_capacity_ceiling(d, 8, G);
+            assert!(c > prev, "ceiling must grow with d: d={d} gave {c}, prev {prev}");
+            prev = c;
+        }
+    }
+
+    /// `ceiling` and `required` must be consistent inverses: the ceiling is
+    /// representable at d, and one document past it is not.
+    #[test]
+    fn capacity_ceiling_and_required_round_trip() {
+        const G: f64 = 0.1;
+        for (d, k) in [(8usize, 2usize), (8, 5), (8, 8), (16, 16), (32, 10)] {
+            let c = dim_capacity_ceiling(d, k, G);
+            assert!(
+                dim_capacity_required(c, k, G) <= d,
+                "ceiling {c} should be representable at d={d}, k={k}"
+            );
+            assert!(
+                dim_capacity_required(c + 1, k, G) > d,
+                "ceiling+1 ({}) should NOT be representable at d={d}, k={k}",
+                c + 1
+            );
+        }
+    }
+
+    /// The k-free floor must never exceed the true minimum over k, and must
+    /// track the closed form `d · log2(1 + 1/gamma)`.
+    #[test]
+    fn capacity_floor_is_conservative_and_linear_in_dim() {
+        const G: f64 = 0.1;
+        for d in [8usize, 16, 32, 64, 128] {
+            let floor = dim_capacity_floor(d, G);
+            let exact_min = (1usize..=(4 * d + 40))
+                .map(|k| dim_capacity_ceiling(d, k, G))
+                .min()
+                .expect("non-empty");
+            assert!(
+                floor <= exact_min,
+                "floor {floor} must not exceed exact min {exact_min} at d={d}"
+            );
+            // Stirling's sqrt factor costs only a few documents.
+            assert!(
+                exact_min - floor <= 8,
+                "floor {floor} too loose vs exact min {exact_min} at d={d}"
+            );
+        }
+        // Reference values from the closed form d * log2(11).
+        assert_eq!(dim_capacity_floor(8, G), 27);
+        assert_eq!(dim_capacity_floor(64, G), 221);
+        assert_eq!(dim_capacity_floor(768, G), 2656);
+        assert_eq!(dim_capacity_floor(8, 0.0), usize::MAX, "gamma=0 -> unbounded");
+    }
+
+    #[test]
+    fn capacity_ceiling_edge_cases() {
+        assert_eq!(dim_capacity_ceiling(8, 0, 0.1), usize::MAX, "k=0 → unbounded");
+        assert_eq!(dim_capacity_ceiling(8, 4, 0.0), usize::MAX, "γ=0 → unbounded");
+        assert_eq!(dim_capacity_ceiling(8, 4, -1.0), usize::MAX, "γ<0 → unbounded");
+        // d=0 admits only the single subset C(k,k)=1.
+        assert_eq!(dim_capacity_ceiling(0, 4, 0.1), 4, "d=0 → n=k");
+        // γ > 1 is infeasible for unit vectors; clamped to the tightest γ=1.
+        assert_eq!(
+            dim_capacity_ceiling(8, 4, 5.0),
+            dim_capacity_ceiling(8, 4, 1.0),
+            "γ>1 clamps to γ=1"
+        );
+        // NaN falls through to the conservative γ=1 clamp.
+        assert_eq!(
+            dim_capacity_ceiling(8, 4, f64::NAN),
+            dim_capacity_ceiling(8, 4, 1.0),
+            "NaN clamps to γ=1"
+        );
+    }
+
+    /// A tighter margin demands more dimensions / yields a smaller ceiling.
+    #[test]
+    fn capacity_tighter_margin_is_stricter() {
+        let loose = dim_capacity_ceiling(8, 4, 0.01);
+        let mid = dim_capacity_ceiling(8, 4, 0.1);
+        let tight = dim_capacity_ceiling(8, 4, 1.0);
+        assert!(loose > mid, "γ=0.01 should allow more than γ=0.1: {loose} vs {mid}");
+        assert!(mid > tight, "γ=0.1 should allow more than γ=1.0: {mid} vs {tight}");
+    }
+
+    #[test]
+    fn ln_binomial_matches_exact_small_values() {
+        // Exact C(n,k) for values that fit, compared in log space.
+        for (n, k, exact) in [
+            (5usize, 2usize, 10.0f64),
+            (10, 3, 120.0),
+            (46, 2, 1_035.0), // the LIMIT construction: C(46,2) = 1035
+            (20, 10, 184_756.0),
+        ] {
+            let got = ln_binomial(n, k);
+            assert!(
+                (got - exact.ln()).abs() < 1e-9,
+                "ln C({n},{k}): got {got}, want ln({exact}) = {}",
+                exact.ln()
+            );
+        }
+        assert_eq!(ln_binomial(10, 0), 0.0, "C(n,0) = 1");
+        assert_eq!(ln_binomial(10, 10), 0.0, "C(n,n) = 1");
+        assert!(ln_binomial(5, 9).is_infinite(), "k > n → no subset");
+    }
+
+    /// `dim_capacity_required` (worst-case, all subsets) and
+    /// `dim_sufficiency_bound` (positive, k-sparse) answer different questions
+    /// and are expected to disagree. Pinned so nobody "fixes" one to match the
+    /// other.
+    #[test]
+    fn capacity_and_sufficiency_are_distinct_bounds() {
+        let worst_case = dim_capacity_required(10_000, 2, 0.1); // 8
+        let k_sparse = dim_sufficiency_bound(2, 10_000); // ceil(1.5*2*ln(1e4)) = 28
+        assert_ne!(
+            worst_case, k_sparse,
+            "the two bounds are different theorems; equality would be suspicious"
+        );
+    }
+
     #[test]
     fn proof3_bound_monotonic() {
         let b1 = dim_sufficiency_bound(2, 50);

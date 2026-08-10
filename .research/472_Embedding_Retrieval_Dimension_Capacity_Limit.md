@@ -15,9 +15,9 @@
 
 The paper proves a *negative, worst-case* capacity theorem for single-vector retrieval: for embedding dimension `d`, the number of top-`k` document subsets realizable by **any** query is bounded, so there always exist relevance structures no `d`-dimensional single-vector index can represent — regardless of model size, training data, or loss. This is the exact complement to Research 123, which proved the *positive, k-sparse-conditional* bound `d = Θ(k log n)`.
 
-**Why it matters here:** our entire default-on retrieval surface is single-vector cosine top-k at **`d = 8`**. Applying the paper's own Theorem 1 at γ=0.1, `d=8` supports all top-`k` subsets only up to `n ≤ 20,482` for `k=2`, `n ≤ 267` for `k=4`, and `n ≤ 44` for `k=8`. `ItemEmbedIndex` runs `k=5` retrieval over the real **25,943-item** Seal catalogue at `d=8`, where the bound demands `d ≥ 19.2` — **2.4× under**.
+**Why it matters here:** our entire default-on retrieval surface is single-vector cosine top-k at **`d = 8`**. Applying the paper's own Theorem 1 at γ=0.1, `d=8` supports all top-`k` subsets only up to `n ≤ 20,706` for `k=2`, `n ≤ 269` for `k=4`, and `n ≤ 44` for `k=8` — and the minimum over *all* `k` is just **30 documents** (§2.2b). `ItemEmbedIndex` runs `k=5` retrieval over the real **25,943-item** Seal catalogue at `d=8`, where the ceiling is 122 items and the bound demands `d ≥ 19.2` — **213× over on corpus, 2.4× under on dimension**.
 
-**Distilled for katgpt-rs (modelless, inference-time):** the transferable artifact is not a new mechanism — it is a *closed-form capacity budget* `d ≥ ln C(n,k) / ln(1+1/γ)`, monotone in `n` and `k`, computable in nanoseconds with zero allocation, that says a priori whether a retrieval configuration is inside or outside its representable regime. We already ship this instrument (`dim_sufficiency_bound`, Plan 157) — **but it has zero production call sites.**
+**Distilled for katgpt-rs (modelless, inference-time):** the transferable artifact is not a new mechanism — it is a *closed-form capacity budget* `d ≥ ln C(n,k) / ln(1+1/γ)`, increasing in `n`, that says a priori whether a retrieval configuration is inside its representable regime. Shipped 2026-08-10 as `dim_capacity_required` / `dim_capacity_ceiling` / `dim_capacity_floor` / `ln_binomial` in `katgpt-types/src/simd/research.rs` (feature `sigmoid_margin`), with tests reproducing the paper's Table 1 cell-for-cell. Complements — does not replace — Research 123's positive `dim_sufficiency_bound`, which still has zero production call sites.
 
 ---
 
@@ -112,13 +112,43 @@ So the minimum viable embedding dimension is pinned between sign-rank − 1 and 
 
 ### 2.2 Theorem 1 applied at γ=0.1 — max corpus `n` with all top-`k` subsets realizable
 
-| d | k=2 | k=4 | k=8 | k=10 | k=16 |
-|---|---|---|---|---|---|
-| **8** | 20,482 | **267** | **44** | **35** | **30** |
-| 16 | 2.97e8 | 32,285 | 454 | 212 | 82 |
-| 32 | ~1e9 | 4.69e8 | 55,086 | 9,664 | 819 |
-| 64 | ~1e9 | ~1e9 | 8.00e8 | 2.09e7 | 97,805 |
-| 768 | ~1e9 | ~1e9 | ~1e9 | ~1e9 | ~1e9 |
+| d | k=2 | k=4 | k=5 | k=8 | k=10 | k=16 | **min over all k** |
+|---|---|---|---|---|---|---|---|
+| **8** | 20,706 | **269** | **122** | **44** | **35** | **30** | **30** |
+| 16 | 303,149,237 | 32,407 | 5,603 | 458 | 214 | 82 | 58 |
+| 32 | 6.50e16 | 474,454,197 | 12,043,410 | 55,117 | 9,741 | 830 | 114 |
+| 64 | >2^62 | 1.02e17 | 5.57e13 | 806,921,985 | 20,935,801 | 99,573 | 225 |
+| 768 | >2^62 | >2^62 | >2^62 | >2^62 | >2^62 | >2^62 | 2,662 |
+
+> **Corrected 2026-08-10.** An earlier revision of this table carried
+> coarse-search-step underestimates in the k=2/k=4/k=16 columns (e.g. 20,482 for
+> d=8/k=2 instead of 20,706). All values above are now produced by
+> `dim_capacity_ceiling` and pinned by tests that additionally reproduce the
+> paper's Table 1 cell-for-cell. The two load-bearing figures were unaffected:
+> d=8/k=8 → 44 and the ItemEmbedIndex d≥19.2 requirement.
+
+### 2.2b The k-free statement — `min ceiling ≈ d · log₂(1 + 1/γ)`
+
+The per-`k` table above hides a much simpler result. `dim_capacity_ceiling` is
+**U-shaped in `k`, not monotone**: it falls until roughly `k ≈ n/2`, then rises
+again because `C(n,k) = C(n,n−k)` makes near-complete subsets easy ("retrieve
+almost everything" needs little separating power). The minimum of that curve is
+the only `k`-free thing you can say about a dimension, and it has a one-line
+closed form — at `k ≈ n/2`, `C(n,n/2) ≈ 2ⁿ`, so Theorem 1 becomes
+
+```
+n · ln 2 ≤ d · ln(1 + 1/γ)     ⇒     n ≤ d · log₂(1 + 1/γ)
+```
+
+At γ=0.1 that is **≈ 3.46·d** — the capacity floor is *linear* in the embedding
+dimension, not exponential. Concretely: **a `d=8` index can never represent all
+top-`k` subsets of more than 30 documents, for any `k` whatsoever.** Shipped as
+`dim_capacity_floor(d, γ)` (O(1); a few documents conservative vs the exact
+minimum, since it drops Stirling's `√(πn/2)`).
+
+This is the number to quote when provisioning, because it needs no assumption
+about `k`. Our 8-D surfaces sit **33×** (1000-node graphs) to **865×**
+(the 25,943-item catalogue) past it.
 
 Free-embedding best case (`critical_n`, k=2), with the paper's measured 4.5× real-model multiplier:
 
@@ -141,6 +171,11 @@ Free-embedding best case (`critical_n`, k=2), with the paper's measured 4.5× re
 | 3 | 11.97 | 8 | 1.5× under |
 | 4 | 15.63 | 8 | 2.0× under |
 | **5** | **19.20** | **8** | **2.4× under** |
+
+Read the other way round: at `d=8, k=5` the capacity ceiling is **122 items**,
+against a real catalogue of 25,943 — **213× over** (and 865× over the k-free
+floor of 30). The `d` view understates it because the bound is logarithmic in
+`n`: a 2.4× dimension shortfall is a two-order-of-magnitude corpus shortfall.
 
 The passing GOAT gate is not invalidated — it measures the *realized* (benign, type-clustered, centroid-initialised) qrel matrix. The bound says there is **no worst-case headroom left**: any move toward compositional/multi-attribute item relevance ("light armour that a mage can equip below level 30 excluding quest rewards") is combinatorially richer and cannot be fixed by better embeddings at `d=8`.
 
@@ -206,10 +241,12 @@ Plan 410 is the precedent for the correct shape of response: a published impossi
 Benchmark 319 G2b runs `seed_k=8` over 1000 nodes, **~23× past** the `n≤44` ceiling Theorem 1 gives at
 `d=8, k=8, γ=0.1`. Three transferable results came out of that alignment:
 
-1. **The bound is monotone decreasing in `k`** — 44 nodes at `k=8`, 30 at `k=16`. So the reflexive fix
-   for a weak seed stage (raise `seed_k`) makes the worst-case requirement *worse*. **Coverage cannot be
-   bought with larger `k`; the escape is structural or dimensional.** This generalizes to every top-k
-   consumer in the stack and is the most useful corollary found so far.
+1. **The bound falls as `k` grows, throughout the practical regime `k ≪ n`** — 269 nodes at `k=4`,
+   44 at `k=8`, 30 at `k=16`. So the reflexive fix for a weak seed stage (raise `seed_k`) makes the
+   worst-case requirement *worse*. **Coverage cannot be bought with a larger `k`; the escape is
+   structural or dimensional.** This generalizes to every top-k consumer in the stack. (The curve is
+   U-shaped, not monotone — it rises again once `k` approaches `n`, which is the degenerate
+   "retrieve almost everything" branch and must not be cited as headroom. See §2.2b.)
 2. **Seed capacity upper-bounds downstream recall** in any seed→expand retriever: expansion amplifies
    whichever region the seed lands in, so depth does not rescue a seed set in the wrong neighborhood.
 3. **`ExperienceNode` is the stack's one natural multi-vector document** — node + `sibling_hashes[8]` =

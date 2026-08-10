@@ -182,6 +182,202 @@ pub fn dim_sufficiency_bound(k: usize, n: usize) -> usize {
     bound.ceil() as usize
 }
 
+// ── Worst-case retrieval capacity (Research 472, arXiv:2508.21038) ──
+//
+// Theorem 1 (Weller, Boratko, Naim & Lee, ICLR 2026): if EVERY top-k subset of
+// n documents is realizable by some unit query with score-gap margin 2γ, then
+//
+//     C(n, k) ≤ (1 + 1/γ)^d        hence        d ≥ ln C(n, k) / ln(1 + 1/γ)
+//
+// This is the NEGATIVE, worst-case counterpart to `dim_sufficiency_bound`:
+//
+// | fn                       | paper       | direction | conditioned on          |
+// |--------------------------|-------------|-----------|-------------------------|
+// | `dim_sufficiency_bound`  | 2605.23556  | positive  | k-sparse queries        |
+// | `dim_capacity_required`  | 2508.21038  | negative  | ALL C(n,k) subsets      |
+//
+// They answer different questions and will disagree; that is expected, not a
+// bug. `dim_sufficiency_bound` says "this d suffices for the margin you want on
+// k-sparse queries". `dim_capacity_required` says "below this d there PROVABLY
+// EXIST relevance structures no single-vector index can represent, at any model
+// size or training budget". Neither subsumes the other.
+//
+// These are provisioning/diagnostic helpers, NOT hot-path functions:
+// `dim_capacity_ceiling` runs a ~64-step binary search, each step costing k
+// `ln` calls. Call at index construction or in a debug assertion, never per
+// query.
+
+/// Corpus size below which a `d`-dimensional single-vector index is safe for
+/// **every** `k` simultaneously — the worst-case-over-`k` floor.
+///
+/// Because [`dim_capacity_ceiling`] is U-shaped in `k`, its minimum is the only
+/// `k`-free statement you can make about a dimension. That minimum sits near
+/// `k ≈ n/2`, where `C(n, n/2) ≈ 2ⁿ`, so Theorem 1 collapses to
+///
+/// ```text
+///     n · ln 2 ≤ d · ln(1 + 1/γ)        ⇒        n ≤ d · log₂(1 + 1/γ)
+/// ```
+///
+/// At γ = 0.1 that is `≈ 3.46·d` — a strikingly small linear function of the
+/// embedding dimension. Reference values (exact minimum in parentheses):
+/// d=8 → 27 (30), d=16 → 55 (58), d=32 → 110 (114), d=64 → 221 (225),
+/// d=128 → 442 (447), d=768 → 2656 (2662).
+///
+/// This closed form is a **lower** estimate of the true minimum: dropping
+/// Stirling's `√(πn/2)` factor costs a few documents. Use it as a quick
+/// provisioning reference; use [`dim_capacity_ceiling`] with the `k` you
+/// actually retrieve when you need the exact answer for a guard.
+///
+/// Returns `usize::MAX` when no bound applies (`γ ≤ 0`).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_floor(d: usize, gamma: f64) -> usize {
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return usize::MAX;
+    };
+    // n ≤ d · ln(1 + 1/γ) / ln 2
+    ((d as f64) * per_dim / core::f64::consts::LN_2) as usize
+}
+
+/// Natural log of the binomial coefficient `C(n, k)`, as `Σ_{i=1..k} ln((n−k+i)/i)`.
+///
+/// Computing `C(n, k)` directly overflows almost immediately (`C(46, 2)` fits in
+/// a `u64`, `C(1000, 10)` does not), so the capacity bounds work in log space
+/// throughout. `k` terms, no gamma function, no allocation.
+///
+/// Returns `0.0` for `k == 0` (`C(n, 0) = 1`) and `f64::INFINITY` for `k > n`
+/// (no such subset exists).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+#[inline]
+pub fn ln_binomial(n: usize, k: usize) -> f64 {
+    if k == 0 {
+        return 0.0;
+    }
+    if k > n {
+        return f64::INFINITY;
+    }
+    // n ≥ k, so `base` cannot underflow; `base + i ≤ n` cannot overflow.
+    let base = n - k;
+    let mut acc = 0.0f64;
+    for i in 1..=k {
+        acc += (((base + i) as f64) / (i as f64)).ln();
+    }
+    acc
+}
+
+/// Capacity in nats contributed per embedding dimension: `ln(1 + 1/γ)`.
+///
+/// `None` means "no bound applies" — as `γ → 0⁺` the margin requirement
+/// vanishes and any corpus size is representable.
+///
+/// γ is clamped to the paper's feasible range: for unit vectors the score gap
+/// `2γ ≤ 2`, so `γ ≤ 1`. Non-finite γ falls through to the conservative `γ = 1`
+/// clamp (both comparisons are false for `NaN`).
+///
+/// γ is `f64` deliberately, not `f32`. Boundary cases are razor-thin: at
+/// `d = 8, k = 2, γ = 0.1` the ceiling n = 20,706 clears the cap by only
+/// `7.5e-8` nats, while representing `0.1` in `f32` perturbs the cap by
+/// `1.1e-7` — enough to flip the answer to 20,705. This is a provisioning
+/// helper, so accuracy beats the (nonexistent) benefit of a narrower float.
+#[cfg(feature = "sigmoid_margin")]
+#[inline]
+fn capacity_nats_per_dim(gamma: f64) -> Option<f64> {
+    if gamma <= 0.0 {
+        return None;
+    }
+    let g = if gamma <= 1.0 { gamma } else { 1.0 };
+    Some((1.0 + 1.0 / g).ln())
+}
+
+/// Minimum embedding dimension for which every top-`k` subset of `n` documents
+/// is realizable at margin γ (Theorem 1, forward direction).
+///
+/// Reproduces the paper's Table 1 exactly at γ = 0.1 — e.g. `n = 10_000` gives
+/// 8 (k=2), 33 (k=10), 233 (k=100), 1354 (k=1000).
+///
+/// Returns `0` when `k == 0` or `k >= n`: at most one subset exists, so no
+/// separation is required (the paper's "trivial" table entries).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_required(n: usize, k: usize, gamma: f64) -> usize {
+    if k == 0 || k >= n {
+        return 0;
+    }
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return 0;
+    };
+    (ln_binomial(n, k) / per_dim).ceil() as usize
+}
+
+/// Largest corpus size `n` whose every top-`k` subset a `d`-dimensional
+/// single-vector index can realize at margin γ (Theorem 1, inverted).
+///
+/// Beyond the returned `n`, there provably exist relevance structures that no
+/// `d`-dimensional single-vector cosine/dot ranking can produce as a top-`k`
+/// result — regardless of model size, training data, or loss. Note the paper
+/// cannot say a priori *which* structures fail, so exceeding this ceiling is a
+/// loss of worst-case headroom, not a guarantee of observed failure: a benign,
+/// low-rank realized relevance matrix stays perfectly servable.
+///
+/// **Decreasing in `k` throughout the practical regime `k ≪ n`** — at `d = 8`,
+/// γ = 0.1: 20,706 (k=2), 269 (k=4), 122 (k=5), 44 (k=8), 35 (k=10), 30 (k=16).
+/// Raising `k` to widen coverage *shrinks* the ceiling, because more subsets
+/// must be representable. **Coverage cannot be bought with a larger `k`;** the
+/// escape is structural (graph/lexical expansion, multi-vector late
+/// interaction) or dimensional.
+///
+/// The curve is U-shaped, not monotone: past the minimum it rises again
+/// (d=8, γ=0.1: 31 at k=20, 40 at k=32, 47 at k=40) because `C(n,k) = C(n,n−k)`
+/// makes near-complete subsets easy once `k` approaches `n` — "retrieve almost
+/// everything" needs little separating power. That branch is degenerate for
+/// retrieval and should not be read as extra headroom. The **global minimum
+/// over all `k`** is the honest worst case for a given `d` (30 documents at
+/// d=8, γ=0.1, attained at k=16).
+///
+/// Returns `usize::MAX` when no bound applies (`k == 0`, or `γ ≤ 0`), and `k`
+/// when `d == 0` (only the single subset `C(k,k) = 1` is representable).
+///
+/// Not a hot-path function — see the module note above.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_ceiling(d: usize, k: usize, gamma: f64) -> usize {
+    if k == 0 {
+        return usize::MAX;
+    }
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return usize::MAX;
+    };
+    let cap = (d as f64) * per_dim;
+
+    // `n = k` is always feasible (`ln C(k,k) = 0 ≤ cap`), so `lo` is a valid
+    // answer from the start and the search never returns something too small.
+    if ln_binomial(usize::MAX, k) <= cap {
+        return usize::MAX;
+    }
+    let mut lo = k;
+    let mut hi = usize::MAX - 1;
+    while lo < hi {
+        // Overflow-safe midpoint, biased up so `lo` converges to the last
+        // feasible n rather than stalling.
+        let mid = lo + (hi - lo).div_ceil(2);
+        if ln_binomial(mid, k) <= cap {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    lo
+}
+
 // ── SIMD Sum of Squares (Issue 075) ──────────────────────────
 
 /// SIMD-accelerated sum of squares: `Σ x[i]²`.
