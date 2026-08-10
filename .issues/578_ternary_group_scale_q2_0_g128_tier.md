@@ -147,6 +147,39 @@ opt-in.
 The ~1.3x overhead is the extra `vmulq` per 4 lanes that folds the group scale into the sign
 vector. Stable across a 10x range of shapes, so it is the arithmetic cost, not a cache artifact.
 
+### Row-parallel kernel added 2026-08-10 (`simd_ternary_group_matvec_parallel`)
+
+The G2 table above measures the **single-threaded** kernel, and until now that
+was the only one this tier had: the sole rayon entry point,
+`simd_ternary_group_matmul_batch`, parallelizes over **batch**, so at
+`batch = 1` — every autoregressive decode step — there was no parallelism at
+all. The dense tier has had `matmul_parallel` for exactly this all along.
+
+Measured on real Ternary-Bonsai-27B geometry (riir-ai
+[Bench 582](../../riir-ai/.benchmarks/582_ternary_bonsai_decode_throughput_preflight.md),
+M3 Max, 16 threads):
+
+| | s/token | tok/s | GMAC/s |
+|---|---|---|---|
+| serial | 3.995 | 0.25 | 6.41 |
+| **row-parallel** | 0.554 | **1.80** | **46.22** |
+| | | | **7.21× overall** |
+
+The serial figure independently confirms this issue's own G2 prediction
+(6.41 measured vs 6.3 GMAC/s).
+
+GOAT: **G1** bit-identical to serial (rows are independent, so the
+`par_chunks_mut` split is a pure partition — tested across ragged row counts
+and a zeroed row); **G2** 7.21×, up to 7.77× on a 248320-row `lm_head`;
+**G3** new function, serial path untouched; **G4** 0 allocations over 50 calls
+(`katgpt-core/tests/ternary_group_parallel_alloc_check.rs`) — which is what let
+riir-engine's `forward_ternary` adopt it without breaking its own
+0-alloc-per-token gate.
+
+Below `PARALLEL_ROW_MIN = 256` it delegates to serial. Bonsai's
+`ssm_alpha`/`ssm_beta` are 48 rows and measure 1.01×, so the threshold is
+exercised by the real model rather than only by tests.
+
 **`vs dense` reproduces Benchmark 044's finding independently:** both ternary tiers run at
 0.35-0.45x dense f32 NEON. Timings are wall-clock on a working developer machine — treat <15%
 as noise; the 2.6-2.9x dense advantage is far outside that.
