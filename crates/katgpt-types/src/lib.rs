@@ -147,7 +147,7 @@ pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
 pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]
-pub use ternary::TernaryWeights;
+pub use ternary::{TernaryPackError, TernaryWeights};
 
 // Internal helpers (read_u32_le / read_f32_le / read_u16_le) live in
 // `domain.rs` and are crate-private — not re-exported here. If other modules
