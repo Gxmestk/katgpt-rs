@@ -47,7 +47,7 @@ directions even when moods were present.
 | v2 direction rank | 2 of 6 | **4 of 6** |
 | Zero rows | `fear`, `anger` | **none** |
 | Collinear pairs (v2) | valence~arousal (−1.0), desperation~calm (−1.0) | **none** |
-| Recorded state rank | 2 of 16 | **4 of 32** |
+| Recorded state rank | 2 of 16 | **4 of 16** (state ceiling raised from 2 → 4) |
 
 The rank doubled (2 → 4) and ALL collinear pairs vanished. The v2 rederivations
 (arousal from energy, desperation from desperation-scalar) combined with T10's
@@ -63,10 +63,24 @@ major structural improvement.
 
 | Gate | Status |
 |---|---|
-| G1 (correctness) | ✅ PASS — 1454 lib tests (was 1451; +3 new T10 tests) |
+| G1 (correctness) | ✅ PASS — 1454 lib tests + 2 integration gate tests (was 1451; +3 new T10 unit tests + 2 gate tests fixed) |
 | G2 (perf) | ✅ PASS — `extract_emotion_directions_for_map` cost: ~5 × 5 × 200 = 5000 HLA updates (was 4000); negligible vs map generation |
 | G3 (no-regression) | ✅ PASS — all existing tests pass unchanged; `test_run_betrayal_scenario_shift` still verifies the midpoint transition |
 | G4 (alloc-free) | ✅ N/A — scenario generator runs once at map init, not per-tick |
+
+### Gate test fix (this session)
+
+The integration gate test `tests/emotion_directions_v2_gate.rs` was stale after
+the original T10 commit — it used a 4-scenario recorder (no MonsterRaid) while
+the production path `extract_emotion_directions_for_map` used 5 scenarios. This
+is the exact "two test sites, only one updated" pattern the `merkle_root` lesson
+warns about. The unit tests in `directions_v2.rs` were updated correctly; the
+integration gate was missed.
+
+Fixed: the gate now uses the same 5-scenario recorder as production, and the
+assertions pin the T10 state (rank 4, zero collinear pairs, all 6 axes derived).
+Two new invariants added: G6 (v2 rank reaches the state ceiling) + G5 (no axis
+unavailable).
 
 ## Tests shipped
 
@@ -76,6 +90,12 @@ major structural improvement.
   directions are non-zero + reported as derived
 - `rank_audit_no_longer_reports_fear_anger_as_zero_rows` — verifies rank ≥ 4 +
   zero collinear pairs
+- `v2_fixes_the_arousal_sign_and_improves_desperation` (gate, fixed this
+  session) — pins the semantic correctness contract: arousal sign flip,
+  desperation no-regress, valence bit-identical, rank ≤ state ceiling, all axes
+  derived, rank reaches the ceiling
+- `recorded_state_is_the_rank_ceiling` (gate, fixed this session) — pins the
+  state rank at 4 (was 2 pre-T10), stable across tolerances
 
 ## What this does NOT do
 
@@ -94,3 +114,6 @@ major structural improvement.
   extraction + tests
 - `crates/riir-games-civ/src/civ/emotion/tests.rs` — updated call sites for
   new function signatures
+- `crates/riir-games-civ/tests/emotion_directions_v2_gate.rs` — gate test
+  fixed this session: 5-scenario recorder (was 4) + T10 assertions (rank 4,
+  all axes derived, rank reaches ceiling)
