@@ -40,14 +40,23 @@ use katgpt_types::{TernaryGroupWeights, TernaryWeights};
 // Inlined rather than `#[path]`-included from another crate's tests/common:
 // this is a separate compilation unit and the shared macro lives in
 // katgpt-dec / katgpt-core, neither of which katgpt-types depends on.
+//
+// Thread-local counter (not process-global): under default parallel test
+// execution, a process-global counter would attribute sibling tests' heap
+// work (e.g. G2's matrix setup) to G4's alloc_delta window, producing
+// flaky false positives. Each thread counts only its own allocations, so
+// `alloc_delta` is robust to concurrent tests. The `const` initializer
+// keeps thread_local access off the allocating slow path.
 
 struct CountingAllocator;
 
-static ALLOC_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+thread_local! {
+    static ALLOC_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 unsafe impl std::alloc::GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
-        ALLOC_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        ALLOC_COUNT.with(|c| c.set(c.get().wrapping_add(1)));
         unsafe { std::alloc::System.alloc(layout) }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: std::alloc::Layout) {
@@ -60,9 +69,9 @@ static A: CountingAllocator = CountingAllocator;
 
 #[inline]
 fn alloc_delta<R>(f: impl FnOnce() -> R) -> (R, usize) {
-    let before = ALLOC_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+    let before = ALLOC_COUNT.with(|c| c.get());
     let r = f();
-    let after = ALLOC_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+    let after = ALLOC_COUNT.with(|c| c.get());
     (r, after - before)
 }
 
@@ -90,17 +99,22 @@ fn median_ns(reps: usize, inner: usize, mut f: impl FnMut()) -> f64 {
     for _ in 0..inner {
         f();
     }
-    let mut samples: Vec<f64> = (0..reps)
-        .map(|_| {
-            let t = Instant::now();
-            for _ in 0..inner {
-                f();
-            }
-            t.elapsed().as_nanos() as f64 / inner as f64
-        })
-        .collect();
-    samples.sort_by(|a, b| a.partial_cmp(b).expect("no NaN timings"));
-    samples[samples.len() / 2]
+    // Stack-allocated samples: heap allocs here would bleed into G4's
+    // CountingAllocator window under parallel test execution. 32 is generous
+    // headroom over the reps=9 used at the call sites; bump if a future call
+    // site needs more.
+    const MAX_REPS: usize = 32;
+    assert!(reps <= MAX_REPS, "median_ns reps={reps} exceeds MAX_REPS={MAX_REPS}");
+    let mut samples = [0.0f64; MAX_REPS];
+    for slot in samples.iter_mut().take(reps) {
+        let t = Instant::now();
+        for _ in 0..inner {
+            f();
+        }
+        *slot = t.elapsed().as_nanos() as f64 / inner as f64;
+    }
+    samples[..reps].sort_by(|a, b| a.partial_cmp(b).expect("no NaN timings"));
+    samples[reps / 2]
 }
 
 // ── G2: perf ──────────────────────────────────────────────────

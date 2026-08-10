@@ -500,7 +500,6 @@ pub fn simd_sigmoid_tanh_clamp_inplace(out: &mut [f32], a: &[f32], q: &[f32], cl
         } else {
             scalar_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp)
         }
-        return;
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
@@ -560,7 +559,6 @@ pub fn simd_sigmoid_inplace(x: &mut [f32]) {
         } else {
             scalar_sigmoid_inplace(x)
         }
-        return;
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
