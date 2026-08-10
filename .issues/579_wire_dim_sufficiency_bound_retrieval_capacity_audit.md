@@ -4,7 +4,7 @@
 **Type:** refactor + proof
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md), [123](../.research/123_TopK_Dimensionality_Barrier_Retrieval.md)
 **Plans:** [157](../.plans/157_sigmoid_margin_loss.md)
-**Status:** In progress — **T1 + T2 DONE 2026-08-10**
+**Status:** In progress — **T1, T2, T3, T4, T5 DONE 2026-08-10** (riir-rag call site remains)
 
 ---
 
@@ -48,9 +48,29 @@ This does **not** invalidate the passing gates (they measure a benign, centroid-
          cited as headroom. The practical claim survives intact for `k ≪ n`, and the minimum yields a
          cleaner k-free statement: **a d=8 index can never represent all top-k subsets of more than 30
          documents, for any k.**
-- [ ] **T3** Wire a **debug-only** capacity assertion at index construction (`ShardIndex::from_shards`, `ItemEmbedIndex` build, `riir-rag` retriever init): if `n > dim_capacity_ceiling(d, k_typical, γ)`, emit a one-line warning naming the index, `n`, `k`, `d`, and the ceiling. Must be zero-cost in release — no hot-path checks.
-- [ ] **T4** Document in `riir-neuron-db/.docs/04_consolidation_retrieval/` that `fast_knn`'s "recall@k = 100% within ε=1e-4" and `DenseEmbedIndex`'s "recall@10 = 100%" are **fidelity to the cosine ranking**, not retrieval correctness, and therefore confer no immunity to the capacity bound. This is the single most likely misreading.
-- [ ] **T5** Note in the same docs that `ShardIndex::query` (`index/mod.rs:257`) scores only 3 candidates via a binary search on `embedding[0]`, so it is strictly weaker than true cosine top-1 — the capacity bound is an *upper* bound on what that path can do. Cross-link the existing tests that document it (`tests/hebbian_bridge_t44_compat.rs:197,212`).
+- [x] **T3 DONE (2026-08-10)** — `riir-neuron-db/src/capacity_audit.rs` + the
+      `audit_retrieval_capacity!` macro, wired at `ShardIndex::from_shards` (k=8)
+      and `ItemEmbedIndex::from_entries` (k=5). New opt-in `capacity_audit` feature
+      pulling `katgpt-core/sigmoid_margin` (no new default, no new external deps).
+
+      **Design change vs the task as written:** the trigger is the **k-free floor**
+      `dim_capacity_floor(d, γ)` rather than `dim_capacity_ceiling(d, k_typical, γ)`.
+      Keying on a guessed `k_typical` would make the warning wrong whenever a caller
+      passes a different `k`; the floor is the minimum over all `k`, so it cannot be
+      wrong about the configuration. The per-`k` ceiling is still reported in the
+      message as context.
+
+      Zero-cost: the macro body is `#[cfg(all(debug_assertions, feature = "capacity_audit"))]`,
+      so release and default builds expand it to nothing. Even when active it is
+      once-per-call-site (`AtomicBool` latch) and only at construction, never on a
+      query path. Verified clippy-clean at default / `capacity_audit` / `--all-features`,
+      6 tests, and the warning observed firing:
+      `[capacity_audit] ...: n=25943 at d=8 exceeds the k-free capacity floor 27 by 961x (γ=0.1). At k=5 the ceiling is 122. ...`
+
+      Remaining: the **`riir-rag` retriever init** call site (riir-ai repo) — separate
+      repo, not wired here.
+- [x] **T4 DONE (2026-08-10)** — new `riir-neuron-db/.docs/04_consolidation_retrieval/retrieval_capacity_bound.md` ("Misreading 1"), plus an anchor note at each site that publishes a recall number: `shard_index.md` (fast_knn) and `dense_embed_index.md` (G1b row, now footnoted). Original text: Document in `riir-neuron-db/.docs/04_consolidation_retrieval/` that `fast_knn`'s "recall@k = 100% within ε=1e-4" and `DenseEmbedIndex`'s "recall@10 = 100%" are **fidelity to the cosine ranking**, not retrieval correctness, and therefore confer no immunity to the capacity bound. This is the single most likely misreading.
+- [x] **T5 DONE (2026-08-10)** — same doc, "Misreading 2", plus the note appended to `shard_index.md`; cross-links `tests/hebbian_bridge_t44_compat.rs:197,212`. Original text: Note in the same docs that `ShardIndex::query` (`index/mod.rs:257`) scores only 3 candidates via a binary search on `embedding[0]`, so it is strictly weaker than true cosine top-1 — the capacity bound is an *upper* bound on what that path can do. Cross-link the existing tests that document it (`tests/hebbian_bridge_t44_compat.rs:197,212`).
 
 ## Non-goals
 
