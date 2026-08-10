@@ -591,3 +591,135 @@ fn g6_best_response_crowd_scale() {
         "G6 FAIL: {N_ENTITIES} best-response calls took {elapsed:?} (>{TICK_BUDGET_MS}ms)"
     );
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 5 — UQ Floor Comparison (G7 — "Report the Floor" rule)
+//
+// The Bayesian posterior ω must beat a conformal-naive floor (single-direction
+// sigmoid projection on match-fraction) on Brier score by ≥10% relative. If it
+// doesn't, the primitive isn't adding value over a dumb dot-product.
+//
+// To make the test meaningful (not trivially perfect separation), we use a
+// SOFT identity model: shared partners match with probability δ=0.9 (not
+// 1.0), random partners match with probability 0.5. This creates overlapping
+// distributions where calibration actually matters.
+// ──────────────────────────────────────────────────────────────────────────
+
+/// Soft-identity Bayesian posterior computed from match/mismatch counts.
+/// This is the SAME math as SimilarityPosterior but with a non-degenerate
+/// shared hypothesis (P(match|shared) = δ < 1, not 1).
+///
+/// `ω_T = sigmoid(logit(α) + n_match·log(δ/0.5) + n_mismatch·log((1−δ)/0.5))`
+fn soft_bayesian_omega(alpha: f32, delta: f32, n_match: u32, n_mismatch: u32) -> f32 {
+    // logit(α) = ln(α/(1−α))
+    let logit_alpha = (alpha / (1.0 - alpha)).ln();
+    // Per-observation log-likelihood-ratio:
+    //   match:    log( P(match|shared) / P(match|indep) ) = log( δ / 0.5 )
+    //   mismatch: log( P(mismatch|shared) / P(mismatch|indep) ) = log( (1−δ) / 0.5 )
+    let llr_match = (delta / 0.5_f32).ln();
+    let llr_mismatch = ((1.0 - delta) / 0.5_f32).ln();
+    let logit_omega = logit_alpha + (n_match as f32) * llr_match + (n_mismatch as f32) * llr_mismatch;
+    crate::sigmoid(logit_omega)
+}
+
+/// Conformal-naive floor: sigmoid projection on match-fraction.
+/// `omega_floor = sigmoid(k · (match_fraction − 0.5))`
+/// This is the "single dot-product on a summary statistic" baseline.
+fn floor_omega(n_match: u32, n_mismatch: u32, k: f32) -> f32 {
+    let total = (n_match + n_mismatch) as f32;
+    if total == 0.0 {
+        return 0.5; // no evidence → uniform
+    }
+    let match_fraction = n_match as f32 / total;
+    crate::sigmoid(k * (match_fraction - 0.5))
+}
+
+/// Brier score: mean squared error between predicted probability and binary
+/// outcome. Lower is better. `predictions[i]` is the forecast probability;
+/// `outcomes[i]` is 1.0 (event happened) or 0.0 (didn't).
+fn brier_score(predictions: &[f32], outcomes: &[f32]) -> f32 {
+    assert_eq!(predictions.len(), outcomes.len());
+    let n = predictions.len() as f32;
+    predictions
+        .iter()
+        .zip(outcomes.iter())
+        .map(|(p, o)| (p - o).powi(2))
+        .sum::<f32>()
+        / n
+}
+
+#[test]
+fn g7_uq_floor_comparison() {
+    // G7 assertion: Bayesian ω beats conformal-naive floor on Brier score
+    // by ≥10% relative. Uses the soft-identity model (δ=0.9) to create
+    // overlapping distributions where calibration matters.
+    //
+    // Setup: 1000 entity pairs, half shared (label=1), half random (label=0).
+    // Each pair plays T=50 rounds. Shared pairs match with P=0.9; random with
+    // P=0.5. We observe the match/mismatch sequence and compute both ω
+    // (Bayesian soft posterior) and ω_floor (sigmoid on match_fraction).
+    const N_PAIRS: usize = 1000;
+    const T_ROUNDS: u32 = 50;
+    const ALPHA: f32 = 0.1;
+    const DELTA: f32 = 0.9; // soft identity: shared partners match 90% of the time
+    const FLOOR_K: f32 = 10.0; // floor sigmoid steepness
+
+    // Deterministic RNG (xorshift64) for reproducibility.
+    let mut rng_state = 0x1234_5678_9ABC_DEF0_u64;
+    let mut next_rand = || {
+        rng_state ^= rng_state << 13;
+        rng_state ^= rng_state >> 7;
+        rng_state ^= rng_state << 17;
+        (rng_state >> 11) as f32 / (u64::MAX >> 11) as f32 // uniform [0, 1)
+    };
+
+    let mut bayes_preds = Vec::with_capacity(N_PAIRS);
+    let mut floor_preds = Vec::with_capacity(N_PAIRS);
+    let mut labels = Vec::with_capacity(N_PAIRS);
+
+    for pair_idx in 0..N_PAIRS {
+        let is_shared = pair_idx < N_PAIRS / 2;
+        let label = if is_shared { 1.0_f32 } else { 0.0 };
+        let match_prob = if is_shared { DELTA } else { 0.5 };
+
+        let mut n_match = 0_u32;
+        let mut n_mismatch = 0_u32;
+        for _ in 0..T_ROUNDS {
+            let r = next_rand();
+            if r < match_prob {
+                n_match += 1;
+            } else {
+                n_mismatch += 1;
+            }
+        }
+
+        let omega_bayes = soft_bayesian_omega(ALPHA, DELTA, n_match, n_mismatch);
+        let omega_floor = floor_omega(n_match, n_mismatch, FLOOR_K);
+        bayes_preds.push(omega_bayes);
+        floor_preds.push(omega_floor);
+        labels.push(label);
+    }
+
+    let brier_bayes = brier_score(&bayes_preds, &labels);
+    let brier_floor = brier_score(&floor_preds, &labels);
+    let relative_improvement = (brier_floor - brier_bayes) / brier_floor;
+
+    eprintln!("G7 UQ floor comparison ({N_PAIRS} pairs, T={T_ROUNDS}, δ={DELTA}, α={ALPHA}):");
+    eprintln!("  Bayesian ω Brier:  {brier_bayes:.6}");
+    eprintln!("  Floor ω Brier:     {brier_floor:.6}");
+    eprintln!("  Relative improvement: {:.1}% (target ≥10%)", relative_improvement * 100.0);
+    eprintln!("  Mean Bayesian ω (shared): {:.4}", {
+        let s: f32 = bayes_preds.iter().zip(labels.iter()).filter(|(_, l)| **l == 1.0).map(|(p, _)| *p).sum();
+        s / (N_PAIRS as f32 / 2.0)
+    });
+    eprintln!("  Mean Bayesian ω (random): {:.4}", {
+        let s: f32 = bayes_preds.iter().zip(labels.iter()).filter(|(_, l)| **l == 0.0).map(|(p, _)| *p).sum();
+        s / (N_PAIRS as f32 / 2.0)
+    });
+
+    assert!(
+        relative_improvement >= 0.10,
+        "G7 FAIL: Bayesian ω Brier {brier_bayes:.6} does not beat floor {brier_floor:.6} by ≥10% (got {:.1}%)",
+        relative_improvement * 100.0
+    );
+}
