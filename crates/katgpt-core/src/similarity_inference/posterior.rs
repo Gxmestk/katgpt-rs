@@ -239,6 +239,33 @@ impl SimilarityPosterior {
         self.last_omega * sigmoid_proj + (1.0 - self.last_omega) * sigmoid_proj * 0.5
     }
 
+    /// Update ω from a parallel third-party encounter: the focal and the
+    /// partner both played against the SAME NPC in the SAME situation, and
+    /// the focal observed the partner's action. This is the **indirect
+    /// inference** path (Plan 526 Phase 3, paper §H.4) — the focal and
+    /// partner never interacted directly, but the focal can still infer
+    /// similarity by comparing "what I played" to "what the partner played"
+    /// in the shared situation.
+    ///
+    /// Mathematically identical to a direct observation: the evidence is the
+    /// same (match or mismatch on the action pair). The distinction is purely
+    /// semantic — where the evidence came from. The posterior update doesn't
+    /// care whether the partner's action was observed directly or via a shared
+    /// third-party encounter.
+    ///
+    /// This method is provided for API clarity (consumers that want to
+    /// distinguish direct vs indirect evidence in their logs). The PoC in
+    /// `poc::IndirectAgent` calls `observe_match`/`observe_mismatch` directly
+    /// — this wrapper is for consumers that prefer the semantic name.
+    #[inline]
+    pub fn observe_third_party(&mut self, my_action: u8, their_action: u8, n_actions: usize) {
+        if their_action == my_action {
+            self.observe_match(n_actions);
+        } else {
+            self.observe_mismatch(n_actions);
+        }
+    }
+
     /// Recompute `last_omega` from the current `log_w_independent`. Called
     /// after every observe so reads are free.
     #[inline]
