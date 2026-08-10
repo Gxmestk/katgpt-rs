@@ -7,6 +7,8 @@
 > **Related Plans:** 560 (this note's plan — SE(2) lift primitive + G1+G2 gate)
 > **Cross-ref (riir-ai):** Research 325 (SE(2)-Equivariant NPC Perception Guide — private Super-GOAT selling-point doc)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis):** Faramarzi, Lamb, Rish [arXiv:2607.03580 "When Geometry Aligns: Dihedral Hidden-State Transformations in UNet, ViT, and DiT Architectures"] — applies D4 dihedral reflections to hidden states of diffusion/vision models as a fine-tuning regularizer + diagnostic. Covered by this note's SE(2) lift (a strict superset: includes translations + continuous rotations + reflections, equivariant-by-construction rather than post-hoc). The paper's domain (U-Net/DiT/VAE latent diffusion) is explicitly out of scope per AGENTS.md; its multi-branch consistency principle ("transform all coupled heads/skip-connections or none") is already satisfied by construction in `se2_lift_into`. Image-specific DiT training → genuinely out of scope (no riir-train Plan).
 
 ---
 
