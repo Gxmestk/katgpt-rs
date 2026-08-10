@@ -422,10 +422,26 @@ pub fn simd_fused_decay_write(dst: &mut [f32], decay: f32, src: &[f32], write: f
 /// AVX2: fused via `_mm256_mul_ps` (2 multiplies per 8 elements).
 #[inline(always)]
 pub fn simd_scale_mul_inplace(x: &mut [f32], gamma: &[f32], scale: f32) {
-    debug_assert_eq!(
+    // HARD assert, not `debug_assert` (riir-ai Issue 594, 2026-08-10). Every
+    // backend below is `unsafe` and indexes `gamma` by `x`'s length, so a
+    // shorter `gamma` is an out-of-bounds read — undefined behaviour, and
+    // silent in release, which is the only build that matters for inference.
+    //
+    // Not hypothetical: this is how the real Ternary-Bonsai-27B produced NaN
+    // logits. qwen35's `ssm_norm` is per-head `[128]` while the DeltaNet
+    // recurrent output is `n_v_heads * head_dim = 6144`, so
+    // `rmsnorm_with_gamma_eps` read 6016 floats past the end of gamma. The
+    // synthetic test fixture happened to size gamma at 6144, so nothing caught
+    // it until the real weights ran.
+    //
+    // Cost is one usize compare against a SIMD loop over >=128 elements. A
+    // length mismatch is always a caller bug — fail loudly instead.
+    assert_eq!(
         x.len(),
         gamma.len(),
-        "simd_scale_mul_inplace: slices must have equal length"
+        "simd_scale_mul_inplace: slices must have equal length (x={}, gamma={});          a shorter gamma is an out-of-bounds read in the unsafe backends",
+        x.len(),
+        gamma.len()
     );
     #[cfg(target_arch = "aarch64")]
     {
