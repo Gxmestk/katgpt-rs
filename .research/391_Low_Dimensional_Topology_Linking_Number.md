@@ -7,8 +7,8 @@
 > **Related Research:** 219 (DEC substrate), 242 (topological state tracking), 294 (viable manifold graph), 296 (Stokes vocabulary crosswalk), 317 (Gibbs attractor — same Plan-276 caveat class), 371 (Hopf bifurcation — different "Hopf").
 > **Related Plans:** 251 (DEC operators), 314 (Stokes wrappers), 410 (this paper — queued).
 > **Classification:** Public (katgpt-rs)
-
----
+>
+> **PASS-Redirects (synthesis):** Faramarzi, Lamb, Rish [arXiv:2607.03580 "When Geometry Aligns: Dihedral Hidden-State Transformations in UNet, ViT, and DiT Architectures"] — applies D4 dihedral reflections (horizontal/vertical/diagonal flips) to hidden states of diffusion/vision models. **Strongest conceptual match in the corpus:** the paper's D4 reflections ARE fold operations in this note's sense — `|x|` is a reflection, and this note (Theorem 3.7) proves reflections are the unique way to break topological linking. The synthesis: reflections are a **dual-use geometric tool** — the paper uses *consistent* D4 reflections during fine-tuning as a **regularizer** (capacity-reducing, stability-preserving per Rademacher complexity); this note uses *targeted* fold reflections at inference as a **corrector** (link-breaking, separability-restoring). Opposite uses of the same operation. The paper doesn't add actionable insight to this note's shipped `fold_projection` (Plan 410, DEFAULT-ON) because: (1) the paper's domain is 2D spatial feature maps in vision/diffusion models (out of scope), (2) the paper's multi-branch consistency principle (transform ALL attention heads or none) doesn't apply to our fold (operates on full latent vectors, not per-head), (3) our latent states carry trivial symmetry groups (R314). The connection is conceptual — both are reflection-based geometry interventions — not actionable.
 
 ## TL;DR
 
