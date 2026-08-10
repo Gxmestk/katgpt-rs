@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md](../../riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md)
 **Source paper:** [arXiv:2608.03958](https://arxiv.org/abs/2608.03958) — Meulemans et al., Google Paradigms of Intelligence, 4 Aug 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity_inference/` (new module) + Cargo feature `similarity_inference`
-**Status:** Phases 1-6 COMPLETE — **promoted to DEFAULT-ON** (2026-08-11). Phase 7 (conditional Super-GOAT claim for indirect inference) unblocked by G5 PASS.
+**Status:** Phases 1-6 COMPLETE — **promoted to DEFAULT-ON** (2026-08-11). Phase 7 (conditional scoped Super-GOAT claim for indirect inference) **COMPLETE 2026-08-11** — G5 PASS triggered the scoped claim; both guides ([R474](../.research/474_Indirect_Similarity_Inference_Zero_Shot_Cooperation.md) + [riir-ai R336](../../riir-ai/.research/336_Indirect_Similarity_Inference_Zero_Shot_Guide.md)) written in lockstep per skill §1.5.
 
 **Verdict note (post-revision):** GOAT, not Super-GOAT. The equilibrium *concept* is covered by shipped CCE (`CceLp<N,A>`, Plan 295, DEFAULT-ON, +37.5%/+108% over Nash). The novelty is the *mechanism* — similarity-inferred **endogenous correlation device** for the CCE substrate. Plan 526 ships the mechanism; the gain is the **endogenous moderator fusion** (R143 × R471). **Phase 7 (conditional)** opens a separate scoped Super-GOAT claim for **indirect inference** (zero-shot cooperation from third-party observation) IF G5 PoC passes — that subset is genuinely new capability, the direct-inference mechanism is not.
 
@@ -197,15 +197,27 @@ If G5 passes, the indirect-inference capability warrants a separate scoped Super
 
 ### Tasks (only if G5 passes)
 
-- [ ] **T7.1** Confirm G5 passed with margin (shared-policy primary entities cooperate at >70%; random-policy at <25%).
-- [ ] **T7.2** Re-run the §1.5 novelty gate scoped to indirect inference ONLY: grep `indirect.*inference|third.party.*observation|zero.shot.*cooperat|parallel.*encounter` across all 7 repos. If zero prior-art hits → scoped novelty claim is defensible.
-- [ ] **T7.3** Open a new scoped research note (next free number in katgpt-rs/.research/) titled `Indirect_Similarity_Inference_Zero_Shot_Cooperation` with the scoped Super-GOAT claim — indirect inference ONLY, not direct inference, not the equilibrium concept.
-- [ ] **T7.4** Open a new scoped private guide in riir-ai/.research/ for the indirect-inference selling point ("two merchants who've both traded with the same customers cooperate on first meeting — zero-shot emergent social structure from third-party observation").
-- [ ] **T7.5** Do NOT claim the scoped Super-GOAT until T7.2 grep confirms zero prior art AND T7.3/T7.4 guides are written. Per skill §1.5 "no candidate escape hatch": writing the claim triggers the mandatory guide outputs in the same session.
+- [x] **T7.1** Confirm G5 passed with margin (shared-policy primary entities cooperate at >70%; random-policy at <25%). **DONE 2026-08-11 — PASS WITH MASSIVE MARGIN.** Re-ran `g5_indirect_inference_poc` with `--nocapture`: 40 trials × 50 rounds × 3 shared NPCs → shared-policy coop rate **1.000** (target >0.70), random-policy **0.000** (target <0.25). Mean ω: shared **1.0000** vs random **0.0000**. Perfect separation; both G5 tests pass (the PoC + the structural `g5_indirect_primaries_never_directly_interact` API-enforcement test).
+- [x] **T7.2** Re-run the §1.5 novelty gate scoped to indirect inference ONLY: grep `indirect.*inference|third.party.*observation|zero.shot.*cooperat|parallel.*encounter|IndirectSimilarity|indirect_similarity|observe_other_via_third_party` across all 7 repos. **DONE 2026-08-11 — ZERO PRIOR ART.** All hits in `katgpt-rs` are Plan 526's own artifacts (`posterior.rs` comments, Bench 579, R274 cross-ref). All hits in `riir-ai` are R335's same-session forward reference. Zero hits in `riir-chain`, `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-mmorpg-examples`. The scoped novelty claim IS defensible.
+- [x] **T7.3** Open a new scoped research note (next free number in katgpt-rs/.research/) titled `Indirect_Similarity_Inference_Zero_Shot_Cooperation` with the scoped Super-GOAT claim — indirect inference ONLY, not direct inference, not the equilibrium concept. **DONE 2026-08-11.** [`katgpt-rs/.research/474_Indirect_Similarity_Inference_Zero_Shot_Cooperation.md`](../.research/474_Indirect_Similarity_Inference_Zero_Shot_Cooperation.md) — scoped Super-GOAT verdict, §1.5 reverse-grep evidence, G5 PoC numbers, §2.3 classical-mechanism comparison table, Q1-Q4 all YES scoped to indirect inference only, honest caveat (deterministic PoC is best-case; production will be softer).
+- [x] **T7.4** Open a new scoped private guide in riir-ai/.research/ for the indirect-inference selling point ("two merchants who've both traded with the same customers cooperate on first meeting — zero-shot emergent social structure from third-party observation"). **DONE 2026-08-11.** [`riir-ai/.research/336_Indirect_Similarity_Inference_Zero_Shot_Guide.md`](../../riir-ai/.research/336_Indirect_Similarity_Inference_Zero_Shot_Guide.md) — scoped Super-GOAT selling point, 4 game-runtime fusions (emergent trade networks, cross-zone defensive alliances, skill-masterline inheritance, player-NPC trust bridge), productionization roadmap (P0-P5 TODO in riir-ai).
+- [x] **T7.5** Do NOT claim the scoped Super-GOAT until T7.2 grep confirms zero prior art AND T7.3/T7.4 guides are written. Per skill §1.5 "no candidate escape hatch": writing the claim triggers the mandatory guide outputs in the same session. **DONE 2026-08-11 — both guides written in same session as the claim.**
 
 ### If G5 FAILS
 
-- [ ] **T7.6** Document the failure honestly. Indirect inference is not a new-capability claim on this domain. The plan stays GOAT-tier (direct inference endogenous-correlation-device mechanism only). The conditional Super-GOAT branch closes without opening.
+- [-] **T7.6** Document the failure honestly. Indirect inference is not a new-capability claim on this domain. The plan stays GOAT-tier (direct inference endogenous-correlation-device mechanism only). The conditional Super-GOAT branch closes without opening. **N/A — G5 PASSED.** Branch opened (T7.1-T7.5 DONE) rather than closed.
+
+---
+
+## Phase 7 — COMPLETE ✅ (2026-08-11)
+
+**Conditional trigger:** G5 PASS (Phase 3, 100% vs 0% perfect separation).
+
+**Outcome:** scoped Super-GOAT claim for indirect inference opened. Two research notes written in lockstep per skill §1.5:
+- [`katgpt-rs/.research/474`](../.research/474_Indirect_Similarity_Inference_Zero_Shot_Cooperation.md) — open scoped Super-GOAT note (Public/MIT).
+- [`riir-ai/.research/336`](../../riir-ai/.research/336_Indirect_Similarity_Inference_Zero_Shot_Guide.md) — private scoped Super-GOAT guide (game-runtime selling point).
+
+**Scoped verdict:** Super-GOAT for **indirect inference ONLY** (zero-shot cooperation from third-party observation). Does NOT extend to direct inference (GOAT-tier), the equilibrium concept (covered by CCE Plan 295), or the math form (paper §I). The PoC's perfect separation (100% vs 0%) is the best-case demonstration; production behavior will be softer (partial shard overlap, stochastic policies, limited evidence) — the gate thresholds (`>0.70` shared, `<0.25` random) leave room for these realistic effects.
 
 ---
 
