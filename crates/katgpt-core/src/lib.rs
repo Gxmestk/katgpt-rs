@@ -582,8 +582,9 @@ pub use spectral_hierarchy::{cauchy_interlacing_check, eigenspace_alignment, haa
 
 #[cfg(feature = "sigmoid_margin")]
 pub use simd::{
-    compute_retrieval_margin, dim_capacity_ceiling, dim_capacity_floor, dim_capacity_required,
-    dim_sufficiency_bound, ln_binomial, sigmoid_margin_loss,
+    ArgmaxAudit, argmaxable_witness, audit_argmaxable, compute_retrieval_margin,
+    dim_capacity_ceiling, dim_capacity_floor, dim_capacity_required, dim_sufficiency_bound,
+    ln_binomial, matrix_rank, sigmoid_margin_loss,
 };
 
 #[cfg(feature = "dual_gram_pca")]

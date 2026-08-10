@@ -1770,3 +1770,209 @@ pub fn coincidence_score(top_k: &[usize], parent_path: &[usize], window: usize) 
 
     agreement as f32 / effective_window
 }
+
+// ── Sigmoid argmaxability (Issue 581, Grivas/Vergari/Lopez AAAI 2024) ──
+//
+// A low-rank sigmoid output layer cannot produce every label combination. For
+// `W ∈ R^{L×d}` and independent per-label sigmoid gates, label combination
+// `y ∈ {0,1}^L` is *argmaxable* (achievable for some input) iff the strict
+// linear system
+//
+//     diag(2y − 1) · W · x > 0
+//
+// has a solution. Grivas et al. (arXiv:2310.10443) show that when `L` exceeds
+// the rank of `W`, exponentially many combinations are **unargmaxable** — no
+// input produces them, at any weight values. Their fix is a DFT output layer.
+//
+// Two-tier decision procedure, both constructive:
+//
+// 1. **rank(W) == L ⇒ every combination is argmaxable.** `W` then has a right
+//    inverse, so `W x = 2y − 1` is solvable exactly and the system holds with
+//    margin 1. This is a proof, not a heuristic, and it is the common case
+//    whenever `d ≥ L` with non-degenerate directions.
+// 2. Otherwise, per-combination search: the rows of `A = diag(s)W` admit an
+//    `x` with `Ax > 0` iff they all lie in one open halfspace. A perceptron
+//    finds such an `x` whenever one exists; failing to find one within the
+//    iteration budget is reported as *unresolved*, never as proof of
+//    impossibility.
+//
+// Relevance here: the affect bridge projects a flattened HLA onto 5–6 emotion
+// directions (valence / arousal / desperation / calm / fear [+ anger]) and gates
+// each with a sigmoid — a textbook low-rank sigmoid multi-label layer whose
+// outputs cross the sync boundary.
+
+/// Rank of a row-major `rows × cols` matrix via Gaussian elimination with
+/// partial pivoting. `tol` is the absolute pivot threshold below which a column
+/// is treated as dependent.
+///
+/// Allocation: one scratch copy of the matrix. Diagnostic use only.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn matrix_rank(m: &[f32], rows: usize, cols: usize, tol: f32) -> usize {
+    debug_assert_eq!(m.len(), rows * cols, "matrix_rank: shape mismatch");
+    let mut a: Vec<f32> = m.to_vec();
+    let mut rank = 0usize;
+    let mut row = 0usize;
+    for col in 0..cols {
+        if row >= rows {
+            break;
+        }
+        // Partial pivot: largest |value| in this column at or below `row`.
+        let mut piv = row;
+        let mut best = a[row * cols + col].abs();
+        for r in (row + 1)..rows {
+            let v = a[r * cols + col].abs();
+            if v > best {
+                best = v;
+                piv = r;
+            }
+        }
+        if best <= tol {
+            continue;
+        }
+        if piv != row {
+            for c in 0..cols {
+                a.swap(row * cols + c, piv * cols + c);
+            }
+        }
+        let inv = 1.0 / a[row * cols + col];
+        for r in (row + 1)..rows {
+            let f = a[r * cols + col] * inv;
+            if f == 0.0 {
+                continue;
+            }
+            for c in col..cols {
+                a[r * cols + c] -= f * a[row * cols + c];
+            }
+        }
+        rank += 1;
+        row += 1;
+    }
+    rank
+}
+
+/// Search for an input realizing the sign pattern `signs` through the low-rank
+/// sigmoid layer `w` (row-major `l × d`).
+///
+/// `signs[i]` must be `+1` (label on) or `-1` (label off). Returns a witness `x`
+/// if one is found, else `None` — which means *not found within the budget*, not
+/// *proved impossible*.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn argmaxable_witness(
+    w: &[f32],
+    l: usize,
+    d: usize,
+    signs: &[i8],
+    max_iters: usize,
+) -> Option<Vec<f32>> {
+    debug_assert_eq!(w.len(), l * d);
+    debug_assert_eq!(signs.len(), l);
+    // Rows of A = diag(signs) * W.
+    let a: Vec<f32> = (0..l)
+        .flat_map(|i| {
+            let s = signs[i] as f32;
+            (0..d).map(move |j| s * w[i * d + j])
+        })
+        .collect();
+    // Perceptron: start at the sum of rows (a good guess when feasible), then
+    // repair the most-violated constraint each step.
+    let mut x = vec![0.0f32; d];
+    for i in 0..l {
+        for j in 0..d {
+            x[j] += a[i * d + j];
+        }
+    }
+    for _ in 0..max_iters {
+        let mut worst = (usize::MAX, f32::INFINITY);
+        for i in 0..l {
+            let s: f32 = (0..d).map(|j| a[i * d + j] * x[j]).sum();
+            if s < worst.1 {
+                worst = (i, s);
+            }
+        }
+        if worst.1 > 0.0 {
+            return Some(x);
+        }
+        // Add the violated row; normalize to keep magnitudes bounded.
+        for j in 0..d {
+            x[j] += a[worst.0 * d + j];
+        }
+        let norm: f32 = x.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if norm > 1e-12 {
+            for v in x.iter_mut() {
+                *v /= norm;
+            }
+        }
+    }
+    None
+}
+
+/// Result of an exhaustive argmaxability audit over all `2^L` label combinations.
+#[cfg(feature = "sigmoid_margin")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ArgmaxAudit {
+    /// Rank of the output matrix.
+    pub rank: usize,
+    /// Number of labels `L`.
+    pub labels: usize,
+    /// `2^L`.
+    pub total: usize,
+    /// Combinations with a constructed witness.
+    pub achievable: usize,
+    /// Combinations where no witness was found within the budget. **Suspected**
+    /// unargmaxable — not proven, since the search is incomplete.
+    pub unresolved: usize,
+    /// `true` when `rank == labels`, which *proves* every combination is
+    /// argmaxable (the matrix has a right inverse). No search needed.
+    pub full_rank_proof: bool,
+}
+
+/// Exhaustively audit a low-rank sigmoid output layer for unargmaxable label
+/// combinations. `w` is row-major `l × d`; `l` must be ≤ 24 to keep `2^L`
+/// tractable.
+///
+/// When `rank(w) == l` the audit short-circuits with a proof that all
+/// combinations are achievable (see the module note). Otherwise every one of the
+/// `2^l` sign patterns gets a perceptron search.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn audit_argmaxable(w: &[f32], l: usize, d: usize) -> ArgmaxAudit {
+    assert!(l <= 24, "audit_argmaxable: 2^{l} combinations is not tractable");
+    let rank = matrix_rank(w, l, d, 1e-6);
+    let total = 1usize << l;
+    if rank == l {
+        return ArgmaxAudit {
+            rank,
+            labels: l,
+            total,
+            achievable: total,
+            unresolved: 0,
+            full_rank_proof: true,
+        };
+    }
+    let mut achievable = 0usize;
+    let mut signs = vec![1i8; l];
+    for mask in 0..total {
+        for (i, s) in signs.iter_mut().enumerate() {
+            *s = if mask & (1 << i) != 0 { 1 } else { -1 };
+        }
+        if argmaxable_witness(w, l, d, &signs, 256).is_some() {
+            achievable += 1;
+        }
+    }
+    ArgmaxAudit {
+        rank,
+        labels: l,
+        total,
+        achievable,
+        unresolved: total - achievable,
+        full_rank_proof: false,
+    }
+}
