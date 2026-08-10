@@ -84,6 +84,10 @@ pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief}
 // STAY opt-in — this promotion removes the katgpt-core re-forward friction
 // only; consumers still choose.
 #[cfg(feature = "conformal_predictive_intervals")]
+// Issue 580: the LIMIT adversarial retrieval fixture (arXiv:2508.21038 §5.2).
+// Opt-in — a cold-path eval fixture, never linked into production builds.
+#[cfg(feature = "limit_fixture")]
+pub mod limit_fixture;
 pub mod conformal;
 #[cfg(feature = "conformal_predictive_intervals")]
 pub use conformal::metrics::{

@@ -38,11 +38,6 @@
 //! # Feature flag
 //! `limit_fixture` — Issue 580
 
-extern crate alloc;
-use alloc::string::String;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-
 /// A document in the corpus.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LimitDoc {
@@ -130,6 +125,33 @@ impl LimitConfig {
     }
 }
 
+/// Upper bound on enumerated `k`-subsets, so a large `n_relevant` cannot make
+/// the generator allocate without limit.
+const MAX_SUBSETS: usize = 500_000;
+
+/// All `k`-subsets of `0..n` in lexicographic order, capped at `limit`.
+fn combinations(n: usize, k: usize, limit: usize) -> Vec<Vec<usize>> {
+    let mut out: Vec<Vec<usize>> = Vec::new();
+    if k == 0 || k > n || limit == 0 {
+        return out;
+    }
+    let mut idx: Vec<usize> = (0..k).collect();
+    loop {
+        out.push(idx.clone());
+        if out.len() >= limit {
+            return out;
+        }
+        // Rightmost position that can still be advanced.
+        let Some(i) = (0..k).rev().find(|&i| idx[i] < n - k + i) else {
+            return out;
+        };
+        idx[i] += 1;
+        for j in (i + 1)..k {
+            idx[j] = idx[j - 1] + 1;
+        }
+    }
+}
+
 /// Deterministic xorshift64* — reproducible fixtures with no RNG dependency.
 struct Rng(u64);
 
@@ -189,38 +211,11 @@ pub fn build_limit(cfg: &LimitConfig) -> LimitFixture {
     let mut rng = Rng::new(cfg.seed);
 
     // ── Enumerate distinct k-subsets of the relevant pool ──
-    let mut subsets: Vec<Vec<usize>> = Vec::new();
-    let mut idx = vec![0usize; cfg.k];
-    for i in 0..cfg.k {
-        idx[i] = i;
-    }
-    loop {
-        subsets.push(idx.clone());
-        // Odometer over strictly increasing indices.
-        let mut p = cfg.k;
-        loop {
-            if p == 0 {
-                break;
-            }
-            p -= 1;
-            if idx[p] < cfg.n_relevant - (cfg.k - p) {
-                idx[p] += 1;
-                for q in (p + 1)..cfg.k {
-                    idx[q] = idx[q - 1] + 1;
-                }
-                break;
-            }
-            if p == 0 {
-                break;
-            }
-        }
-        // Terminate when the odometer has wrapped to its maximum state.
-        if idx.iter().enumerate().all(|(i, &v)| v == cfg.n_relevant - cfg.k + i) {
-            subsets.push(idx.clone());
-            break;
-        }
-    }
-    subsets.dedup();
+    // Enumerate a generous superset, then shuffle and truncate. Truncating
+    // *before* shuffling would bias every query toward lexicographically-early
+    // documents, which would leak positional signal into the relevance structure.
+    let cap = cfg.n_queries.saturating_mul(4).max(cfg.n_queries).min(MAX_SUBSETS);
+    let mut subsets = combinations(cfg.n_relevant, cfg.k, cap);
 
     // Deterministic Fisher-Yates so query order carries no positional signal.
     for i in (1..subsets.len()).rev() {
@@ -348,8 +343,8 @@ pub fn modelless_embed_8(text: &str) -> [f32; LIMIT_EMBED_DIM] {
     for (t, &byte) in b.iter().enumerate() {
         let ang = core::f32::consts::TAU * t as f32 / n as f32;
         let v = byte as f32 / 255.0;
-        re += v * cos_approx(ang);
-        im -= v * sin_approx(ang);
+        re += v * ang.cos();
+        im -= v * ang.sin();
     }
     let mag = (re * re + im * im).sqrt();
     out[4] = 1.0 / (1.0 + (-mag).exp()) * 2.0 - 1.0;
@@ -380,25 +375,6 @@ pub fn cosine(a: &[f32], b: &[f32]) -> f32 {
         return 0.0;
     }
     dot / (na * nb)
-}
-
-// `no_std`-friendly trig/exp helpers. Accuracy is irrelevant here — the embedder
-// only needs to be deterministic and to spread inputs across the sphere.
-fn cos_approx(x: f32) -> f32 {
-    // Wrap to [-pi, pi] then use a 4th-order minimax-ish polynomial.
-    let mut a = x % core::f32::consts::TAU;
-    if a > core::f32::consts::PI {
-        a -= core::f32::consts::TAU;
-    }
-    if a < -core::f32::consts::PI {
-        a += core::f32::consts::TAU;
-    }
-    let x2 = a * a;
-    1.0 - x2 / 2.0 + x2 * x2 / 24.0 - x2 * x2 * x2 / 720.0
-}
-
-fn sin_approx(x: f32) -> f32 {
-    cos_approx(x - core::f32::consts::FRAC_PI_2)
 }
 
 #[cfg(test)]

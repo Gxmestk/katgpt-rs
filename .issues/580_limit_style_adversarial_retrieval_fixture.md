@@ -4,7 +4,7 @@
 **Type:** poc + proof
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md)
 **Cross-ref:** riir-neuron-db Plan 324 / Benchmark 324, riir-ai Plan 524
-**Status:** In progress — **T4 DONE 2026-08-10** ([Benchmark 574](../.benchmarks/574_retrieval_capacity_break_point.md))
+**Status:** In progress — **T1, T3, T4, T5 DONE; T2 public legs done** 2026-08-10 ([Bench 574](../.benchmarks/574_retrieval_capacity_break_point.md), [Bench 576](../.benchmarks/576_limit_fixture_recall.md)). Remaining: T2's private index legs.
 
 ---
 
@@ -34,9 +34,64 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
 
 ## Tasks
 
-- [ ] **T1** Build the fixture as a modelless generator (seeded, deterministic, no network): `n`, `k`, attribute count and distractor count parameterised. Emit 8-D embeddings via the existing `ModellessEmbedder` path (`riir-ai/crates/riir-rag/src/embedder.rs:74`) so the test measures *our* embedder, not a stand-in.
-- [ ] **T2** Measure recall@{2,10,20} for: `ShardIndex::query` (3-candidate path), `query_k_nearest_cosine` (`fast_knn`), `retrieve_diverse` (wedge span), `ItemEmbedIndex::query_top_k`, and `smooth_min_similarity` aggregation. Report each separately — do not average.
-- [ ] **T3** Add the BM25 leg (`bm25.rs`) and the synonym variant. Confirm or refute the paper's asymmetry (lexical near-solves plain, collapses on synonyms) on our tokenizers (`CodeTokenizer` default).
+- [x] **T1 DONE (2026-08-10)** — `crates/katgpt-core/src/limit_fixture/` behind an opt-in
+      `limit_fixture` feature: `LimitConfig` (with `paper_small` / `paper_full`
+      presets and `with_synonyms`), `build_limit`, `recall_at_k`,
+      `modelless_embed_8`, `cosine`. Seeded, deterministic, no network, no new deps.
+      **11 construction tests** assert it is genuinely the paper's adversarial
+      structure: ground truth is exactly the attribute carriers, no two queries
+      share a relevant set, attribute counts uniform, filler drawn from a disjoint
+      slot range, synonym variant preserves relevance byte-identically.
+
+      **Deviation, deliberate:** the embedder is a *reference* modelless embedder
+      matching riir-ai's `ModellessEmbedder` in shape (BLAKE3 + DFT + sigmoid →
+      `[f32; 8]`, weightless) but **not bit-exact**. Importing the real one would
+      drag private game IP into the public engine, so the fixture lives in
+      `katgpt-core` with a pluggable embedding and riir-ai can re-run it against
+      the production embedder from its side. Flagged in Bench 576's scope limits.
+- [~] **T2 PARTIAL (2026-08-10)** — the **public** legs are measured in
+      [Bench 576](../.benchmarks/576_limit_fixture_recall.md), reported per leg and
+      per k, not averaged:
+
+      | leg / variant | R@2 | R@10 | R@20 |
+      |---|---|---|---|
+      | dense 8-D / plain | **0.045** | 0.229 | 0.434 |
+      | dense 8-D / synonym | 0.038 | 0.209 | 0.436 |
+      | lexical / plain | **1.000** | 1.000 | 1.000 |
+      | lexical / synonym | 0.043 | 0.220 | 0.438 |
+
+      **Headline: the modelless 8-D dense leg is statistically indistinguishable
+      from random ranking** (0.045 vs a 0.043 chance floor) on *both* variants. It
+      has no channel by which a shared attribute token can raise cosine — it is not
+      weak on LIMIT, it is absent. That quantifies riir-rag's own
+      "structural, not semantic" caveat.
+
+      **Still open:** the index-specific legs — `ShardIndex::query` (3-candidate
+      path), `query_k_nearest_cosine` (`fast_knn`), `retrieve_diverse` (wedge span),
+      `ItemEmbedIndex::query_top_k`, `smooth_min_similarity` — all live in private
+      repos and need a riir-neuron-db test consuming `katgpt-core/limit_fixture`.
+      What is already settled is the paradigm they share: since plain 8-D cosine
+      over a modelless embedding is at chance, none of them can inherit quality
+      from the embedding — any gain must come from their own mechanism
+      (diversification, multi-token aggregation, lexical fusion).
+- [x] **T3 DONE (2026-08-10)** — synonym variant shipped; the paper's asymmetry is
+      **CONFIRMED, and more extreme than the paper's**:
+
+      | | plain | synonym | drop |
+      |---|---|---|---|
+      | lexical (ours) | 1.000 | 0.043 | **−95.7%** |
+      | BM25 (paper) | 97.8 | 10.6 | −89.2% |
+      | dense (ours) | 0.045 | 0.038 | −15.6% |
+      | Qwen3 (paper) | 19.0 | 11.6 | −38.9% |
+
+      Ours drops harder because the leg is pure token overlap with no idf
+      smoothing. **The dense leg's smaller drop is vacuous** — it looks robust only
+      because it never worked; a robustness ratio is meaningless without an
+      absolute baseline.
+
+      **Caveat:** measured with an idealised token-overlap leg, not the real
+      `Bm25Index` (k1=1.2, b=0.75, `CodeTokenizer`), which ships in riir-neuron-db.
+      Re-measuring there is folded into the remaining T2 work.
 - [x] **T4 DONE (2026-08-10)** — harness `crates/katgpt-types/tests/capacity_break_point.rs`,
       results in [Benchmark 574](../.benchmarks/574_retrieval_capacity_break_point.md).
 
@@ -65,7 +120,27 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
       worst-case (adversarial all-pairs qrel against unstructured random docs);
       `k=2` only, and the ceiling falls steeply with `k`, so the gap should narrow
       at larger `k` — untested.
-- [ ] **T5** Record results in `.benchmarks/`. If the wedge-diverse or smooth-min legs materially beat plain cosine on the fixture, that is a promotion argument for the corresponding riir-* gates; if BM25 is the only leg that survives, that is an argument for raising its weight in `riir-rag` fusion (see Issue 579 context and the additive-fusion caveat in `riir_rag.md`).
+- [x] **T5 DONE (2026-08-10)** — [Bench 576](../.benchmarks/576_limit_fixture_recall.md).
+      The conditional in this task resolved to its second branch: **the lexical leg
+      is the only one that survives plain LIMIT**, which is an argument for making
+      `riir-rag` fusion weight workload-conditional.
+
+      This **contradicts riir-rag's stated priority** — `riir_rag.md` makes the
+      latent 8-D leg "the primary path", calls BM25 "the fallback … never the
+      primary path", and folds additively so the latent term stays dominant. On
+      this workload that ordering is inverted, and additive fusion with a dominant
+      latent term would bury the only working leg.
+
+      Kept honest two ways: LIMIT is *designed* to be attribute-matching, maximally
+      favourable to lexical, and is not representative of riir-rag's actual target
+      (structural code retrieval, where `graph_score` answers what neither leg can);
+      and the synonym variant shows lexical alone is equally unsafe. The conclusion
+      is not "promote BM25" but "the fusion weight should be workload-conditional",
+      which `riir_rag.md` caveat 4 already flags as a future knob. This supplies the
+      evidence to act.
+
+      The wedge-diverse / smooth-min promotion question stays open — those legs are
+      part of the remaining T2 work.
 
 ## Why this is worth the cost
 
