@@ -4,7 +4,7 @@
 **Type:** poc + proof
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md)
 **Cross-ref:** riir-neuron-db Plan 324 / Benchmark 324, riir-ai Plan 524
-**Status:** In progress — **T1, T3, T4, T5 DONE; T2 public legs done** 2026-08-10 ([Bench 574](../.benchmarks/574_retrieval_capacity_break_point.md), [Bench 576](../.benchmarks/576_limit_fixture_recall.md)). Remaining: T2's private index legs.
+**Status:** ✅ **ALL TASKS DONE 2026-08-10** — [Bench 574](../.benchmarks/574_retrieval_capacity_break_point.md), [Bench 576](../.benchmarks/576_limit_fixture_recall.md), riir-neuron-db [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md).
 
 ---
 
@@ -49,31 +49,46 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
       drag private game IP into the public engine, so the fixture lives in
       `katgpt-core` with a pluggable embedding and riir-ai can re-run it against
       the production embedder from its side. Flagged in Bench 576's scope limits.
-- [~] **T2 PARTIAL (2026-08-10)** — the **public** legs are measured in
-      [Bench 576](../.benchmarks/576_limit_fixture_recall.md), reported per leg and
-      per k, not averaged:
+- [x] **T2 DONE (2026-08-10)** — public legs in
+      [Bench 576](../.benchmarks/576_limit_fixture_recall.md); the five shipped
+      index legs in riir-neuron-db
+      [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md)
+      via `tests/limit_recall_legs.rs` (feature `limit_recall`, consuming
+      `katgpt-core/limit_fixture`). Per leg, per k, never averaged:
 
-      | leg / variant | R@2 | R@10 | R@20 |
+      | leg (plain variant) | R@2 | R@10 | R@20 |
       |---|---|---|---|
-      | dense 8-D / plain | **0.045** | 0.229 | 0.434 |
-      | dense 8-D / synonym | 0.038 | 0.209 | 0.436 |
-      | lexical / plain | **1.000** | 1.000 | 1.000 |
-      | lexical / synonym | 0.043 | 0.220 | 0.438 |
+      | `ShardIndex::query` (top-1, default) | 0.025 | 0.025 | 0.025 |
+      | `fast_knn` cosine top-k | 0.045 | 0.229 | 0.434 |
+      | `retrieve_diverse` (wedge) | 0.049 | 0.233 | 0.440 |
+      | `ItemEmbedIndex::query_top_k` | 0.045 | 0.230 | 0.433 |
+      | **`Bm25Index` (CodeTokenizer)** | **1.000** | 1.000 | 1.000 |
+      | **`smooth_min` (token MaxSim)** | **0.461** | 0.759 | 0.909 |
 
-      **Headline: the modelless 8-D dense leg is statistically indistinguishable
-      from random ranking** (0.045 vs a 0.043 chance floor) on *both* variants. It
-      has no channel by which a shared attribute token can raise cosine — it is not
-      weak on LIMIT, it is absent. That quantifies riir-rag's own
-      "structural, not semantic" caveat.
+      Chance floor 0.043 (top-2) / 0.022 (top-1 — a leg returning one document has
+      a lower floor, so comparing it against the top-2 floor would be
+      apples-to-oranges).
 
-      **Still open:** the index-specific legs — `ShardIndex::query` (3-candidate
-      path), `query_k_nearest_cosine` (`fast_knn`), `retrieve_diverse` (wedge span),
-      `ItemEmbedIndex::query_top_k`, `smooth_min_similarity` — all live in private
-      repos and need a riir-neuron-db test consuming `katgpt-core/limit_fixture`.
-      What is already settled is the paradigm they share: since plain 8-D cosine
-      over a modelless embedding is at chance, none of them can inherit quality
-      from the embedding — any gain must come from their own mechanism
-      (diversification, multi-token aggregation, lexical fusion).
+      **All three 8-D cosine legs are at chance**, confirming Bench 576 on the real
+      shipped indexes. **`ShardIndex::query` is structurally capped** — it returns
+      at most one document, so recall@2 ≤ 0.5 and does not move with k (0.025 at
+      every k, at chance for its shape); two limits compound, the 3-candidate
+      `embedding[0]` search and the single result.
+
+      **Headline: token-level `smooth_min` is a 10× gain at k=2** (0.461 vs 0.045)
+      and 0.909 at k=20 — the multi-vector escape works on our own modelless
+      embedder with no training. Whole-string BLAKE3 destroys the attribute signal;
+      embedding tokens separately preserves it, since identical token strings embed
+      to identical vectors. Reproduces the paper's multi-vector result inside our
+      stack and matches katgpt-core's shipped `+50.5pp` SmoothMinAligned figure.
+
+      **But that gain is lexical, not semantic** — it collapses to 0.047 on the
+      synonym variant. Asserted, so the leg cannot be oversold.
+
+      `retrieve_diverse` shows no gain (0.214 vs 0.213 R@10): LIMIT's two relevant
+      documents share no geometric relationship, so there is no mode to escape.
+      **No promotion is argued** from any of this.
+
 - [x] **T3 DONE (2026-08-10)** — synonym variant shipped; the paper's asymmetry is
       **CONFIRMED, and more extreme than the paper's**:
 
@@ -89,9 +104,10 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
       because it never worked; a robustness ratio is meaningless without an
       absolute baseline.
 
-      **Caveat:** measured with an idealised token-overlap leg, not the real
-      `Bm25Index` (k1=1.2, b=0.75, `CodeTokenizer`), which ships in riir-neuron-db.
-      Re-measuring there is folded into the remaining T2 work.
+      **Re-measured on the real index (2026-08-10):** `Bm25Index` with
+      `CodeTokenizer` (k1=1.2, b=0.75) gives **1.000 → 0.041, a −95.9% drop** —
+      the asymmetry holds on the shipped index, not just the stand-in. riir-neuron-db
+      [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md).
 - [x] **T4 DONE (2026-08-10)** — harness `crates/katgpt-types/tests/capacity_break_point.rs`,
       results in [Benchmark 574](../.benchmarks/574_retrieval_capacity_break_point.md).
 
@@ -139,8 +155,14 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
       which `riir_rag.md` caveat 4 already flags as a future knob. This supplies the
       evidence to act.
 
-      The wedge-diverse / smooth-min promotion question stays open — those legs are
-      part of the remaining T2 work.
+      **Wedge-diverse / smooth-min promotion question resolved (2026-08-10):**
+      `retrieve_diverse` shows no gain on LIMIT, and `smooth_min`'s 10× gain is
+      lexical and not wired to any index (it aggregates over pre-tokenised text;
+      no index stores multi-vector). **Neither warrants a promotion from this
+      benchmark.** The actionable consequence is instead that multi-vector storage
+      is the highest-value gap — see riir-neuron-db Issue 591 §C, which already
+      proposes the cheapest version (`ExperienceNode` + `sibling_hashes[8]` as a
+      natural 9-vector region).
 
 ## Why this is worth the cost
 
@@ -149,3 +171,9 @@ The fixture is cheap (46–50k synthetic docs, no training, no GPU) and it conve
 ## Done when
 
 The fixture is committed and deterministic, all five retrieval legs have recall@k numbers on both variants, and T4's measured-vs-predicted multiplier is recorded in `.benchmarks/`.
+
+✅ **All satisfied 2026-08-10.** Fixture: `katgpt-core/limit_fixture` (11 construction
+tests). Five legs + `smooth_min`, both variants: riir-neuron-db Bench 476. T4
+multiplier: Bench 574. Follow-ups spawned rather than left implicit — multi-vector
+storage (Issue 591 §C), workload-conditional `riir-rag` fusion weight, and
+re-running the fixture against riir-ai's real `ModellessEmbedder`.
