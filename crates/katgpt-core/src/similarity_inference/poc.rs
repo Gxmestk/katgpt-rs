@@ -472,3 +472,122 @@ fn g2_random_pairs_mismatch_frequently() {
     // Should be close to 0.5; allow generous bounds for the deterministic mix.
     assert!(agree_rate > 0.4 && agree_rate < 0.6, "agreement rate {agree_rate} outside [0.4, 0.6]");
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 4 — Alloc-Free + Crowd-Scale (G4 + G6)
+//
+// G4: observe_match / observe_mismatch / embedded_best_response allocate 0
+// bytes after construction. Verified by code audit: the hot path is pure f32
+// arithmetic (log_w +=, saturating_add, exp, divide) + a flat payoff-matrix
+// scan. No Vec/Box/String/format! on the hot path. A CountingAllocator bench
+// (bench_526_similarity_inference_goat.rs, harness=false) is the rigorous
+// follow-up; the test below is a smoke check (runs 100K observes without
+// OOM/panic, which a leaky path would fail).
+//
+// G6: 1000 entities × 20 AOI-neighbors = 20K pairwise ω updates per tick.
+// Target: <5ms total per tick (sub-µs per individual update).
+// ──────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn g4_alloc_free_smoke() {
+    // Run 100K observe_match calls. A leaky implementation would OOM or slow
+    // down; a correct one finishes in microseconds. This is NOT a rigorous
+    // alloc-count (that needs a CountingAllocator in a separate bench binary)
+    // but it catches gross leaks + verifies the hot path is tight.
+    let mut p = SimilarityPosterior::new(0.1).unwrap();
+    let start = std::time::Instant::now();
+    for _ in 0..100_000 {
+        p.observe_match(2);
+    }
+    let elapsed = start.elapsed();
+    eprintln!(
+        "G4 smoke: 100K observe_match calls in {elapsed:?} ({:.0} ns/call)",
+        elapsed.as_nanos() as f64 / 100_000.0
+    );
+    // ω should have saturated to 1.0 long ago (f32 precision floor).
+    assert_eq!(p.omega(), 1.0);
+    // 100K calls should take <100ms even on a slow CI box (sub-µs each).
+    assert!(elapsed.as_millis() < 100, "100K observes took {elapsed:?} (>100ms)");
+}
+
+#[test]
+fn g6_crowd_scale_latency() {
+    // G6 assertion: 1000 entities × 20 AOI-neighbors = 20K pairwise ω updates
+    // per tick. Target: <5ms total per tick on the dev machine (the plan says
+    // "Apple Silicon" but the gate is generous enough for any modern CPU).
+    //
+    // We simulate the crowd-scale workload: 20K SimilarityPosterior instances,
+    // each receiving one observe_match per tick. This is the per-tick hot path
+    // for a 1000-NPC zone with 20 neighbors each.
+    const N_ENTITIES: usize = 1000;
+    const N_NEIGHBORS: usize = 20;
+    const N_UPDATES_PER_TICK: usize = N_ENTITIES * N_NEIGHBORS; // 20_000
+    const TICK_BUDGET_MS: u128 = 5;
+
+    // Build 20K posteriors (construction is NOT the hot path — it's per-pair
+    // setup, done once).
+    let mut posteriors: Vec<SimilarityPosterior> = (0..N_UPDATES_PER_TICK)
+        .map(|_| SimilarityPosterior::new(0.1).unwrap())
+        .collect();
+
+    // Run one tick: each posterior observes one matched action.
+    let start = std::time::Instant::now();
+    for p in &mut posteriors {
+        p.observe_match(2);
+    }
+    let elapsed = start.elapsed();
+    let elapsed_ns = elapsed.as_nanos();
+    let per_update_ns = elapsed_ns as f64 / N_UPDATES_PER_TICK as f64;
+
+    eprintln!(
+        "G6 crowd-scale: {N_UPDATES_PER_TICK} pairwise ω updates in {elapsed:?} ({per_update_ns:.0} ns/update, budget {TICK_BUDGET_MS}ms)"
+    );
+
+    assert!(
+        elapsed.as_millis() < TICK_BUDGET_MS,
+        "G6 FAIL: {N_UPDATES_PER_TICK} updates took {elapsed:?} (>{TICK_BUDGET_MS}ms budget)"
+    );
+    // Sub-µs per individual update is the aspirational target; the hard gate
+    // is the 5ms/tick total. Report the per-update number for diagnostics.
+    eprintln!(
+        "G6 per-update: {per_update_ns:.0} ns (aspirational target <1000 ns)"
+    );
+}
+
+#[test]
+fn g6_best_response_crowd_scale() {
+    // Companion to g6_crowd_scale_latency: measures the embedded_best_response
+    // path (the terminal PD decision) at crowd scale. Each entity decides
+    // cooperate/defect against one partner per tick. 1000 entities = 1000
+    // best-response calls per tick.
+    const N_ENTITIES: usize = 1000;
+    const TICK_BUDGET_MS: u128 = 5;
+
+    let payoff = canonical_pd();
+    let marginal = [0.5_f32, 0.5];
+    // Simulate a range of ω values across the crowd.
+    let omegas: Vec<f32> = (0..N_ENTITIES).map(|i| (i as f32) / (N_ENTITIES as f32)).collect();
+    let mut actions = vec![0u8; N_ENTITIES];
+
+    let start = std::time::Instant::now();
+    for (i, &omega) in omegas.iter().enumerate() {
+        crate::similarity_inference::embedded_best_response_into(
+            omega,
+            &payoff,
+            &marginal,
+            &mut actions[i],
+        )
+        .unwrap();
+    }
+    let elapsed = start.elapsed();
+    let per_call_ns = elapsed.as_nanos() as f64 / N_ENTITIES as f64;
+
+    eprintln!(
+        "G6 best-response crowd-scale: {N_ENTITIES} calls in {elapsed:?} ({per_call_ns:.0} ns/call, budget {TICK_BUDGET_MS}ms)"
+    );
+
+    assert!(
+        elapsed.as_millis() < TICK_BUDGET_MS,
+        "G6 FAIL: {N_ENTITIES} best-response calls took {elapsed:?} (>{TICK_BUDGET_MS}ms)"
+    );
+}
