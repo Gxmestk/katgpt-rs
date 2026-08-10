@@ -198,6 +198,28 @@ Plan 410 is the precedent for the correct shape of response: a published impossi
 
 **Grandfather note (UQ rule):** this primitive claims no probability distribution, interval, or coverage guarantee, so the "Report the Floor" conformal-naive gate does not apply.
 
+### Applied downstream (2026-08-10)
+
+**riir-neuron-db `experience_graph`** (DEFAULT-ON since 2026-07-16, Plan 319) — aligned in
+`riir-neuron-db/.proposals/001` §"Capacity + regime addendum" + **Issue 591**. `latent_seed_top_k`
+(`src/experience_graph/graph.rs:196`) is flat brute-force 8-D cosine top-k over `task_embedding[8]`;
+Benchmark 319 G2b runs `seed_k=8` over 1000 nodes, **~23× past** the `n≤44` ceiling Theorem 1 gives at
+`d=8, k=8, γ=0.1`. Three transferable results came out of that alignment:
+
+1. **The bound is monotone decreasing in `k`** — 44 nodes at `k=8`, 30 at `k=16`. So the reflexive fix
+   for a weak seed stage (raise `seed_k`) makes the worst-case requirement *worse*. **Coverage cannot be
+   bought with larger `k`; the escape is structural or dimensional.** This generalizes to every top-k
+   consumer in the stack and is the most useful corollary found so far.
+2. **Seed capacity upper-bounds downstream recall** in any seed→expand retriever: expansion amplifies
+   whichever region the seed lands in, so depth does not rescue a seed set in the wrong neighborhood.
+3. **`ExperienceNode` is the stack's one natural multi-vector document** — node + `sibling_hashes[8]` =
+   9 `task_embedding[8]` vectors per experience region, so MaxSim late interaction is available at zero
+   new storage. This is the cheapest path to the multi-vector escape §2.4 found missing everywhere.
+
+Also corrected a stale claim in shipped code: `graph.rs` asserted a *"100× gap that is a regime
+boundary"* for NS traversal (5–10 ms PoC) when Benchmark 319 measured **0.065 ms** — ~1.3× over the
+online budget, refuted by the benchmark that promoted the feature. Re-justified on scaling grounds.
+
 ### Actionable follow-ups (issues, not plans — per AGENTS.md)
 
 - **Issue 579** — wire `dim_sufficiency_bound` into the retrieval paths (it has zero production call sites) and extend Research 123's sufficiency table to the default-on 8-D indexes it omits.
