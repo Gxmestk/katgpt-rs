@@ -106,14 +106,26 @@ pub enum ModelArchitecture {
     /// count vary. Native 256K context. GGUF-loaded; opt-in `gemma4_inference`.
     #[cfg(feature = "gemma4_inference")]
     Gemma4,
-    /// BitNet / Ternary-Bonsai architecture (Plan 333 Phase 2).
+    /// Ternary-weight transformer (Plan 333 Phase 2).
     /// Ternary {-1,0,+1} weights with per-128 f16 group scale (Q2_0_g128).
     /// The weight substrate ships behind `ternary_group_scale` (Issue 578:
     /// `TernaryGroupWeights` + `simd_ternary_group_matvec`); this variant
     /// gates only the forward dispatch in riir-engine. GGUF-loaded via the
     /// `Q2_0` tensor type (Plan 333 T2.1).
-    #[cfg(feature = "bitnet_inference")]
-    BitNet,
+    ///
+    /// **Not named `BitNet`** (renamed 2026-08-10): the format is `Q2_0_g128`,
+    /// not BitNet's `i2_s`, and Ternary-Bonsai-27B is `general.architecture =
+    /// qwen35`, not the BitNet b1.58 family. Every piece of the substrate is
+    /// named `ternary`; this variant now matches.
+    ///
+    /// **Known modelling tension** (riir-ai Issue 593): "ternary" is a *weight
+    /// container*, not an architecture, so it is orthogonal to the other
+    /// variants rather than parallel to them. It earns a variant here only
+    /// because this repo's dispatch pattern is one variant per weights struct.
+    /// Running a ternary qwen35 hybrid will need a container-vs-architecture
+    /// split, not a second variant.
+    #[cfg(feature = "ternary_inference")]
+    Ternary,
 }
 
 /// Per-layer attention type for Gemma 4 (Issue 577).

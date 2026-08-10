@@ -52,12 +52,14 @@ deltanet_inference = []
 # Opt-in — gates the loader + forward pass in riir-engine.
 gemma4_inference = []
 
-# BitNet / Ternary-Bonsai inference: ModelArchitecture::BitNet variant.
+# Ternary-weight inference: ModelArchitecture::Ternary variant.
 # Gates the forward dispatch arm in riir-engine. The weight substrate
 # (TernaryGroupWeights + simd_ternary_group_matvec) ships behind
 # `ternary_group_scale` (Issue 578); this feature gates only the
 # architecture enum + the riir-engine forward path. Plan 333 Phase 2.
-bitnet_inference = []
+# Renamed from `bitnet_inference` 2026-08-10 — the format is Q2_0_g128,
+# not BitNet i2_s, and the whole substrate is named `ternary`.
+ternary_inference = []
 
 # Collapse-aware ThinkingBudget enum (Plan 212).
 collapse_aware_thinking = []
