@@ -106,6 +106,14 @@ pub enum ModelArchitecture {
     /// count vary. Native 256K context. GGUF-loaded; opt-in `gemma4_inference`.
     #[cfg(feature = "gemma4_inference")]
     Gemma4,
+    /// BitNet / Ternary-Bonsai architecture (Plan 333 Phase 2).
+    /// Ternary {-1,0,+1} weights with per-128 f16 group scale (Q2_0_g128).
+    /// The weight substrate ships behind `ternary_group_scale` (Issue 578:
+    /// `TernaryGroupWeights` + `simd_ternary_group_matvec`); this variant
+    /// gates only the forward dispatch in riir-engine. GGUF-loaded via the
+    /// `Q2_0` tensor type (Plan 333 T2.1).
+    #[cfg(feature = "bitnet_inference")]
+    BitNet,
 }
 
 /// Per-layer attention type for Gemma 4 (Issue 577).
