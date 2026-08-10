@@ -1,7 +1,7 @@
 # Benchmark 578: Linking-Fold interaction (T6) + affect consumer audit (T8) — Issue 581 closeout
 
 **Date:** 2026-08-10
-**Issue:** [581](../.issues/581_sigmoid_argmaxability_bottleneck_audit.md) T6 + T8 (closeout)
+**Issue:** 581 T6 + T8 (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in Benchmarks 575 + 577 + this benchmark)
 **Sibling records:** [Benchmark 575](575_sigmoid_argmaxability_audit.md) (T1–T4), [Benchmark 577](577_emotion_direction_rank.md) (T5')
 **Code touched:** `riir-ai/crates/riir-games-civ/src/civ/emotion/mod.rs` — fixed a stray
 `#[cfg(feature = "emotion_mux")]` on `pub mod rank_audit;` (it was accidentally masked by

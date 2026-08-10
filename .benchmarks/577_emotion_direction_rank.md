@@ -1,7 +1,7 @@
 # Benchmark 577: the shipped emotion directions are rank 2 of 6 — Benchmark 575's verdict does not transfer (Issue 581 T5')
 
 **Date:** 2026-08-10
-**Issue:** [581](../.issues/581_sigmoid_argmaxability_bottleneck_audit.md) T5'
+**Issue:** 581 T5' (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in Benchmarks 575 + 577 + 578)
 **Supersedes the conditional in:** [Benchmark 575](575_sigmoid_argmaxability_audit.md)
 **Harness:** `riir-ai/crates/riir-games-civ/src/civ/emotion/rank_audit.rs` +
 `riir-ai/crates/riir-games-civ/tests/emotion_direction_rank.rs`, feature `direction_rank_audit`

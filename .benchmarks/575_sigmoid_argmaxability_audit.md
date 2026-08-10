@@ -18,7 +18,7 @@
 
 
 **Date:** 2026-08-10
-**Issue:** [581](../.issues/581_sigmoid_argmaxability_bottleneck_audit.md)
+**Issue:** 581 (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in Benchmarks 575 + 577 + 578)
 **Source:** Grivas, Vergari & Lopez, *Taming the Sigmoid Bottleneck: Provably Argmaxable Sparse Multi-Label Classification*, AAAI 2024 — [arXiv:2310.10443](https://arxiv.org/abs/2310.10443)
 **Research:** [472 §1.6](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md)
 **Harness:** `crates/katgpt-types/tests/sigmoid_argmaxability.rs` (feature `sigmoid_margin`)
