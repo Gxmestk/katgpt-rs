@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md](../../riir-ai/.research/335_Similarity_Inference_Emergent_Cooperation_Guide.md)
 **Source paper:** [arXiv:2608.03958](https://arxiv.org/abs/2608.03958) — Meulemans et al., Google Paradigms of Intelligence, 4 Aug 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity_inference/` (new module) + Cargo feature `similarity_inference`
-**Status:** Active — Phase 1 (skeleton)
+**Status:** Phases 1-6 COMPLETE — **promoted to DEFAULT-ON** (2026-08-11). Phase 7 (conditional Super-GOAT claim for indirect inference) unblocked by G5 PASS.
 
 **Verdict note (post-revision):** GOAT, not Super-GOAT. The equilibrium *concept* is covered by shipped CCE (`CceLp<N,A>`, Plan 295, DEFAULT-ON, +37.5%/+108% over Nash). The novelty is the *mechanism* — similarity-inferred **endogenous correlation device** for the CCE substrate. Plan 526 ships the mechanism; the gain is the **endogenous moderator fusion** (R143 × R471). **Phase 7 (conditional)** opens a separate scoped Super-GOAT claim for **indirect inference** (zero-shot cooperation from third-party observation) IF G5 PoC passes — that subset is genuinely new capability, the direct-inference mechanism is not.
 
@@ -167,13 +167,21 @@ If G2 fails (cooperation does not emerge, or emerges for random pairs too), the 
 
 ### Tasks
 
-- [ ] **T6.1** Write `.benchmarks/526_similarity_inference_goat.md` with all G1–G7 results (pass or fail, honestly).
-- [ ] **T6.2** Update `katgpt-rs/README.md` feature table with `similarity_inference` (opt-in initially).
-- [ ] **T6.3** If ALL gates pass (G1–G7): promote `similarity_inference` to `default` in `katgpt-core/Cargo.toml`. Record promotion in the benchmark file.
-- [ ] **T6.4** If G2 (emergent cooperation) FAILS: keep opt-in, document the failure in the benchmark, do NOT promote. The architectural coverage (closed-form math is correct) stands; the quality claim (emergent cooperation on this domain) is unproven.
-- [ ] **T6.5** If G7 (UQ floor) FAILS: keep opt-in, document that the Bayesian posterior does not beat a single-direction projection on this domain. Consider whether a richer prior (beyond the paper's constructed one) would help — but that's a follow-up, not this plan.
-- [ ] **T6.6** Cross-ref: add a one-line note to `katgpt-rs/.research/274` (CCE Moderator) pointing to this primitive as the *endogenous-correlation-device* companion.
-- [ ] **T6.7** Commit on `develop` (per AGENTS.md global rule — commit at task completion).
+- [x] **T6.1** Write `.benchmarks/526_similarity_inference_goat.md` with all G1–G7 results (pass or fail, honestly). **DONE 2026-08-11** — written as [`.benchmarks/579_similarity_inference_goat.md`](../.benchmarks/579_similarity_inference_goat.md) (number 579 = highwater+1; 526 was the plan number, the benchmark gets its own monotonic number per the numbering discipline).
+- [x] **T6.2** Update `katgpt-rs/README.md` feature table with `similarity_inference` (opt-in initially). **N/A after promotion** — the feature is now DEFAULT-ON (T6.3); the README feature table is for opt-in features. The DEFAULT-ON list in README §"Feature Flags" is auto-summarized; the Cargo.toml `default = [...]` line is the source of truth and now includes `similarity_inference`. The bench file (T6.1) is the canonical documentation.
+- [x] **T6.3** If ALL gates pass (G1–G7): promote `similarity_inference` to `default` in `katgpt-core/Cargo.toml`. Record promotion in the benchmark file. **DONE 2026-08-11.** Added `"similarity_inference"` to the `default = [...]` list in `katgpt-core/Cargo.toml` (Phase 26 promotion). Verified: `cargo test -p katgpt-core --lib similarity_inference::` passes with default features (no `--features` flag needed). Promotion recorded in bench 579 + Cargo.toml comment.
+- [x] **T6.4** If G2 (emergent cooperation) FAILS: keep opt-in, document the failure in the benchmark, do NOT promote. The architectural coverage (closed-form math is correct) stands; the quality claim (emergent cooperation on this domain) is unproven. **N/A — G2 PASSED (100% vs 0%).**
+- [x] **T6.5** If G7 (UQ floor) FAILS: keep opt-in, document that the Bayesian posterior does not beat a single-direction projection on this domain. Consider whether a richer prior (beyond the paper's constructed one) would help — but that's a follow-up, not this plan. **N/A — G7 PASSED (99.2% improvement, 119× better calibrated).**
+- [x] **T6.6** Cross-ref: add a one-line note to `katgpt-rs/.research/274` (CCE Moderator) pointing to this primitive as the *endogenous-correlation-device* companion. **DONE 2026-08-11.** Added a blockquote note at the end of R274 §7 (Cross-Reference Summary) pointing to Plan 526 + Research 471 + Bench 579 as the endogenous-correlation-device companion.
+- [x] **T6.7** Commit on `develop` (per AGENTS.md global rule — commit at task completion). **DONE 2026-08-11** (this commit).
+
+---
+
+## Phase 6 — COMPLETE ✅ (2026-08-11)
+
+**Promotion to DEFAULT-ON.** All GOAT gates passed (G1–G8); the primitive is now in the `default = [...]` feature list in `katgpt-core/Cargo.toml`. Benchmark file at `.benchmarks/579_similarity_inference_goat.md`. Cross-ref added to R274.
+
+---
 
 ---
 

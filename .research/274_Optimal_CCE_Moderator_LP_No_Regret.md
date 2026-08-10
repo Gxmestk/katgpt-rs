@@ -306,6 +306,17 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 | `riir-ai/crates/riir-chain/src/encoding/latcal*.rs` | LatCal fixed-point bridge — sync commitment of `ζ` |
 | `riir-ai/crates/riir-engine/src/cgsp_runtime/` | CGSP conjecturer pool = deviation class `D` |
 
+> **Endogenous-correlation-device companion (Plan 526, 2026-08-11):** the
+> LP-CCE Moderator uses an *exogenous* designer-set correlation device `ζ`
+> (this note). Plan 526 ships the *endogenous* counterpart —
+> `SimilarityPosterior ω` inferred from joint-action history
+> ([`katgpt-core/src/similarity_inference/`](../crates/katgpt-core/src/similarity_inference/),
+> [Research 471](471_Similarity_Inference_Embedded_Equilibrium.md),
+> [Bench 579](../.benchmarks/579_similarity_inference_goat.md)). The two
+> compose: when crowd `ω` crosses threshold, the moderator's `Γ₀` can switch
+> endogenously. Phases 1-5 GOAT ALL PASS; indirect inference (G5) is the
+> Super-GOAT-capability subset.
+
 ---
 
 ## 8. References
