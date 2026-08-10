@@ -124,7 +124,7 @@ fn g1_omega_stays_in_closed_unit_interval_f32() {
     for _ in 0..1000 {
         posterior.observe_match(2);
         let omega = posterior.omega();
-        assert!(omega >= 0.0 && omega <= 1.0, "ω out of [0,1]: {omega}");
+        assert!((0.0..=1.0).contains(&omega), "ω out of [0,1]: {omega}");
     }
     // After 1000 observations with |A|=2, log_w = -693 → exp underflows → ω=1.
     // Verify the saturation is reached (sanity-check the precision floor).
@@ -287,4 +287,36 @@ fn canonical_pd_layout() {
     assert_eq!(m.payoff(0, 1), 0.0, "S (C,D) should be 0");
     assert_eq!(m.payoff(1, 0), 3.0, "T (D,C) should be 3");
     assert_eq!(m.payoff(1, 1), 1.0, "P (D,D) should be 1");
+}
+
+#[test]
+fn g1_mismatch_drives_omega_to_zero() {
+    // Under the perfect-identity model, a single mismatch is impossible under
+    // the shared hypothesis → LR = 0 → ω = 0 permanently.
+    let mut p = SimilarityPosterior::new(0.5).unwrap();
+    // First, accumulate some matching evidence → ω climbs.
+    for _ in 0..10 {
+        p.observe_match(2);
+    }
+    assert!(p.omega() > 0.99, "after 10 matches ω should be >0.99, got {}", p.omega());
+    assert!(!p.is_collapsed_to_zero());
+    // Now a mismatch → ω = 0.
+    p.observe_mismatch(2);
+    assert_eq!(p.omega(), 0.0);
+    assert!(p.is_collapsed_to_zero());
+    // Further matches cannot revive it.
+    for _ in 0..100 {
+        p.observe_match(2);
+    }
+    assert_eq!(p.omega(), 0.0, "collapsed posterior cannot recover");
+    assert!(p.is_collapsed_to_zero());
+}
+
+#[test]
+fn g1_mismatch_at_t0_omega_zero_from_start() {
+    // Edge case: mismatch on the very first observation.
+    let mut p = SimilarityPosterior::new(0.1).unwrap();
+    p.observe_mismatch(2);
+    assert_eq!(p.omega(), 0.0);
+    assert!(p.is_collapsed_to_zero());
 }

@@ -70,12 +70,27 @@ If G2 fails (cooperation does not emerge, or emerges for random pairs too), the 
 
 ### Tasks
 
-- [ ] **T2.1** Create `katgpt-rs/crates/katgpt-core/src/similarity_inference/poc.rs` (gated `#[cfg(test)]`).
-- [ ] **T2.2** Build a synthetic crowd: N=64 entities. Half are "shared-shard" pairs (same deterministic policy `π`); half are "random-shard" pairs (independent random policies). Each entity has a `SimilarityPosterior` per AOI-neighbor.
-- [ ] **T2.3** Simulate T=50 info-gathering rounds (random 2×2 matrix games per round, perfect monitoring). Each entity observes its partner's action + the situation.
-- [ ] **T2.4** At round T+1, terminal Prisoner's Dilemma. Each entity runs `embedded_best_response`. Record cooperation rate per pair type.
-- [ ] **T2.5** **G2 assertion**: shared-shard pairs cooperate at >80%; random-shard pairs cooperate at <20%.
-- [ ] **T2.6** If G2 FAILS: honestly record the numbers in `.benchmarks/526_similarity_inference_goat.md`, do NOT silently revise. Per skill §3.6, the verdict is downgraded: architectural coverage stands (the math is correct), quality claim is "unproven on this domain".
+- [x] **T2.1** Create `katgpt-rs/crates/katgpt-core/src/similarity_inference/poc.rs` (gated `#[cfg(test)]`). **DONE 2026-08-11.** Module declared in `mod.rs` as `#[cfg(test)] mod poc;`.
+- [x] **T2.2** Build a synthetic crowd: N=64 entities. Half are "shared-shard" pairs (same deterministic policy `π`); half are "random-shard" pairs (independent random policies). Each entity has a `SimilarityPosterior` per AOI-neighbor. **DONE 2026-08-11.** `PoCAgent` struct with deterministic xorshift-mix policy (shared pairs share `policy_seed`; random pairs have independent seeds). 32 pairs per kind × 2 kinds = 128 entities total (exceeds the N=64 spec).
+- [x] **T2.3** Simulate T=50 info-gathering rounds (random 2×2 matrix games per round, perfect monitoring). Each entity observes its partner's action + the situation. **DONE 2026-08-11.** Each round: deterministic `situation_seed = mix(pair_seed, pair_idx*1000 + round)`; both agents act deterministically; focal observes partner's action and calls `observe_match` or `observe_mismatch`.
+- [x] **T2.4** At round T+1, terminal Prisoner's Dilemma. Each entity runs `embedded_best_response`. Record cooperation rate per pair type. **DONE 2026-08-11.** `terminal_action()` calls `embedded_best_response(ω, canonical_pd(), uniform_marginal)`. A pair "cooperated" iff BOTH agents chose Cooperate (action 0).
+- [x] **T2.5** **G2 assertion**: shared-shard pairs cooperate at >80%; random-shard pairs cooperate at <20%. **DONE 2026-08-11 — PASS.** Mean over 10 seeds × 32 pairs/seed:
+  - Shared-shard coop rate: **1.000** (target >0.80) ✓
+  - Random-shard coop rate: **0.000** (target <0.20) ✓
+  - Shared-shard mean ω: **1.0000** (50 matches → ω saturates to 1 in f32)
+  - Random-shard mean ω: **0.0000** (at least 1 mismatch in 50 rounds → ω collapses to 0)
+  Perfect separation: 100% vs 0%. The mechanism works exactly as the paper predicts.
+- [x] **T2.6** If G2 FAILS: honestly record the numbers in `.benchmarks/526_similarity_inference_goat.md`, do NOT silently revise. **N/A — G2 PASSED.** Numbers recorded in this plan + in the test's `eprintln!` output (visible with `--nocapture`).
+
+---
+
+## Phase 2 — COMPLETE ✅ (2026-08-11)
+
+**G2 (emergent cooperation PoC) — PASS.** The load-bearing quality gate holds: shared-shard pairs cooperate at 100%, random-shard pairs at 0%. The mechanism (similarity posterior → cooperation threshold) produces the predicted emergent cooperation.
+
+**Correctness fix shipped with Phase 2:** `observe_mismatch` was incorrectly calling `observe_match` (both added `log(1/|A|)` to `log_w`). Re-derived the Bayes update: under the perfect-identity shared hypothesis, a mismatch is *impossible* (LR = 0), so `observe_mismatch` now sets `log_w = +∞` → ω = 0 permanently. Added regression tests `g1_mismatch_drives_omega_to_zero` + `g1_mismatch_at_t0_omega_zero_from_start` + `is_collapsed_to_zero()` diagnostic.
+
+---
 
 ---
 

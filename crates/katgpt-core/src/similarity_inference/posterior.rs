@@ -149,31 +149,45 @@ impl SimilarityPosterior {
     }
 
     /// Incorporate one *mismatched* discrete-action observation: the partner
-    /// played a different action from the focal. Under the independent
-    /// marginal, the probability of any specific non-focal action is also
-    /// `1/n_actions` (for a symmetric uniform game), so this contributes the
-    /// same `log(1/n_actions)` to `log_w_independent`.
+    /// played a different action from the focal.
     ///
-    /// **Subtle point:** matched vs mismatched is NOT the evidence distinction
-    /// the paper makes. The paper's evidence is "the partner played action X"
-    /// — under independence that has probability `1/n_actions` regardless of
-    /// whether X matches the focal. The "shared shard" hypothesis predicts
-    /// `a_partner == a_self` with probability 1; the independent hypothesis
-    /// predicts it with probability `1/n_actions`. So BOTH matched and
-    /// mismatched observations contribute `log(1/n_actions)` to
-    /// `log_w_independent`; the difference is whether the observation is
-    /// *consistent* with the shared-shard hypothesis (matched = yes, supports
-    /// ω → 1; mismatched = no, but still contributes the same likelihood
-    /// ratio because the alternative hypothesis is uniform, not anti-correlated).
+    /// Under the perfect-identity shared hypothesis, the partner mirrors the
+    /// focal's action with probability 1 (the Kronecker delta `δ(a_partner,
+    /// a_self) = 1` for a match, `0` for a mismatch). A single mismatch is
+    /// therefore *impossible* under the shared hypothesis — it has likelihood
+    /// ratio `LR = P(mismatch|shared) / P(mismatch|indep) = 0 / (1/|A|) = 0`,
+    /// which drives the posterior `ω` to exactly 0.
     ///
-    /// For a true shared-shard-vs-independent likelihood ratio you need a
-    /// non-uniform shared-shard prediction (e.g., `π_shared(a_partner) = δ` for
-    /// the focal's action and `(1−δ)/(n−1)` for others). Phase 1 keeps the
-    /// uniform model per the paper's closed-form derivation.
+    /// This is mathematically correct for the perfect-identity model (Plan 526
+    /// Phase 2 PoC: shared-shard pairs are deterministic-same-policy, so a
+    /// mismatch never occurs for them; random-shard pairs will mismatch at
+    /// least once in T=50 rounds with overwhelming probability, setting their
+    /// ω to 0 and forcing Defect). For a *soft* identity model (shared
+    /// partners match with probability `δ < 1`), pass a custom likelihood to
+    /// [`Self::observe`] instead.
+    ///
+    /// # Implementation
+    ///
+    /// Sets `log_w_independent = +∞`, which makes `W = exp(+∞) = +∞` and thus
+    /// `ω = α / (α + (1−α)·∞) = 0`. Once set, subsequent `observe_match` calls
+    /// cannot recover ω (the evidence is permanent — you can't "unsee" a
+    /// contradiction of the identity hypothesis). This matches the paper's
+    /// perfect-identity Bayes update.
     #[inline]
-    pub fn observe_mismatch(&mut self, n_actions: usize) {
-        // Same contribution as observe_match under the uniform independent marginal.
-        self.observe_match(n_actions);
+    pub fn observe_mismatch(&mut self, _n_actions: usize) {
+        // A mismatch is impossible under the perfect-identity shared
+        // hypothesis: LR = 0 → W = +∞ → ω = 0 permanently.
+        self.log_w_independent = f32::INFINITY;
+        self.observation_count = self.observation_count.saturating_add(1);
+        self.last_omega = 0.0;
+    }
+
+    /// Whether the posterior has been permanently driven to zero by a
+    /// mismatched observation under the perfect-identity model. Once true, no
+    /// further evidence can revive ω.
+    #[inline]
+    pub fn is_collapsed_to_zero(&self) -> bool {
+        self.log_w_independent.is_infinite() && self.log_w_independent > 0.0
     }
 
     /// Current posterior `ω_T`. Recomputed lazily on each observe; this is a

@@ -155,6 +155,8 @@ pub mod best_response;
 pub mod posterior;
 
 #[cfg(test)]
+mod poc;
+#[cfg(test)]
 mod tests;
 
 pub use best_response::{PayoffMatrix, canonical_pd, embedded_best_response, embedded_best_response_into};
