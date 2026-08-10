@@ -4,7 +4,7 @@
 **Type:** poc + proof
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md)
 **Cross-ref:** riir-neuron-db Plan 324 / Benchmark 324, riir-ai Plan 524
-**Status:** Open
+**Status:** In progress — **T4 DONE 2026-08-10** ([Benchmark 574](../.benchmarks/574_retrieval_capacity_break_point.md))
 
 ---
 
@@ -37,7 +37,34 @@ Expected shape of results, if the bound is real at `d=8`: single-vector 8-D cosi
 - [ ] **T1** Build the fixture as a modelless generator (seeded, deterministic, no network): `n`, `k`, attribute count and distractor count parameterised. Emit 8-D embeddings via the existing `ModellessEmbedder` path (`riir-ai/crates/riir-rag/src/embedder.rs:74`) so the test measures *our* embedder, not a stand-in.
 - [ ] **T2** Measure recall@{2,10,20} for: `ShardIndex::query` (3-candidate path), `query_k_nearest_cosine` (`fast_knn`), `retrieve_diverse` (wedge span), `ItemEmbedIndex::query_top_k`, and `smooth_min_similarity` aggregation. Report each separately — do not average.
 - [ ] **T3** Add the BM25 leg (`bm25.rs`) and the synonym variant. Confirm or refute the paper's asymmetry (lexical near-solves plain, collapses on synonyms) on our tokenizers (`CodeTokenizer` default).
-- [ ] **T4** Sweep `n` upward until recall breaks, and compare the empirical break point against `dim_capacity_ceiling` from Issue 579 T2. **This is the real deliverable**: does our measured break point track the theorem, and by what multiplier? The paper measured 4.5× between theory and free-embedding best case; our modelless BLAKE3+DFT embedder should be worse still. Report the multiplier.
+- [x] **T4 DONE (2026-08-10)** — harness `crates/katgpt-types/tests/capacity_break_point.rs`,
+      results in [Benchmark 574](../.benchmarks/574_retrieval_capacity_break_point.md).
+
+      **Answer: the measured break point does NOT track the theorem — it is ~2124×
+      below it at `d=8`** (breaks at `n ≈ 10` vs a 20,706 ceiling), and the gap
+      *widens* with `d` (5× at d=2 → 2124× at d=8). The paper's own
+      theory-vs-free-embedding gap was 4.5×.
+
+      Three arms isolate where the loss lives: `centroid` (3.8), `rocchio` (5.0),
+      and a margin `perceptron` started from both heuristics (9.8), which finds a
+      separating query whenever one exists. Perceptron beats the best heuristic by
+      only ~2×, so **query construction costs ~2× and the remaining ~1000× is
+      document geometry** — random unit vectors are simply not arranged so that
+      every pair is jointly top-2-separable. Optimizing queries cannot recover it.
+
+      **This reframes Research 472's priority ordering** for an 8-D modelless
+      index: (1) document embedding construction, ~1000× headroom, dominant;
+      (2) query construction, ~2×; (3) the Theorem 1 ceiling, real and provable
+      but ~2124× from where we operate — a long-run constraint, not today's
+      bottleneck. So `ItemEmbedIndex` being 213× past its k=5 ceiling is a
+      second-order worry; the first-order question is whether schema-centroid init
+      yields good enough geometry for the *realized* qrels, which is T5.
+
+      Scope limits recorded honestly in the benchmark: upper bound on the gap (not
+      an estimate — neither docs nor queries are optimized); worst-case ×
+      worst-case (adversarial all-pairs qrel against unstructured random docs);
+      `k=2` only, and the ceiling falls steeply with `k`, so the gap should narrow
+      at larger `k` — untested.
 - [ ] **T5** Record results in `.benchmarks/`. If the wedge-diverse or smooth-min legs materially beat plain cosine on the fixture, that is a promotion argument for the corresponding riir-* gates; if BM25 is the only leg that survives, that is an argument for raising its weight in `riir-rag` fusion (see Issue 579 context and the additive-fusion caveat in `riir_rag.md`).
 
 ## Why this is worth the cost
