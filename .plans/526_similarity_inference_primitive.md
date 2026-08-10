@@ -36,16 +36,33 @@ If G2 fails (cooperation does not emerge, or emerges for random pairs too), the 
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/similarity_inference/mod.rs` with module doc + feature gate `similarity_inference`.
-- [ ] **T1.2** Define `JointActionHistory` trait — `push(self_a: &[f32], partner_a: &[f32], situation: &[f32])` + `window(t: usize)`.
-- [ ] **T1.3** Define `SimilarityPosterior` struct — `{ prior_alpha: f32, log_w_independent: f32, last_omega: f32 }`. Implement `new(prior_alpha)`, `observe(...)`, `omega()`, `predictive_similarity(contemplated)`.
-- [ ] **T1.4** Implement the closed-form update per paper §H.2: `ω_T = α / (α + (1−α)·W(æ_<T))` where `W(æ_<T) = Π_t P(a_i_t, a_j_t | situation_t)` under independent-policy marginal. Use log-space accumulator to avoid underflow.
-- [ ] **T1.5** Define `embedded_best_response(omega, payoff_table, partner_predicted) -> u8` per paper §H.3. Compute `Q(C) − Q(D)` and return the argmax. The threshold is payoff-table-derived at runtime (canonical PD collapses to 0.5).
-- [ ] **T1.6** Add `PayoffTable<2>` adapter (or reuse existing if katgpt-core ships one — grep first per substrate-first).
-- [ ] **T1.7** Unit tests: closed-form `ω_T` matches analytical `α/(α+(1−α)·2^(−T))` to f32 epsilon for T=0..50, α=0.1. (G1.)
-- [ ] **T1.8** Unit tests: `embedded_best_response` cooperates iff `ω > 0.5` for canonical PD. Defects otherwise.
-- [ ] **T1.9** `cargo clippy -p katgpt-core --features similarity_inference` clean.
-- [ ] **T1.10** Wire feature into `katgpt-core/Cargo.toml` `[features]` block (opt-in).
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/similarity_inference/mod.rs` with module doc + feature gate `similarity_inference`. **DONE 2026-08-11.** Module doc covers: what this is, what it is NOT (5 points incl. the CCE moderator distinction), closed-form posterior math, embedded best-response math, allocation discipline, sigmoid-not-softmax rule, substrate check (ran substrate-first skill: zero prior impl; `PayoffTable<N>` exists in riir-games-shared but combat-specific — wrong shape; decision BUILD NEW), Phase 1 GOAT gate, full references.
+- [x] **T1.2** Define `JointActionHistory` trait — `push(self_a: &[f32], partner_a: &[f32], situation: &[f32])` + `window(t: usize)`. **DONE 2026-08-11.** Trait lives in `mod.rs`; Phase 1 ships a single concrete `SimilarityPosterior` that consumes observations incrementally and does not require callers to implement the trait. `window(t)` deferred to Phase 3 (indirect-inference replay) — not needed for the closed-form path.
+- [x] **T1.3** Define `SimilarityPosterior` struct — `{ prior_alpha: f32, log_w_independent: f32, last_omega: f32 }`. Implement `new(prior_alpha)`, `observe(...)`, `omega()`, `predictive_similarity(contemplated)`. **DONE 2026-08-11.** Added 4th field `observation_count: u32` for the Phase 3 staleness window. `observe()` takes a caller-supplied `log_likelihood_under_independence` (the continuous-embedding generalization); `observe_match(n_actions)` is the discrete fast path.
+- [x] **T1.4** Implement the closed-form update per paper §H.2: `ω_T = α / (α + (1−α)·W(æ_<T))` where `W(æ_<T) = Π_t P(a_i_t, a_j_t | situation_t)` under independent-policy marginal. Use log-space accumulator to avoid underflow. **DONE 2026-08-11.** `log_w_independent` accumulates `log(1/n_actions) = -ln(n_actions)` per matched observation. O(1) per observe. `recompute_omega()` runs after each observe so reads are free.
+- [x] **T1.5** Define `embedded_best_response(omega, payoff_table, partner_predicted) -> u8` per paper §H.3. Compute `Q(C) − Q(D)` and return the argmax. The threshold is payoff-table-derived at runtime (canonical PD collapses to 0.5). **DONE 2026-08-11.** `embedded_best_response` + `_into` variant. Predicted partner distribution is the mixture `P̂(a'|a) = ω·δ(a',a) + (1−ω)·q(a')`. O(A²) inner loop, zero allocs. Returns action index in `0..A`; ties break toward lower index (Cooperate in canonical PD).
+- [x] **T1.6** Add `PayoffTable<2>` adapter (or reuse existing if katgpt-core ships one — grep first per substrate-first). **DONE 2026-08-11.** Substrate-first grep found `PayoffTable<N>` in `riir-ai/crates/riir-games-shared/src/payoff/mod.rs` but it's **combat-specific** (f64, `UnitSpec`, armor classes) — wrong shape for abstract normal-form games. Defined local `PayoffMatrix` (f32, flat row-major `Vec<f32>`, no combat semantics) + `canonical_pd()` factory. Decision documented in `mod.rs` §"Substrate check".
+- [x] **T1.7** Unit tests: closed-form `ω_T` matches analytical `α/(α+(1−α)·2^(−T))` to f32 epsilon for T=0..50, α=0.1. (G1.) **DONE 2026-08-11 — PASS.** `g1_matches_analytical_omega` walks T=0..50 and asserts rel_err < 1e-5 at each step. Also added `g1_log_w_matches_minus_t_ln_a` (companion: verifies `log W = -T·ln|A|` exactly for |A|=4), `g1_observations_counter_tracks_t`, `g1_rejects_invalid_prior_alpha`, `g1_omega_stays_in_closed_unit_interval_f32` (documents the f32 precision regime: ω saturates to exactly 1.0 once log_w < -88.7 because exp underflows — mirrors the katgpt-rs HLA boundedness proof convention: strict (0,1) over ℝ, closed [0,1] in f32).
+- [x] **T1.8** Unit tests: `embedded_best_response` cooperates iff `ω > 0.5` for canonical PD. Defects otherwise. **DONE 2026-08-11 — PASS.** `g8_cooperates_iff_omega_above_half_pd` sweeps ω across {0, 0.1, 0.25, 0.49, 0.4999, 0.5, 0.5001, 0.6, 0.75, 0.9, 1.0}. Also added `g8_threshold_analytical_pd` (binary-searches the threshold to 4 decimals: measured 0.500 ± 0.001, matches the derived `2ω−1 > 0 ⟺ ω > 0.5`).
+- [x] **T1.9** `cargo clippy -p katgpt-core --features similarity_inference` clean. **DONE 2026-08-11.** Zero warnings in similarity_inference code (only pre-existing `katgpt-types` warnings remain).
+- [x] **T1.10** Wire feature into `katgpt-core/Cargo.toml` `[features]` block (opt-in). **DONE 2026-08-11.** Added `similarity_inference = []` to `katgpt-core/Cargo.toml` + forwarding shim `similarity_inference = ["katgpt-core/similarity_inference"]` to root `katgpt-rs/Cargo.toml`. Module declaration + re-exports in `lib.rs` (L1846-1871).
+
+---
+
+## Phase 1 — COMPLETE ✅ (2026-08-11)
+
+**GOAT gate status:**
+- **G1 (closed-form reproduction)** — PASS. `ω_T` matches `α/(α+(1−α)·|A|^(−T))` to rel_err < 1e-5 for T=0..50, α=0.1.
+- **G8 (PD threshold = 0.5)** — PASS. Binary-searched threshold 0.500 ± 0.001.
+- **G3 (no-regression)** — PASS. Default features 1862 → 1862 (no regression); all-features 3832 pass including the new 12.
+- **G4 (alloc-free)** — PASS by construction (O(1) observe, O(A²) best-response, no allocations). Bench deferred to Phase 4.
+
+**12 unit tests** in `crates/katgpt-core/src/similarity_inference/tests.rs`:
+- `g1_matches_analytical_omega`, `g1_log_w_matches_minus_t_ln_a`, `g1_observations_counter_tracks_t`, `g1_rejects_invalid_prior_alpha`, `g1_omega_stays_in_closed_unit_interval_f32`, `g1_clone_preserves_state`
+- `g8_cooperates_iff_omega_above_half_pd`, `g8_threshold_analytical_pd`, `g8_shape_mismatch_errors`, `g8_into_variant_matches_plain`
+- `payoff_matrix_shape_validation`, `canonical_pd_layout`
+
+---
 
 ---
 

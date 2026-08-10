@@ -1844,6 +1844,30 @@ pub use inversion::{
     invert_sequence, invert_sequence_into,
 };
 
+// Similarity Inference — endogenous correlation device for embedded equilibrium
+// (Plan 526, Research 471, arXiv:2608.03958 Meulemans et al. *Paradigms of
+// Intelligence* Aug 2026). Per-focal `SimilarityPosterior ω ∈ (0,1)` updated
+// incrementally from joint-action history via the paper's §H.2 closed form
+// `ω_T = α/(α+(1−α)·|A|^(−T))`; `embedded_best_response` switches from
+// competitive-best-response (Nash) to cooperative-best-response (CCE) when ω
+// crosses a payoff-derived threshold (exactly 0.5 for canonical PD). Pure
+// modelless closed-form math; O(1) observe, O(A²) best-response, zero allocs
+// after construction. The mechanism is genuinely novel per R471 §3.5: the
+// shipped `CceLp<N,A>` (Plan 295, DEFAULT-ON) uses an *exogenous*
+// designer-set correlation device ζ; this primitive *infers* an *endogenous*
+// correlation device ω from interaction history. NOT a sync-boundary primitive
+// (ω is latent per-focal; only the final cooperate/defect u8 action crosses).
+// Sigmoid, not softmax (ω is a posterior probability, not a categorical).
+// Opt-in — Plan 526 Phase 1 GOAT G1 (closed-form reproduction) + G8 (PD
+// threshold = 0.5) PASS; Phases 2–7 pending.
+#[cfg(feature = "similarity_inference")]
+pub mod similarity_inference;
+#[cfg(feature = "similarity_inference")]
+pub use similarity_inference::{
+    JointActionHistory, PayoffMatrix, SimilarityError, SimilarityPosterior, canonical_pd,
+    embedded_best_response, embedded_best_response_into,
+};
+
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
 // fusion (Plan 327 Phases 1-3, Research 309, Guide 160 private). Five generic
 // protocol primitives distilled from the ARG Standard
