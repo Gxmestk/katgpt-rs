@@ -99,6 +99,43 @@ impl MultiLayerKVCache {
         }
     }
 
+    /// Construct with per-layer KV dimensions and an explicit position cap.
+    ///
+    /// Identical to [`new_with_per_layer_kv_dim`] except each layer is sized
+    /// `[max_positions * per_layer_kv_dim[i]]` instead of
+    /// `[block_size * per_layer_kv_dim[i]]`. Use this for **training** where
+    /// the sequence length is fixed and known upfront — avoids reserving the
+    /// model's full context window (e.g. Gemma-4-12B `block_size = 262_144` →
+    /// ~168 GiB of demand-paged virtual address space that can exceed the
+    /// system commit limit when the GPU runtime also holds significant host
+    /// memory). `max_positions` should be the training `seq_len`.
+    ///
+    /// `max_positions` is clamped to `>= 1` to avoid zero-sized allocations.
+    pub fn new_with_per_layer_kv_dim_bounded(
+        config: &Config,
+        per_layer_kv_dim: &[usize],
+        max_positions: usize,
+    ) -> Self {
+        debug_assert_eq!(
+            per_layer_kv_dim.len(),
+            config.n_layer,
+            "per_layer_kv_dim length must equal n_layer"
+        );
+        let cap = max_positions.max(1);
+        let layers = per_layer_kv_dim
+            .iter()
+            .map(|&kvd| KVCache {
+                key: vec![0.0; cap * kvd],
+                value: vec![0.0; cap * kvd],
+            })
+            .collect();
+        Self {
+            layers,
+            fill_pos: 0,
+            sliding_capacity: vec![0; config.n_layer],
+        }
+    }
+
     /// Construct a sliding-bounded cache for Gemma-4's alternating
     /// Sliding/Full layer pattern (Plan 320 Phase D3 production fix).
     ///
@@ -777,6 +814,60 @@ mod sliding_bounded_tests {
                 0,
                 "layer {i} should be unbounded"
             );
+        }
+    }
+
+    #[test]
+    fn bounded_cache_respects_max_positions() {
+        // The bounded constructor should size each layer at `max_positions * kvd`
+        // instead of `block_size * kvd` (Issue 442 T4 — training KV cache
+        // over-allocation that caused the CUDA-backend host OOM).
+        let mut config = tiny_config();
+        config.block_size = 1024; // simulate Gemma-4's large context window
+        let per_layer_kvd = vec![4; 3];
+        let max_positions = 32; // training seq_len
+        let cache = MultiLayerKVCache::new_with_per_layer_kv_dim_bounded(
+            &config,
+            &per_layer_kvd,
+            max_positions,
+        );
+
+        // Each layer should be sized at max_positions * kvd, NOT block_size * kvd.
+        for (i, layer) in cache.layers.iter().enumerate() {
+            let expected = max_positions * per_layer_kvd[i];
+            assert_eq!(
+                layer.key.len(),
+                expected,
+                "layer {i} key: expected {expected} (max_positions*kvd), got {}",
+                layer.key.len()
+            );
+            assert_eq!(
+                layer.value.len(),
+                expected,
+                "layer {i} value: expected {expected} (max_positions*kvd), got {}",
+                layer.value.len()
+            );
+        }
+
+        // Bounded cache should also report zero sliding_capacity (same as unbounded).
+        for i in 0..config.n_layer {
+            assert_eq!(cache.sliding_capacity(i), 0);
+        }
+    }
+
+    #[test]
+    fn bounded_cache_clamps_zero_max_positions() {
+        // max_positions = 0 should be clamped to 1 (avoid zero-sized alloc).
+        let config = tiny_config();
+        let per_layer_kvd = vec![4; 3];
+        let cache = MultiLayerKVCache::new_with_per_layer_kv_dim_bounded(
+            &config,
+            &per_layer_kvd,
+            0,
+        );
+        for layer in &cache.layers {
+            assert_eq!(layer.key.len(), 4, "clamped to 1*kvd");
+            assert_eq!(layer.value.len(), 4, "clamped to 1*kvd");
         }
     }
 
