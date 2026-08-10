@@ -1,5 +1,10 @@
-# Benchmark 579: Scenario generator Fearful/Aggressive moods (Issue 581 T10 resolution)
+# Benchmark 584: Scenario generator Fearful/Aggressive moods (Issue 581 T10 resolution)
 
+> **Renumbered 579 → 584 (2026-08-11).** The prior number 579 collided with
+> `579_similarity_inference_goat.md` (Plan 526 Phase 6, 4 cross-refs). This
+> file had zero cross-refs, so it was the cheaper rename target. Git history
+> under the old number is preserved.
+>
 > Closes the T10 deferred follow-up from katgpt-rs Issue 581 (sigmoid argmaxability
 > bottleneck audit). Implementation tracked in riir-ai Issue 582.
 
