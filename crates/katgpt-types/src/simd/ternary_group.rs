@@ -34,10 +34,10 @@
 
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
-#[cfg(feature = "ternary_group_scale")]
-use super::simd_level;
 #[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
 use super::SimdLevel;
+#[cfg(feature = "ternary_group_scale")]
+use super::simd_level;
 #[cfg(feature = "ternary_group_scale")]
 use crate::{GROUP_SIZE, TernaryGroupWeights};
 
@@ -53,7 +53,20 @@ const BLOCKS_PER_GROUP: usize = GROUP_SIZE / 64;
 pub fn ternary_group_matvec_scalar(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
     assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
     assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
-    for r in 0..w.rows {
+    scalar_row_range(w, x, y, 0);
+}
+
+/// Scalar kernel over the row range `[row_offset, row_offset + y.len())`.
+///
+/// Split out of [`ternary_group_matvec_scalar`] so
+/// [`simd_ternary_group_matvec_parallel`] can hand each rayon worker a
+/// disjoint slice of `y`. Rows are fully independent — row `r` reads only
+/// `pos_bits`/`neg_bits`/`group_scale` at its own offsets and writes only
+/// `y[r]` — so this is a pure partition, bit-identical to the serial loop.
+#[cfg(feature = "ternary_group_scale")]
+fn scalar_row_range(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32], row_offset: usize) {
+    for (i, y_slot) in y.iter_mut().enumerate() {
+        let r = row_offset + i;
         let row_base = r * w.blocks64;
         let group_base = r * w.groups_per_row;
         let mut row_sum = 0.0f32;
@@ -71,17 +84,29 @@ pub fn ternary_group_matvec_scalar(w: &TernaryGroupWeights, x: &[f32], y: &mut [
             }
             row_sum += w.group_scale[group_base + g].to_f32() * group_acc;
         }
-        y[r] = row_sum;
+        *y_slot = row_sum;
     }
 }
 
 #[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
 unsafe fn neon_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
-    // Safety: caller guarantees x.len() == w.cols and y.len() == w.rows.
+    assert_eq!(y.len(), w.rows);
+    unsafe { neon_row_range(w, x, y, 0) }
+}
+
+/// NEON kernel over the row range `[row_offset, row_offset + y.len())`.
+///
+/// See [`scalar_row_range`] for why partitioning by row is safe.
+///
+/// # Safety
+/// Caller guarantees `x.len() == w.cols` and that
+/// `row_offset + y.len() <= w.rows`.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
+unsafe fn neon_row_range(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32], row_offset: usize) {
     unsafe {
         use core::arch::aarch64::{float32x4_t, uint32x4_t, *};
         assert_eq!(x.len(), w.cols);
-        assert_eq!(y.len(), w.rows);
+        debug_assert!(row_offset + y.len() <= w.rows);
 
         // SWAR bit-position masks: AND a splatted byte with these to isolate
         // each bit of a nibble into its own lane (same construction as the
@@ -92,7 +117,8 @@ unsafe fn neon_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut 
         let mask_hi: uint32x4_t = vld1q_u32(mask_hi_arr.as_ptr());
         let one_u: uint32x4_t = vdupq_n_u32(1);
 
-        for r in 0..w.rows {
+        for (i, y_slot) in y.iter_mut().enumerate() {
+            let r = row_offset + i;
             let row_base = r * w.blocks64;
             let group_base = r * w.groups_per_row;
 
@@ -193,7 +219,7 @@ unsafe fn neon_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut 
             }
 
             acc0 = vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3));
-            y[r] = vaddvq_f32(acc0);
+            *y_slot = vaddvq_f32(acc0);
         }
     }
 }
@@ -265,6 +291,62 @@ pub fn simd_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut [f3
     }
 }
 
+/// Row-parallel group-scale ternary matvec: `y = W × x`, rows split across
+/// rayon workers.
+///
+/// ## Why this exists (Issue 594 pre-flight, 2026-08-10)
+///
+/// [`simd_ternary_group_matvec`] is single-threaded, and the only rayon in this
+/// tier was [`simd_ternary_group_matmul_batch`], which parallelizes over
+/// **batch**. At `batch = 1` — i.e. every autoregressive decode step — that
+/// gave *no* parallelism at all, so a 27 B ternary model decoded at **0.25
+/// tok/s** on an M3 Max (measured: riir-ai
+/// `bench_594_ternary_bonsai_throughput`) against llama.cpp Metal's 20-30.
+///
+/// The dense tier has had [`crate::math::matmul_parallel`] for this all along;
+/// the ternary tier simply never grew the equivalent.
+///
+/// ## Correctness
+///
+/// Rows are fully independent: row `r` reads only its own slices of
+/// `pos_bits` / `neg_bits` / `group_scale`, and writes only `y[r]`. Splitting
+/// `y` with `par_chunks_mut` is therefore a pure partition — the result is
+/// **bit-identical** to the serial kernel, not merely close. Asserted by
+/// `parallel_matches_serial_bit_identical`.
+///
+/// Below `PARALLEL_ROW_MIN` rows this delegates to the serial kernel: rayon's
+/// per-task overhead (~1-5 µs) would otherwise dominate. That threshold matters
+/// for real shapes — Bonsai's `ssm_alpha`/`ssm_beta` are only 48 rows.
+#[cfg(feature = "ternary_group_scale")]
+pub fn simd_ternary_group_matvec_parallel(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
+    use rayon::prelude::*;
+
+    /// Below this row count, rayon's task overhead outweighs the work.
+    const PARALLEL_ROW_MIN: usize = 256;
+
+    assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
+    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
+
+    if w.rows < PARALLEL_ROW_MIN {
+        simd_ternary_group_matvec(w, x, y);
+        return;
+    }
+
+    // One chunk per worker — fewer, larger tasks beat many small ones here
+    // because each row already carries `cols` worth of work.
+    let chunk = w.rows.div_ceil(rayon::current_num_threads().max(1));
+    y.par_chunks_mut(chunk)
+        .enumerate()
+        .for_each(|(ci, y_chunk)| {
+            let row_offset = ci * chunk;
+            match simd_level() {
+                #[cfg(target_arch = "aarch64")]
+                SimdLevel::Neon => unsafe { neon_row_range(w, x, y_chunk, row_offset) },
+                _ => scalar_row_range(w, x, y_chunk, row_offset),
+            }
+        });
+}
+
 /// Batched group-scale ternary matmul: for each `batch[i]`, `y[i] = W × x[i]`.
 ///
 /// Mirrors `simd_ternary_matmul_batch` / `simd_binary_matmul_batch`.
@@ -284,11 +366,7 @@ pub fn simd_ternary_group_matmul_batch(
             let y_off = b * w.rows;
             // Slice EXACTLY — the matvec asserts x.len() == w.cols, so an
             // open-ended `&x[x_off..]` panics for 2 <= batch < 4.
-            simd_ternary_group_matvec(
-                w,
-                &x[x_off..x_off + w.cols],
-                &mut y[y_off..y_off + w.rows],
-            );
+            simd_ternary_group_matvec(w, &x[x_off..x_off + w.cols], &mut y[y_off..y_off + w.rows]);
         }
         return;
     }
@@ -311,7 +389,9 @@ mod tests {
 
     /// Deterministic pseudo-random f32 in [-1, 1). No rand dep, reproducible.
     fn pseudo(seed: &mut u64) -> f32 {
-        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((*seed >> 33) as f32 / (1u64 << 31) as f32) - 1.0
     }
 
@@ -543,5 +623,125 @@ mod tests {
                 y_grp[r]
             );
         }
+    }
+}
+
+#[cfg(all(test, feature = "ternary_group_scale"))]
+mod parallel_tests {
+    use super::*;
+    use crate::TernaryGroupWeights;
+    use half::f16;
+
+    /// Build weights with all three ternary states and varied group scales.
+    fn fixture(rows: usize, cols: usize, seed: u64) -> TernaryGroupWeights {
+        let mut w = TernaryGroupWeights::new(rows, cols);
+        let mut s = seed;
+        let mut next = move || {
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            s
+        };
+        for r in 0..rows {
+            for c in 0..cols {
+                let v = match next() % 3 {
+                    0 => -1i8,
+                    1 => 0,
+                    _ => 1,
+                };
+                if v != 0 {
+                    w.set(r, c, v);
+                }
+            }
+            for g in 0..w.groups_per_row {
+                w.set_scale(r, g, 0.01 + (r % 7) as f32 * 0.03);
+            }
+        }
+        w
+    }
+
+    /// The correctness claim `simd_ternary_group_matvec_parallel` rests on:
+    /// partitioning by row changes nothing, so the result must be **bit**-equal
+    /// to the serial kernel — not approximately equal.
+    ///
+    /// Each row's accumulation order is untouched by the split; only which
+    /// thread runs it changes. Any `!=` here means the partition is unsound
+    /// (wrong `row_offset`, overlapping chunks, or a kernel that reads outside
+    /// its own row).
+    #[test]
+    fn parallel_matches_serial_bit_identical() {
+        // Shapes chosen to straddle PARALLEL_ROW_MIN (256) and to include a
+        // row count that does NOT divide evenly by the worker count, which is
+        // where an off-by-one in `row_offset` would surface.
+        for &(rows, cols) in &[
+            (256, 128),
+            (257, 128), // ragged: rows % threads != 0
+            (1024, 256),
+            (1023, 512), // ragged again, larger
+            (2048, 128),
+        ] {
+            let w = fixture(rows, cols, 0x5940 + rows as u64);
+            let x: Vec<f32> = (0..cols).map(|i| (i % 13) as f32 * 0.07 - 0.4).collect();
+
+            let mut y_serial = vec![0.0f32; rows];
+            let mut y_par = vec![0.0f32; rows];
+            simd_ternary_group_matvec(&w, &x, &mut y_serial);
+            simd_ternary_group_matvec_parallel(&w, &x, &mut y_par);
+
+            for r in 0..rows {
+                assert_eq!(
+                    y_serial[r].to_bits(),
+                    y_par[r].to_bits(),
+                    "{rows}x{cols} row {r}: serial {} vs parallel {} — not bit-identical",
+                    y_serial[r],
+                    y_par[r]
+                );
+            }
+        }
+    }
+
+    /// Below `PARALLEL_ROW_MIN` the parallel entry delegates to the serial
+    /// kernel. Bonsai's `ssm_alpha`/`ssm_beta` are 48 rows, so this path is
+    /// exercised by the real model, not just by tests.
+    #[test]
+    fn parallel_delegates_below_threshold_and_stays_correct() {
+        for &rows in &[1usize, 2, 48, 255] {
+            let cols = 256;
+            let w = fixture(rows, cols, 0x5941 + rows as u64);
+            let x: Vec<f32> = (0..cols).map(|i| (i % 5) as f32 * 0.11).collect();
+
+            let mut y_serial = vec![0.0f32; rows];
+            let mut y_par = vec![0.0f32; rows];
+            simd_ternary_group_matvec(&w, &x, &mut y_serial);
+            simd_ternary_group_matvec_parallel(&w, &x, &mut y_par);
+
+            assert_eq!(y_serial, y_par, "{rows} rows: delegation path diverged");
+        }
+    }
+
+    /// A zero row must stay exactly zero through the parallel path — catches a
+    /// chunk that accumulates into a neighbour's slot.
+    #[test]
+    fn parallel_preserves_zero_rows() {
+        let (rows, cols) = (512, 256);
+        let mut w = fixture(rows, cols, 7);
+        // Wipe row 300 entirely.
+        for i in 0..w.blocks64 {
+            w.pos_bits[300 * w.blocks64 + i] = 0;
+            w.neg_bits[300 * w.blocks64 + i] = 0;
+        }
+        for g in 0..w.groups_per_row {
+            w.group_scale[300 * w.groups_per_row + g] = f16::from_f32(0.5);
+        }
+
+        let x: Vec<f32> = (0..cols).map(|i| 1.0 + i as f32).collect();
+        let mut y = vec![f32::NAN; rows];
+        simd_ternary_group_matvec_parallel(&w, &x, &mut y);
+
+        assert_eq!(y[300], 0.0, "all-zero row must produce exactly 0.0");
+        assert!(
+            y.iter().all(|v| v.is_finite()),
+            "NaN survived — a slot was never written"
+        );
     }
 }

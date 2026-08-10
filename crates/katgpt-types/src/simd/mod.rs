@@ -111,7 +111,8 @@ pub use elementwise::{
 pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "ternary_group_scale")]
 pub use ternary_group::{
-    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, ternary_group_matvec_scalar,
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, simd_ternary_group_matvec_parallel,
+    ternary_group_matvec_scalar,
 };
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
