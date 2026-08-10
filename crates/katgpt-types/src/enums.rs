@@ -118,7 +118,7 @@ pub enum ModelArchitecture {
     /// qwen35`, not the BitNet b1.58 family. Every piece of the substrate is
     /// named `ternary`; this variant now matches.
     ///
-    /// **Known modelling tension** (riir-ai Issue 593): "ternary" is a *weight
+    /// **Known modelling tension** (riir-ai Issue 594): "ternary" is a *weight
     /// container*, not an architecture, so it is orthogonal to the other
     /// variants rather than parallel to them. It earns a variant here only
     /// because this repo's dispatch pattern is one variant per weights struct.
