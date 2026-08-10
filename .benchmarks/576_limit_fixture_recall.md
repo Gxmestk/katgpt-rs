@@ -1,7 +1,7 @@
 # Benchmark 576: LIMIT fixture recall — the modelless dense leg is at chance (Issue 580 T1–T3, T5)
 
 **Date:** 2026-08-10
-**Issue:** [580](../.issues/580_limit_style_adversarial_retrieval_fixture.md) T1, T2 (public legs), T3, T5
+**Issue:** 580 T1, T2 (public legs), T3, T5 (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in this benchmark + [Bench 574](574_retrieval_capacity_break_point.md) + riir-neuron-db [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md))
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md) (arXiv:2508.21038, ICLR'26)
 **Prior:** [Benchmark 574](574_retrieval_capacity_break_point.md) (measured-vs-predicted break point)
 **Harness:** `crates/katgpt-core/src/limit_fixture/` + `crates/katgpt-core/tests/limit_recall.rs` (feature `limit_fixture`)
@@ -118,7 +118,7 @@ structure, not merely a random corpus:
 - **The index-specific legs are not yet measured** — `ShardIndex::query` (the
   3-candidate path), `query_k_nearest_cosine` (`fast_knn`), `retrieve_diverse`
   (wedge span), `ItemEmbedIndex::query_top_k`, and `smooth_min_similarity`
-  aggregation all live in private repos. Issue 580 T2 remains open for those.
+  aggregation all live in private repos. **Issue 580 T2 DONE** — those legs measured in riir-neuron-db [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md).
   What *is* settled is the paradigm they share: plain 8-D single-vector cosine
   over a modelless embedding is at chance on LIMIT, so none of them can inherit
   quality from the embedding — any gain they show must come from their own

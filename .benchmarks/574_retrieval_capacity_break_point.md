@@ -1,7 +1,7 @@
 # Benchmark 574: measured-vs-predicted retrieval break point (Issue 580 T4)
 
 **Date:** 2026-08-10
-**Issue:** [580 T4](../.issues/580_limit_style_adversarial_retrieval_fixture.md)
+**Issue:** 580 T4 (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in this benchmark + [Bench 576](576_limit_fixture_recall.md) + riir-neuron-db [Bench 476](../../riir-neuron-db/.benchmarks/476_limit_recall_five_legs.md))
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md) (arXiv:2508.21038, ICLR'26)
 **Harness:** `crates/katgpt-types/tests/capacity_break_point.rs` (feature `sigmoid_margin`)
 **Reproduce:**
@@ -79,7 +79,8 @@ Concretely: `ItemEmbedIndex` sits 213× past its k=5 ceiling, which Research 472
 flagged as the most exposed artifact. This benchmark says the ceiling is the
 *second-order* worry there — the first-order question is whether schema-centroid
 initialization produces geometry good enough for the realized qrels, which is
-what Issue 580 T5 (seed recall against known ground truth) should measure.
+what Issue 580 T5 (seed recall against known ground truth) should measure — **T5
+DONE**, see [Bench 576](576_limit_fixture_recall.md).
 
 ## Honest scope limits
 
