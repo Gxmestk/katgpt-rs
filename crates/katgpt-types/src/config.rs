@@ -150,6 +150,23 @@ pub struct Config {
     /// Usually equals `deltanet_linear_n_heads`.
     #[cfg(feature = "deltanet_inference")]
     pub deltanet_linear_n_value_heads: usize,
+    /// RoPE dimension count for full-attention layers (Issue 594).
+    ///
+    /// Qwen3.5 uses **partial RoPE**: only the first `rope_dimension_count`
+    /// dimensions of each `head_dim`-sized head are rotated; the rest pass
+    /// through unchanged. For Ternary-Bonsai-27B this is **64 of 256** (25%),
+    /// matching the GGUF metadata `rope.dimension_count = 64`.
+    ///
+    /// **0 = sentinel meaning "full rotation" (`head_dim`)** — backward
+    /// compatible with pre-Issue-594 configs and the 0.8B reference model path
+    /// (which used `apply_rope_with_freq` on the full `head_dim`).
+    ///
+    /// The mrope sections (`rope.dimension_sections = [11, 11, 10, 0]`) split
+    /// these 64 dims into 4 sections for multimodal position IDs (T/H/W/extra).
+    /// For **text-only** inference all sections share the same position ID, so
+    /// mrope collapses to standard partial RoPE — no section handling needed.
+    #[cfg(feature = "deltanet_inference")]
+    pub rope_dimension_count: usize,
 
     // --- RiM Reasoning Buffer Slots (Plan 172, Research 192) ---
     /// Number of reasoning buffer blocks (K in RiM paper). 0 = disabled.
@@ -348,6 +365,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -494,6 +513,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -612,6 +633,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -740,6 +763,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -848,6 +873,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -957,6 +984,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1064,6 +1093,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1173,6 +1204,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1281,6 +1314,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1391,6 +1426,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1526,6 +1563,8 @@ impl Config {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
@@ -1631,6 +1670,11 @@ impl Config {
             deltanet_linear_head_dim: head_dim,
             deltanet_linear_n_heads: n_head,
             deltanet_linear_n_value_heads: n_kv_head,
+            // Issue 594: 0 = sentinel for full rotation (head_dim). The real
+            // Bonsai-27B value (64) is read from GGUF metadata `rope.dimension_count`
+            // at load time. The 0.8B reference path keeps full rope so existing
+            // dense tests stay green.
+            rope_dimension_count: 0,
             #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
             #[cfg(feature = "rim_slots")]
