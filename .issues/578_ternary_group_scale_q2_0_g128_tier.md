@@ -1,7 +1,7 @@
 # Issue 578: Ternary tier with group-wise f16 scale (`Q2_0_g128` container)
 
 **Date:** 2026-08-09
-**Status:** LANDED, opt-in (2026-08-09). G1 partial / G2 PASS / G3 PASS / G4 PASS. Only AVX2 outstanding.
+**Status:** LANDED, opt-in (2026-08-09). G1 partial / G2 PASS / G3 PASS / G4 PASS. **AVX2 kernel added 2026-08-11 (Bench 581)** — 5.98-6.13× vs scalar; deviation closed.
 **Feature flag (proposed):** `ternary_group_scale` (opt-in; promotion needs the GOAT gate below)
 **Filed by:** riir-train [Plan 333](../../riir-train/.plans/333_bitnet_ternary_moe_neuro_symbolic_poc.md) T3.1a
 **Related:** [Issue 145](https://github.com/katopz/katgpt-rs) `binary_plasma` tier (got the scale
@@ -98,7 +98,7 @@ per-group — the bit-plane popcount inner loop is unchanged.
       idiom + an added `pos & neg == 0` invariant check on load.
 - [x] `TernaryGroupWeights::from_ternary` widening (broadcast `row_scale` across the row's
       groups) — always succeeds, unlike `from_ternary_no_zeros`.
-- [ ] AVX2 kernel (deferred — see Deviations).
+- [x] AVX2 kernel (added 2026-08-11, [Bench 581](../.benchmarks/581_ternary_group_avx2_goat.md) — 5.98-6.13× vs scalar, validated on the 4090 host).
 - [x] Perf bench for G2 + `CountingAllocator` harness for G4 —
       `crates/katgpt-types/tests/bench_578_ternary_group_goat.rs`.
 
@@ -130,11 +130,12 @@ passing on aarch64/NEON:
 | G1 correctness | **PARTIAL.** Scalar/NEON parity, invariants, quantizer, loader, widening all pass. The **llama.cpp logit match (±1%) is NOT done** — it needs the real Bonsai tensor, so it stays riir-train Plan 333 T3.2. |
 | G2 perf | **PASS.** Group-scale costs 1.29-1.31x the row-scale kernel across 512x512, 1024x1024, 512x5120 — under the 1.5x ceiling. See the table below. |
 | G3 no-regression | **PASS.** `katgpt-types` 127 default tests unchanged, 155 with the feature; `katgpt-transformer` 21 default. Clean under default / `--no-default-features` / feature-on / feature-on-without-`plasma_path`. |
-| G4 alloc-free | **PASS.** 0 allocs / 1000 calls (NEON matvec), 0 / 1000 (scalar path), 0 / 200 (sub-threshold batch), under a `CountingAllocator`. |
+| G4 alloc-free | **PASS.** 0 allocs / 1000 calls (NEON matvec), 0 / 1000 (scalar path), 0 / 1000 (**AVX2 matvec**, [Bench 581](../.benchmarks/581_ternary_group_avx2_goat.md)), 0 / 200 (sub-threshold batch), under a `CountingAllocator`. |
 
 **Promotion to default-on is still NOT justified** — G1's load-bearing half (matching llama.cpp
-on a real Bonsai tensor, Plan 333 T3.2) is untested, and x86_64 has no specialized kernel. Stays
-opt-in.
+on a real Bonsai tensor, Plan 333 T3.2) is untested. The x86_64 AVX2 kernel landed 2026-08-11
+(Bench 581, 5.98-6.13× vs scalar), so the “no specialized kernel” caveat is closed, but that does
+not resolve the correctness gate. Stays opt-in.
 
 ### G2 measurements (M3 Max, aarch64/NEON, `--release`, median of 9 x 20 calls)
 
@@ -254,10 +255,7 @@ Fixed in all three tiers (exact slicing + `zip(par_chunks)`), with
 
 ### Deviations from the spec above
 
-1. **AVX2 not implemented.** `simd_ternary_group_matvec` falls back to scalar on x86_64. The
-   development machine is aarch64 (M3 Max), so a hand-written AVX2 intrinsics kernel could not be
-   executed or validated here — an unvalidated AVX2 kernel is worse than a correct scalar one.
-   The dispatcher has the arm shape ready for it.
+1. **AVX2 implemented 2026-08-11 (Bench 581).** `simd_ternary_group_matvec` now dispatches to a hand-written AVX2+FMA kernel on x86_64 hosts that report AVX2+FMA at runtime, validated on the 4090 host (5.98-6.13× vs scalar reference). The kernel mirrors the binary AVX2 shape (4 × `__m256` accums, 8-element SWAR byte mask) but computes the sign explicitly (`cvt(neg_set − pos_set)` → +1/0/−1) rather than via the binary kernel's two-state FMA identity — ternary's zero state requires it. See [Bench 581](../.benchmarks/581_ternary_group_avx2_goat.md) for full numbers + honest caveats (single-host measurement, no real-Bonsai end-to-end on x86_64 yet).
 2. **Scalar and NEON are close, not bit-identical** (~1e-6 relative). They associate the scale
    differently: scalar applies it once per group (matching how `Q2_0_g128` is defined and how
    llama.cpp dequantizes), NEON folds it per element so the 4 accumulators can span the whole row

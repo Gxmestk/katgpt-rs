@@ -1,5 +1,5 @@
 //! Ternary bit-plane matvec with group-wise f16 scale — the `Q2_0_g128`
-//! kernel (`ternary_group_scale` feature, Issue 578). Scalar / NEON paths.
+//! kernel (`ternary_group_scale` feature, Issue 578). Scalar / NEON / AVX2 paths.
 //!
 //! Combines the two shipped tiers' halves: the two bit-planes of
 //! [`crate::TernaryWeights`] (so the zero state survives) with the per-128
@@ -14,27 +14,38 @@
 //!
 //! The group scale is folded **into the sign vector** (`±scale` instead of
 //! `±1`), the same trick the binary kernel uses (Issue 145 Gate A): the 4
-//! accumulators then span the entire row with no per-group reset and no
-//! per-group horizontal sum, keeping the out-of-order pipeline fed. Cost is one
-//! extra `vmulq` per 4 lanes versus the row-scale ternary kernel, which applies
-//! its single scale once at the very end.
+//! accums then span the entire row with no per-group reset and no per-group
+//! horizontal sum, keeping the out-of-order pipeline fed. Cost is one extra
+//! multiply per chunk versus the row-scale ternary kernel, which applies its
+//! single scale once at the very end.
 //!
-//! # Scalar/NEON agreement is close, not bit-identical
+//! # Scalar vs SIMD agreement is close, not bit-identical
 //!
 //! Unlike [`super::simd_ternary_matvec`] — where both paths apply one row scale
-//! at the end and therefore agree bit-for-bit — the two paths here associate
-//! the scale differently:
+//! at the end and therefore agree bit-for-bit — the paths here associate the
+//! scale differently:
 //!
 //! - scalar: `Σ_g scale_g · (Σ_{col∈g} sign·x)` — scale applied once per group
-//! - NEON:   `Σ_g Σ_{col∈g} (scale_g·sign)·x` — scale folded per element
+//! - NEON/AVX2: `Σ_g Σ_{col∈g} (scale_g·sign)·x` — scale folded per element
 //!
 //! These are equal in exact arithmetic but not in f32. Agreement is ~1e-6
 //! relative (asserted in tests). The scalar form is the reference because it
 //! matches how `Q2_0_g128` is defined and how llama.cpp dequantizes it.
+//!
+//! # AVX2 port (Issue 578 follow-up, 2026-08-11)
+//!
+//! Mirrors [`super::binary`]'s AVX2 kernel shape: 4 `__m256` accums (8 lanes
+//! each) cover 32 elements per outer unroll, with an 8-byte SWAR mask
+//! `_mm256_setr_epi32(1,2,4,8,16,32,64,128)` extracting each bit of a splatted
+//! pos/neg byte into its own lane. Unlike the binary kernel (which can use the
+//! `fmadd(neg_2scale, bs_f, neg_scale)` two-state identity because every
+//! weight is ±scale), ternary has **three** states so the sign must be computed
+//! explicitly: `sign_f = cvt(neg_set − pos_set)` → +1/0/−1, then scaled by
+//! `vmul(sign_f, scale_v)` and accumulated with `fmadd`.
 
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
-#[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
+#[cfg(all(feature = "ternary_group_scale", any(target_arch = "aarch64", target_arch = "x86_64")))]
 use super::SimdLevel;
 #[cfg(feature = "ternary_group_scale")]
 use super::simd_level;
@@ -273,20 +284,200 @@ unsafe fn fmla_scaled_nibble8(
     }
 }
 
+// ── AVX2 (x86_64) ────────────────────────────────────────────────────
+//
+// Mirrors `avx2_binary_matvec` in [`super::binary`] but with two bit-planes
+// (pos / neg) and the three-state sign (`+1`/`0`/`−1`). Validated on Haswell+
+// via `is_avx2_fma_available` runtime detection (Issue 578 follow-up,
+// 2026-08-11).
+
+#[cfg(all(feature = "ternary_group_scale", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn avx2_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
+    assert_eq!(y.len(), w.rows);
+    unsafe { avx2_row_range(w, x, y, 0) }
+}
+
+/// AVX2 kernel over the row range `[row_offset, row_offset + y.len())`.
+///
+/// See [`scalar_row_range`] for why partitioning by row is safe.
+///
+/// # Safety
+/// Caller guarantees `x.len() == w.cols` and that
+/// `row_offset + y.len() <= w.rows`.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn avx2_row_range(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32], row_offset: usize) {
+    use super::horizontal::horizontal_sum_256;
+    use core::arch::x86_64::*;
+    unsafe {
+        assert_eq!(x.len(), w.cols);
+        debug_assert!(row_offset + y.len() <= w.rows);
+
+        // 8-bit SWAR mask: lane i holds bit i (1,2,4,8,16,32,64,128). ANDing
+        // a splatted byte with this isolates each bit into its own lane.
+        let mask_byte: __m256i = _mm256_setr_epi32(1, 2, 4, 8, 16, 32, 64, 128);
+        let zero_i: __m256i = _mm256_setzero_si256();
+
+        for (i, y_slot) in y.iter_mut().enumerate() {
+            let r = row_offset + i;
+            let row_base = r * w.blocks64;
+            let group_base = r * w.groups_per_row;
+
+            // 4 accumulators × 8 lanes each span the ENTIRE row (no per-group
+            // reset) — the scale rides inside the sign vector instead.
+            let mut acc0: __m256 = _mm256_setzero_ps();
+            let mut acc1: __m256 = _mm256_setzero_ps();
+            let mut acc2: __m256 = _mm256_setzero_ps();
+            let mut acc3: __m256 = _mm256_setzero_ps();
+
+            for g in 0..w.groups_per_row {
+                let scale = w.group_scale[group_base + g].to_f32();
+                let scale_v: __m256 = _mm256_set1_ps(scale);
+
+                // A group is exactly BLOCKS_PER_GROUP whole blocks; the final
+                // group of a ragged row may be short.
+                let b_start = g * BLOCKS_PER_GROUP;
+                let b_end = (b_start + BLOCKS_PER_GROUP).min(w.blocks64);
+
+                for b in b_start..b_end {
+                    let idx = row_base + b;
+                    let pos_word = w.pos_bits[idx];
+                    let neg_word = w.neg_bits[idx];
+
+                    let base_col = b * 64;
+                    let remaining = if base_col + 64 <= w.cols {
+                        64
+                    } else {
+                        w.cols - base_col
+                    };
+
+                    // 32-element unroll: 4 × 8-element chunks, one per accumulator.
+                    let mut col = 0usize;
+                    while col + 32 <= remaining {
+                        fma_scaled_nibble8_avx2(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                            scale_v,
+                        );
+                        col += 8;
+                        fma_scaled_nibble8_avx2(
+                            &mut acc1, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                            scale_v,
+                        );
+                        col += 8;
+                        fma_scaled_nibble8_avx2(
+                            &mut acc2, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                            scale_v,
+                        );
+                        col += 8;
+                        fma_scaled_nibble8_avx2(
+                            &mut acc3, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                            scale_v,
+                        );
+                        col += 8;
+                    }
+
+                    // Remaining 8-element chunks.
+                    while col + 8 <= remaining {
+                        fma_scaled_nibble8_avx2(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                            scale_v,
+                        );
+                        col += 8;
+                    }
+
+                    // Scalar tail (0-7 elements).
+                    let mut scalar_acc = 0.0f32;
+                    while col < remaining {
+                        let bit_mask = 1u64 << col;
+                        let pos = ((pos_word & bit_mask) != 0) as i32 as f32;
+                        let neg = ((neg_word & bit_mask) != 0) as i32 as f32;
+                        scalar_acc += (pos - neg) * scale * *x.get_unchecked(base_col + col);
+                        col += 1;
+                    }
+                    if scalar_acc != 0.0 {
+                        acc0 = _mm256_add_ps(
+                            acc0,
+                            _mm256_setr_ps(scalar_acc, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                        );
+                    }
+                }
+            }
+
+            acc0 = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
+            *y_slot = horizontal_sum_256(acc0);
+        }
+    }
+}
+
+/// AVX2 inner-loop helper: 8 elements (one byte of each bit-plane) with SWAR
+/// mask construction, group scale folded into the sign.
+///
+/// Sign computation differs from [`super::binary`]'s `fma_scaled_byte8_avx2`:
+/// the binary kernel uses a two-state FMA identity
+/// (`fmadd(neg_2scale, bs_f, neg_scale)` → ±scale), but ternary has three
+/// states so the sign must be computed explicitly:
+/// `sign_f = cvt(neg_set − pos_set)` → +1/0/−1, then `scaled = sign_f · scale`.
+///
+/// No `#[target_feature]` here — it would conflict with `#[inline(always)]`
+/// (rust-lang/rust#145574). The `avx2,fma` feature is in force on the caller,
+/// which is the only caller, so the body still compiles against the AVX2
+/// intrinsics. Same shape as [`super::binary`]'s helper.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "x86_64"))]
+#[inline(always)]
+unsafe fn fma_scaled_nibble8_avx2(
+    acc: &mut core::arch::x86_64::__m256,
+    pos_word: u64,
+    neg_word: u64,
+    col: usize,
+    base_col: usize,
+    x: &[f32],
+    mask_byte: core::arch::x86_64::__m256i,
+    zero_i: core::arch::x86_64::__m256i,
+    scale_v: core::arch::x86_64::__m256,
+) {
+    use core::arch::x86_64::*;
+    unsafe {
+        let byte_off = col / 8;
+        let pos_byte = ((pos_word >> (byte_off * 8)) & 0xFF) as i32;
+        let neg_byte = ((neg_word >> (byte_off * 8)) & 0xFF) as i32;
+
+        let pos_splat = _mm256_set1_epi32(pos_byte);
+        let neg_splat = _mm256_set1_epi32(neg_byte);
+
+        // cmpgt(and, 0) → all-ones (-1 as i32) where the bit is set, 0 where clear.
+        let pos_set_i = _mm256_cmpgt_epi32(_mm256_and_si256(pos_splat, mask_byte), zero_i);
+        let neg_set_i = _mm256_cmpgt_epi32(_mm256_and_si256(neg_splat, mask_byte), zero_i);
+
+        // sign = neg_set − pos_set → +1 where pos, −1 where neg, 0 where neither.
+        // (−1 − (−1) = 0; 0 − (−1) = +1; −1 − 0 = −1.)
+        let sign_f = _mm256_cvtepi32_ps(_mm256_sub_epi32(neg_set_i, pos_set_i));
+
+        // Fold the group scale in: ±1 → ±scale (0 stays 0).
+        let scaled = _mm256_mul_ps(sign_f, scale_v);
+
+        let x_v = _mm256_loadu_ps(x.as_ptr().add(base_col + col));
+        *acc = _mm256_fmadd_ps(scaled, x_v, *acc);
+    }
+}
+
 /// Group-scale ternary matvec: `y = W × x`.
 ///
-/// Dispatches to NEON where available, scalar otherwise.
+/// Dispatches to NEON / AVX2 where available, scalar otherwise.
 ///
-/// **x86_64/AVX2 is not yet specialized** — it falls back to the scalar path.
-/// The AVX2 port is deliberately deferred: it cannot be validated on the
-/// aarch64 development machine, and an unvalidated hand-written AVX2 kernel is
-/// worse than a correct scalar one. Tracked in Issue 578.
+/// The AVX2 port (Issue 578 follow-up, 2026-08-11) is gated on
+/// [`super::is_avx2_fma_available`] at runtime so the binary stays portable to
+/// pre-Haswell x86_64. The kernel mirrors [`super::binary`]'s AVX2 shape but
+/// computes the ternary sign explicitly (`cvt(neg_set − pos_set)` → ±1/0)
+/// rather than via the binary kernel's two-state FMA identity.
 #[cfg(feature = "ternary_group_scale")]
 #[inline]
 pub fn simd_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
     match simd_level() {
         #[cfg(target_arch = "aarch64")]
         SimdLevel::Neon => unsafe { neon_ternary_group_matvec(w, x, y) },
+        #[cfg(target_arch = "x86_64")]
+        SimdLevel::Avx2 => unsafe { avx2_ternary_group_matvec(w, x, y) },
         _ => ternary_group_matvec_scalar(w, x, y),
     }
 }
@@ -342,6 +533,8 @@ pub fn simd_ternary_group_matvec_parallel(w: &TernaryGroupWeights, x: &[f32], y:
             match simd_level() {
                 #[cfg(target_arch = "aarch64")]
                 SimdLevel::Neon => unsafe { neon_row_range(w, x, y_chunk, row_offset) },
+                #[cfg(target_arch = "x86_64")]
+                SimdLevel::Avx2 => unsafe { avx2_row_range(w, x, y_chunk, row_offset) },
                 _ => scalar_row_range(w, x, y_chunk, row_offset),
             }
         });
