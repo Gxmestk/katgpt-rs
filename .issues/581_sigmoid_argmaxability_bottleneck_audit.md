@@ -4,7 +4,7 @@
 **Type:** proof + poc
 **Research:** [472](../.research/472_Embedding_Retrieval_Dimension_Capacity_Limit.md) §1.6
 **Source:** Grivas, Vergari & Lopez, "Taming the Sigmoid Bottleneck: Provably Argmaxable Sparse Multi-Label Classification", AAAI 2024 — [arXiv:2310.10443](https://arxiv.org/abs/2310.10443)
-**Status:** T1–T4 DONE 2026-08-10 — **honest negative, conditional** ([Benchmark 575](../.benchmarks/575_sigmoid_argmaxability_audit.md)). One guard remains (T5').
+**Status:** T1–T5' DONE 2026-08-10. **The conditional RESOLVED — and it resolved NEGATIVE:** the shipped directions are **rank 2 of 6**, so Benchmark 575's clean verdict does not transfer ([Benchmark 577](../.benchmarks/577_emotion_direction_rank.md)). T6 remains.
 
 ---
 
@@ -60,13 +60,50 @@ Convenient alignment: the DFT fix is not foreign machinery here — `ModellessEm
 - [-] **T5 NOT NEEDED (2026-08-10)** — no unargmaxable combination exists at our
       shape, so the DFT output layer is unnecessary. Deferred rather than done.
       Original: If any unargmaxable combination is found: evaluate the DFT output layer as a closed-form, deterministically-constructed replacement (no training — this must stay modelless per the mandate). Gate behind a feature flag; GOAT gate is "previously-unargmaxable combinations become reachable with no regression on the existing affect benchmarks."
-- [ ] **T5'** (replaces T5, the only remaining action) Assert `matrix_rank(W) == L`
-      at direction-extraction time in riir-ai (`extract_emotion_directions` /
-      `extract_emotion_directions_for_map`). Negligible cost, and it upgrades T3's
-      conditional result to an unconditional one — the shipped directions are
-      derived from recorded HLA state and nothing currently checks them for
-      degeneracy. Consume `katgpt_core::matrix_rank`; do not reimplement.
-- [ ] **T6** Check the interaction with Plan 410's Linking-Fold — does the fold already restore argmaxability for some combinations? Record the overlap either way.
+- [x] **T5' DONE (2026-08-10) — and it FAILS: the shipped directions are rank 2 of L=6.**
+      [Benchmark 577](../.benchmarks/577_emotion_direction_rank.md).
+      `riir-ai/crates/riir-games-civ/src/civ/emotion/rank_audit.rs` behind
+      `direction_rank_audit`, consuming `katgpt_core::matrix_rank` (not reimplemented),
+      called from `extract_emotion_directions`.
+
+      **This does not upgrade T3's conditional to unconditional — it refutes the
+      precondition.** Three structural causes:
+
+      1. **`fear` and `anger` are hardcoded `vec![0.0; embed_dim]`** — only 4 scenarios
+         exist (no near-threat / under-attack). A zero direction projects to a constant
+         `sigmoid(0) = 0.5`: those two scalars carry **no information at all**.
+      2. **`arousal ≡ −valence` exactly** (`cos = −1.000000`) — the formulas use the same
+         two scenario groups with the sign swapped, so they are collinear *by
+         construction*; no dataset could separate them.
+      3. **`desperation` is anti-parallel to `calm`** (`cos = −1.000000`), norm ~400×
+         smaller — the recorded scenario means lie essentially on one line.
+
+      **Both dependent pairs are ANTI-collinear, which is the consequential case:** since
+      `sigmoid(⟨s,−v⟩) = 1 − sigmoid(⟨s,v⟩)`, such a pair is perfectly *complementary*, so
+      **high-valence + high-arousal is unreachable**, as is high-desperation + high-calm.
+      Unreachable sign combinations are exactly what Benchmark 575 was hunting.
+
+      Precisely what is / isn't overturned: 575's *structural* claim stands (independent
+      directions at `L ≤ d` are safe) and its arithmetic was right; the **precondition**
+      fails. The bridge is not "clean because the 8→5 shape is safe" — it is degenerate
+      for an unrelated reason, namely how the directions are derived.
+
+      **Deliberate deviation from the literal wording:** the guard *reports* instead of
+      asserting. A hard `assert!(rank == L)` would fire on every civ run, since the
+      degeneracy is shipped reality with two acknowledged placeholders. Following
+      riir-neuron-db's `capacity_audit` precedent it is latched, `debug_assertions`-only
+      and feature-gated (zero release cost), and it separates **acknowledged** degeneracy
+      (zero rows) from **unexpected** degeneracy (`rank < informative_directions` — two
+      *non-zero* dependent rows, `true` on the shipped set). Silently weakening the check
+      to make it pass, or breaking every run, were both worse options.
+
+      Rank is tolerance-sensitive (4 at 1e-9, 3 at 1e-6, **2** at every tol ≥ 1e-5), so
+      the audit scales its pivot tolerance by `max|W|` and a test pins that stability.
+- [ ] **T6** Check the interaction with Plan 410's Linking-Fold — does the fold already restore argmaxability for some combinations? Record the overlap either way. **Re-scoped by T5' (2026-08-10):** the question is no longer "does the fold help an already-clean bridge" but "does it recover any of the axes lost to rank-2 degeneracy". Note the fold cannot fix causes 1 and 2 — a hardcoded zero row and an exact sign-flip are gone before any fold sees them.
+
+- [ ] **T7** (opened by T5') Fix the derivations rather than the symptom: (a) derive `arousal` from a contrast that is not valence-with-the-sign-flipped (e.g. high- vs low-activity states, orthogonalised against valence); (b) give `desperation` a contrast independent of `calm`; (c) either add the near-threat / under-attack scenarios `fear` and `anger` need, or remove those permanently-0.5 fields from the public struct so consumers stop reading them as signal. Then re-run Benchmark 577 — the audit is already wired to report the improvement.
+
+- [ ] **T8** (opened by T5') Audit the affect *consumers*: anything treating the five scalars as five independent axes is mistaken — there are ~2 axes of real information. Check before any sixth scalar is added.
 
 ## Expected outcome
 
@@ -75,3 +112,15 @@ Plausibly a **negative result** — at 8→5 the layer is only mildly low-rank, 
 ## Done when
 
 T3 returns an exhaustive verdict for the affect bridge, T4 covers the other two sites, and the result is recorded — as a closed honest negative, or as a DFT-correction gate with a benchmark.
+
+**Amended 2026-08-10 (T5').** The T1–T4 result was recorded as a closed honest negative, but
+T5' showed that verdict rested on a precondition the shipped code violates. So the issue does
+**not** close here: the bottleneck is not an intrinsic property of our 8→5 shape (575 stands on
+that), yet the shipped affect bridge *does* have unreachable combinations — via direction
+degeneracy rather than the shape. Closing now requires T7 (fix the derivations) and T8 (audit
+the consumers). T6 is re-scoped accordingly.
+
+**The transferable lesson:** an argmaxability/expressivity audit that assumes full-rank
+projections proves nothing about a system whose projections are derived from recorded data
+unless the rank is actually checked. The check cost ~30 lines and overturned a shipped
+conclusion.

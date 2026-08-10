@@ -1,5 +1,22 @@
 # Benchmark 575: sigmoid argmaxability audit — affect bridge (Issue 581 T3)
 
+> **⚠️ AMENDED 2026-08-10 — the conditional resolved NEGATIVE.**
+> This benchmark's exhaustive negative over all 32 affect sign combinations was
+> **conditional on the direction matrix having full row rank**. Issue 581 T5'
+> checked the directions that actually ship and found them **rank 2 of L = 6**
+> ([Benchmark 577](577_emotion_direction_rank.md)): `fear`/`anger` are hardcoded
+> zero vectors, `arousal ≡ −valence` by construction, and `desperation` is
+> anti-parallel to `calm`. Because `sigmoid(⟨s,−v⟩) = 1 − sigmoid(⟨s,v⟩)`, the two
+> anti-collinear pairs are perfectly complementary, so *high-valence + high-arousal*
+> and *high-desperation + high-calm* are **unreachable** in the shipped system.
+>
+> What still stands: the *structural* claim below (any `L ≤ d` with linearly
+> independent directions is safe) and its arithmetic. The bottleneck is **not** an
+> intrinsic property of our 8→5 shape. What fails is the precondition — so
+> **do not cite this benchmark as "the affect bridge is clean."** It is clean in
+> shape and degenerate in derivation. See Benchmark 577 and Issue 581 T7.
+
+
 **Date:** 2026-08-10
 **Issue:** [581](../.issues/581_sigmoid_argmaxability_bottleneck_audit.md)
 **Source:** Grivas, Vergari & Lopez, *Taming the Sigmoid Bottleneck: Provably Argmaxable Sparse Multi-Label Classification*, AAAI 2024 — [arXiv:2310.10443](https://arxiv.org/abs/2310.10443)
