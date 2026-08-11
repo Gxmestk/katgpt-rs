@@ -2698,6 +2698,60 @@ Feature gate: `ica_lens` (**DEFAULT-ON** since 2026-08-11; zero runtime cost unl
 
 ---
 
+### 🤝 Similarity Inference — Endogenous Correlation Device from Joint-Action History (Plan 526, arxiv 2608.03958)
+
+Distills Meulemans et al. 2026 (Google Paradigms of Intelligence) into a **modelless cooperation-primitive** — the missing acquisition step for the CCE substrate: where the shipped `CceLp<N,A>` (Plan 295, DEFAULT-ON) uses an *exogenous* designer-set correlation device, this primitive **infers** `ω ∈ (0,1)` endogenously from joint-action history and switches from competitive-best-response (Nash) to cooperative-best-response (CCE) when `ω` crosses a payoff-derived threshold.
+
+```text
+ω_T = α / (α + (1−α) · W(æ_<T))     // Bayesian posterior, log-space accumulator
+W(æ_<T) = Π_t P(a_i_t, a_j_t | situation_t)   // independent-policy marginal
+P̂(a'|a) = ω·δ(a',a) + (1−ω)·q(a')            // predicted partner mixture
+embedded_best_response(ω, payoff, P̂)          // cooperate iff ω > threshold
+```
+
+Two modelless paths, both zero-allocation after construction:
+- `observe_match(n_actions)` — discrete fast path (`log_w += −ln(|A|)`); O(1).
+- `embedded_best_response_into(...)` — O(A²) inner loop, writes into caller-supplied `&mut`.
+
+**Indirect inference (Phase 7, the Super-GOAT-capability subset):** zero-shot cooperation from third-party observation — primaries never interact directly, each plays the same NPCs concurrently and infers the other's similarity via shared-NPC encounters. G5 PASS triggered the scoped claim.
+
+**GOAT status (G1–G8 ALL PASS, [Bench 579](.benchmarks/579_similarity_inference_goat.md), 2026-08-11):**
+- **G1** (closed-form reproduction): `ω_T` matches `α/(α+(1−α)·|A|^(−T))` to rel_err < 1e-5 for T=0..50, α=0.1.
+- **G2** (emergent cooperation, the load-bearing gate): shared-shard pairs cooperate **100%** vs random-shard **0%** (target >80% / <20%) — perfect separation.
+- **G5** (indirect inference): shared-policy primaries cooperate **100%** vs random-policy **0%** (target >70% / <25%).
+- **G6** (crowd-scale latency): 20K pairwise `observe_match` in **482.6µs** (24 ns/update), 1000 `embedded_best_response` in **114.6µs** (115 ns/call) — 10×/43× headroom under the 5ms budget.
+- **G7** (UQ floor, "Report the Floor" rule): Bayesian `ω` Brier score **0.001220** vs floor `0.145789` — **119× better calibrated** (99.2% improvement).
+- **G8** (PD threshold): cooperates iff `ω > 0.5` for canonical PD — binary-searched to 0.500 ± 0.001.
+
+> **Verdict: GOAT, not Super-GOAT** (post-revision). The equilibrium *concept* is covered by shipped CCE (Plan 295). The novelty is the *mechanism* — endogenous correlation device. Phase 7 opens a separate scoped Super-GOAT claim for indirect inference ONLY.
+
+Feature gate: `similarity_inference` (**DEFAULT-ON** since 2026-08-11, Plan 526 Phase 6). Pure modelless (Bayesian posterior + sigmoid + best-response comparator; no training). Zero runtime cost unless invoked. 📖 Plan: [`526`](.plans/526_similarity_inference_primitive.md), Research: [`.research/471_Similarity_Inference_Embedded_Equilibrium.md`](.research/471_Similarity_Inference_Embedded_Equilibrium.md), GOAT bench: [`.benchmarks/579_similarity_inference_goat.md`](.benchmarks/579_similarity_inference_goat.md), Source: [`crates/katgpt-core/src/similarity_inference/`](crates/katgpt-core/src/similarity_inference/). Paper: [arXiv:2608.03958](https://arxiv.org/abs/2608.03958).
+
+---
+
+### ⚡ Channel SIMD Alignment — Cache-Line-Padded Weight Storage for Vectorized Matvec (Plan 227 Phase 5, Gemma 4 QAT)
+
+The 6th and final phase of QAT Infusion (Plan 227) — cache-line-padded weight storage that eliminates the unaligned-load penalty in the SIMD matvec hot path. The structural fix is simple: store weights contiguously per-channel so the NEON/SIMD load path gets aligned data instead of strided gather. The throughput gain is release-only (debug builds don't auto-vectorize).
+
+```text
+aligned weights:  [w_0, w_1, ..., w_{D-1}]   // contiguous, cache-line padded
+unaligned weights: stride-based indexing       // gather-scatter, cache misses
+matvec_into(&x, &mut out)                       // caller-supplied output buffer
+```
+
+**GOAT status (G1–G5 ALL PASS, [Bench 580](.benchmarks/580_channel_simd_align_release_goat.md), 2026-08-11):**
+- **G1** (correctness): aligned result matches unaligned within 1e-3.
+- **G2** (alignment properties): contiguous allocation, **0.0% padding overhead**.
+- **G3** (no-regression): 8/8 tests pass.
+- **G4** (alloc-free hot path): `matvec_into(&x, &mut out)` — caller-supplied buffer.
+- **G5** (throughput, the load-bearing gate): **84.9% / 86.7%** throughput improvement in release mode (far exceeds the ≥5% gate).
+
+> **Debug-mode caveat:** the 1.02× debug-mode result was uninitialized-SIMD noise — debug builds don't auto-vectorize, so the contiguous-layout advantage doesn't materialize. The test has a `#[cfg(debug_assertions)]` branch that verifies structure and a `#[cfg(not(debug_assertions))]` branch that enforces the ≥5% throughput gate. Standard pattern for SIMD-bearing primitives.
+
+Feature gate: `channel_simd_align` (**DEFAULT-ON** since 2026-08-11, Plan 227 Phase 5 — the last of 6 QAT Infusion phases to reach DEFAULT-ON). Pure modelless (memory layout optimization; no training). Zero runtime cost unless a caller uses the aligned path. 📖 Plan: [`227`](.plans/227_qat_infusion_modelless.md), GOAT bench: [`.benchmarks/580_channel_simd_align_release_goat.md`](.benchmarks/580_channel_simd_align_release_goat.md), Source: [`crates/katgpt-core/src/channel_simd.rs`](crates/katgpt-core/src/channel_simd.rs).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
