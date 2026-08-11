@@ -108,6 +108,58 @@ pub trait TernaryFfnHook: Send + Sync {
     );
 }
 
+/// Hook for fused DeltaNet input projections (Issue 602).
+///
+/// The DeltaNet layer's first step is 4 ternary matvecs that ALL share the
+/// same input `x`:
+///
+/// ```text
+/// qkv = in_proj_qkv @ x   (output: q_dim + k_dim + v_dim)
+/// z   = in_proj_z   @ x   (output: z_dim = v_dim)
+/// a   = in_proj_a   @ x   (output: n_v_heads)
+/// b   = in_proj_b   @ x   (output: n_v_heads)
+/// ```
+///
+/// When this hook is present, the forward path calls `input_projections()`
+/// once instead of 4 separate `matvec` calls. The GPU implementation chains
+/// all 4 GEMVs in a single command buffer (all reading the same uploaded
+/// `x`, writing to 4 separate output buffers) and does ONE `read_one` at
+/// the end — eliminating 3 of 4 GPU sync points per layer.
+///
+/// At ~2.5 ms/sync × 3 × 64 layers, this saves ~480 ms/token on M3 Max Metal.
+///
+/// Output slices MUST NOT alias each other or `x`. The forward path ensures
+/// this by writing into pre-allocated scratch buffers.
+#[cfg(feature = "ternary_group_scale")]
+#[allow(clippy::too_many_arguments, reason = "Fused GPU dispatch interface: 4 weight matrices + 1 input + 4 outputs is inherent to the DeltaNet input projection block")]
+pub trait TernaryInputProjHook: Send + Sync {
+    /// Fused DeltaNet input projections — all 4 sharing input `x`.
+    ///
+    /// - `qkv_w`: [(q_dim + k_dim + v_dim) × n_embd]
+    /// - `z_w`: [z_dim × n_embd]
+    /// - `a_w`: [n_v_heads × n_embd]
+    /// - `b_w`: [n_v_heads × n_embd]
+    /// - `x`: [n_embd] — RMSNorm'd layer input
+    /// - `qkv_out`: [(q_dim + k_dim + v_dim)] — QKV projection output
+    /// - `z_out`: [z_dim] — output gate projection
+    /// - `a_out`: [n_v_heads] — decay gate projection (raw, pre-softplus)
+    /// - `b_out`: [n_v_heads] — update rate projection (raw, pre-sigmoid)
+    fn input_projections(
+        &self,
+        qkv_w: &TernaryGroupWeights,
+        z_w: &TernaryGroupWeights,
+        a_w: &TernaryGroupWeights,
+        b_w: &TernaryGroupWeights,
+        x: &[f32],
+        qkv_out: &mut [f32],
+        z_out: &mut [f32],
+        a_out: &mut [f32],
+        b_out: &mut [f32],
+    );
+}
+
+
+
 #[cfg(feature = "ternary_group_scale")]
 impl TernaryGroupWeights {
     /// Create all-zero weights with unit group scale.
