@@ -56,6 +56,31 @@ pub struct TernaryGroupWeights {
     pub group_scale: Vec<f16>, // [rows * groups_per_row]
 }
 
+/// Hook for GPU-accelerated ternary matvec (Issue 599 unblock path).
+///
+/// When provided to `forward_qwen_deltanet_ternary_with_hook`, replaces
+/// `simd_ternary_group_matvec_parallel` for each projection. The GPU
+/// implementation (riir-gpu `GemvTernaryCubeCL`) uploads weights once at
+/// construction and dispatches CubeCL kernels per matvec call.
+///
+/// The contract is identical to `simd_ternary_group_matvec_parallel`:
+/// `y = w @ x` where `x.len() == w.cols` and `y.len() == w.rows`.
+///
+/// Thread-safety: implementations must be `Send + Sync` because the forward
+/// may be called from any thread. The GPU implementation holds pre-uploaded
+/// handles keyed by the `TernaryGroupWeights` pointer identity (the weights
+/// themselves are immutable after load).
+#[cfg(feature = "ternary_group_scale")]
+pub trait TernaryMatvecHook: Send + Sync {
+    /// `y = w @ x` — same contract as `simd_ternary_group_matvec_parallel`.
+    ///
+    /// Implementations SHOULD pre-upload weights at construction time and
+    /// cache the GPU handles by `(pos_bits.as_ptr(), neg_bits.as_ptr())`.
+    /// The first call for a new weight matrix uploads; subsequent calls hit
+    /// the cache.
+    fn matvec(&self, w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]);
+}
+
 #[cfg(feature = "ternary_group_scale")]
 impl TernaryGroupWeights {
     /// Create all-zero weights with unit group scale.

@@ -566,7 +566,7 @@ pub use simd::{
     ternary_group_matvec_scalar,
 };
 #[cfg(feature = "ternary_group_scale")]
-pub use types::TernaryGroupWeights;
+pub use types::{TernaryGroupWeights, TernaryMatvecHook};
 
 #[cfg(feature = "peira_distill")]
 pub mod peira;
