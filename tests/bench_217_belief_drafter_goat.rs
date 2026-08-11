@@ -103,6 +103,8 @@ fn bench_217_belief_drafter_goat_proof() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
@@ -449,6 +451,8 @@ fn bench_217_belief_pruner_quality() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
@@ -924,6 +928,8 @@ fn bench_217_cached_vs_uncached_mlp() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
@@ -1128,6 +1134,8 @@ fn goat_217_acceptance_rate() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
@@ -1324,6 +1332,8 @@ fn goat_217_variable_length_speedup() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
