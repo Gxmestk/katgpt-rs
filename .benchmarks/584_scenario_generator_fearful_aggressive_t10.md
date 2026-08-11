@@ -104,10 +104,17 @@ unavailable).
 
 ## What this does NOT do
 
-- **v1 `extract_emotion_directions` unchanged.** Fear/anger stay zero in v1.
+- ~~**v1 `extract_emotion_directions` unchanged.** Fear/anger stay zero in v1.
   This is intentional — v1 is the safe default; v2 is opt-in
   (`emotion_directions_v2` feature). Promotion of v2 to default-on remains a
-  separate decision (changes output for every caller).
+  separate decision (changes output for every caller).~~
+  **RESOLVED 2026-08-11 (commit `f07bb097`, riir-ai):** the v2 corrections
+  (arousal ← energy median split; desperation ← desperation-scalar median split;
+  fear/anger extraction from Fearful/Aggressive moods) were **promoted into the
+  canonical** `extract_emotion_directions`. Every caller now gets rank-4,
+  zero-collinear-pair directions. The `emotion_directions_v2` feature gates only
+  a thin diagnostic wrapper (`DirectionSourceReport`). The v1/v2 distinction
+  no longer exists as a behavioral fork — only as a diagnostic toggle.
 - **No new HLA dimension.** The embed_dim is unchanged; the improvement is
   purely from scenario diversity + correct mood injection.
 

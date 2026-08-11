@@ -1,6 +1,6 @@
 # Benchmark 575: sigmoid argmaxability audit — affect bridge (Issue 581 T3)
 
-> **⚠️ AMENDED 2026-08-10 — the conditional resolved NEGATIVE.**
+> **⚠️ AMENDED 2026-08-10 — the conditional resolved NEGATIVE (then RESOLVED 2026-08-11).**
 > This benchmark's exhaustive negative over all 32 affect sign combinations was
 > **conditional on the direction matrix having full row rank**. Issue 581 T5'
 > checked the directions that actually ship and found them **rank 2 of L = 6**
@@ -15,6 +15,25 @@
 > intrinsic property of our 8→5 shape. What fails is the precondition — so
 > **do not cite this benchmark as "the affect bridge is clean."** It is clean in
 > shape and degenerate in derivation. See Benchmark 577 and Issue 581 T7.
+>
+> **✅ RESOLVED 2026-08-11 — the precondition now holds (rank 4, zero collinear pairs).**
+> Two subsequent landings closed the gap this amendment identified:
+> 1. **Benchmark 584** (T10, riir-ai Issue 582) enriched the scenario generator
+>    with Fearful/Aggressive moods → `fear`/`anger` became non-zero, recorded
+>    state rank rose 2 → 4.
+> 2. **Commit `f07bb097`** (riir-ai, Issue 581 T7 closeout) promoted the v2
+>    direction corrections into the **canonical** `extract_emotion_directions`:
+>    arousal re-derived from the `energy` scalar (median split, +0.91 correlation
+>    — was −0.88), desperation from the `desperation` scalar (+0.96 — was +0.81).
+>    Both anti-collinear pairs eliminated; the `emotion_directions_v2` feature now
+>    gates only a thin diagnostic wrapper.
+>
+> The shipped directions are now **rank 4 of 6 with zero collinear pairs**
+> (see [Benchmark 577](577_emotion_direction_rank.md) for the updated
+> measurement). The remaining gap (4 of 6, not 6 of 6) is the recorded-state
+> ceiling — 4 independent mood-injection patterns — not a derivation defect.
+> The structural claim below is now **unconditional** for the shipped directions:
+> all 32 sign combinations are reachable.
 
 
 **Date:** 2026-08-10

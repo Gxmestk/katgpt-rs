@@ -1,5 +1,25 @@
 # Benchmark 578: Linking-Fold interaction (T6) + affect consumer audit (T8) — Issue 581 closeout
 
+> **✅ AMENDED 2026-08-11 — T7 promotion landed; T10 follow-up closed.**
+> Two items in this benchmark's closeout section have been superseded:
+> - **T7 (c)** "fear/anger stay zero" → **RESOLVED** by Benchmark 584 (T10,
+>   riir-ai Issue 582): Fearful/Aggressive scenarios added, fear/anger now
+>   non-zero, recorded state rank 2 → 4.
+> - **T8 §"What was done about it" item 1** "v2 directions (opt-in
+>   `emotion_directions_v2`)... Promotion to default is a separate decision"
+>   → **RESOLVED** by commit `f07bb097` (riir-ai): the v2 corrections (arousal
+>   ← energy median split +0.91; desperation ← desperation-scalar median split
+>   +0.96) were promoted into the **canonical** `extract_emotion_directions`.
+>   The `emotion_directions_v2` feature now gates only a thin diagnostic wrapper.
+>
+> The T6 analysis (Linking-Fold ≠ direction-matrix rank fix) is **unaffected** —
+> it is a structural argument about state-space vs direction-space operations
+> that holds regardless of which derivation the directions use. The T8 consumer
+> audit's per-consumer verdicts are also structurally unchanged: the consumers
+> that summed anti-collinear pairs were "correct but information-poor" under v1,
+> and are now "correct and information-richer" under the promoted canonical
+> directions (4 independent axes instead of 2).
+
 **Date:** 2026-08-10
 **Issue:** 581 T6 + T8 (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in Benchmarks 575 + 577 + this benchmark)
 **Sibling records:** [Benchmark 575](575_sigmoid_argmaxability_audit.md) (T1–T4), [Benchmark 577](577_emotion_direction_rank.md) (T5')
@@ -172,12 +192,15 @@ structure averages out. Not broken.**
 
 ### What was done about it
 
-1. **v2 directions** (Issue 581 T7, opt-in `emotion_directions_v2`): fixes the
-   `arousal` sign bug (anti-correlation → positive correlation with energy) and
-   rederives `desperation` from its own scalar. Both changes are semantic corrections,
-   not rank inflation — the rank stays 2 because the recorded HLA state is rank 2
-   (3 distinct moods only). Promotion to default is a separate decision (changes
-   output for every caller).
+1. **v2 directions → promoted to canonical** (Issue 581 T7, commit `f07bb097`, 2026-08-11):
+   fixes the `arousal` sign bug (anti-correlation −0.88 → positive correlation
+   +0.91 with energy) and rederives `desperation` from its own scalar (+0.81 →
+   +0.96). Both changes are semantic corrections. The corrections were promoted
+   from the opt-in `emotion_directions_v2` feature into the canonical
+   `extract_emotion_directions` — every caller now gets the corrected directions.
+   The rank rose from 2 to 4 after Benchmark 584 (T10) enriched the scenario
+   generator with Fearful/Aggressive moods; the `emotion_directions_v2` feature
+   now gates only a thin diagnostic wrapper (`DirectionSourceReport`).
 2. **`DirectionSourceReport`** (v2 module): explicitly reports `fear` and `anger` as
    **unavailable** — no contrast exists in the recorded data. Consumers can check
    `report.has_unavailable()` before treating a scalar as signal.
@@ -206,10 +229,13 @@ All tasks resolved:
 | T5 — DFT output layer | − NOT NEEDED | No unargmaxable combination at full-rank shapes; deferred, then T5' showed the precondition fails |
 | T5' — rank audit of shipped directions | ✅ DONE (NEGATIVE) | Benchmark 577 — rank 2 of 6 |
 | T6 — Linking-Fold interaction | ✅ DONE (this benchmark) | Fold operates on state; collinearity is in directions → zero combinations recovered |
-| T7 — fix the derivations | ✅ DONE (a, b) + PARTIAL (c) | (a)(b) v2 module fixes arousal sign + desperation; (c) fear/anger stay zero — reported unavailable, anger rescued by grudge bridge, Fearful-mood scenarios are T10 follow-up |
+| T7 — fix the derivations | ✅ DONE (a, b, c) | (a)(b) v2 module fixes arousal sign + desperation, **promoted to canonical** in `f07bb097` (2026-08-11); (c) fear/anger now non-zero via Benchmark 584 (T10, riir-ai Issue 582) — Fearful/Aggressive scenarios added |
 | T8 — affect consumer audit | ✅ DONE (this benchmark) | 2 independent axes at direction layer; consumers using sums/distances are correct but information-poor; fear-from-direction is constant; anger has grudge bridge |
 
-**Deferred follow-up:** T10 — enrich the scenario generator to emit Fearful/Aggressive
-moods so `fear` and `anger` directions become derivable. This is the only path to
-raising the recorded state rank above 2, which is the hard ceiling on direction
-independence.
+**T10 follow-up — CLOSED** (Benchmark 584, riir-ai Issue 582): the scenario
+ generator now emits Fearful/Aggressive moods (MonsterRaid scenario + Betrayal
+ injection fix). `fear`/`anger` directions are non-zero; recorded state rank
+ rose 2 → 4; all collinear pairs eliminated after the T7 promotion. The
+ remaining gap (4 of 6, not 6 of 6) is the recorded-state ceiling — 4
+ independent mood-injection patterns. Reaching rank 6 would require richer
+ scenarios (Tired/Worried/Friendly moods), which is content authoring.

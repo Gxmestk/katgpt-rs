@@ -1,5 +1,31 @@
 # Benchmark 577: the shipped emotion directions are rank 2 of 6 — Benchmark 575's verdict does not transfer (Issue 581 T5')
 
+> **✅ SUPERSEDED 2026-08-11 — the shipped directions are now rank 4 of 6, zero collinear pairs.**
+> The rank-2 finding below was accurate at measurement time (2026-08-10) against
+> the v1 `extract_emotion_directions`. Two landings raised the rank and eliminated
+> both anti-collinear pairs:
+> 1. **Benchmark 584** (T10, riir-ai Issue 582) added Fearful/Aggressive
+>    scenarios → recorded state rank 2 → 4; `fear`/`anger` became non-zero.
+> 2. **Commit `f07bb097`** (riir-ai, Issue 581 T7 closeout) promoted the v2
+>    corrections (arousal ← energy median split; desperation ← desperation-scalar
+>    median split) into the **canonical** `extract_emotion_directions`. The
+>    `emotion_directions_v2` feature now gates only a diagnostic wrapper.
+>
+> | metric | v1 (this benchmark) | canonical (post-`f07bb097`) |
+> |---|---|---|
+> | rank | 2 of 6 | **4 of 6** |
+> | zero rows | `fear`, `anger` | **none** |
+> | collinear pairs | valence~arousal (−1.0), desperation~calm (−1.0) | **none** |
+> | arousal vs energy | −0.88 (wrong sign) | **+0.91** |
+> | desperation vs scalar | +0.81 | **+0.96** |
+>
+> The analysis below remains valid as the **historical record** of the v1 defect
+> and the diagnosis that drove the T7 + T10 fixes. The "actionable consequences"
+> (§1–5) are all now resolved. The remaining gap (4 of 6, not 6 of 6) is the
+> recorded-state ceiling (4 independent mood-injection patterns), not a
+> derivation defect — raising it requires richer scenarios (Tired/Worried/Friendly
+> moods), which is content authoring.
+
 **Date:** 2026-08-10
 **Issue:** 581 T5' (removed 2026-08-10 per noise-reduction rule — DONE; full content preserved in Benchmarks 575 + 577 + 578)
 **Supersedes the conditional in:** [Benchmark 575](575_sigmoid_argmaxability_audit.md)
