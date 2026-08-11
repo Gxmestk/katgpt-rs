@@ -281,6 +281,21 @@ Phase 2 and Phase 3 both stall without it:**
 Phase 1 (external PoC via the PrismML llama.cpp fork) is **not** blocked; it runs entirely outside
 our stack. This issue gates the native-Rust port only.
 
+### Consumer status update (2026-08-12)
+
+The container is now consumed **end-to-end in production** by two GPU-resident
+forward stacks in riir-ai:
+
+| Consumer | Status | Measured |
+|---|---|---|
+| **riir-ai CubeCL `TernaryDeltanetGpuForward`** (Issue 604) | ✅ PRODUCTION on M3 Metal | **8.5 tok/s** on Ternary-Bonsai-27B (8.9× over CPU); the `bonsai-go-gpu-resident` example feature. See [riir-ai `.docs/09_performance/ternary_gpu_forward.md`](../../riir-ai/.docs/09_performance/ternary_gpu_forward.md) |
+| **riir-ai cudarc `TernaryDeltanetGpuForwardCudarc`** (Issue 615) | 🚧 T1–T7 DONE, T8 GOAT gate pending | Projected 40–70 tok/s on the 4090 (dp4a kernel at 88.9% roofline) |
+| **riir-ai Issue 594** (qwen35 DeltaNet ternary port, G1 PASS) | ✅ DONE | ` Paris` rank 1 @ p=0.69 vs llama.cpp ref |
+
+The CPU pure ternary SIMD path (~1.0 tok/s) is the portable fallback. See
+[riir-ai `.docs/09_performance/bonsai_ternary_throughput.md`](../../riir-ai/.docs/09_performance/bonsai_ternary_throughput.md)
+for the CPU-vs-GPU headline table.
+
 ---
 
 ## GOAT gate (promotion to default requires all four)
