@@ -81,6 +81,33 @@ pub trait TernaryMatvecHook: Send + Sync {
     fn matvec(&self, w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]);
 }
 
+/// Hook for fused FFN dispatch (Issue 601).
+///
+/// When present, the forward path calls `ffn()` for the SwiGLU MLP portion
+/// instead of 3 separate `matvec` calls. This enables the GPU implementation
+/// to chain gate+up GEMVs + SwiGLU + down GEMV in a single command buffer,
+/// eliminating per-matvec sync readback (2.574× speedup, Issue 600).
+///
+/// `out` MAY alias `x` (the forward path saves the residual before calling).
+#[cfg(feature = "ternary_group_scale")]
+pub trait TernaryFfnHook: Send + Sync {
+    /// Fused FFN: `out = down @ swiglu(gate @ x, up @ x)`.
+    ///
+    /// - `gate_w`: [mlp_dim × n_embd]
+    /// - `up_w`: [mlp_dim × n_embd]
+    /// - `down_w`: [n_embd × mlp_dim]
+    /// - `x`: [n_embd] — RMSNorm'd input
+    /// - `out`: [n_embd] — FFN output (pre-residual-add)
+    fn ffn(
+        &self,
+        gate_w: &TernaryGroupWeights,
+        up_w: &TernaryGroupWeights,
+        down_w: &TernaryGroupWeights,
+        x: &[f32],
+        out: &mut [f32],
+    );
+}
+
 #[cfg(feature = "ternary_group_scale")]
 impl TernaryGroupWeights {
     /// Create all-zero weights with unit group scale.

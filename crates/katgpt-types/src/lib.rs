@@ -96,7 +96,7 @@ mod tests_types;
 #[cfg(feature = "binary_plasma")]
 pub use binary::{BinaryWeights, GROUP_SIZE};
 #[cfg(feature = "ternary_group_scale")]
-pub use ternary_group::{TernaryGroupWeights, TernaryMatvecHook};
+pub use ternary_group::{TernaryFfnHook, TernaryGroupWeights, TernaryMatvecHook};
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]
 pub use domain::DomainLatent;
