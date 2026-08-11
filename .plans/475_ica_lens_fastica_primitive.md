@@ -55,7 +55,7 @@ Ship the FastICA fixed-point iteration (non-Gaussianity-maximizing rotation afte
   - (a) Synthetic non-Gaussian (4 Laplace + 4 Uniform mixed, d=8): **ICA/PCA ratio = 4.33×** (target ≥ 2.0×). FastICA recovers directions with kurtosis 2.2-2.9 (Laplace sources) vs PCA's 0.3-0.5.
   - (b) Realistic d=64 substrate (16 Laplace + 48 Uniform mixed, mimicking NeuronShard style_weights): **ICA/PCA ratio = 6.31×** (target ≥ 1.5×). The gap is even larger at higher dim — confirming FastICA is strictly stronger on non-Gaussian data.
   - (c) d=8 HLA-scale: covered by (a) — the synthetic source IS d=8. The 4.33× ratio far exceeds the 1.2× bar. **HLA application is NOT scope-limited** — FastICA is strictly better even at d=8.
-- [x] **T3.3 (G3 — No regression)** All 107 existing `katgpt-spectral` tests pass under `--features ica_lens`. The `EigenbasisScratch` API gained one new method (`with_gram_buffers`); existing callers are unchanged.
+- [x] **T3.3 (G3 — No regression)** 85 → 107 `katgpt-spectral` tests under `--features ica_lens` (+22 new ICA Lens tests, 0 regressions). The `EigenbasisScratch` API gained one new method (`with_gram_buffers`); existing callers are unchanged.
 - [x] **T3.4 (G4 — Alloc-free steady-state)** ✅ **PASS** — 0 bytes in steady state. Internal `vec!` calls for `eigvecs_d`, `cov_eigvals`, `z_buf` moved into `FastIcaScratch` fields; `w_mat` eliminated entirely (identity init inlined). `p95_accepts` → `p95_accepts_into` with scratch sort buffer to avoid `to_vec()` allocation.
 - [x] **T3.5 (G5 — Determinism)** ✅ **PASS** — bit-identical `reading_map` across two runs. Deterministic identity-matrix seed; no RNG.
 - [x] **T3.6 Decision:** G1 + G2(a) + G2(b) + G3 + G4 + G5 ALL PASS. **PROMOTED to DEFAULT-ON** (2026-08-11). The load-bearing quality gate passes with a large margin (4.33× at d=8, 6.26× at d=64). Alloc cleanup landed (0 bytes steady-state). Latency target re-specified to 1ms (offline corpus fit). Transitive dep on `hla_eigenbasis_recovery` is architecturally acceptable (EigenbasisScratch is a pure workspace buffer; the 3 deferred validation items are for `recover_eigenbasis_from_window`, not the scratch struct).
@@ -63,7 +63,7 @@ Ship the FastICA fixed-point iteration (non-Gaussianity-maximizing rotation afte
 ### Phase 4 — Docs + integration hooks
 
 - [x] **T4.1** Module docstring added to `ica_lens.rs` citing the paper, the relationship to `EigenbasisTracker` + `excess_kurtosis`, and the three stability recipes.
-- [-] **T4.2** README section under "Feature Showcase" — deferred (the root `katgpt-rs/README.md` is large; add on next doc-sync pass).
+- [x] **T4.2** README section under "Feature Showcase" — added (2026-08-11) at the end of the showcase list, after the Plan 571 entry. Covers the algorithm, the three stability recipes, the ERF diagnostic, the relationship to existing substrate (PCA + excess_kurtosis + MAG), all 5 GOAT gate results, and the DEFAULT-ON decision.
 - [-] **T4.3** Example under `katgpt-rs/examples/` — deferred (the GOAT bench exercises the full API; a standalone example is lower priority than the G1/G4 alloc cleanup).
 - [x] **T4.4** Cross-reference from `hla_eigenbasis.rs` docstring added via the `ica_lens` module doc + the `EigenbasisScratch::with_gram_buffers` method doc.
 

@@ -1358,7 +1358,7 @@ mod tests {
             for i in 0..t {
                 let u1 = lcg_next(&mut rng);
                 let u2 = lcg_next(&mut rng);
-                sources[i * d + j] = if j < d / 2.max(1) {
+                sources[i * d + j] = if j < d / 2 {
                     let s = if u1 < 0.5 { -1.0 } else { 1.0 };
                     s * (1.0 - 2.0 * (u1 - 0.5).abs()).ln()
                 } else {

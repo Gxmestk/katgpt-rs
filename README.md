@@ -2660,6 +2660,42 @@ Two bridge helpers cross the raw→latent boundary per AGENTS.md: `from_speeds_a
 
 Feature gate: `phase_separation` (**DEFAULT-ON** since 2026-08-07; zero runtime cost unless a caller invokes the probe). 📖 Plan: [`571`](.plans/571_phase_separation_probe.md), Research: [`.research/470_Lonely_Runner_Phase_Separation_Probe.md`](.research/470_Lonely_Runner_Phase_Separation_Probe.md), GOAT bench: [`.benchmarks/571_phase_separation_goat.md`](.benchmarks/571_phase_separation_goat.md), Phase 3 demo: `crates/katgpt-core/examples/phase_separation_demo.rs`. Paper: [arXiv:0710.4495](https://arxiv.org/abs/0710.4495).
 
+### 🔭 ICA Lens — FastICA Non-Gaussian Direction Mining + ERF Diagnostic (Plan 475, arxiv 2606.11722)
+
+Distills Liu & Han 2026 (*ICA Lens*) into a **modelless unsupervised-direction primitive** — the missing third corner of the direction-acquisition triangle: designer-authored (R290) / verdict-supervised (MAG R397) / **unsupervised-statistical (this plan)**. Given a `T × D` activation window, FastICA finds the `m` maximally non-Gaussian directions via Hyvärinen's 1999 deflationary fixed-point iteration:
+
+```text
+X_c = row_normalize(X) − mean              // recipe A1 (outlier robust)
+K   = Λ^−½ · E^⊤                            // whitening via Jacobi eigendecomp of cov(X_c)
+Z   = X_c · K^⊤                             // whitened, unit-covariance
+w_j ← E[z · g(w_j^⊤ z)] − E[g'(w_j^⊤ z)] · w_j   // FastICA update, logcosh default
+w_j ← orthogonalize(w_j, w_1..w_{j−1})      // Gram-Schmidt deflation
+R = W · K                                   // reading map (activations → scores)
+D = R^†                                     // writing map (scores → activations)
+```
+
+Three modelless paths, all writing into caller-provided `&mut [f32]` (zero allocation after first call):
+- `fastica_into(window, T, D, cfg, scratch, ...)` — corpus-level offline fit; 0 bytes steady-state.
+- `effective_receptive_field(scores_full, target_idx, suffix_scores, schedule, top_n) -> usize` — the novel ERF diagnostic: minimum left-context length needed to recover a component's signed score.
+- `erf_batch(...)` — average ERF over an evidence set.
+
+**The three stability recipes (paper §3.2)** make scikit-learn-brittle FastICA practical on outlier-dominated activations (attention-sink regime): (A1) row-normalization before whitening; (A2) p95-LIM acceptance instead of strict max (rescues fits with a small unstable tail); (A3) adaptive refit — halve `m` until acceptance, down to `min_components`.
+
+**Relationship to existing substrate:** FastICA consumes [`EigenbasisScratch`](crates/katgpt-spectral/src/hla_eigenbasis.rs) (from `hla_eigenbasis_recovery`) for its whitening Gram + Jacobi eigvecs. PCA maximizes *variance* then ranks post-hoc by `excess_kurtosis()` (Plan 203); ICA maximizes *non-Gaussianity* directly — strictly stronger on non-Gaussian data (which NPC activations are). Sibling to MAG (verdict-supervised, Plan 418), Within-Class Effective Rank (Plan 415), Rosetta Polarization (R180).
+
+**GOAT status (G1–G5 ALL PASS, [Bench 475](.benchmarks/475_ica_lens_fastica_goat.md), 2026-08-11):**
+- **G1** (latency @ T=512, D=8, m=8): **439µs** (< 1ms target). Target is 1ms, not 100µs — ICA is a corpus-level offline fit (like `faithfulness_probe`), not a per-tick hot path (FastICA does ~1000× more compute than power-iteration PCA: `m × ~15 iters × T×m` MACs vs `5 iters × D²` MACs).
+- **G2** (quality, the load-bearing gate): **ICA/PCA kurtosis ratio = 4.33× at d=8** (synthetic 4 Laplace + 4 Uniform; target ≥ 2.0×), **6.26× at d=64** (16 Laplace + 48 Uniform, mimicking NeuronShard style_weights; target ≥ 1.5×). FastICA recovers directions with kurtosis 2.2-2.9 (Laplace sources) vs PCA's 0.3-0.5.
+- **G3** (no-regression): 85 → 107 `katgpt-spectral` tests (+22 new ICA Lens tests, 0 regressions under `--features ica_lens`).
+- **G4** (alloc-free): **0 bytes** steady-state (was 16,992 bytes). Internal `vec!` for `eigvecs_d`, `cov_eigvals`, `z_buf` moved into `FastIcaScratch`; `w_mat` eliminated (identity init inlined); `p95_accepts` → `p95_accepts_into` with scratch sort buffer.
+- **G5** (determinism): bit-identical `reading_map` across two runs. Deterministic identity-matrix seed; no RNG.
+
+> **Design note (deflationary vs parallel):** the plan originally specified parallel FastICA with symmetric orthogonalization. Implementation switched to **deflationary FastICA with Gram-Schmidt** (Hyvärinen 1999 classic) — the parallel variant was numerically unstable when multiple rows converged to the same maximal direction. The deflationary variant extracts one direction at a time; more robust, textbook FastICA.
+
+**Decision: `ica_lens` DEFAULT-ON** (Plan 475 Phase 3, 2026-08-11). Pure modelless (linear algebra + fixed-point iteration; no training, no SAE dictionary learning). Zero runtime cost unless invoked. Transitive dep on `hla_eigenbasis_recovery` is architecturally acceptable — `EigenbasisScratch` is a pure workspace buffer (the 3 deferred validation items for `recover_eigenbasis_from_window` are unrelated to the scratch struct).
+
+Feature gate: `ica_lens` (**DEFAULT-ON** since 2026-08-11; zero runtime cost unless a caller invokes the fit). 📖 Plan: [`475`](.plans/475_ica_lens_fastica_primitive.md), Research: [`.research/475_ICA_Lens_FastICA_Non_Gaussian_Directions.md`](.research/475_ICA_Lens_FastICA_Non_Gaussian_Directions.md), GOAT bench: [`.benchmarks/475_ica_lens_fastica_goat.md`](.benchmarks/475_ica_lens_fastica_goat.md), Source: [`crates/katgpt-spectral/src/ica_lens.rs`](crates/katgpt-spectral/src/ica_lens.rs). Paper: [arXiv:2606.11722](https://arxiv.org/abs/2606.11722).
+
 ---
 
 ## 🔧 KV Compression

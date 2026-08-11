@@ -126,8 +126,8 @@ fn pca_top_k_kurtosis(
             mean[j] += centered[r * d + j];
         }
     }
-    for j in 0..d {
-        mean[j] /= t as f32;
+    for item in mean.iter_mut().take(d) {
+        *item /= t as f32;
     }
     for r in 0..t {
         for j in 0..d {
