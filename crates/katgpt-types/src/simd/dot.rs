@@ -875,6 +875,56 @@ pub fn simd_matmul_rows_parallel(
     }
 }
 
+/// Batched dense matmul with weight-reuse loop ordering (Issue 597).
+///
+/// Computes `y[p, r] = dot(weight[r, :], x[p, :])` for `p in 0..batch`, `r in 0..rows`.
+/// Input `x` is `[batch, cols]` row-major; output `y` is `[batch, rows]` row-major;
+/// weight is `[rows, cols]` row-major (same layout as [`simd_matmul_rows`]).
+///
+/// **Why the loop nest matters:** the naive approach (`batch` calls to
+/// [`simd_matmul_rows`]) loads each weight row `batch` times — once per
+/// position — because the weight matrix typically exceeds L2 cache. This
+/// kernel transposes the loop nest so the outer loop is over weight rows
+/// and the inner loop is over batch positions: each weight row is loaded
+/// once and reused across all `batch` inputs, cutting weight memory traffic
+/// by a factor of `batch`.
+///
+/// The result is **bit-identical** to `batch` separate [`simd_matmul_rows`]
+/// calls — each output element is the same `simd_dot_f32(weight_row, x_row)`
+/// sum, just computed in a different loop order. No floating-point
+/// reassociation occurs inside the dot product.
+///
+/// For `batch == 1` this degenerates to exactly [`simd_matmul_rows`].
+#[inline]
+pub fn simd_matmul_rows_batched(
+    y: &mut [f32],
+    weight: &[f32],
+    x: &[f32],
+    rows: usize,
+    cols: usize,
+    batch: usize,
+) {
+    if batch == 0 || rows == 0 {
+        return;
+    }
+    debug_assert_eq!(weight.len(), rows * cols, "weight shape mismatch");
+    debug_assert_eq!(x.len(), batch * cols, "x shape mismatch");
+    debug_assert_eq!(y.len(), batch * rows, "y shape mismatch");
+
+    // Weight-reuse loop nest: outer = weight rows, inner = batch positions.
+    // Each weight row (cols f32s) is loaded once and dotted with all batch
+    // inputs before moving to the next row.
+    for r in 0..rows {
+        let w_row = &weight[r * cols..(r + 1) * cols];
+        for p in 0..batch {
+            let x_row = &x[p * cols..(p + 1) * cols];
+            unsafe {
+                *y.get_unchecked_mut(p * rows + r) = simd_dot_f32(w_row, x_row, cols);
+            }
+        }
+    }
+}
+
 /// SIMD-accelerated matmul + ReLU: `output[r] = max(0, dot(weight_row_r, input))`.
 ///
 /// Replaces the inner loop of `matmul_relu()` in `types.rs`.
@@ -1367,5 +1417,81 @@ pub fn simd_matmul_f16_f16_rows_parallel(
                     *out = simd_dot_f16_f16(&weight_f16[row_off..row_off + cols], input_f16, cols);
                 }
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Deterministic pseudo-random f32 in [-1, 1). No rand dep, reproducible.
+    fn pseudo(seed: &mut u64) -> f32 {
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((*seed >> 33) as f32 / (1u64 << 31) as f32) - 1.0
+    }
+
+    /// The batched kernel must produce bit-identical results to `batch`
+    /// separate `simd_matmul_rows` calls — same dot product, different loop
+    /// order. This is the Issue 597 G1 invariant.
+    #[test]
+    fn batched_matches_sequential_bit_identical() {
+        let rows = 32;
+        let cols = 17;
+        let batch = 8;
+
+        let mut seed = 42u64;
+        let weight: Vec<f32> = (0..rows * cols).map(|_| pseudo(&mut seed)).collect();
+        let x: Vec<f32> = (0..batch * cols).map(|_| pseudo(&mut seed)).collect();
+
+        // Sequential: batch separate GEMVs
+        let mut y_seq = vec![0.0f32; batch * rows];
+        for p in 0..batch {
+            let x_row = &x[p * cols..(p + 1) * cols];
+            let y_row = &mut y_seq[p * rows..(p + 1) * rows];
+            simd_matmul_rows(y_row, &weight, x_row, rows, cols);
+        }
+
+        // Batched: one call
+        let mut y_batch = vec![0.0f32; batch * rows];
+        simd_matmul_rows_batched(&mut y_batch, &weight, &x, rows, cols, batch);
+
+        // Bit-identical
+        for p in 0..batch {
+            for r in 0..rows {
+                let i = p * rows + r;
+                assert_eq!(
+                    y_seq[i], y_batch[i],
+                    "mismatch at batch={p}, row={r}: seq={}, batched={}",
+                    y_seq[i], y_batch[i]
+                );
+            }
+        }
+    }
+
+    /// `batch == 1` must degenerate to exactly `simd_matmul_rows`.
+    #[test]
+    fn batched_batch_one_matches_gemv() {
+        let rows = 16;
+        let cols = 33;
+        let mut seed = 7u64;
+        let weight: Vec<f32> = (0..rows * cols).map(|_| pseudo(&mut seed)).collect();
+        let x: Vec<f32> = (0..cols).map(|_| pseudo(&mut seed)).collect();
+
+        let mut y_gemv = vec![0.0f32; rows];
+        simd_matmul_rows(&mut y_gemv, &weight, &x, rows, cols);
+
+        let mut y_batch = vec![0.0f32; rows];
+        simd_matmul_rows_batched(&mut y_batch, &weight, &x, rows, cols, 1);
+
+        assert_eq!(y_gemv, y_batch);
+    }
+
+    /// Zero-batch and zero-rows are no-ops (don't panic).
+    #[test]
+    fn batched_zero_batch_is_noop() {
+        let mut y = vec![0.0f32; 0];
+        simd_matmul_rows_batched(&mut y, &[], &[], 4, 4, 0);
     }
 }

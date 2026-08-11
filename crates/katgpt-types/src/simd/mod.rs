@@ -96,9 +96,9 @@ pub use argmax::simd_argmax_f32;
 pub use dot::{
     simd_dot_f16_f16, simd_dot_f16_f32, simd_dot_f32, simd_fma_row, simd_matmul_f16_f16_rows,
     simd_matmul_f16_f16_rows_parallel, simd_matmul_f16_f32_rows, simd_matmul_f16_f32_rows_parallel,
-    simd_matmul_relu_rows, simd_matmul_rows, simd_matmul_rows_parallel, simd_matvec,
-    simd_outer_product_acc, simd_outer_product_acc_scaled, simd_transpose_matvec_acc,
-    simd_transpose_matvec_into,
+    simd_matmul_relu_rows, simd_matmul_rows, simd_matmul_rows_batched, simd_matmul_rows_parallel,
+    simd_matvec, simd_outer_product_acc, simd_outer_product_acc_scaled,
+    simd_transpose_matvec_acc, simd_transpose_matvec_into,
 };
 pub use elementwise::{
     simd_add_inplace, simd_add_into, simd_add_scalar_inplace, simd_fused_decay_write,
