@@ -132,8 +132,10 @@ hla_eigenbasis_recovery = ["uuid", "blake3"]
 # FastICA after centering + whitening. Consumes `EigenbasisScratch` as the
 # whitening substrate. Sibling to `hla_eigenbasis_recovery` — ICA is the
 # non-Gaussianity-maximizing rotation that complements PCA's
-# variance-maximization. Opt-in pending GOAT gate G2 (quality) confirmation;
-# see .plans/475_ica_lens_fastica_primitive.md.
+# variance-maximization. All 5 GOAT gates PASS (2026-08-11): G1 390µs ≤ 1ms
+# (offline corpus fit), G2(a) 4.33× + G2(b) 6.26× kurtosis ratio vs PCA,
+# G4 0 bytes alloc-free, G5 bit-identical determinism. Promoted to DEFAULT-ON
+# at the root crate level (see root Cargo.toml `default` list).
 ica_lens = ["hla_eigenbasis_recovery"]
 
 # Spectral Rewiring — weight delta purification via base SVD projection

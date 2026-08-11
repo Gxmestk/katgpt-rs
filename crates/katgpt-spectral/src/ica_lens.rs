@@ -255,6 +255,17 @@ pub struct FastIcaScratch {
     aug: Vec<f32>,
     /// Column mean for centering (D).
     col_mean: Vec<f32>,
+    /// Eigenvectors of the D×D covariance (D×D, column-major). Used by
+    /// `whiten_into` as the Jacobi eigvecs output.
+    eigvecs_d: Vec<f32>,
+    /// Eigenvalues of the D×D covariance (D). Used by `whiten_into`.
+    cov_eigvals: Vec<f32>,
+    /// Temp buffer for whitening the window in place: Z = X_c · K^T (T × D).
+    /// Written then copied back into `window_buf`.
+    z_buf: Vec<f32>,
+    /// Scratch buffer for P95 acceptance sort (length m_req). Avoids
+    /// per-call allocation in `p95_accepts_into`.
+    p95_buf: Vec<f32>,
     /// Reuse `EigenbasisScratch` for the whitening Gram + power iteration.
     eigenbasis_scratch: EigenbasisScratch,
     /// Cached (T, D, m) — resize only on change.
@@ -297,6 +308,10 @@ impl FastIcaScratch {
         self.work_d.resize(d, 0.0);
         self.aug.resize(m * 2 * m, 0.0);
         self.col_mean.resize(d, 0.0);
+        self.eigvecs_d.resize(d * d, 0.0);
+        self.cov_eigvals.resize(d, 0.0);
+        self.z_buf.resize(t * d, 0.0);
+        self.p95_buf.resize(m, 0.0);
         self.eigenbasis_scratch = EigenbasisScratch::with_capacity_d(d);
         self.cached_t = t;
         self.cached_d = d;
@@ -384,7 +399,7 @@ fn whiten_into(
         jacobi_eig_symmetric_into(
             gram,
             d_dim,
-            50,
+            30,
             out_eigvals,
             eigvecs_buf,
             out_k, // scratch (mutated by Jacobi)
@@ -868,7 +883,11 @@ pub fn fastica_into<'a>(
 
         let accepted = match config.acceptance {
             IcaAcceptance::Strict => count_unstable(&out_component_lim[..m_try], config) == 0,
-            IcaAcceptance::P95 => p95_accepts(&out_component_lim[..m_try], config),
+            IcaAcceptance::P95 => p95_accepts_into(
+                &out_component_lim[..m_try],
+                config,
+                &mut scratch.p95_buf,
+            ),
         };
 
         if accepted {
@@ -968,58 +987,35 @@ fn fastica_single_fit(
     }
 
     // ── 2. Whiten: K (D × D) into scratch.whitening.
-    // Use scratch.rrt_eigvecs as a D*D eigvecs buffer for whiten_into.
-    // Wait — rrt_eigvecs is m*m, not D*D. Need a separate buffer. Use
-    // scratch.reading_prev (m*D) — too small when m < D. Use a fresh allocation
-    // for now; the proper fix is to add an `eigvecs_d: Vec<f32>` field.
-    //
-    // For correctness in Phase 1: allocate here. Alloc-free comes after we
-    // confirm the algorithm works.
-    let mut eigvecs_d = vec![0.0_f32; d_dim * d_dim];
-    let mut cov_eigvals = vec![0.0_f32; d_dim];
     whiten_into(
         &scratch.window_buf,
         t_dim,
         d_dim,
         &mut scratch.whitening,
-        &mut cov_eigvals,
-        &mut eigvecs_d,
+        &mut scratch.cov_eigvals,
+        &mut scratch.eigvecs_d,
         &mut scratch.eigenbasis_scratch,
     );
 
     // ── 3. Whiten the window IN PLACE: Z = X_c · K^T replaces window_buf.
-    // Z[i, j] = Σ_l X_c[i, l] · K[j, l] = Σ_l window_buf[i*D+l] · whitening[j*D+l]
-    // We need a temp buffer to avoid aliasing. Use proj_buf (length T) — too small.
-    // Use source_scores (T*m) — too small when m < D.
-    // Allocate a T*D temp.
-    let mut z_buf = vec![0.0_f32; t_dim * d_dim];
+    // Z[i, j] = Σ_l X_c[i, l] · K[j, l] = simd_dot(X_c[i, 0..D], K[j, 0..D])
+    // Write into z_buf to avoid aliasing, then copy back into window_buf.
     for i in 0..t_dim {
+        let x_row = &scratch.window_buf[i * d_dim..(i + 1) * d_dim];
         for j in 0..d_dim {
-            let mut acc = 0.0_f32;
-            for l in 0..d_dim {
-                acc += scratch.window_buf[i * d_dim + l] * scratch.whitening[j * d_dim + l];
-            }
-            z_buf[i * d_dim + j] = acc;
+            let k_row = &scratch.whitening[j * d_dim..(j + 1) * d_dim];
+            scratch.z_buf[i * d_dim + j] = simd_dot_f32(x_row, k_row, d_dim);
         }
     }
     // Move Z into window_buf (X_c is no longer needed).
-    scratch.window_buf[..t_dim * d_dim].copy_from_slice(&z_buf[..t_dim * d_dim]);
+    scratch.window_buf[..t_dim * d_dim].copy_from_slice(&scratch.z_buf[..t_dim * d_dim]);
 
-    // ── 4. Initialize W (m × m) as the identity matrix (each component starts
-    //    aligned with a different axis of whitened space — maximum diversity).
-    let mut w_mat = vec![0.0_f32; m * m];
-    for i in 0..m {
-        w_mat[i * m + i] = 1.0;
-    }
-    // Copy W rows into scratch.reading (m × D). Each row j of W (length m) is
-    // placed into the first m columns of reading[j]; the remaining D-m columns
-    // are zero (they don't participate in the whitened-space iteration).
+    // ── 4. Initialize W as identity in the first m columns of scratch.reading
+    //    (m × D). Each component starts aligned with a different axis of
+    //    whitened space — maximum diversity. Columns [m..D] are zero.
     for j in 0..m {
-        for k in 0..m {
-            scratch.reading[j * d_dim + k] = w_mat[j * m + k];
-        }
-        for k in m..d_dim {
-            scratch.reading[j * d_dim + k] = 0.0;
+        for k in 0..d_dim {
+            scratch.reading[j * d_dim + k] = if k == j { 1.0 } else { 0.0 };
         }
     }
 
@@ -1066,13 +1062,20 @@ fn fastica_single_fit(
                 .copy_from_slice(&scratch.reading[j * d_dim..j * d_dim + m]);
 
             // d. New W[j,k] = inv_T · Σ g_buf[i]·Z[i,k] − mean_gp·W_prev[j,k].
+            // Loop i-outer, k-inner for sequential Z access (cache-friendly).
             for k in 0..m {
-                let mut acc = 0.0_f32;
-                for i in 0..t_dim {
-                    acc += scratch.g_buf[i] * scratch.window_buf[i * d_dim + k];
+                scratch.work_d[k] = 0.0;
+            }
+            for i in 0..t_dim {
+                let g = scratch.g_buf[i];
+                let z_row = &scratch.window_buf[i * d_dim..i * d_dim + m];
+                for k in 0..m {
+                    scratch.work_d[k] += g * z_row[k];
                 }
+            }
+            for k in 0..m {
                 scratch.reading[j * d_dim + k] =
-                    acc * inv_t - mean_gp * scratch.reading_prev[j * d_dim + k];
+                    scratch.work_d[k] * inv_t - mean_gp * scratch.reading_prev[j * d_dim + k];
             }
 
             // e. Gram-Schmidt against W[0..j-1].
@@ -1170,7 +1173,7 @@ fn fastica_single_fit(
     // Status from acceptance.
     let accepted = match config.acceptance {
         IcaAcceptance::Strict => count_unstable(&out_lim[..m], config) == 0,
-        IcaAcceptance::P95 => p95_accepts(&out_lim[..m], config),
+        IcaAcceptance::P95 => p95_accepts_into(&out_lim[..m], config, &mut scratch.p95_buf),
     };
     if accepted {
         FastIcaStatus::Converged
@@ -1194,15 +1197,16 @@ fn count_unstable(lim: &[f32], config: &FastIcaConfig) -> usize {
 /// Copies into a temp Vec to sort — this allocates. For the alloc-free hot
 /// path, callers can check `count_unstable` directly against `5% of m`.
 #[inline]
-fn p95_accepts(lim: &[f32], config: &FastIcaConfig) -> bool {
+fn p95_accepts_into(lim: &[f32], config: &FastIcaConfig, sort_buf: &mut [f32]) -> bool {
     if lim.is_empty() {
         return true;
     }
-    let mut sorted: Vec<f32> = lim.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let idx = ((sorted.len() as f32) * 0.95).ceil() as usize;
-    let idx = idx.saturating_sub(1).min(sorted.len() - 1);
-    sorted[idx] < config.lim_threshold
+    sort_buf[..lim.len()].copy_from_slice(lim);
+    let buf = &mut sort_buf[..lim.len()];
+    buf.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let idx = ((lim.len() as f32) * 0.95).ceil() as usize;
+    let idx = idx.saturating_sub(1).min(lim.len() - 1);
+    buf[idx] < config.lim_threshold
 }
 
 // ---------------------------------------------------------------------------
