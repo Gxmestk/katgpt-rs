@@ -6,6 +6,8 @@
 > **Related Research:** 131 (UNSL — sibling scaling-law theory), 222 (Spectral Scaling Laws of Muon — direct predecessor, *empirical* power laws by layer; this paper is the *mechanistic* companion), 295 (AC-GPT — explicitly defers the sigmoid-vs-softmax justification to here), 240 (CGSP — confirms sigmoid scaling as codebase default)
 > **Related Plans:** 254 (Spectral Budget Router — already implements Research 222's coefficient-space navigation), 297 (PersonalityWeightedComposition — coefficient-space drift), 321 (CommittedFieldBlend — coefficient-space commit)
 > **Classification:** Public (katgpt-rs — modelless inference justification)
+>
+> **PASS-Redirects (synthesis):** Skaling / Videau et al. [arXiv:2608.07222 "Skaling: Chinchilla's Exponents Meet Kaplan's Coupling"] — provides the actual coupled functional form `L(N,D)=(A·N^-α+B·D^-β)^k+E` (single coupling exponent k ≈ 0.31–0.45 empirically) + L-shape sparse profiling (~10× compute saving for scaling-law fitting) that this note's §4 "Not a Chinchilla-style compute-optimal allocation recipe" explicitly defers. → riir-train: applicable ONLY if/when we run multi-config (N,D) scaling-law sweeps — we currently don't (Plan 318 is single-shot 4B training on one 4090, not a Farseer-style 404-config grid; Plans 059/066/501–505 are all single-model pipelines). The sigmoid escape valve + coefficient-space navigation (this note's actual modelless contribution) is unaffected — Skaling operates on the training-side loss surface, not on inference-time blend gates. PASS not because the form is wrong (it's a genuine 1.5–3× MAPE improvement over Chinchilla) but because we have no multi-run scaling-law-fitting workflow to apply it to.
 
 ---
 
