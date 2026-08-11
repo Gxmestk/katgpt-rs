@@ -68,6 +68,14 @@ pub mod outlier_guard;
 #[cfg(feature = "hla_eigenbasis_recovery")]
 pub mod hla_eigenbasis;
 
+// ── Plan 475 (2026-08-11): ICA Lens — FastICA non-Gaussian direction mining
+// + ERF diagnostic (arXiv:2606.11722). Sibling to `hla_eigenbasis` — ICA
+// consumes the EigenbasisTracker Gram as its whitening step, then runs the
+// FastICA fixed-point rotation. Gated by `ica_lens`; the
+// `hla_eigenbasis_recovery` dep is required for the whitening substrate.
+#[cfg(feature = "ica_lens")]
+pub mod ica_lens;
+
 // Spectral Rewiring — weight delta purification via base SVD projection
 // (Plan 423, Research 406). The on-principal complement of `off_principal`
 // (Plan 264). STAYS OPT-IN — Plan 423 Phase 3 GOAT (Bench 423, 2026-07-10):

@@ -107,6 +107,27 @@ impl EigenbasisScratch {
             self.cached_d = d;
         }
     }
+
+    /// Lend out the internal `(gram, v, w)` scratch buffers for the whitening
+    /// Gram-build + power-iteration step. Used by `ica_lens::whiten_into`
+    /// (Plan 475) to reuse the same workspace without re-allocating.
+    ///
+    /// The callback receives `(gram: &mut [f32], v: &mut [f32], w: &mut [f32])`
+    /// already sized to `d * d`, `d`, `d` respectively. The buffers are
+    /// mutated in place; callers should zero `gram` before accumulating
+    /// (see `recover_eigenbasis_inner` for the same pattern).
+    pub fn with_gram_buffers<R>(
+        &mut self,
+        d: usize,
+        f: impl FnOnce(&mut [f32], &mut [f32], &mut [f32]) -> R,
+    ) -> R {
+        self.ensure_capacity_d(d);
+        f(
+            &mut self.gram[..d * d],
+            &mut self.v[..d],
+            &mut self.w[..d],
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
