@@ -5,7 +5,7 @@
 **Feature:** `ternary_group_scale` (opt-in; AVX2 path is now auto-selected on `x86_64` hosts with AVX2+FMA)
 **Validated on:** RTX 4090 host (AMD Ryzen-class x86_64, AVX2+FMA confirmed via `cpuid`)
 **Host toolchain:** rustc 1.93.0 (254b59607 2026-01-19), `--release` profile
-**Related issue:** [`katgpt-rs/.issues/578`](../.issues/578_ternary_group_scale_q2_0_g128_tier.md) — AVX2 deviation (closed by this benchmark)
+**Related issue:** [`.docs/08_performance/ternary_group_q2_0_tier.md`](../.docs/08_performance/ternary_group_q2_0_tier.md) — the tier doc (formerly Issue 578, closed + removed 2026-08-12); this benchmark closed its AVX2 deviation
 
 ## TL;DR
 

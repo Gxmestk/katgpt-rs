@@ -1975,6 +1975,7 @@ A consolidated section for standalone opt-in features with their own plans but n
 | Feature | Plan | Role |
 |---|---|---|
 | `binary_plasma` | Issue 145 | Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale. The fastest Plasma tier; ternary (plasma_path) moved to Hot. |
+| `ternary_group_scale` | Issue 578 (closed) | `TernaryGroupWeights` — ternary {-1,0,+1} bit-planes + per-128 f16 group scale, the `Q2_0_g128` container (Ternary-Bonsai-27B). G1–G4 GOAT gate ALL PASS (2026-08-12), stays opt-in by policy: promoting it would transitively promote `binary_plasma` (opt-in by deliberate Issue 145 decision) and the tier is a model-specific container 1.3× slower than row-scale ternary. Implies `binary_plasma`. See [`../08_performance/ternary_group_q2_0_tier.md`](../08_performance/ternary_group_q2_0_tier.md). |
 | `gpart_adapter` | 257 | GPart isometric partition adapter loading |
 | `gpart_pruning` | Issue 008 | GPart top-k group pruning — zero out low-magnitude groups at apply time (implies gpart_adapter) |
 | `simd_sigmoid` | Issues 024/025 | SIMD-vectorized sigmoid→tanh→clamp fused pass for AttractorKernel::step() + BoMSampler |

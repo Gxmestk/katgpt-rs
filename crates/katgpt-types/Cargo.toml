@@ -84,6 +84,11 @@ binary_plasma = []
 # Issue 578: ternary {-1,0,+1} bit-planes with per-128 f16 group scale — the
 # Q2_0_g128 container (Ternary-Bonsai-27B). Implies binary_plasma for the shared
 # GROUP_SIZE convention (single source of truth for the 128-weight group).
+# G1-G4 GOAT gate ALL PASS (2026-08-12; Issue 578 closed and removed, content in
+# .docs/08_performance/ternary_group_q2_0_tier.md). STAYS OPT-IN BY POLICY:
+# promotion would transitively promote binary_plasma (opt-in by deliberate
+# decision above), and the tier is a model-specific container 1.3x slower than
+# the row-scale kernel — its win is memory traffic on Q2_0_g128 weights only.
 ternary_group_scale = ["binary_plasma"]
 
 # MaxSim late-interaction scoring (Plan 080, Research 073).
