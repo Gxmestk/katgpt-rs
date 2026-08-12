@@ -151,6 +151,39 @@ that work is not where the remaining 2.9× lives.
 
 ---
 
+## ⚠️ Condition asymmetry — read before quoting the 2.79×
+
+**This bench has the same mixed-condition flaw that Bench 009 (riir-clippy) was
+corrected for, and it is not yet fixed here because the box will not go quiet.**
+
+| measurement | machine state |
+|---|---|
+| Arm A `llama-bench` pp512 / tg128 (25.50 t/s) | **quiet**, `load 4.09`, recorded |
+| Arm A `test-backend-ops` Q2_0 (82.0 GB/s) | load **not recorded** |
+| Arm B Bench 606 re-run (9.16 tok/s, 82.6–132.6 GB/s) | **contended** — a sibling session was running `riir_gpu` at 330–370% CPU plus `bonsai_lora_accuracy_parity`, i.e. **competing for the same GPU** |
+
+Bonsai decode on this box is separately measured to swing **12.6 – 25.5 t/s**
+purely on GPU residency (see Bench 009's CORRECTION section), so contention here
+is worth ~2×, not a rounding error.
+
+**Both biases run AGAINST our arm**, so the conclusions are conservative:
+
+- The **2.79×** projection-vs-full-token deficit is an **upper bound**. Our true
+  quiet figure is better than 9.16 tok/s by an unquantified amount.
+- The **kernel parity / 1.4–1.6× advantage** is a **lower bound**. If our kernel
+  numbers were taken under GPU contention, the real efficiency is higher, which
+  *strengthens* "the kernel is not the bottleneck."
+- The **P1–P4 ranking is unaffected**, because it is derived from *ratios between
+  our own tensors measured in the same run* (`ssm_alpha/beta` at 0.2% roof vs
+  `ffn_gate/up` at 28.4%), not from the cross-arm comparison. Contention scales
+  those roughly uniformly.
+
+**Required follow-up:** re-run Arm B (and `test-backend-ops`) with the box quiet
+and the load recorded, then restate the cross-arm rows. Until then, treat the
+cross-arm magnitudes as provisional and the intra-arm ranking as sound.
+
+---
+
 ## Caveats
 
 - **Shapes are not exactly matched.** `test-backend-ops` enumerates fixed shapes
