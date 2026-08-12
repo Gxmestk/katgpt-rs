@@ -118,6 +118,8 @@ Tier = **Gain** today (the `lora_target_layers` config is a small actionable imp
 | `tf_loop` (Plan 136) | `katgpt-rs/crates/katgpt-forward/` | Training-free mid-stack re-application, ODE sub-stepping. |
 | Plan 066 QKV-only finding | `riir-train/crates/riir-train-gpu/src/distill_attention.rs` | Fourier-AHLA: QKV-LoRA works (KL 7.4→0.097), MLP-only fails (KL 9.4). Tells us the target. |
 | `ternary_lora_forward` (Plan 333 T3.3) | `riir-train/crates/riir-train-engine/src/ternary_lora_forward.rs` | Forward path: `y = W_ternary·x + scale·B·(A·x)` with `LoraDelta::{Dense, Ternary}`. SHIPS — needs no change. |
+| **`TernaryDeltanetGpuForward`** (Issue 604/615, Plan 528) | `riir-gpu/src/ternary_deltanet_gpu_forward.rs` | GPU-resident forward for ternary DeltaNet at **9.5 tok/s M3 Metal / 30 tok/s 4090**. Resolved the 0.27 tok/s CPU blocker from Bench 448. |
+| **`lm_head_lora_train`** (Plan 528 T1.3, Bench 618) | `riir-engine/src/deltanet/lm_head_lora_train.rs` | Rank-r LoRA on lm_head only — trivial backward (two outer products). The pragmatic first training step for Bonsai. Training works (loss decreasing, Bench 618). |
 | `lora.bin` format | `riir-train/.docs/02_pipelines/training_data_pipeline.md` §Binary Format | `n_adapters` is a u32 field — already supports `n_adapters = 2` (single-layer × Q+V). Loader needs no change. |
 | LoTA-QAF ternary merge | `riir-train/crates/riir-train-engine/src/lota_ternary.rs` | `ternary_merge` + `QuantGrid` (Plan 333 T3.3b settled the grid-aware merge question). |
 
@@ -187,7 +189,7 @@ The single-layer-trained adapter is a **frozen latent-state artifact** in the ne
 | **C — Single-layer all-6 at mid** | `lora_target_layers: Some(vec![n_layer / 2])`, all 6 targets | **6** |
 | **D — All-layer Q+V only** | All layers, `lora_targets: Some(vec![Q, V])` (tests Plan 066 QKV-only finding at scale) | `n_layer × 2` |
 
-**Domain:** Gemma-2-2B (the fast Plan 423 baseline — runs at ~19 s/step natively, so a 1000-step PoC is ~5 hours, affordable per §3.5 Path 0.5). Use the Rust-coder corpus (Plan 331) for supervised; defer the RL variant to a follow-up.
+**Domain:** **Ternary-Bonsai-27B** (the production target — per user direction 2026-08-12). The GPU-resident forward runs at 9.5 tok/s on M3 Max Metal (Plan 528 T1.3, Bench 618), making a multi-arm PoC feasible overnight. Use the Go game corpus (Plan 528) for supervised training; the zero-shot position bias (Bench 617) is the quality signal to beat. Gemma-2-2B is retained as a secondary validation path (Issue 446 T2.0/T2.0a/T2.0b shipped a 4-arm CPU+GPU harness), but is NOT the primary PoC.
 
 **Metrics:**
 - **Quality:** HumanEval pass@1 (or a proxy if HumanEval infra is not ready — Bench 423 specifies the metric)
@@ -236,19 +238,25 @@ The single-layer-trained adapter is a **frozen latent-state artifact** in the ne
 **This is exactly the kind of honest negative result the defend-wrong PoC is designed to surface.** The fusion's value proposition was "train 2 adapters instead of 384 → 192× gradient-FLOP reduction → unblock Plan 333". On a dense model path where forward+backward are dominated by the base model, that math doesn't translate to wall-clock. **The quality axis (G4) remains the load-bearing question** — does single-layer Q+V capture ≥70% of full-LoRA quality, independent of speed? That requires the full 1000-step run + F1 eval, deferred to the user.
 
 **Where the speedup bet still might pay off:**
-- **Ternary-Bonsai-27B (Plan 333 T3.1)** — the backward path there is dominated by 384 per-adapter grad projections (Bench 448 measured 0.27 tok/s); sparsifying to 2 adapters could matter more. Still blocked on batched DeltaNet prefill (Issue 445 §Next steps).
+- **Ternary-Bonsai-27B (Plan 528 T1.3, Bench 618)** — the throughput blocker was **resolved** by the CubeCL GPU-resident forward (`TernaryDeltanetGpuForward`, Issue 604/615): **9.5 tok/s on M3 Max Metal** (vs the 0.27 tok/s CPU measurement in Bench 448). Plan 528 T1.3 shipped **lm_head-only LoRA training** (`riir-engine/src/deltanet/lm_head_lora_train.rs`, ~370 LOC) + the `go_20_bonsai_lora_train.rs` driver. Bench 618 shows training works (loss decreasing, predictions diversifying away from the zero-shot position bias). The per-step cost is **~20.7s** (191-token prompts × 9.5 tok/s), feasible as an overnight run. **The single-layer Q+V hypothesis can now be tested directly on Bonsai** — Issue 446 refined to Ternary-Bonsai-27B only (user direction 2026-08-12).
 - **GPU paths** where per-adapter kernel-launch overhead is non-trivial (the CubeCL gemma2_lora_gpu path). Not measured here.
 - **Tiny-model CpuLoraTrainer path** (Config::game() ~18K params) — there the LoRA contribution is a much larger fraction of total FLOPs. The T1 plumbing landed here too; could be a quick bench.
 
-### 9.2 TBD — Full PoC numbers
+**NOTE (2026-08-12 correction):** the prior version of this section cited "0.27 tok/s" and "blocked on batched DeltaNet prefill (Issue 445)" as the Bonsai state. That was **stale** — Bench 448 measured the **CPU hybrid-dense path** only; the **GPU-resident ternary forward** (Issue 604/615, shipped after Bench 448) runs at 9.5 tok/s on M3 Max Metal and 30 tok/s on the 4090. Issue 445's stop rule measured the CPU path; the GPU path is the production training path (Plan 528 T1.3) and does NOT hit the stop rule.
 
-**Populated when Issue 446 T2.1-T2.6 completes.** Will record:
-- Raw s/step + HumanEval pass@1 for arms A/B/C/D at 1000 steps, seq_len=512, warmup=100
+### 9.2 TBD — Full PoC numbers (Ternary-Bonsai-27B only, per user direction 2026-08-12)
+
+**Plan pivot:** the PoC is refined to target **Ternary-Bonsai-27B only** (not Gemma-2-2B). The Gemma-2-2B harness (Issue 446 T2.0 + T2.0a + T2.0b GPU support) is retained as a secondary validation path but is NOT the primary PoC. The user direction: "focus on ternary bonsai, refine the plan to do ternary bonsai only".
+
+**Rationale:** the Bonsai GPU training path already ships (Plan 528 T1.3, Bench 618) at 9.5 tok/s — the throughput blocker is resolved. Testing the single-layer hypothesis directly on the production target model (Ternary-Bonsai-27B) is more valuable than testing it on a proxy (Gemma-2-2B).
+
+**Populated when Issue 446 T2 (Bonsai variant) completes.** Will record:
+- Raw loss curves + quality metrics for lm_head-only vs single-layer Q+V LoRA on Bonsai
 - Which Q1–Q4 axes confirmed vs refuted
 - Honest tier revision (Gain / GOAT / Super-GOAT / Pass with negative result)
 - If Super-GOAT: trigger the mandatory outputs (open primitive in katgpt-rs, private guide in riir-ai, plan for full integration)
 
-Current pre-PoC best guess (unchanged from §3): **Tier = Gain**. The smoke test suggests G2 will fail on the dense-model CPU path, narrowing the realistic upgrade paths to: (a) GOAT if G4 passes + T3.1 passes on Ternary-Bonsai; (b) Gain if G4 fails (ship T1 as code-cleanup + perf optimization).
+Current pre-PoC best guess (unchanged from §3): **Tier = Gain**. The smoke test suggests G2 (≥10× speedup) will fail because LoRA FLOPs are negligible vs the base model forward; the load-bearing question is G4 (quality ≥ 70% of full LoRA).
 
 ---
 
