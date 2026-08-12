@@ -249,6 +249,38 @@ impl<E: Clone> BranchBank<E> {
         }
     }
 
+    /// Synchronize the flat anchor cache for `branch` from its current
+    /// `spawn_anchor` field. Call this after any mutation that modifies a
+    /// branch's `spawn_anchor` in place (e.g., via `get_mut`).
+    ///
+    /// This is the maintenance hook for external mutation paths (like
+    /// `StepAttributionConsolidationJob`'s `DirectionDelta` candidate
+    /// mutation in riir-engine) that bypass the bank's own spawn/merge
+    /// methods. Without this call, the flat cache would be stale and the
+    /// router would route against outdated anchors.
+    ///
+    /// Returns `true` if the cache was updated; `false` if the branch doesn't
+    /// exist, isn't routable, or the flat cache isn't populated.
+    #[inline]
+    pub fn sync_anchor_flat(&mut self, branch: BranchId) -> bool {
+        let dim = self.anchor_dim;
+        if dim == 0 {
+            return false;
+        }
+        let slot = branch.0 as usize;
+        let Some(b) = self.branches.get(slot) else {
+            return false;
+        };
+        if !b.lifecycle.is_routable() {
+            return false;
+        }
+        // Copy the anchor out to avoid simultaneous immutable (read
+        // spawn_anchor) + mutable (write_anchor_flat) borrow.
+        let anchor_copy: Vec<f32> = b.spawn_anchor.clone();
+        self.write_anchor_flat(slot, &anchor_copy);
+        true
+    }
+
     /// Mark the branch at `id` as `Removed`, clear its memory stores (preserving
     /// capacity for reuse), and push its slot onto the free-list.
     ///
