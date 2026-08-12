@@ -86,27 +86,29 @@ its *result*.)
 0 allocations / 1000 calls at 512×5120 under a thread-local `CountingAllocator`.
 Per-group accumulators are registers; nothing heap-side changed.
 
-## T4 — the AVX2 leg is implemented, UNMEASURED, and now DEFERRED
+## T4 — the AVX2 leg: MEASURED on i7-13700K, G2 FAILS, fold stays
 
-> **DEFERRED 2026-08-12 (focus directive).** The AVX2 leg is **CPU work that
-> needs the 4090**, and the active focus is bonsai / GPU / SIMD-on-this-host /
-> clippy / optimization. x86_64 keeps the folded dispatch — the safe, measured
-> state — until someone wants the x86 CPU path badly enough to run it. Issue 583
-> was removed on this deferral; this benchmark is the record.
-> The 4090 was also unreachable at the time (SSH banner timeouts under ~30 hung
-> `git`/`ssh` processes from prior sessions), so this is a deferral of something
-> that could not be measured anyway.
+> **RESOLVED 2026-08-12 (Bench 586).** The AVX2 leg was measured on the 4090
+> host (i7-13700K, AVX2+FMA). **G2 FAILS at 1.06× median (gate ≥1.10×).** The
+> fold stays as the x86_64 dispatch target. The architecture-flip predicted in
+> the original caveat below was confirmed by measurement: AVX2's
+> `horizontal_sum_256` cost cancels the 31-`vmulps` saving.
 
 `avx2_row_range_hoisted` + `fma_nibble8_avx2_unscaled` ship as the x86_64 mirror
 (1 `_mm256_mul_ps` + 1 horizontal sum per group instead of 16 `_mm256_mul_ps`),
 reachable through `simd_ternary_group_matvec_hoisted`.
 
-**The x86_64 dispatch was deliberately NOT switched.** This host is aarch64 and
-cannot measure AVX2; the NEON result does not transfer on its own — AVX2's
-`horizontal_sum_256` is more expensive than NEON's single `vaddvq`, and Bench 611
-already produced one Metal-vs-CUDA case where a latency assumption inverted
-between architectures. `simd_ternary_group_matvec` keeps the folded AVX2 path
-until a 4090 run says otherwise.
+**The x86_64 dispatch is NOT switched.** The 4090 measurement (Bench 586)
+confirms the original prediction: AVX2's `horizontal_sum_256` is more expensive
+than NEON's single `vaddvq`, enough to cancel the vmul saving — exactly the
+Metal-vs-CUDA-style architecture-flip Bench 611 warned about. Measured 1.02–1.07×
+on the i7-13700K vs 1.11–1.12× on the M3 Max. See [Bench 586](586_avx2_ternary_t4_measurements.md)
+for the full AVX2 table.
+
+| Arch | hoisted vs folded | G2 (≥1.10×) | x86_64/aarch64 dispatch |
+|---|---|---|---|
+| aarch64 (NEON, M3 Max) | 1.11–1.12× | **PASS — PROMOTED** | `neon_row_range_hoisted` |
+| x86_64 (AVX2, i7-13700K) | 1.02–1.07× | **FAIL — STAYS FOLDED** | `avx2_row_range_folded` (status quo) |
 
 ## Honest caveats
 

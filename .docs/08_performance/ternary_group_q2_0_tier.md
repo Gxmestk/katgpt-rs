@@ -82,8 +82,12 @@ vector — stable across a 10× shape range, so arithmetic cost, not a cache
 artifact. **Issue 583 removed most of it**: hoisting the scale to one `vmulq` +
 one `vaddvq` per group (instead of 32 `vmulq`) is 1.11× faster and brought the
 ratio to 1.16–1.21×. The fold trick is retired on aarch64 and retained only as
-the A/B baseline (`simd_ternary_group_matvec_folded`); the AVX2 dispatch still
-folds, pending a 4090 measurement. See [Bench 583](../../.benchmarks/583_scale_hoist_goat.md).
+the A/B baseline (`simd_ternary_group_matvec_folded`); the AVX2 dispatch also
+still folds — the 4090 measurement ([Bench 586](../../.benchmarks/586_avx2_ternary_t4_measurements.md),
+i7-13700K, 2026-08-12) confirmed the architecture-flip prediction: hoisting
+nets only 1.02–1.07× on AVX2 (gate ≥1.10× FAILs) because AVX2's `horizontal_sum_256`
+cost cancels the 31-`vmulps` saving. See [Bench 583](../../.benchmarks/583_scale_hoist_goat.md)
+for the NEON leg + the cross-architecture table.
 
 **Ternary is slower than dense f32 on NEON and always has been** (0.35–0.45×,
 reproducing [Bench 044](../../.benchmarks/044_plasma_path_goat.md) independently);

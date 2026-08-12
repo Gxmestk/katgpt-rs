@@ -175,16 +175,21 @@ passed; comparing against the shipped reference did not.
 
 ## Honest caveats
 
-1. **AVX2 kernel written, UNMEASURED, and DEFERRED (2026-08-12 focus directive).**
-   x86 CPU measurement on the 4090 is out of focus (bonsai / GPU / SIMD / clippy /
-   optimization); the kernel ships and compiles, its numbers are simply unclaimed.
-   Original note follows. `avx2_trit_row_range` ships (one
-   `_mm256_cvtepi8_epi32` unpacks 8 decoded trits per instruction), compile-
-   verified via `--target x86_64-apple-darwin`, clippy clean. It cannot be
-   *executed* here: Rosetta 2 does not implement AVX2, so
-   `is_avx2_fma_available()` is false and the path is unreachable on this host.
-   Queued for the 4090 alongside Issue 583 T4. Until then the x86_64 claim is
-   compile-only.
+1. **AVX2 kernel MEASURED on i7-13700K (Bench 586, 2026-08-12): trit is
+   15–31% SLOWER than bit-plane on AVX2 SIMD** — the opposite of NEON's
+   1.10–1.15× faster. AVX2's 8-wide lanes favour SWAR bit-extraction over LUT
+   decode. Scalar trit is still 35–38% faster than scalar bit-plane (decode is
+   genuinely cheaper), so the LUT approach itself is sound — it just doesn't
+   map to 8-wide SIMD as well as SWAR does. The footprint win (18.8% smaller)
+   is architecture-independent and stands. **On x86_64, `ternary_trit_pack` is a
+   footprint-tier, not a speed-tier.** See [Bench 586](586_avx2_ternary_t4_measurements.md)
+   for the full AVX2 table + cross-architecture summary.
+
+   `avx2_trit_row_range` ships (one `_mm256_cvtepi8_epi32` unpacks 8 decoded
+   trits per instruction). The dispatch in `simd_ternary_trit_matvec` reaches
+   it when `is_avx2_fma_available()` — correct for the consumer who explicitly
+   chose the trit container. No dispatch change needed; the point is that no
+   one should reach for trit on x86_64 for speed.
 2. **No real-model end-to-end.** The measurement is synthetic matvecs. The
    consumers that would benefit (riir-ai's Metal/CUDA forwards) run their GEMV on
    GPU, where this container is not yet implemented — that is riir-ai Issue 628.
