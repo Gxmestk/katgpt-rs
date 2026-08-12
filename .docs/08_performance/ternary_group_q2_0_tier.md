@@ -87,7 +87,11 @@ folds, pending a 4090 measurement. See [Bench 583](../../.benchmarks/583_scale_h
 
 **Ternary is slower than dense f32 on NEON and always has been** (0.35–0.45×,
 reproducing [Bench 044](../../.benchmarks/044_plasma_path_goat.md) independently);
-its win is memory traffic. The original G2 clause "≥2× the dense f16 matvec"
+its win is **capacity, not bandwidth** — [Bench 582 §G2c](../../.benchmarks/582_trit_pack_goat.md)
+measured this kernel class at 1.9 GB/s while streaming a 42 MiB matrix, ~200×
+below the M3 Max roofline, so on CPU it is compute-bound and fewer bytes per
+weight buy footprint rather than latency. (On GPU the picture inverts — those
+kernels *are* at roofline.) The original G2 clause "≥2× the dense f16 matvec"
 was **struck on arrival 2026-08-09** — it was copied from Plan 333's G-PERF,
 which misread Bench 044 (16.12 Gop/s = 0.45× FP32 NEON's 36 Gop/s, documented
 there as *fundamental*: SWAR bit-decoding has higher opcode count than pure
