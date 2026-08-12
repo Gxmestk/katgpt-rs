@@ -278,6 +278,39 @@ The finding is about **capacity** (rank-16 lm_head is input-independent), not tr
 
 **Tier update:** still **Gain** (arm A negative; arm B unproven). Will revise to GOAT candidate if arm B passes G4, or to Pass-with-negative-result if arm B also fails.
 
+### 9.4 Pivot — Go abandoned; refined hypothesis: accuracy parity + speed advantage (2026-08-12, user direction)
+
+**The Go path is dead.** Bonsai-27B at Q2_0 was never trained on Go → it has ~0% Go capability zero-shot (92.5% illegal rate). LoRA (any rank, any layer) **steers existing capability** — it cannot create capability the base model lacks. The "one layer is enough" papers (2607.01232, 2512.07829) all assume the base model ALREADY has the target capability; that assumption is violated for Go on Bonsai. Arm B (mid-layer Q+V) would produce another negative result for the same fundamental reason. **Abandoned, not deferred.**
+
+**What's NOT wasted:** the DeltaNet BPTT backward (`riir-engine/src/deltanet/backward.rs`, ~780 LOC, 4 FD tests PASS) is independent substrate — it's the delta-rule linear attention backward needed for ANY DeltaNet training task, not Go-specific.
+
+**The refined hypothesis (the actual test of "one layer is enough"):**
+
+> On tasks Bonsai-27B **already performs** (code/text completion — its native training distribution), single-layer LoRA should match full-layer LoRA **accuracy** at lower **train + infer cost**.
+
+This is the original 2607.01232 claim, now tested correctly:
+- The base model HAS the capability (it can complete code/text)
+- LoRA FINE-TUNES that capability (adapts to a specific domain/style)
+- The question: does single-layer capture the same accuracy as full-layer, but faster?
+
+**Two measurable advantages (the value proposition):**
+
+| Axis | Full-layer LoRA (baseline) | Single-layer LoRA (candidate) | Why faster |
+|---|---|---|---|
+| **Train speed** | backward through all n_layer layers | backward through 0 layers (lm_head) or top-half only (mid-layer) | fewer grad computations |
+| **Infer speed** | n_layer × 2 LoRA matvecs per token | 1-2 LoRA matvecs per token | fewer adapter applications |
+| **Accuracy** | reference | target: ≥90% of full-layer | the load-bearing question |
+
+**Constraint (user direction):** Bonsai-27B only, Metal only. No Gemma, no 4090, no other models. The test runs entirely on M3 Max Metal.
+
+**Test design (Plan 334):**
+1. Pick a code/text completion task in Bonsai's native distribution
+2. Train full-layer LoRA → measure perplexity + train time + infer overhead
+3. Train single-layer LoRA (lm_head + mid-layer Q+V) → measure same metrics
+4. GOAT gate: accuracy parity (≥90%) + speed advantage (train ≥1.5×, infer overhead ≤50%)
+
+**Tier:** still **Gain** until Plan 334 measures accuracy parity. If single-layer matches full-layer accuracy at measurable speed advantage → **GOAT** (the "one layer is enough" claim proven for LoRA on ternary). If accuracy drops below 90% → **Pass with negative result** (single-layer LoRA is a speed optimization, not an accuracy match).
+
 ---
 
 ## 10. Implementation priority table
