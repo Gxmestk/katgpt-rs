@@ -218,11 +218,37 @@ The single-layer-trained adapter is a **frozen latent-state artifact** in the ne
 
 ## 9. PoC Addendum
 
-**TBD — populated when Issue 446 completes.** Will record:
-- Raw s/step + HumanEval pass@1 for arms A/B/C/D
+### 9.1 Smoke-test signal (2026-08-12, Issue 446 T1 + T2.0 shipped)
+
+**What shipped:**
+- **T1 (DONE):** `CpuLoraTargetSpec { layers, targets }` + `CpuLoraTrainer::new_with_targets()` in `riir-train-engine` — sparse adapter layout with dense→sparse `slot_to_adapter` map. 12 forward/backward callsites wrapped in `if let Some(sparse_idx) = self.slot_to_adapter[dense_idx]`. 6 unit tests pass (incl. bit-identical sparse-vs-dense-with-zeroed-inactive forward). Existing 1210 tests still pass (G3 no-regression).
+- **T2.0 (DONE):** `issue446_single_layer_lora_poc.rs` example — 4-arm head-to-head harness for Gemma-2-2B. The `GemmaLora` substrate already supported sparse LoRA natively (per-projection `Option<LoraAdapter>`), so no Gemma-2 substrate change was needed — only harness construction.
+
+**Smoke-test numbers** (3 steps, seq_len=256, warmup=0, 50 samples, M3 Max release):
+
+| Arm | Adapters | s/step (steady) | Initial loss | Notes |
+|---|---|---|---|---|
+| A (full)              | 182 | 73 | 0.7942 | grad_norm up to 163 without warmup |
+| B (Q+V @ mid)         |   2 | 72 | 0.7942 | same initial loss → seed-shared init confirmed |
+
+**Critical early signal: G2 (≥10× speedup) is likely to FAIL on the CPU Gemma-2-2B path.** The 91× reduction in adapter count yields <5% wall-clock speedup because the LoRA contribution to FLOPs is negligible vs the 2B-param base model forward+backward. The base transformer matvecs dominate; sparsifying LoRA only removes a tiny fraction of total compute.
+
+**This is exactly the kind of honest negative result the defend-wrong PoC is designed to surface.** The fusion's value proposition was "train 2 adapters instead of 384 → 192× gradient-FLOP reduction → unblock Plan 333". On a dense model path where forward+backward are dominated by the base model, that math doesn't translate to wall-clock. **The quality axis (G4) remains the load-bearing question** — does single-layer Q+V capture ≥70% of full-LoRA quality, independent of speed? That requires the full 1000-step run + F1 eval, deferred to the user.
+
+**Where the speedup bet still might pay off:**
+- **Ternary-Bonsai-27B (Plan 333 T3.1)** — the backward path there is dominated by 384 per-adapter grad projections (Bench 448 measured 0.27 tok/s); sparsifying to 2 adapters could matter more. Still blocked on batched DeltaNet prefill (Issue 445 §Next steps).
+- **GPU paths** where per-adapter kernel-launch overhead is non-trivial (the CubeCL gemma2_lora_gpu path). Not measured here.
+- **Tiny-model CpuLoraTrainer path** (Config::game() ~18K params) — there the LoRA contribution is a much larger fraction of total FLOPs. The T1 plumbing landed here too; could be a quick bench.
+
+### 9.2 TBD — Full PoC numbers
+
+**Populated when Issue 446 T2.1-T2.6 completes.** Will record:
+- Raw s/step + HumanEval pass@1 for arms A/B/C/D at 1000 steps, seq_len=512, warmup=100
 - Which Q1–Q4 axes confirmed vs refuted
 - Honest tier revision (Gain / GOAT / Super-GOAT / Pass with negative result)
 - If Super-GOAT: trigger the mandatory outputs (open primitive in katgpt-rs, private guide in riir-ai, plan for full integration)
+
+Current pre-PoC best guess (unchanged from §3): **Tier = Gain**. The smoke test suggests G2 will fail on the dense-model CPU path, narrowing the realistic upgrade paths to: (a) GOAT if G4 passes + T3.1 passes on Ternary-Bonsai; (b) Gain if G4 fails (ship T1 as code-cleanup + perf optimization).
 
 ---
 
@@ -230,8 +256,8 @@ The single-layer-trained adapter is a **frozen latent-state artifact** in the ne
 
 | Priority | Task | Repo | Gate | Status |
 |---|---|---|---|---|
-| **P0** | Add `lora_target_layers` + `lora_targets` to `TrainingConfig` + `CpuLoraTrainer::new` | `riir-train` | clippy + existing tests | Pending (Issue 446 T1) |
-| **P0** | Defend-wrong PoC on Gemma-2-2B: arms A/B/C/D | `riir-train` | G1+G2+G3+G4 above | Pending (Issue 446 T2) |
+| **P0** | Add `lora_target_layers` + `lora_targets` to `TrainingConfig` + `CpuLoraTrainer::new` | `riir-train` | clippy + existing tests | **DONE (Issue 446 T1, commit 3161444e)** |
+| **P0** | Defend-wrong PoC on Gemma-2-2B: arms A/B/C/D | `riir-train` | G1+G2+G3+G4 above | Harness DONE (T2.0, commit 4655c06a); full run pending (smoke signal: G2 likely FAIL on CPU dense path) |
 | **P1** | If PoC passes G4: re-run Plan 333 Phase 3 T3.0 with `lora_target_layers: Some(vec![32])` on Ternary-Bonsai-27B | `riir-train` | Plan 333 stop-rule (≤60 s/step at seq_len=64) | Blocked on P0 |
 | **P1** | If PoC passes: ensure katgpt-rs `LoraAdapter::load` handles single-layer `lora.bin` files (`n_adapters = 2`) cleanly | `katgpt-rs` | existing loader tests + 1 new test for `n_adapters = 2` | Blocked on P0 |
 | **P2** | If PoC passes strongly: private guide in `riir-ai/.research/` for "single-layer steering vs policy improvement" | `riir-ai` | n/a (doc) | Blocked on P0 + P1 |
