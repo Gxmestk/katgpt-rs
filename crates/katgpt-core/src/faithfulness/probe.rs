@@ -191,6 +191,108 @@ where
         self.smear = Some(classifier);
         self
     }
+
+    /// Zero-alloc variant of [`probe_intervention`](FaithfulnessProbe::probe_intervention).
+    ///
+    /// Instead of cloning `memory` per call (5 clones per audit), this copies
+    /// `memory` into the caller-provided `scratch` buffer, perturbs `scratch`
+    /// in-place, then evaluates behavior against `scratch`. The scratch buffer
+    /// is reused across all 5 interventions in a single audit pass.
+    ///
+    /// `scratch` MUST have the same length as `memory`. The caller is
+    /// responsible for ensuring `scratch.len() == memory.len()` before each
+    /// call — this method does NOT resize `scratch`.
+    ///
+    /// # Bit-identical to `probe_intervention`
+    ///
+    /// The only difference is where the perturbation buffer lives (caller-owned
+    /// vs heap-allocated clone). The perturbation RNG sequence is identical
+    /// because the same `intervention` + `rng` state produces the same draws.
+    #[inline]
+    pub fn probe_intervention_into(
+        &mut self,
+        memory: &C::Memory,
+        scratch: &mut C::Memory,
+        intervention: Intervention,
+        rng: &mut Rng,
+    ) -> C::Delta {
+        let baseline = self.consumer.baseline_behavior();
+
+        // Clone memory → scratch, then perturb scratch in-place.
+        // `clone_from_slice` requires only `T: Clone` (matches the
+        // `MemorySlice::Elem: Clone + Default` bound). NLL: the mutable
+        // borrow of scratch.mem_as_mut_slice ends before we pass &*scratch
+        // to behavior_with_memory.
+        {
+            let src = memory.mem_as_slice();
+            let dst = scratch.mem_as_mut_slice();
+            dst.clone_from_slice(src);
+        }
+        {
+            let slice = scratch.mem_as_mut_slice();
+            match intervention {
+                Intervention::Empty => perturb::perturb_empty(slice),
+                Intervention::Shuffle => perturb::perturb_shuffle(slice, rng),
+                Intervention::Corrupt => perturb::perturb_corrupt(slice, rng),
+                Intervention::Irrelevant => {
+                    perturb::perturb_irrelevant(slice, rng, &self.irrelevant_pool)
+                }
+                Intervention::Filler => perturb::perturb_filler(slice, &self.filler_elem),
+            }
+        }
+
+        let behavior = self.consumer.behavior_with_memory(scratch);
+        self.consumer.behavior_delta(&baseline, &behavior)
+    }
+
+    /// Zero-alloc variant of
+    /// [`faithfulness_profile`](FaithfulnessProbe::faithfulness_profile).
+    ///
+    /// Runs all 5 interventions {Empty, Shuffle, Corrupt, Irrelevant, Filler}
+    /// using a single caller-provided `scratch` buffer, eliminating the 5
+    /// per-audit heap clones that `faithfulness_profile` performs.
+    ///
+    /// `scratch` MUST have the same length as `memory` and will be overwritten
+    /// on each intervention (the original `memory` is never modified).
+    ///
+    /// # Bit-identical to `faithfulness_profile`
+    ///
+    /// Same RNG draw order (Empty → Shuffle → Corrupt → Irrelevant → Filler),
+    /// same aggregation. Only the allocation strategy differs.
+    #[inline]
+    pub fn faithfulness_profile_into(
+        &mut self,
+        memory: &C::Memory,
+        scratch: &mut C::Memory,
+        rng: &mut Rng,
+    ) -> FaithfulnessProfile<C::Delta>
+    where
+        C::Delta: PartialOrd,
+    {
+        let empty_delta =
+            self.probe_intervention_into(memory, scratch, Intervention::Empty, rng);
+        let shuffle_delta =
+            self.probe_intervention_into(memory, scratch, Intervention::Shuffle, rng);
+        let corrupt_delta =
+            self.probe_intervention_into(memory, scratch, Intervention::Corrupt, rng);
+        let irrelevant_delta =
+            self.probe_intervention_into(memory, scratch, Intervention::Irrelevant, rng);
+        let filler_delta =
+            self.probe_intervention_into(memory, scratch, Intervention::Filler, rng);
+
+        let shuffle_or_corrupt_delta = if shuffle_delta >= corrupt_delta {
+            shuffle_delta
+        } else {
+            corrupt_delta
+        };
+
+        FaithfulnessProfile {
+            empty_delta,
+            shuffle_or_corrupt_delta,
+            irrelevant_delta,
+            filler_delta,
+        }
+    }
 }
 
 impl<C> FaithfulnessProbe for DefaultFaithfulnessProbe<C>
@@ -416,6 +518,7 @@ mod tests {
     /// Faithful consumer: behavior = weighted dot product with position-dependent
     /// weights. Empty memory → behavior 0 (= baseline). Meaningful perturbations
     /// → non-zero behavior.
+    #[derive(Clone)]
     struct FaithfulConsumer {
         weights: Vec<f32>,
     }
@@ -520,6 +623,63 @@ mod tests {
             !profile.is_faithfully_used(threshold),
             "unfaithful consumer should NOT be detected as faithfully used: {:?}",
             profile
+        );
+    }
+
+    #[test]
+    fn test_scratch_api_bit_identical_to_clone_api() {
+        // The zero-alloc scratch API (probe_intervention_into /
+        // faithfulness_profile_into) MUST produce bit-identical results to
+        // the clone-based API (probe_intervention / faithfulness_profile)
+        // given the same RNG seed. This is the correctness invariant.
+        let weights = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let consumer = FaithfulConsumer { weights };
+        let irrelevant_pool = vec![0.1_f32, 0.2, 0.3, 0.4];
+        let filler = 1.0_f32;
+        let memory = vec![1.0_f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+
+        // Clone-based API.
+        let mut probe_clone =
+            DefaultFaithfulnessProbe::new(consumer.clone(), irrelevant_pool.clone(), filler);
+        let mut rng_clone = Rng::with_seed(42);
+        let profile_clone = probe_clone.faithfulness_profile(&memory, &mut rng_clone);
+
+        // Scratch-based API — same consumer, pool, filler, seed.
+        let mut probe_scratch =
+            DefaultFaithfulnessProbe::new(consumer, irrelevant_pool, filler);
+        let mut rng_scratch = Rng::with_seed(42);
+        let mut scratch = vec![0.0_f32; memory.len()];
+        let profile_scratch =
+            probe_scratch.faithfulness_profile_into(&memory, &mut scratch, &mut rng_scratch);
+
+        // Bit-identical: same bits, not just "close".
+        assert_eq!(
+            profile_clone.empty_delta.to_bits(),
+            profile_scratch.empty_delta.to_bits(),
+            "empty_delta differs: clone={} scratch={}",
+            profile_clone.empty_delta,
+            profile_scratch.empty_delta
+        );
+        assert_eq!(
+            profile_clone.shuffle_or_corrupt_delta.to_bits(),
+            profile_scratch.shuffle_or_corrupt_delta.to_bits(),
+            "shuffle_or_corrupt_delta differs: clone={} scratch={}",
+            profile_clone.shuffle_or_corrupt_delta,
+            profile_scratch.shuffle_or_corrupt_delta
+        );
+        assert_eq!(
+            profile_clone.irrelevant_delta.to_bits(),
+            profile_scratch.irrelevant_delta.to_bits(),
+            "irrelevant_delta differs: clone={} scratch={}",
+            profile_clone.irrelevant_delta,
+            profile_scratch.irrelevant_delta
+        );
+        assert_eq!(
+            profile_clone.filler_delta.to_bits(),
+            profile_scratch.filler_delta.to_bits(),
+            "filler_delta differs: clone={} scratch={}",
+            profile_clone.filler_delta,
+            profile_scratch.filler_delta
         );
     }
 }
