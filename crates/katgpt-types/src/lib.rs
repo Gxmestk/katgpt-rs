@@ -86,6 +86,10 @@ mod ternary;
 /// `Q2_0_g128` container (Issue 578, `ternary_group_scale` feature).
 #[cfg(feature = "ternary_group_scale")]
 pub mod ternary_group;
+/// Ternary `{-1,0,+1}` packed 5-per-byte in base 3 — the 1.75 bits/weight
+/// footprint tier (Issue 582, `ternary_trit_pack` feature).
+#[cfg(feature = "ternary_trit_pack")]
+pub mod ternary_trit;
 
 #[cfg(test)]
 mod tests_types;
@@ -98,6 +102,10 @@ pub use binary::{BinaryWeights, GROUP_SIZE};
 #[cfg(feature = "ternary_group_scale")]
 pub use ternary_group::{
     TernaryFfnHook, TernaryGroupWeights, TernaryInputProjHook, TernaryMatvecHook,
+};
+#[cfg(feature = "ternary_trit_pack")]
+pub use ternary_trit::{
+    TRIT_CODE_LIMIT, TRIT_LUT, TRIT_POW3, TRITS_PER_BYTE, TernaryTritWeights,
 };
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]

@@ -99,13 +99,24 @@ fn scalar_row_range(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32], row_offse
     }
 }
 
+/// NEON entry point. Dispatches to the **hoisted-scale** kernel since Issue 583
+/// (1.11–1.12× over the folded one, measured on M3 Max across 4 runs — see
+/// [Bench 583](../../../../.benchmarks/583_scale_hoist_goat.md)). The folded
+/// kernel is retained as [`neon_row_range`] so the A/B stays reproducible.
 #[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
 unsafe fn neon_ternary_group_matvec(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
     assert_eq!(y.len(), w.rows);
-    unsafe { neon_row_range(w, x, y, 0) }
+    unsafe { neon_row_range_hoisted(w, x, y, 0) }
 }
 
-/// NEON kernel over the row range `[row_offset, row_offset + y.len())`.
+/// NEON kernel over the row range `[row_offset, row_offset + y.len())`, with the
+/// group scale **folded into the sign vector**.
+///
+/// **Superseded as the production path by [`neon_row_range_hoisted`] (Issue
+/// 583).** Retained because it is the baseline half of that A/B — Bench 583
+/// measures the two against each other on the same container, so deleting it
+/// would make the 1.11× claim unreproducible. Reachable via
+/// [`simd_ternary_group_matvec_folded`].
 ///
 /// See [`scalar_row_range`] for why partitioning by row is safe.
 ///
@@ -282,6 +293,241 @@ unsafe fn fmla_scaled_nibble8(
         *acc = vfmaq_f32(*acc, scaled_lo, x_lo);
         *acc = vfmaq_f32(*acc, scaled_hi, x_hi);
     }
+}
+
+/// NEON inner-loop helper, **unscaled** variant (Issue 583).
+///
+/// Identical to [`fmla_scaled_nibble8`] minus the two `vmulq_f32` that fold the
+/// group scale into the sign vector. The caller applies the scale once per group
+/// instead — see [`neon_row_range_hoisted`].
+#[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
+#[inline(always)]
+unsafe fn fmla_nibble8_unscaled(
+    acc: &mut core::arch::aarch64::float32x4_t,
+    pos_word: u64,
+    neg_word: u64,
+    col: usize,
+    base_col: usize,
+    x: &[f32],
+    mask_lo: core::arch::aarch64::uint32x4_t,
+    mask_hi: core::arch::aarch64::uint32x4_t,
+    one_u: core::arch::aarch64::uint32x4_t,
+) {
+    use core::arch::aarch64::*;
+    unsafe {
+        let byte_off = col / 8;
+        let pos_byte = ((pos_word >> (byte_off * 8)) & 0xFF) as u32;
+        let neg_byte = ((neg_word >> (byte_off * 8)) & 0xFF) as u32;
+
+        let pos_splat = vdupq_n_u32(pos_byte);
+        let neg_splat = vdupq_n_u32(neg_byte);
+
+        let pos_lo = vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(pos_splat, mask_lo), one_u));
+        let neg_lo = vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(neg_splat, mask_lo), one_u));
+        let pos_hi = vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(pos_splat, mask_hi), one_u));
+        let neg_hi = vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(neg_splat, mask_hi), one_u));
+
+        // sign = neg - pos → +1 where pos, -1 where neg, 0 where neither.
+        let sign_lo_f = vcvtq_f32_s32(vsubq_s32(neg_lo, pos_lo));
+        let sign_hi_f = vcvtq_f32_s32(vsubq_s32(neg_hi, pos_hi));
+
+        let x_lo = vld1q_f32(x.as_ptr().add(base_col + col));
+        let x_hi = vld1q_f32(x.as_ptr().add(base_col + col + 4));
+
+        *acc = vfmaq_f32(*acc, sign_lo_f, x_lo);
+        *acc = vfmaq_f32(*acc, sign_hi_f, x_hi);
+    }
+}
+
+/// NEON kernel with the group scale **hoisted** out of the inner loop (Issue 583).
+///
+/// The shipped [`neon_row_range`] folds the scale into every sign vector — one
+/// `vmulq` per 4 lanes, 32 per 128-weight group — so its 4 accumulators can span
+/// the whole row. This variant resets the accumulators per group, horizontally
+/// sums once, and multiplies by the scale once: **1 `vmulq` + 1 `vaddvq` per
+/// group instead of 32 `vmulq`**.
+///
+/// Issue 578 chose the fold to avoid the per-group reset and hsum, on the
+/// reasoning that they serialize the pipeline. Bench 582 measured the opposite
+/// on the trit tier, which is why this variant exists — see Issue 583 for the
+/// A/B and the promotion decision.
+///
+/// Bonus: this association (one scale per group) is exactly what
+/// [`ternary_group_matvec_scalar`] does, and how `Q2_0_g128` is defined, so the
+/// NEON path lands closer to its own reference.
+///
+/// # Safety
+/// Caller guarantees `x.len() == w.cols` and `row_offset + y.len() <= w.rows`.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "aarch64"))]
+unsafe fn neon_row_range_hoisted(
+    w: &TernaryGroupWeights,
+    x: &[f32],
+    y: &mut [f32],
+    row_offset: usize,
+) {
+    unsafe {
+        use core::arch::aarch64::{float32x4_t, uint32x4_t, *};
+        debug_assert_eq!(x.len(), w.cols);
+        debug_assert!(row_offset + y.len() <= w.rows);
+
+        let mask_lo_arr: [u32; 4] = [1, 2, 4, 8];
+        let mask_hi_arr: [u32; 4] = [16, 32, 64, 128];
+        let mask_lo: uint32x4_t = vld1q_u32(mask_lo_arr.as_ptr());
+        let mask_hi: uint32x4_t = vld1q_u32(mask_hi_arr.as_ptr());
+        let one_u: uint32x4_t = vdupq_n_u32(1);
+
+        for (i, y_slot) in y.iter_mut().enumerate() {
+            let r = row_offset + i;
+            let row_base = r * w.blocks64;
+            let group_base = r * w.groups_per_row;
+            let mut row_sum = 0.0f32;
+
+            for g in 0..w.groups_per_row {
+                // Accumulators are per-GROUP here, not per-row.
+                let mut acc0: float32x4_t = vdupq_n_f32(0.0);
+                let mut acc1: float32x4_t = vdupq_n_f32(0.0);
+                let mut acc2: float32x4_t = vdupq_n_f32(0.0);
+                let mut acc3: float32x4_t = vdupq_n_f32(0.0);
+                let mut scalar_acc = 0.0f32;
+
+                let b_start = g * BLOCKS_PER_GROUP;
+                let b_end = (b_start + BLOCKS_PER_GROUP).min(w.blocks64);
+
+                for b in b_start..b_end {
+                    let idx = row_base + b;
+                    let pos_word = w.pos_bits[idx];
+                    let neg_word = w.neg_bits[idx];
+
+                    let base_col = b * 64;
+                    let remaining = match base_col + 64 <= w.cols {
+                        true => 64,
+                        false => w.cols - base_col,
+                    };
+
+                    let mut col = 0usize;
+                    while col + 32 <= remaining {
+                        fmla_nibble8_unscaled(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_lo, mask_hi,
+                            one_u,
+                        );
+                        col += 8;
+                        fmla_nibble8_unscaled(
+                            &mut acc1, pos_word, neg_word, col, base_col, x, mask_lo, mask_hi,
+                            one_u,
+                        );
+                        col += 8;
+                        fmla_nibble8_unscaled(
+                            &mut acc2, pos_word, neg_word, col, base_col, x, mask_lo, mask_hi,
+                            one_u,
+                        );
+                        col += 8;
+                        fmla_nibble8_unscaled(
+                            &mut acc3, pos_word, neg_word, col, base_col, x, mask_lo, mask_hi,
+                            one_u,
+                        );
+                        col += 8;
+                    }
+
+                    while col + 8 <= remaining {
+                        fmla_nibble8_unscaled(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_lo, mask_hi,
+                            one_u,
+                        );
+                        col += 8;
+                    }
+
+                    if col + 4 <= remaining {
+                        let byte_off = col / 8;
+                        let pos_byte = ((pos_word >> (byte_off * 8)) & 0xFF) as u32;
+                        let neg_byte = ((neg_word >> (byte_off * 8)) & 0xFF) as u32;
+                        let pos_splat = vdupq_n_u32(pos_byte);
+                        let neg_splat = vdupq_n_u32(neg_byte);
+                        let pos_nz =
+                            vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(pos_splat, mask_lo), one_u));
+                        let neg_nz =
+                            vreinterpretq_s32_u32(vcgeq_u32(vandq_u32(neg_splat, mask_lo), one_u));
+                        let sign_f = vcvtq_f32_s32(vsubq_s32(neg_nz, pos_nz));
+                        let x_v = vld1q_f32(x.as_ptr().add(base_col + col));
+                        acc0 = vfmaq_f32(acc0, sign_f, x_v);
+                        col += 4;
+                    }
+
+                    // Scalar tail (0-3 elements) — unscaled, folded in below.
+                    while col < remaining {
+                        let bit_mask = 1u64 << col;
+                        let pos = ((pos_word & bit_mask) != 0) as i32 as f32;
+                        let neg = ((neg_word & bit_mask) != 0) as i32 as f32;
+                        scalar_acc += (pos - neg) * *x.get_unchecked(base_col + col);
+                        col += 1;
+                    }
+                }
+
+                let group_acc = vaddvq_f32(vaddq_f32(
+                    vaddq_f32(acc0, acc1),
+                    vaddq_f32(acc2, acc3),
+                )) + scalar_acc;
+                row_sum += w.group_scale[group_base + g].to_f32() * group_acc;
+            }
+
+            *y_slot = row_sum;
+        }
+    }
+}
+
+/// The hoisted-scale NEON kernel, reachable directly.
+///
+/// Since Issue 583 this is what [`simd_ternary_group_matvec`] dispatches to on
+/// aarch64, so the two are equivalent there; it stays public so Bench 583 can
+/// name both halves of the A/B explicitly rather than relying on which one
+/// happens to be wired up.
+#[cfg(feature = "ternary_group_scale")]
+pub fn simd_ternary_group_matvec_hoisted(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
+    assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
+    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if matches!(simd_level(), SimdLevel::Neon) {
+            unsafe { neon_row_range_hoisted(w, x, y, 0) };
+            return;
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if super::is_avx2_fma_available() {
+            unsafe { avx2_row_range_hoisted(w, x, y, 0) };
+            return;
+        }
+    }
+    scalar_row_range(w, x, y, 0);
+}
+
+/// The **folded**-scale NEON/AVX2 kernel — the pre-Issue-583 production path.
+///
+/// Kept reachable so the A/B in Bench 583 measures a live code path rather than
+/// a deleted one. On x86_64 it is still the *production* path — the AVX2 leg of
+/// the hoist question (Issue 583 T4) is unmeasured, so the dispatch there was
+/// deliberately left alone.
+#[cfg(feature = "ternary_group_scale")]
+pub fn simd_ternary_group_matvec_folded(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32]) {
+    assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
+    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if matches!(simd_level(), SimdLevel::Neon) {
+            unsafe { neon_row_range(w, x, y, 0) };
+            return;
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if super::is_avx2_fma_available() {
+            unsafe { avx2_row_range(w, x, y, 0) };
+            return;
+        }
+    }
+    scalar_row_range(w, x, y, 0);
 }
 
 // ── AVX2 (x86_64) ────────────────────────────────────────────────────
@@ -461,6 +707,146 @@ unsafe fn fma_scaled_nibble8_avx2(
     }
 }
 
+/// AVX2 inner-loop helper, **unscaled** variant (Issue 583 T4).
+///
+/// [`fma_scaled_nibble8_avx2`] minus the `_mm256_mul_ps` that folds the group
+/// scale into the sign vector; the caller applies the scale once per group.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "x86_64"))]
+#[inline(always)]
+unsafe fn fma_nibble8_avx2_unscaled(
+    acc: &mut core::arch::x86_64::__m256,
+    pos_word: u64,
+    neg_word: u64,
+    col: usize,
+    base_col: usize,
+    x: &[f32],
+    mask_byte: core::arch::x86_64::__m256i,
+    zero_i: core::arch::x86_64::__m256i,
+) {
+    use core::arch::x86_64::*;
+    unsafe {
+        let byte_off = col / 8;
+        let pos_byte = ((pos_word >> (byte_off * 8)) & 0xFF) as i32;
+        let neg_byte = ((neg_word >> (byte_off * 8)) & 0xFF) as i32;
+
+        let pos_splat = _mm256_set1_epi32(pos_byte);
+        let neg_splat = _mm256_set1_epi32(neg_byte);
+
+        let pos_set_i = _mm256_cmpgt_epi32(_mm256_and_si256(pos_splat, mask_byte), zero_i);
+        let neg_set_i = _mm256_cmpgt_epi32(_mm256_and_si256(neg_splat, mask_byte), zero_i);
+
+        // sign = neg_set − pos_set → +1 where pos, −1 where neg, 0 where neither.
+        let sign_f = _mm256_cvtepi32_ps(_mm256_sub_epi32(neg_set_i, pos_set_i));
+
+        let x_v = _mm256_loadu_ps(x.as_ptr().add(base_col + col));
+        *acc = _mm256_fmadd_ps(sign_f, x_v, *acc);
+    }
+}
+
+/// AVX2 kernel with the group scale **hoisted** out of the inner loop
+/// (Issue 583 T4) — the x86_64 mirror of [`neon_row_range_hoisted`].
+///
+/// 1 `_mm256_mul_ps` + 1 horizontal sum per 128-weight group, instead of 16
+/// `_mm256_mul_ps` (one per 8 lanes). The NEON A/B measured 1.11–1.12× for this
+/// restructuring on M3 Max; **whether it also wins on AVX2 is a separate
+/// measurement** — this host cannot run it, so the kernel ships beside the
+/// folded one and the dispatch is NOT switched until a 4090 run says so.
+///
+/// # Safety
+/// Caller guarantees `x.len() == w.cols` and `row_offset + y.len() <= w.rows`.
+#[cfg(all(feature = "ternary_group_scale", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn avx2_row_range_hoisted(
+    w: &TernaryGroupWeights,
+    x: &[f32],
+    y: &mut [f32],
+    row_offset: usize,
+) {
+    use super::horizontal::horizontal_sum_256;
+    use core::arch::x86_64::*;
+    unsafe {
+        assert_eq!(x.len(), w.cols);
+        debug_assert!(row_offset + y.len() <= w.rows);
+
+        let mask_byte: __m256i = _mm256_setr_epi32(1, 2, 4, 8, 16, 32, 64, 128);
+        let zero_i: __m256i = _mm256_setzero_si256();
+
+        for (i, y_slot) in y.iter_mut().enumerate() {
+            let r = row_offset + i;
+            let row_base = r * w.blocks64;
+            let group_base = r * w.groups_per_row;
+            let mut row_sum = 0.0f32;
+
+            for g in 0..w.groups_per_row {
+                // Per-GROUP accumulators, unscaled.
+                let mut acc0: __m256 = _mm256_setzero_ps();
+                let mut acc1: __m256 = _mm256_setzero_ps();
+                let mut acc2: __m256 = _mm256_setzero_ps();
+                let mut acc3: __m256 = _mm256_setzero_ps();
+                let mut scalar_acc = 0.0f32;
+
+                let b_start = g * BLOCKS_PER_GROUP;
+                let b_end = (b_start + BLOCKS_PER_GROUP).min(w.blocks64);
+
+                for b in b_start..b_end {
+                    let idx = row_base + b;
+                    let pos_word = w.pos_bits[idx];
+                    let neg_word = w.neg_bits[idx];
+
+                    let base_col = b * 64;
+                    let remaining = if base_col + 64 <= w.cols {
+                        64
+                    } else {
+                        w.cols - base_col
+                    };
+
+                    let mut col = 0usize;
+                    while col + 32 <= remaining {
+                        fma_nibble8_avx2_unscaled(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                        );
+                        col += 8;
+                        fma_nibble8_avx2_unscaled(
+                            &mut acc1, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                        );
+                        col += 8;
+                        fma_nibble8_avx2_unscaled(
+                            &mut acc2, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                        );
+                        col += 8;
+                        fma_nibble8_avx2_unscaled(
+                            &mut acc3, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                        );
+                        col += 8;
+                    }
+
+                    while col + 8 <= remaining {
+                        fma_nibble8_avx2_unscaled(
+                            &mut acc0, pos_word, neg_word, col, base_col, x, mask_byte, zero_i,
+                        );
+                        col += 8;
+                    }
+
+                    // Scalar tail (0-7 elements) — unscaled, folded in below.
+                    while col < remaining {
+                        let bit_mask = 1u64 << col;
+                        let pos = ((pos_word & bit_mask) != 0) as i32 as f32;
+                        let neg = ((neg_word & bit_mask) != 0) as i32 as f32;
+                        scalar_acc += (pos - neg) * *x.get_unchecked(base_col + col);
+                        col += 1;
+                    }
+                }
+
+                acc0 = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
+                let group_acc = horizontal_sum_256(acc0) + scalar_acc;
+                row_sum += w.group_scale[group_base + g].to_f32() * group_acc;
+            }
+
+            *y_slot = row_sum;
+        }
+    }
+}
+
 /// Group-scale ternary matvec: `y = W × x`.
 ///
 /// Dispatches to NEON / AVX2 where available, scalar otherwise.
@@ -532,7 +918,9 @@ pub fn simd_ternary_group_matvec_parallel(w: &TernaryGroupWeights, x: &[f32], y:
             let row_offset = ci * chunk;
             match simd_level() {
                 #[cfg(target_arch = "aarch64")]
-                SimdLevel::Neon => unsafe { neon_row_range(w, x, y_chunk, row_offset) },
+                // Hoisted since Issue 583 — must match the serial dispatch
+                // above, or the parallel-vs-serial bit-identity gate breaks.
+                SimdLevel::Neon => unsafe { neon_row_range_hoisted(w, x, y_chunk, row_offset) },
                 #[cfg(target_arch = "x86_64")]
                 SimdLevel::Avx2 => unsafe { avx2_row_range(w, x, y_chunk, row_offset) },
                 _ => scalar_row_range(w, x, y_chunk, row_offset),

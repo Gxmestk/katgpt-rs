@@ -54,6 +54,9 @@ mod ternary;
 /// Group-scale ternary matvec kernels (`ternary_group_scale`, Issue 578).
 #[cfg(feature = "ternary_group_scale")]
 pub mod ternary_group;
+/// Trit-packed ternary matvec kernels (`ternary_trit_pack`, Issue 582).
+#[cfg(feature = "ternary_trit_pack")]
+pub mod ternary_trit;
 
 #[cfg(test)]
 mod tests;
@@ -111,9 +114,12 @@ pub use elementwise::{
 pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "ternary_group_scale")]
 pub use ternary_group::{
-    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, simd_ternary_group_matvec_parallel,
-    ternary_group_matvec_scalar,
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec,
+    simd_ternary_group_matvec_folded, simd_ternary_group_matvec_hoisted,
+    simd_ternary_group_matvec_parallel, ternary_group_matvec_scalar,
 };
+#[cfg(feature = "ternary_trit_pack")]
+pub use ternary_trit::{simd_ternary_trit_matvec, ternary_trit_matvec_scalar};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{

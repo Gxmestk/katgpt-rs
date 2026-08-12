@@ -91,6 +91,12 @@ binary_plasma = []
 # the row-scale kernel — its win is memory traffic on Q2_0_g128 weights only.
 ternary_group_scale = ["binary_plasma"]
 
+# Issue 582: base-3 trit packing — 5 trits/byte + per-128 f16 scale = 1.75
+# bits/weight vs the bit-plane tier's 2.125 (-17.6%, Bonsai-27B 7.17 -> 5.90 GB).
+# Same alphabet, same group granularity; only the storage differs. Implies
+# ternary_group_scale for GROUP_SIZE + the `from_group`/`to_group` repack.
+ternary_trit_pack = ["ternary_group_scale"]
+
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []
 
@@ -125,4 +131,16 @@ depth_invariance = []
 # Needs plasma_path too: G2 compares against the row-scale ternary kernel.
 [[test]]
 name = "bench_578_ternary_group_goat"
+required-features = ["ternary_group_scale", "plasma_path"]
+
+# Issue 582 GOAT gates: G2 footprint (deterministic), G2b latency
+# (informational, 2x reject bound), G1 cross-tier, G4 alloc-free.
+[[test]]
+name = "bench_582_trit_pack_goat"
+required-features = ["ternary_trit_pack"]
+
+# Issue 583 A/B: group scale hoisted vs folded in the bit-plane NEON kernel.
+# Needs plasma_path only because the harness shares bench_578's feature shape.
+[[test]]
+name = "bench_583_scale_hoist_goat"
 required-features = ["ternary_group_scale", "plasma_path"]

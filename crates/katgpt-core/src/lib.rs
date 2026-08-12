@@ -570,6 +570,14 @@ pub use types::{
     TernaryFfnHook, TernaryGroupWeights, TernaryInputProjHook, TernaryMatvecHook,
 };
 
+// Issue 582: the base-3 footprint tier — same alphabet and group scale as the
+// Q2_0_g128 container, 5 trits per byte instead of two bit-planes (1.75 vs
+// 2.125 bits/weight, -17.6%).
+#[cfg(feature = "ternary_trit_pack")]
+pub use simd::{simd_ternary_trit_matvec, ternary_trit_matvec_scalar};
+#[cfg(feature = "ternary_trit_pack")]
+pub use types::{TRITS_PER_BYTE, TernaryTritWeights};
+
 #[cfg(feature = "peira_distill")]
 pub mod peira;
 #[cfg(feature = "peira_distill")]

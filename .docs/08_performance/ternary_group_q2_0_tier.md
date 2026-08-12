@@ -62,7 +62,7 @@ across the row's groups — always succeeds, unlike `from_ternary_no_zeros`.
 | Gate | Status |
 |---|---|
 | **G1 correctness** | **PASS.** Scalar/NEON/AVX2 parity, invariants, quantizer, loader (incl. 3 corruption modes), widening — 12 unit tests + 2 loader tests. The load-bearing half — **a real Bonsai tensor reproducing llama.cpp** — closed by riir-ai Issue 594: ` Paris` rank 1 @ p=0.69 vs llama.cpp ref ~0.69, 5/5 top-5 recovery. See [riir-ai `bonsai_ternary_throughput.md`](../../../riir-ai/.docs/09_performance/bonsai_ternary_throughput.md). |
-| **G2 perf** | **PASS.** 1.29–1.31× the row-scale kernel (ceiling 1.5×). Row-parallel kernel adds **7.21×** over serial on real Bonsai geometry. AVX2 5.98–6.13× vs scalar ([Bench 581](../../.benchmarks/581_ternary_group_avx2_goat.md)). |
+| **G2 perf** | **PASS.** Now **1.16–1.21×** the row-scale kernel (ceiling 1.5×) — improved from 1.29–1.31× by Issue 583's scale hoist. Row-parallel kernel adds **7.21×** over serial on real Bonsai geometry. AVX2 5.98–6.13× vs scalar ([Bench 581](../../.benchmarks/581_ternary_group_avx2_goat.md)). |
 | **G3 no-regression** | **PASS.** `katgpt-types` 157 tests with the feature / 127 default; `katgpt-transformer` 25. Clean under default, `--no-default-features`, feature-on, and feature-on-without-`plasma_path`. |
 | **G4 alloc-free** | **PASS.** 0 allocs / 1000 calls on NEON, scalar, and AVX2 matvec; 0 / 200 sub-threshold batch; 0 / 50 row-parallel — under `CountingAllocator`. |
 
@@ -77,9 +77,13 @@ training.
 | 1024×1024 | 163 673 | 127 227 | 60 773 | **1.29×** | 0.37× |
 | 512×5120 | 415 094 | 319 777 | 162 410 | **1.30×** | 0.39× |
 
-The ~1.3× is the extra `vmulq` per 4 lanes folding the group scale into the sign
+The ~1.3× was the extra `vmulq` per 4 lanes folding the group scale into the sign
 vector — stable across a 10× shape range, so arithmetic cost, not a cache
-artifact.
+artifact. **Issue 583 removed most of it**: hoisting the scale to one `vmulq` +
+one `vaddvq` per group (instead of 32 `vmulq`) is 1.11× faster and brought the
+ratio to 1.16–1.21×. The fold trick is retired on aarch64 and retained only as
+the A/B baseline (`simd_ternary_group_matvec_folded`); the AVX2 dispatch still
+folds, pending a 4090 measurement. See [Bench 583](../../.benchmarks/583_scale_hoist_goat.md).
 
 **Ternary is slower than dense f32 on NEON and always has been** (0.35–0.45×,
 reproducing [Bench 044](../../.benchmarks/044_plasma_path_goat.md) independently);
@@ -242,10 +246,14 @@ attempted; it is a real, bounded, katgpt-rs-side optimization with a measured
 
 ## Non-goals
 
-- **Native 2-bit-slot storage / plane interleaving.** We repack into two
-  bit-planes because that is what the SIMD popcount kernel consumes. Closing the
-  2.125 → 1.71 bits/weight gap — and the ~10% Metal GEMV gap it shares a cause
-  with (see above) — is a separate optimization, and a real one.
+- **Native 2-bit-slot storage / plane interleaving.** ~~A separate
+  optimization.~~ **DONE, better than specified** — [Issue 582](../../.issues/582_ternary_trit_packed_footprint_tier.md)
+  ships `TernaryTritWeights`: base-3 packing, 5 trits per byte, **1.725
+  bits/weight** (below the 1.71-ish "ideal" this doc called unreachable), Bonsai
+  5.82 GB instead of 7.16 GB, and — against the prediction — **1.22–1.28×
+  faster** than this tier on NEON, not slower. See
+  [Bench 582](../../.benchmarks/582_trit_pack_goat.md). The GPU leg (single load
+  stream on Metal/CUDA) is riir-ai Issue 628.
 - **Changing `TernaryWeights` or the `CIOTBIT1` format.** Additive tier only —
   adding fields to `TernaryWeights` would break `load_ternary_bits`' struct
   literal and force an on-disk version bump, and carrying both `row_scale` and
