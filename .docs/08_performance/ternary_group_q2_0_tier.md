@@ -251,7 +251,7 @@ attempted; it is a real, bounded, katgpt-rs-side optimization with a measured
 ## Non-goals
 
 - **Native 2-bit-slot storage / plane interleaving.** ~~A separate
-  optimization.~~ **DONE, better than specified** — [Issue 582](../../.issues/582_ternary_trit_packed_footprint_tier.md)
+  optimization.~~ **DONE, better than specified** — [Bench 582](../../.benchmarks/582_trit_pack_goat.md) (Issue 582, closed + removed)
   ships `TernaryTritWeights`: base-3 packing, 5 trits per byte, **1.725
   bits/weight** (below the 1.71-ish "ideal" this doc called unreachable), Bonsai
   5.82 GB instead of 7.16 GB, and — against the prediction — **1.10–1.15×

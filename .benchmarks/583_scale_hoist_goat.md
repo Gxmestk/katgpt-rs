@@ -3,7 +3,7 @@
 **Date:** 2026-08-12
 **Hardware:** M3 Max, aarch64/NEON, `--release`
 **Harness:** `crates/katgpt-types/tests/bench_583_scale_hoist_goat.rs`
-**Issue:** [583](../.issues/583_group_scale_hoist_vs_fold.md)
+**Issue:** 583 — closed + removed 2026-08-12 (T1–T3 done, T4 deferred); this file is the record
 **Origin:** [Bench 582](582_trit_pack_goat.md) §Attribution
 **Affects:** the shipped `ternary_group_scale` tier (Issue 578) — no container or
 wire-format change
@@ -86,7 +86,16 @@ its *result*.)
 0 allocations / 1000 calls at 512×5120 under a thread-local `CountingAllocator`.
 Per-group accumulators are registers; nothing heap-side changed.
 
-## T4 — the AVX2 leg is implemented but UNMEASURED
+## T4 — the AVX2 leg is implemented, UNMEASURED, and now DEFERRED
+
+> **DEFERRED 2026-08-12 (focus directive).** The AVX2 leg is **CPU work that
+> needs the 4090**, and the active focus is bonsai / GPU / SIMD-on-this-host /
+> clippy / optimization. x86_64 keeps the folded dispatch — the safe, measured
+> state — until someone wants the x86 CPU path badly enough to run it. Issue 583
+> was removed on this deferral; this benchmark is the record.
+> The 4090 was also unreachable at the time (SSH banner timeouts under ~30 hung
+> `git`/`ssh` processes from prior sessions), so this is a deferral of something
+> that could not be measured anyway.
 
 `avx2_row_range_hoisted` + `fma_nibble8_avx2_unscaled` ship as the x86_64 mirror
 (1 `_mm256_mul_ps` + 1 horizontal sum per group instead of 16 `_mm256_mul_ps`),

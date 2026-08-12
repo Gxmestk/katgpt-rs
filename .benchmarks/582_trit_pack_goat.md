@@ -4,7 +4,7 @@
 **Hardware:** M3 Max, aarch64/NEON, `--release`
 **Harness:** `crates/katgpt-types/tests/bench_582_trit_pack_goat.rs`
 **Feature:** `ternary_trit_pack` (opt-in)
-**Issue:** [582](../.issues/582_ternary_trit_packed_footprint_tier.md)
+**Issue:** 582 — closed + removed 2026-08-12 (all gates PASS, AVX2 measurement deferred); this file is the record
 **Tier doc:** [`.docs/08_performance/ternary_group_q2_0_tier.md`](../.docs/08_performance/ternary_group_q2_0_tier.md)
 
 ## Executive summary
@@ -175,7 +175,10 @@ passed; comparing against the shipped reference did not.
 
 ## Honest caveats
 
-1. **AVX2 kernel written but UNMEASURED.** `avx2_trit_row_range` ships (one
+1. **AVX2 kernel written, UNMEASURED, and DEFERRED (2026-08-12 focus directive).**
+   x86 CPU measurement on the 4090 is out of focus (bonsai / GPU / SIMD / clippy /
+   optimization); the kernel ships and compiles, its numbers are simply unclaimed.
+   Original note follows. `avx2_trit_row_range` ships (one
    `_mm256_cvtepi8_epi32` unpacks 8 decoded trits per instruction), compile-
    verified via `--target x86_64-apple-darwin`, clippy clean. It cannot be
    *executed* here: Rosetta 2 does not implement AVX2, so
@@ -195,6 +198,28 @@ passed; comparing against the shipped reference did not.
 4. **`from_group` is O(rows·cols) scalar get/set.** Fine at load time
    (one pass, no hot path), but it is not a fast repack; a block-wise version
    would be needed if it ever landed on a latency path.
+
+## Row-parallel kernel (added 2026-08-12)
+
+`simd_ternary_trit_matvec_parallel` mirrors the bit-plane tier's row-parallel
+entry point. Without it the tier was **unusable for its own target**: the
+bit-plane tier's parallel kernel measures 7.21× over serial on real Bonsai
+geometry and riir-engine's `forward_ternary` calls it at every decode step, so a
+consumer adopting trit-packing to save 18.8% of footprint would have traded a 7×
+loss for it.
+
+Bit-identity to serial is asserted across the `PARALLEL_ROW_MIN = 256` boundary
+(255 / 256 / 513 / 1024 rows), a ragged byte count, a zeroed row, and Bonsai's
+48-row `ssm_alpha` shape (serial delegation). Every group re-decodes its own
+bytes — including boundary bytes shared with the neighbouring group — so no state
+crosses a row or group boundary and `par_chunks_mut` is a pure partition.
+
+**G2d timing is reported, not claimed.** At 4096×5120 on 16 threads the trit/plane
+ratio ranged **0.83–1.03× across runs** and thread scaling 2.4–4.5× on a working
+box. So the serial tier's stable 0.87× advantage is *not* reproducibly visible
+under contention, and this harness cannot resolve whether it survives. Only the
+bit-identity and a >2× parallelism floor are asserted. A quiet-box run would
+settle it.
 
 ## Promotion verdict — stays opt-in
 
