@@ -1,7 +1,8 @@
 //! Trit-packed ternary matvec — the base-3 footprint kernel
-//! (`ternary_trit_pack` feature, Issue 582). Scalar / NEON paths.
+//! (`ternary_trit_pack` feature, Issue 582).
 //!
-//! Same arithmetic as [`super::ternary_group`], different unpack. The weights
+//! Scalar / NEON / AVX2 paths. Same arithmetic as [`super::ternary_group`],
+//! different unpack. The weights
 //! arrive 5-per-byte in base 3 ([`crate::TernaryTritWeights`]) instead of as two
 //! 1-bit planes, which is 1.725 bits/weight instead of 2.125 — **18.8% fewer
 //! bytes** to pull through memory.
@@ -202,7 +203,102 @@ unsafe fn neon_row_range(w: &TernaryTritWeights, x: &[f32], y: &mut [f32], row_o
     }
 }
 
-/// `y = w @ x` — dispatches to NEON when available, else the scalar reference.
+/// AVX2 kernel over the row range `[row_offset, row_offset + y.len())`
+/// (Issue 582 follow-up, 2026-08-12).
+///
+/// The base-3 decode itself is architecture-independent — [`decode_group`] is
+/// plain Rust byte moves through [`crate::TRIT_LUT`] — so only the accumulate
+/// loop differs from NEON. AVX2 unpacks the decoded `i8` lanes with a **single**
+/// `_mm256_cvtepi8_epi32` (VPMOVSXBD: 8 signed bytes → 8 `i32`), which is
+/// cheaper than the bit-plane kernel's SWAR path (splat a byte, AND against a
+/// bit-position mask, compare) — the same reason the NEON version wins.
+///
+/// 32 decoded trits per outer unroll across 4 `__m256` accumulators, group scale
+/// applied once after the horizontal sum.
+///
+/// # Safety
+/// Caller guarantees `x.len() == w.cols` and `row_offset + y.len() <= w.rows`.
+#[cfg(all(feature = "ternary_trit_pack", target_arch = "x86_64"))]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn avx2_trit_row_range(
+    w: &TernaryTritWeights,
+    x: &[f32],
+    y: &mut [f32],
+    row_offset: usize,
+) {
+    use super::horizontal::horizontal_sum_256;
+    use core::arch::x86_64::*;
+    unsafe {
+        debug_assert_eq!(x.len(), w.cols);
+        debug_assert!(row_offset + y.len() <= w.rows);
+
+        let mut scratch = [0i8; SCRATCH_LEN];
+        for (i, y_slot) in y.iter_mut().enumerate() {
+            let r = row_offset + i;
+            let group_base = r * w.groups_per_row;
+            let mut row_sum = 0.0f32;
+
+            for g in 0..w.groups_per_row {
+                let (base, live) = decode_group(w, r, g, &mut scratch);
+                let w_start = g * GROUP_SIZE;
+
+                let mut acc0 = _mm256_setzero_ps();
+                let mut acc1 = _mm256_setzero_ps();
+                let mut acc2 = _mm256_setzero_ps();
+                let mut acc3 = _mm256_setzero_ps();
+
+                // 8 trits per accumulator, 4 accumulators = 32 per iteration.
+                let chunks = live / 32;
+                for c in 0..chunks {
+                    let sp = scratch.as_ptr().add(base + c * 32);
+                    let xp = x.as_ptr().add(w_start + c * 32);
+                    // _mm_loadl_epi64 reads 8 bytes; cvtepi8_epi32 sign-extends
+                    // them into 8 i32 lanes in one instruction.
+                    let s0 = _mm256_cvtepi8_epi32(_mm_loadl_epi64(sp as *const __m128i));
+                    let s1 = _mm256_cvtepi8_epi32(_mm_loadl_epi64(sp.add(8) as *const __m128i));
+                    let s2 = _mm256_cvtepi8_epi32(_mm_loadl_epi64(sp.add(16) as *const __m128i));
+                    let s3 = _mm256_cvtepi8_epi32(_mm_loadl_epi64(sp.add(24) as *const __m128i));
+                    acc0 = _mm256_fmadd_ps(_mm256_cvtepi32_ps(s0), _mm256_loadu_ps(xp), acc0);
+                    acc1 =
+                        _mm256_fmadd_ps(_mm256_cvtepi32_ps(s1), _mm256_loadu_ps(xp.add(8)), acc1);
+                    acc2 =
+                        _mm256_fmadd_ps(_mm256_cvtepi32_ps(s2), _mm256_loadu_ps(xp.add(16)), acc2);
+                    acc3 =
+                        _mm256_fmadd_ps(_mm256_cvtepi32_ps(s3), _mm256_loadu_ps(xp.add(24)), acc3);
+                }
+
+                // Remaining 8-element chunks.
+                let mut j = chunks * 32;
+                while j + 8 <= live {
+                    let s = _mm256_cvtepi8_epi32(_mm_loadl_epi64(
+                        scratch.as_ptr().add(base + j) as *const __m128i
+                    ));
+                    acc0 = _mm256_fmadd_ps(
+                        _mm256_cvtepi32_ps(s),
+                        _mm256_loadu_ps(x.as_ptr().add(w_start + j)),
+                        acc0,
+                    );
+                    j += 8;
+                }
+
+                acc0 = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
+                let mut group_acc = horizontal_sum_256(acc0);
+                // Scalar tail (0-7 trits in a ragged final group).
+                while j < live {
+                    group_acc +=
+                        *scratch.get_unchecked(base + j) as f32 * *x.get_unchecked(w_start + j);
+                    j += 1;
+                }
+
+                row_sum += w.group_scale[group_base + g].to_f32() * group_acc;
+            }
+            *y_slot = row_sum;
+        }
+    }
+}
+
+/// `y = w @ x` — dispatches to NEON / AVX2 where available, else the scalar
+/// reference.
 ///
 /// Writes into a caller-owned `y`, allocating nothing (Issue 582 G4).
 #[cfg(feature = "ternary_trit_pack")]
@@ -214,6 +310,13 @@ pub fn simd_ternary_trit_matvec(w: &TernaryTritWeights, x: &[f32], y: &mut [f32]
     {
         if matches!(simd_level(), SimdLevel::Neon) {
             unsafe { neon_row_range(w, x, y, 0) };
+            return;
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if super::is_avx2_fma_available() {
+            unsafe { avx2_trit_row_range(w, x, y, 0) };
             return;
         }
     }
