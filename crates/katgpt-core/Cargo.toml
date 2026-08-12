@@ -1056,6 +1056,17 @@ name = "bench_329_non_interference_branches_goat"
 harness = false
 required-features = ["non_interference_branches"]
 
+# riir-ai Issue 636 — BranchRouter route step cache-miss measurement. Decides
+# whether the SoA BranchBank anchor optimization is worth building by measuring
+# AoS (current, per-branch Vec pointer chase) vs SoA (flat contiguous buffer)
+# at the production NPC shape (8 branches, D=8). Gate: ≥10% faster in cold
+# regime → build; <10% → close as NEGATIVE. Hot + cold cache both measured.
+# Convention: std::time::Instant + harness = false (mirrors bench_329 / bench_377).
+[[bench]]
+name = "branch_router_cache_miss_bench"
+harness = false
+required-features = ["non_interference_branches"]
+
 # Plan 335 Phase 2 — Paired Loss Gap Diagnostic GOAT gate. G2 perf
 # (from_log_probs + filtered_mean at L=8192 ≤ 1µs) + G2-alloc (zero-alloc
 # query hot path) + G4 gain (TopKNoCopy amplifies |gap| ≥ 1.5× vs AllTokens
