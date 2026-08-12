@@ -119,7 +119,9 @@ pub use ternary_group::{
     simd_ternary_group_matvec_parallel, ternary_group_matvec_scalar,
 };
 #[cfg(feature = "ternary_trit_pack")]
-pub use ternary_trit::{simd_ternary_trit_matvec, ternary_trit_matvec_scalar};
+pub use ternary_trit::{
+    simd_ternary_trit_matvec, simd_ternary_trit_matvec_parallel, ternary_trit_matvec_scalar,
+};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{

@@ -324,6 +324,65 @@ pub fn simd_ternary_trit_matvec(w: &TernaryTritWeights, x: &[f32], y: &mut [f32]
     scalar_row_range(w, x, y, 0);
 }
 
+/// Row-parallel `y = w @ x` — the trit tier's decode-step kernel.
+///
+/// Mirrors [`super::ternary_group::simd_ternary_group_matvec_parallel`], which
+/// exists because the only rayon entry point in that tier parallelizes over
+/// *batch* and therefore did nothing at `batch = 1` — i.e. at every
+/// autoregressive decode step. Without this, a consumer switching from the
+/// bit-plane tier to this one to save 18.8% of its footprint would silently give
+/// up that tier's measured **7.21×** row-parallel gain on real Bonsai geometry,
+/// which is a far bigger loss than the footprint win.
+///
+/// ## Correctness
+///
+/// Rows are fully independent: row `r` reads only its own span of `trits` and
+/// `group_scale`, and writes only `y[r]`. Every group re-decodes its own bytes
+/// (shared boundary bytes included), so no state crosses a row or group
+/// boundary and `par_chunks_mut` is a pure partition — **bit-identical** to
+/// serial, not merely close. Asserted by `parallel_matches_serial_bit_identical`.
+///
+/// Below `PARALLEL_ROW_MIN` rows it delegates to serial, matching the bit-plane
+/// tier's threshold so the two tiers switch over at the same shape (Bonsai's
+/// 48-row `ssm_alpha`/`ssm_beta` stay serial in both).
+#[cfg(feature = "ternary_trit_pack")]
+pub fn simd_ternary_trit_matvec_parallel(w: &TernaryTritWeights, x: &[f32], y: &mut [f32]) {
+    use rayon::prelude::*;
+
+    assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
+    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
+
+    /// Same value as the bit-plane tier's threshold — see the doc comment.
+    const PARALLEL_ROW_MIN: usize = 256;
+
+    if w.rows < PARALLEL_ROW_MIN {
+        simd_ternary_trit_matvec(w, x, y);
+        return;
+    }
+
+    // One chunk per worker: each row already carries `cols` worth of work, so
+    // fewer larger tasks beat many small ones.
+    let chunk = w.rows.div_ceil(rayon::current_num_threads().max(1));
+    y.par_chunks_mut(chunk).enumerate().for_each(|(ci, y_chunk)| {
+        let row_offset = ci * chunk;
+        #[cfg(target_arch = "aarch64")]
+        {
+            if matches!(simd_level(), SimdLevel::Neon) {
+                unsafe { neon_row_range(w, x, y_chunk, row_offset) };
+                return;
+            }
+        }
+        #[cfg(target_arch = "x86_64")]
+        {
+            if super::is_avx2_fma_available() {
+                unsafe { avx2_trit_row_range(w, x, y_chunk, row_offset) };
+                return;
+            }
+        }
+        scalar_row_range(w, x, y_chunk, row_offset);
+    });
+}
+
 #[cfg(all(test, feature = "ternary_trit_pack"))]
 mod tests {
     use super::*;
@@ -487,6 +546,40 @@ mod tests {
         assert!(!w.is_canonical(), "byte 250 must be rejected");
         // And it decodes to zeros rather than garbage.
         assert_eq!(TRIT_LUT[250], [0i8; 8]);
+    }
+
+    #[test]
+    fn parallel_matches_serial_bit_identical() {
+        // Straddle PARALLEL_ROW_MIN (256) and include a ragged row count, a
+        // ragged byte count (cols % 5 != 0) and a zeroed row.
+        for &(rows, cols) in &[(255usize, 300usize), (256, 300), (513, 133), (1024, 512)] {
+            let mut w = make(rows, cols);
+            // Zero one row entirely: all-zero weights encode as byte 121, so
+            // this also checks the parallel path does not assume a zeroed buffer.
+            for c in 0..cols {
+                w.set(rows / 2, c, 0);
+            }
+            let x = xs(cols);
+            let mut y_par = vec![0.0f32; rows];
+            let mut y_ser = vec![0.0f32; rows];
+            simd_ternary_trit_matvec_parallel(&w, &x, &mut y_par);
+            simd_ternary_trit_matvec(&w, &x, &mut y_ser);
+            assert_eq!(y_par, y_ser, "{rows}x{cols} must be bit-identical");
+            assert_eq!(y_par[rows / 2], 0.0, "{rows}x{cols} zeroed row");
+        }
+    }
+
+    #[test]
+    fn parallel_delegates_below_threshold() {
+        // 48 rows is Bonsai's ssm_alpha/ssm_beta shape — under the threshold,
+        // so this exercises the serial delegation with a real geometry.
+        let w = make(48, 5120);
+        let x = xs(5120);
+        let mut y_par = vec![0.0f32; 48];
+        let mut y_ser = vec![0.0f32; 48];
+        simd_ternary_trit_matvec_parallel(&w, &x, &mut y_par);
+        simd_ternary_trit_matvec(&w, &x, &mut y_ser);
+        assert_eq!(y_par, y_ser);
     }
 
     #[test]

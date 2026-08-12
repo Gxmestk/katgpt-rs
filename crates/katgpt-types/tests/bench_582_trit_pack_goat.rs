@@ -40,8 +40,8 @@
 use std::time::Instant;
 
 use katgpt_types::simd::{
-    simd_ternary_group_matvec, simd_ternary_trit_matvec, ternary_group_matvec_scalar,
-    ternary_trit_matvec_scalar,
+    simd_ternary_group_matvec, simd_ternary_group_matvec_parallel, simd_ternary_trit_matvec,
+    simd_ternary_trit_matvec_parallel, ternary_group_matvec_scalar, ternary_trit_matvec_scalar,
 };
 use katgpt_types::{TernaryGroupWeights, TernaryTritWeights};
 
@@ -376,6 +376,79 @@ fn g1_matches_bit_plane_tier_at_benchmark_scale() {
         simd_ternary_group_matvec(&plane, &x, &mut y_plane);
         assert_close_rms(&y_trit, &y_plane, 1e-6, &format!("{rows}x{cols} simd"));
     }
+}
+
+// ── G2d: row-parallel parity with the bit-plane tier ──────────
+
+/// The row-parallel kernel is what a decode-step consumer actually calls, so the
+/// tier is only usable if it keeps pace there too.
+///
+/// The bit-plane tier's row-parallel kernel measured **7.21×** over serial on
+/// real Bonsai geometry (riir-ai Bench 582), and riir-engine's `forward_ternary`
+/// depends on it. A footprint tier that saved 18.8% of bytes but lost that 7×
+/// would be strictly worse for every real consumer — so this checks the parallel
+/// split works and stays bit-identical.
+///
+/// **The timing half of this test is noisy and only the bit-identity is
+/// asserted.** Measured trit/plane ratios under 16 threads ranged 0.83–1.03×
+/// across runs on a working developer box, and thread scaling 2.4–4.5× — i.e.
+/// the serial tier's stable 0.87× advantage is *not* reproducibly visible once
+/// 16 threads contend, and this harness cannot resolve whether it survives.
+/// Reported, not claimed. A quiet-box measurement is the way to settle it.
+#[test]
+fn g2d_row_parallel_keeps_pace() {
+    // 4096 rows is past PARALLEL_ROW_MIN (256) by enough to amortize rayon.
+    let (rows, cols) = (4096usize, 5120usize);
+    let plane = big_plane_weights(rows, cols, 0x582_D);
+    let trit = TernaryTritWeights::from_group(&plane);
+
+    let mut s = 0xBEEF_u64;
+    let x: Vec<f32> = (0..cols).map(|_| pseudo(&mut s)).collect();
+    let mut y = vec![0.0f32; rows];
+    let mut y_ref = vec![0.0f32; rows];
+
+    // Bit-identity under threads is the load-bearing claim; time is secondary.
+    simd_ternary_trit_matvec_parallel(&trit, &x, &mut y);
+    simd_ternary_trit_matvec(&trit, &x, &mut y_ref);
+    assert_eq!(y, y_ref, "parallel must be bit-identical to serial");
+
+    // 9 reps rather than 5: the parallel numbers move more than the serial ones.
+    let t_trit_ser = median_ns(9, 3, || simd_ternary_trit_matvec(&trit, &x, &mut y));
+    let t_plane_ser = median_ns(9, 3, || simd_ternary_group_matvec(&plane, &x, &mut y));
+    let t_trit_par = median_ns(9, 5, || simd_ternary_trit_matvec_parallel(&trit, &x, &mut y));
+    let t_plane_par = median_ns(9, 5, || simd_ternary_group_matvec_parallel(&plane, &x, &mut y));
+
+    println!(
+        "\n── Issue 582 G2d: row-parallel ({rows}x{cols}, {} threads; timings noisy) ──\n\
+         {:>10} {:>12} {:>12} {:>10}\n\
+         {:>10} {:>11.3} {:>11.3} {:>9.2}x\n\
+         {:>10} {:>11.3} {:>11.3} {:>9.2}x\n\
+         thread scaling: trit {:.2}x, plane {:.2}x",
+        rayon::current_num_threads(),
+        "",
+        "trit ms",
+        "plane ms",
+        "trit/plane",
+        "serial",
+        t_trit_ser / 1e6,
+        t_plane_ser / 1e6,
+        t_trit_ser / t_plane_ser,
+        "parallel",
+        t_trit_par / 1e6,
+        t_plane_par / 1e6,
+        t_trit_par / t_plane_par,
+        t_trit_ser / t_trit_par,
+        t_plane_ser / t_plane_par
+    );
+
+    // Only a floor is asserted: thread scaling on a busy dev box is noisy, but
+    // anything under 2x on 4096 rows would mean the parallel split is broken
+    // rather than merely contended.
+    assert!(
+        t_trit_ser / t_trit_par > 2.0,
+        "parallel speedup {:.2}x is too low to be real parallelism",
+        t_trit_ser / t_trit_par
+    );
 }
 
 // ── G4: alloc-free ────────────────────────────────────────────

@@ -574,7 +574,9 @@ pub use types::{
 // Q2_0_g128 container, 5 trits per byte instead of two bit-planes (1.75 vs
 // 2.125 bits/weight, -17.6%).
 #[cfg(feature = "ternary_trit_pack")]
-pub use simd::{simd_ternary_trit_matvec, ternary_trit_matvec_scalar};
+pub use simd::{
+    simd_ternary_trit_matvec, simd_ternary_trit_matvec_parallel, ternary_trit_matvec_scalar,
+};
 #[cfg(feature = "ternary_trit_pack")]
 pub use types::{TRITS_PER_BYTE, TernaryTritWeights};
 
