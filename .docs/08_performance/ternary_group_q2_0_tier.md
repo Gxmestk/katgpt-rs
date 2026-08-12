@@ -204,20 +204,48 @@ Consumers enable it by name: `riir-engine/q2_0_ternary_bridge`,
 
 | Consumer | Status | Measured |
 |---|---|---|
-| riir-ai CubeCL `TernaryDeltanetGpuForward` (Issue 604) | ✅ PRODUCTION on M3 Metal | **8.5 tok/s** on Ternary-Bonsai-27B (8.9× over CPU); `bonsai-go-gpu-resident` example feature. See [`ternary_gpu_forward.md`](../../../riir-ai/.docs/09_performance/ternary_gpu_forward.md) |
-| riir-ai cudarc `TernaryDeltanetGpuForwardCudarc` (Issue 615) | 🚧 T1–T7 done, T8 gate pending | Projected 40–70 tok/s on the 4090 (dp4a kernel at 88.9% roofline) |
+| riir-ai CubeCL `TernaryDeltanetGpuForward` (Issue 604) | ✅ PRODUCTION on M3 Metal + 4090 | **9.3 tok/s** on M3 Metal (9.7× over CPU's 0.96; steady-state A/B, Bench 616) and **15.00 tok/s** on the 4090. `bonsai-go-gpu-resident` example feature. See [`ternary_gpu_forward.md`](../../../riir-ai/.docs/09_performance/ternary_gpu_forward.md) |
+| riir-ai cudarc `TernaryDeltanetGpuForwardCudarc` (Issue 615) | ✅ PRODUCTION on RTX 4090, T8 gate PASS | **30.02 tok/s** / 33.31 ms/token — 2.0× the CubeCL path, ~110× CPU, clears the 26.72 target with 1.12× headroom (Bench 615, commit `fe0bbab5`) |
 | riir-ai Issue 594 (qwen35 DeltaNet ternary port) | ✅ DONE, G1 PASS | ` Paris` rank 1 @ p=0.69 vs llama.cpp ref |
 | riir-train Plan 333 T3.1b/T3.1c/T2.2/T3.3a/b | ✅ unblocked | `q2_0.rs` dequant + `ternary_lora_forward.rs` |
 
-The CPU pure-ternary SIMD path (~1.0 tok/s) is the portable fallback; see
+The CPU pure-ternary SIMD path (0.96–1.05 tok/s) is the portable fallback; see
 [`bonsai_ternary_throughput.md`](../../../riir-ai/.docs/09_performance/bonsai_ternary_throughput.md)
 for the CPU-vs-GPU headline table.
 
+### What the container costs the consumers
+
+Reference point: llama.cpp (PrismML fork `9ca265a`) does **13.33 tok/s** on the
+same M3 Max and **86.74 tok/s** on the 4090. So we are 0.70× on Metal and 0.35×
+on CUDA end-to-end — *even though* our dp4a GEMV kernel is **1.44× faster than
+llama.cpp's** (895.8 GB/s = 88.9% of 4090 HBM peak vs their 621.5 GB/s).
+
+The end-to-end gap is therefore **not** the GEMV and **not** this container's
+arithmetic. Two things dominate:
+
+1. **Non-projection sequential compute** — 55.9 of M3 Metal's 107.5 ms/token is
+   recurrence, conv1d, attention, norms, gating. Real dependent compute, not
+   launch overhead (Bench 616 proved fusion buys nothing on Metal: 9.33 baseline
+   vs 9.28 fused; the Metal command scheduler already hides cheap elementwise
+   dispatches behind the next GEMV).
+2. **Dispatch count** — ~200/token on cudarc, ~1200/token on CubeCL Metal.
+
+**The one gap that *is* this container's scope** is the last ~10% of the Metal
+GEMV: we store two separate `pos_bits`/`neg_bits` arrays, llama.cpp stores one
+array of 2-bit codes. Two-array means two loads and two popcount chains per
+word where they have one. Closing it means changing the container layout
+(interleave the planes, or store native 2-bit codes and decode in-register) —
+which would also close the 2.125 → 1.71 bits/weight footprint gap. Not
+attempted; it is a real, bounded, katgpt-rs-side optimization with a measured
+~10% Metal ceiling as its prize, and it would touch every kernel + the
+`TGPLSMA1` wire format.
+
 ## Non-goals
 
-- **Native 2-bit-slot storage.** We repack into bit-planes because that is what
-  the SIMD popcount kernel consumes. Closing the 2.125 → 1.71 bits/weight gap is
-  a separate optimization.
+- **Native 2-bit-slot storage / plane interleaving.** We repack into two
+  bit-planes because that is what the SIMD popcount kernel consumes. Closing the
+  2.125 → 1.71 bits/weight gap — and the ~10% Metal GEMV gap it shares a cause
+  with (see above) — is a separate optimization, and a real one.
 - **Changing `TernaryWeights` or the `CIOTBIT1` format.** Additive tier only —
   adding fields to `TernaryWeights` would break `load_ternary_bits`' struct
   literal and force an on-disk version bump, and carrying both `row_scale` and
