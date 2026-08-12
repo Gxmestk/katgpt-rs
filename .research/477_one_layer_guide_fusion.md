@@ -258,6 +258,26 @@ The single-layer-trained adapter is a **frozen latent-state artifact** in the ne
 
 Current pre-PoC best guess (unchanged from §3): **Tier = Gain**. The smoke test suggests G2 (≥10× speedup) will fail because LoRA FLOPs are negligible vs the base model forward; the load-bearing question is G4 (quality ≥ 70% of full LoRA).
 
+### 9.3 Arm A negative quality result + arm B substrate progress (2026-08-12)
+
+**Bench 619 — arm A (lm_head-only) is insufficient for Go.** The arena eval (already run on the CPU cached-LoRA path, same `save_lora` format as GPU arm A) shows rank-16 lm_head LoRA cannot learn board-dependent move selection:
+
+| Config | Illegal rate | Win rate | Notes |
+|---|---|---|---|
+| Zero-shot | 92.5% | 25% (1/4) | Bias: E6/E7 |
+| Online LoRA (50 steps) | 80.0% | 50% (1/2) | Bias shifted |
+| Cached LoRA (2000 steps) | 90.0% | 0% (0/2) | Mode collapse to G7 |
+
+The finding is about **capacity** (rank-16 lm_head is input-independent), not training speed — so it applies to GPU arm A (T2B.0a) identically. Arm A is an honest negative result for the "light specialization" hypothesis.
+
+**Implication for Research 477:** the fusion's value now depends entirely on arm B (mid-layer Q+V LoRA). If arm B also fails G4, the single-layer guide hypothesis FAILS for Go on Bonsai (tier stays Gain, documented as negative). If arm B passes G4, it's a GOAT candidate (single-layer Q+V captures what lm_head cannot).
+
+**Arm B substrate progress (Issue 446 T2B.0):**
+- **Subtask 2 (DeltaNet BPTT core) DONE** — CPU reference at `riir-engine/src/deltanet/backward.rs` (~780 LOC). `gated_deltanet_forward_save` + `gated_deltanet_bptt` + 4 finite-difference validation tests (all PASS, eps=5e-3, tol=5%). The highest-risk subtask is de-risked — the BPTT math through delta-rule linear attention recurrence is validated. GPU CubeCL port follows the `kda_backward_gpu_matches_cpu` pattern.
+- **Remaining:** activation-saving forward rewrite + GPU BPTT port + Q+V LoRA grad kernels + top-half backprop wiring (~1.5 weeks remaining effort).
+
+**Tier update:** still **Gain** (arm A negative; arm B unproven). Will revise to GOAT candidate if arm B passes G4, or to Pass-with-negative-result if arm B also fails.
+
 ---
 
 ## 10. Implementation priority table
