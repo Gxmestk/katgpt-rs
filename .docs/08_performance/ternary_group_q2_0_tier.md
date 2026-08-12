@@ -250,10 +250,14 @@ attempted; it is a real, bounded, katgpt-rs-side optimization with a measured
   optimization.~~ **DONE, better than specified** — [Issue 582](../../.issues/582_ternary_trit_packed_footprint_tier.md)
   ships `TernaryTritWeights`: base-3 packing, 5 trits per byte, **1.725
   bits/weight** (below the 1.71-ish "ideal" this doc called unreachable), Bonsai
-  5.82 GB instead of 7.16 GB, and — against the prediction — **1.22–1.28×
-  faster** than this tier on NEON, not slower. See
-  [Bench 582](../../.benchmarks/582_trit_pack_goat.md). The GPU leg (single load
-  stream on Metal/CUDA) is riir-ai Issue 628.
+  5.82 GB instead of 7.16 GB, and — against the prediction — **1.10–1.15×
+  faster** than this tier on NEON, not slower (1.22–1.28× before Issue 583 sped
+  *this* tier up by 11%). See
+  [Bench 582](../../.benchmarks/582_trit_pack_goat.md). Note what that benchmark
+  also refutes: streaming a 42 MiB matrix does **not** widen the gap, because CPU
+  ternary GEMV runs ~200× below the memory roofline (1.8 GB/s measured) — so the
+  18.8% is a capacity win, not a bandwidth one. The GPU leg, where the kernels
+  *are* at roofline, is riir-ai Issue 628.
 - **Changing `TernaryWeights` or the `CIOTBIT1` format.** Additive tier only —
   adding fields to `TernaryWeights` would break `load_ternary_bits`' struct
   literal and force an on-disk version bump, and carrying both `row_scale` and

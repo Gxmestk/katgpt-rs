@@ -161,8 +161,16 @@ fn g1_hoisted_matches_scalar_and_folded() {
         simd_ternary_group_matvec_folded(&gw, &x, &mut y_fold);
         ternary_group_matvec_scalar(&gw, &x, &mut y_scalar);
 
+        // Error is measured against the magnitude of the computation, not the
+        // possibly-cancelled result: a row of a 5120-column matvec is 40 group
+        // sums of magnitude ~3, so `max(|want|, 1.0)` would flag a rare
+        // near-zero row as a failure while letting large rows off lightly. See
+        // the same fix in bench_582's `assert_close_rms`.
+        let rms = (y_scalar.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>()
+            / y_scalar.len() as f64)
+            .sqrt() as f32;
         for r in 0..rows {
-            let denom = y_scalar[r].abs().max(1.0);
+            let denom = y_scalar[r].abs().max(rms).max(f32::MIN_POSITIVE);
             let d_hoist = (y_hoist[r] - y_scalar[r]).abs() / denom;
             let d_fold = (y_fold[r] - y_scalar[r]).abs() / denom;
             assert!(

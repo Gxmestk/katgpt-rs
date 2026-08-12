@@ -20,7 +20,8 @@ measuring, was that it would trade latency for bytes.
 |---|---|---|
 | **G1 correctness** | scalar **bit-identical** to `ternary_group_matvec_scalar`; `from_group`→`to_group` lossless; NEON within 1e-6 | **PASS** |
 | **G2 footprint** | **1.725 bits/weight vs 2.125** — ratio 0.8118–0.8162 (gate ≤ 0.83) | **PASS** |
-| **G2b latency** | **0.78–0.82×** the bit-plane kernel — i.e. **1.22–1.28× faster** (gate was only "≤ 2× reject bound") | **PASS, unexpectedly** |
+| **G2b latency** | **0.87–0.91×** the bit-plane kernel — i.e. **1.10–1.15× faster** (gate was only "≤ 2× reject bound"). Was 0.78–0.82× against the *pre-Issue-583* baseline; the bit-plane kernel then got 11% faster, so the remaining gap is decode-only — exactly what the attribution predicted | **PASS, unexpectedly** |
+| **G2c streaming** | ratio **0.872×** at 32768×5120 (34.5 MiB trit vs 42.5 MiB planes, both past L2) — **the same as cache-resident**, so the traffic saving does *not* compound. Prediction refuted | measured |
 | **G3 no-regression** | default / `--no-default-features` / feature-on / `--all-features` clippy-clean; **155** lib tests with the feature, **130** default, 0 failures | **PASS** |
 | **G4 alloc-free** | 0 allocs / 1000 calls, SIMD and scalar | **PASS** |
 
@@ -43,7 +44,8 @@ either way.
 
 ## G2b — latency (the wrong prediction)
 
-Median of 9 × 20 calls, three independent runs:
+Median of 9 × 20 calls, three independent runs **against the bit-plane kernel as
+it stood when this tier landed** (scale folded into the sign vector):
 
 | Shape | trit ns | bit-plane ns | ratio | run 2 | run 3 |
 |---|---|---|---|---|---|
@@ -54,6 +56,51 @@ Median of 9 × 20 calls, three independent runs:
 Stable to ±0.01 across runs — far outside the 15% noise band this repo treats as
 meaningless. **The trit tier is 1.22–1.28× faster than the bit-plane tier while
 being 18.8% smaller.**
+
+### Re-measured after Issue 583 (the moving baseline)
+
+The attribution below sent ~10pp of that win back to the bit-plane tier: Issue
+583 hoisted its group scale and made it 1.11× faster. Re-running the same gate
+against the improved baseline:
+
+| Shape | trit ns | bit-plane ns (hoisted) | ratio |
+|---|---|---|---|
+| 512×512 | ~34 000 | ~37 400 | **0.91×** |
+| 1024×1024 | ~127 000 | ~140 000 | **0.90×** |
+| 512×5120 | 319 975 | 368 677 | **0.87×** |
+
+**0.87–0.91×, i.e. 1.10–1.15× faster.** This is the number to quote now, and it
+is a *confirmation*, not a retreat: 0.79 × 1.11 ≈ 0.88, so the win that survived
+the baseline improvement is precisely the decode half the attribution isolated
+(scalar-vs-scalar, 0.90–0.91×). The two independent measurements agree.
+
+## G2c — the streaming regime, and why the traffic story is wrong on CPU
+
+The caveat in the first version of this benchmark said the cache-resident shapes
+"structurally favour the bit-plane tier" and that the streaming regime "should
+widen the gap". **It does not.** At 32768×5120 — 34.5 MiB of trits vs 42.5 MiB of
+bit-planes, both far past the M3 Max's 16 MB L2, so every call pulls the weights
+from RAM:
+
+| | ms/call | ratio | effective bandwidth |
+|---|---|---|---|
+| trit | 20.513 | **0.872×** | 1.8 GB/s |
+| bit-plane | 23.515 | — | 1.9 GB/s |
+
+Same ratio as cache-resident (0.87–0.91×). The reason is in the last column:
+**1.8 GB/s against an M3 Max roofline of ~400 GB/s — we are ~200× below the
+memory limit.** Single-threaded ternary matvec runs at ~8 GMAC/s, and at
+2.125 bits/weight that only demands ~2 GB/s. Even the 16-thread row-parallel
+kernel (46 GMAC/s) would ask for ~12 GB/s. **CPU ternary GEMV is compute-bound,
+not bandwidth-bound, so bytes-per-weight cannot buy latency there** — the 18.8%
+is a *capacity* win (what fits in RAM/VRAM), and the 1.10–1.15× is a *decode*
+win. They are unrelated effects that happened to arrive together.
+
+This matters beyond this tier: it is the reason riir-ai Issue 628's GPU leg is
+the interesting one. The Metal GEMV sits at 45% of its roofline and the CUDA dp4a
+kernel at 88.9% of HBM peak — **those** are bandwidth-bound regimes where 18.8%
+fewer bytes should convert directly into throughput. The CPU measurement here
+says nothing against that; it says the CPU simply is not the place to look for it.
 
 And note *where* it was measured: every shape here is **cache-resident**, which
 is the regime that should favour the incumbent. The footprint advantage has
@@ -128,17 +175,23 @@ passed; comparing against the shipped reference did not.
 
 ## Honest caveats
 
-1. **NEON + scalar only.** No AVX2 kernel for this tier yet, so x86_64 hosts get
-   the scalar path (still ~0.90× the bit-plane scalar path, so not a regression
-   — but it forgoes the SIMD win). The bit-plane tier has AVX2 (Bench 581).
+1. **AVX2 kernel written but UNMEASURED.** `avx2_trit_row_range` ships (one
+   `_mm256_cvtepi8_epi32` unpacks 8 decoded trits per instruction), compile-
+   verified via `--target x86_64-apple-darwin`, clippy clean. It cannot be
+   *executed* here: Rosetta 2 does not implement AVX2, so
+   `is_avx2_fma_available()` is false and the path is unreachable on this host.
+   Queued for the 4090 alongside Issue 583 T4. Until then the x86_64 claim is
+   compile-only.
 2. **No real-model end-to-end.** The measurement is synthetic matvecs. The
    consumers that would benefit (riir-ai's Metal/CUDA forwards) run their GEMV on
    GPU, where this container is not yet implemented — that is riir-ai Issue 628.
-3. **Cache-resident regime only.** The claimed *reason* for the tier (18.8% less
-   RAM traffic) is untested here, because the tier wins before that effect can
-   even appear. The streaming regime should widen the gap, not narrow it, but
-   that is a prediction, not a measurement — and this benchmark is a reminder
-   that my predictions in this area have been wrong once already today.
+3. **~~Cache-resident regime only.~~ Now measured (G2c) — and the prediction was
+   wrong again.** Streaming a 42 MiB matrix gives the same 0.87× ratio as a
+   cache-resident one, because CPU ternary GEMV runs ~200× below the memory
+   roofline. Two predictions in this benchmark, both refuted by their own
+   harness: the tier would be slower (it is faster), and streaming would widen
+   its lead (it does not move). The footprint claim is arithmetic and stands; the
+   *causal story* attached to it did not survive contact with a measurement.
 4. **`from_group` is O(rows·cols) scalar get/set.** Fine at load time
    (one pass, no hot path), but it is not a fast repack; a block-wise version
    would be needed if it ever landed on a latency path.
@@ -165,4 +218,27 @@ CARGO_TARGET_DIR=/tmp/t582r cargo test --release -p katgpt-types \
 cargo test -p katgpt-types --features ternary_trit_pack --lib ternary_trit
 ```
 
+```bash
+# G2c streaming (allocates ~80 MB, #[ignore]d by default)
+CARGO_TARGET_DIR=/tmp/t582r cargo test --release -p katgpt-types \
+  --features ternary_trit_pack --test bench_582_trit_pack_goat \
+  g2c -- --nocapture --ignored
+```
+
 `--release` is mandatory — a debug timing of a SWAR/LUT kernel is meaningless.
+
+## Test-methodology fix found by G2c
+
+The cross-tier comparison originally divided the error by `max(|want|, 1.0)`.
+G2c's 32768 rows exposed that as wrong: row 190 came out at −0.3007803 vs
+−0.3007903, a 1e-5 absolute difference that the metric scored as 3e-5 relative
+and failed. But a row of a 5120-column matvec is the sum of **40 group sums of
+magnitude ~3**, so a row landing near zero is catastrophic cancellation — 1e-5
+absolute is ~5e-7 of the work actually done.
+
+Dividing by the final value punishes rare near-zero rows and lets large rows off
+lightly, exactly backwards. Both benches now use `assert_close_rms`: denominator
+`max(|want|, rms(want))`, tolerance tightened to **1e-6**. Stricter than the old
+metric in the common case, correct in the cancelling case. The old form only
+looked fine because 512-row shapes rarely hit a cancellation; at 32768 rows it is
+near-certain.

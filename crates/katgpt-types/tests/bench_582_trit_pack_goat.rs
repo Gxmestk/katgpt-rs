@@ -113,6 +113,35 @@ fn median_ns(reps: usize, inner: usize, mut f: impl FnMut()) -> f64 {
     samples[reps / 2]
 }
 
+/// Assert `got ≈ want` with error measured against the **magnitude of the
+/// computation**, not against the possibly-cancelled result.
+///
+/// A row of a 5120-column ternary matvec is the sum of 40 group sums, each of
+/// magnitude ~3, so a row whose final value lands near 0 is catastrophic
+/// cancellation: an absolute error of 1e-5 is ~5e-7 of the work done, but
+/// ~3e-5 relative to the result. Dividing by `max(|want|, 1.0)` therefore
+/// flags rare near-zero rows as failures while letting large rows off lightly —
+/// exactly backwards. Dividing by `max(|want|, rms(want))` measures against the
+/// typical magnitude of the operation instead.
+///
+/// This matters more as `rows` grows: at 512 rows a near-cancelling row is
+/// unlikely, at 32768 it is near-certain. Found the hard way by
+/// `g2c_streaming_regime_out_of_cache` (row 190 of 32768: -0.3007803 vs
+/// -0.3007903, i.e. 1e-5 absolute on a row whose group sums are ~3 each).
+fn assert_close_rms(got: &[f32], want: &[f32], tol: f32, label: &str) {
+    assert_eq!(got.len(), want.len());
+    let rms = (want.iter().map(|v| (*v as f64) * (*v as f64)).sum::<f64>() / want.len() as f64)
+        .sqrt() as f32;
+    for (r, (&g, &w)) in got.iter().zip(want).enumerate() {
+        let denom = w.abs().max(rms).max(f32::MIN_POSITIVE);
+        let rel = (g - w).abs() / denom;
+        assert!(
+            rel < tol,
+            "{label} row {r}: {g} vs {w} (rel {rel:.2e} vs tol {tol:.0e}, rms {rms:.3})"
+        );
+    }
+}
+
 const SHAPES: [(usize, usize); 3] = [(512, 512), (1024, 1024), (512, 5120)];
 
 // ── G2: footprint (the load-bearing gate) ─────────────────────
@@ -232,6 +261,93 @@ fn g2b_latency_vs_bit_plane_kernel() {
     );
 }
 
+// ── G2c: the streaming regime (the tier's actual rationale) ───
+
+/// Build bit-plane weights **without** a dense f32 source.
+///
+/// A 32768×5120 f32 source would be 671 MB; the container itself is only ~44 MB.
+/// Filling `pos_bits`/`neg_bits` directly keeps the fixture affordable, and
+/// `pos = a & !b` / `neg = b & !a` guarantees the `pos & neg == 0` invariant by
+/// construction (asserted below).
+fn big_plane_weights(rows: usize, cols: usize, seed: u64) -> TernaryGroupWeights {
+    let mut w = TernaryGroupWeights::new(rows, cols);
+    let mut s = seed;
+    let mut next = || {
+        s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        s
+    };
+    for i in 0..w.pos_bits.len() {
+        let a = next();
+        let b = next();
+        w.pos_bits[i] = a & !b;
+        w.neg_bits[i] = b & !a;
+    }
+    for scale in w.group_scale.iter_mut() {
+        *scale = half::f16::from_f32(0.25 + ((next() >> 60) as f32) * 0.125);
+    }
+    assert!(w.invariant_holds(), "fixture must satisfy pos & neg == 0");
+    w
+}
+
+/// Does the 18.8% traffic saving actually pay off when the weights do **not**
+/// fit in cache?
+///
+/// Every other timing in this file is cache-resident, which the honest-caveats
+/// section calls out as structurally favouring the bit-plane tier. This test
+/// covers the regime the tier was built for: a 32768×5120 matrix is ~44 MB of
+/// bit-planes vs ~36 MB of trits, both well past the M3 Max's 16 MB L2, so each
+/// call streams the weights from RAM exactly as a 27B decode does.
+///
+/// Informational, not a gate — a single large shape on one host is weak evidence
+/// and the ratio is reported either way. What would be *interesting* is the
+/// ratio moving relative to the cache-resident 0.79–0.82×: further below means
+/// the traffic saving compounds, back toward 1.0 means it does not.
+#[test]
+#[ignore = "allocates ~80 MB and streams it repeatedly; run explicitly"]
+fn g2c_streaming_regime_out_of_cache() {
+    let (rows, cols) = (32768usize, 5120usize);
+    let plane = big_plane_weights(rows, cols, 0x582_5EED);
+    let trit = TernaryTritWeights::from_group(&plane);
+
+    // Correctness first — a fixture this large would otherwise hide an
+    // indexing bug behind a plausible-looking timing.
+    assert!(trit.is_canonical());
+    assert_eq!(trit.checksum(), plane.checksum(), "cross-tier checksum");
+
+    let mut s = 0xBEEF_u64;
+    let x: Vec<f32> = (0..cols).map(|_| pseudo(&mut s)).collect();
+    let mut y_trit = vec![0.0f32; rows];
+    let mut y_plane = vec![0.0f32; rows];
+    simd_ternary_trit_matvec(&trit, &x, &mut y_trit);
+    simd_ternary_group_matvec(&plane, &x, &mut y_plane);
+    assert_close_rms(&y_trit, &y_plane, 1e-6, "streaming trit-vs-plane");
+
+    let mib = |b: usize| b as f64 / (1024.0 * 1024.0);
+    println!(
+        "\n── Issue 582 G2c: streaming regime ({rows}x{cols}) ──\n\
+         trit payload {:.1} MiB vs bit-plane {:.1} MiB",
+        mib(trit.encoded_bytes()),
+        mib(plane.encoded_bytes())
+    );
+
+    // Fewer reps: each call touches ~40 MB, so wall-clock per call is ~ms and
+    // 5 reps of 3 calls is already several seconds.
+    let t_trit = median_ns(5, 3, || simd_ternary_trit_matvec(&trit, &x, &mut y_trit));
+    let t_plane = median_ns(5, 3, || simd_ternary_group_matvec(&plane, &x, &mut y_plane));
+    let ratio = t_trit / t_plane;
+    println!(
+        "trit {:.3} ms/call vs bit-plane {:.3} ms/call → ratio {ratio:.3}x\n\
+         (cache-resident ratio for reference: 0.79-0.82x)\n\
+         effective bandwidth: trit {:.1} GB/s, bit-plane {:.1} GB/s",
+        t_trit / 1e6,
+        t_plane / 1e6,
+        trit.encoded_bytes() as f64 / t_trit,
+        plane.encoded_bytes() as f64 / t_plane
+    );
+}
+
 // ── G1: cross-tier agreement at benchmark scale ───────────────
 
 #[test]
@@ -258,15 +374,7 @@ fn g1_matches_bit_plane_tier_at_benchmark_scale() {
         // SIMD-vs-SIMD differs only in summation order (~1e-6 relative).
         simd_ternary_trit_matvec(&trit, &x, &mut y_trit);
         simd_ternary_group_matvec(&plane, &x, &mut y_plane);
-        for r in 0..rows {
-            let denom = y_plane[r].abs().max(1.0);
-            assert!(
-                (y_trit[r] - y_plane[r]).abs() / denom < 1e-5,
-                "{rows}x{cols} row {r}: trit {} vs plane {}",
-                y_trit[r],
-                y_plane[r]
-            );
-        }
+        assert_close_rms(&y_trit, &y_plane, 1e-6, &format!("{rows}x{cols} simd"));
     }
 }
 

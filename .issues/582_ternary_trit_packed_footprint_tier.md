@@ -3,7 +3,9 @@
 **Date:** 2026-08-12
 **Status:** **LANDED, opt-in (2026-08-12). G1 / G2 / G2b / G3 / G4 ALL PASS** — see
 [Bench 582](../.benchmarks/582_trit_pack_goat.md). The perf axis came out a **gain,
-not a trade**: 1.22–1.28× faster than the bit-plane tier *and* 18.8% smaller.
+not a trade**: **1.10–1.15× faster** than the bit-plane tier *and* 18.8% smaller.
+(1.22–1.28× against the pre-Issue-583 baseline; that kernel then got 11% faster,
+leaving the decode-only margin the attribution predicted.)
 **Feature flag:** `ternary_trit_pack` (opt-in)
 **Filed by:** the Issue 578 closure review (see
 [`.docs/08_performance/ternary_group_q2_0_tier.md`](../.docs/08_performance/ternary_group_q2_0_tier.md)
@@ -155,7 +157,8 @@ training, so promotion turns purely on G1–G4.
 |---|---|
 | G1 | **PASS** — scalar bit-identical to `ternary_group_matvec_scalar` (exact `assert_eq!`, not a tolerance); `from_group`→`to_group` lossless incl. ragged bytes/groups; `quantize_from_f32` agrees weight-for-weight and scale-for-scale; NEON within 1e-6 |
 | G2 footprint | **PASS** — ratio 0.8118–0.8162 (gate ≤ 0.83); 1.725 bits/weight; Bonsai-27B 5.82 GB vs 7.16 GB |
-| G2b latency | **PASS as a gain** — 0.78–0.82× the bit-plane kernel (1.22–1.28× faster), stable across 3 runs. The gate only asked for ≤ 2× |
+| G2b latency | **PASS as a gain** — 0.87–0.91× the bit-plane kernel (1.10–1.15× faster) against the post-Issue-583 baseline; 0.78–0.82× against the pre-583 one. Stable across 3 runs; the gate only asked for ≤ 2× |
+| G2c streaming | **measured, prediction refuted** — 0.872× at 32768×5120 (34.5 vs 42.5 MiB, both past L2), i.e. no better than cache-resident. Effective bandwidth 1.8 GB/s vs a ~400 GB/s roofline: CPU ternary GEMV is compute-bound, so bytes/weight cannot buy latency. The 18.8% is a **capacity** win; the 1.1× is a **decode** win |
 | G3 | **PASS** — clippy clean on default / `--no-default-features` / feature-on / `--all-features`; 155 lib tests with the feature, 130 default |
 | G4 | **PASS** — 0 allocs / 1000 calls, SIMD and scalar (`[i8; 160]` stack scratch) |
 
@@ -176,6 +179,8 @@ deliberate Issue 145 T2.4 decision, and no default-path consumer holds ternary
 weights. But **on CPU, trit-packed is now the better choice for a ternary
 consumer**: smaller, faster, bit-identical scalar results.
 
-**Still open (not blocking):** no AVX2 kernel for this tier (x86_64 gets the
-scalar path); no real-model end-to-end (the GPU consumers need riir-ai Issue 628);
-`from_group` is an O(rows·cols) scalar repack, fine at load time only.
+**Still open (not blocking):** the AVX2 kernel is written and compile-verified but
+**unmeasured** — Rosetta 2 has no AVX2, so it cannot execute on this host; queued
+for the 4090 with Issue 583 T4. No real-model end-to-end (the GPU consumers need
+riir-ai Issue 628). `from_group` is an O(rows·cols) scalar repack, fine at load
+time only.
