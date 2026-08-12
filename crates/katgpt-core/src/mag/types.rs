@@ -95,6 +95,40 @@ impl MagDirection {
         &self.direction
     }
 
+    /// Construct a [`MagDirection`] from a pre-normalized unit-norm slice.
+    ///
+    /// This is the zero-alloc construction path for callers that already hold
+    /// the direction in a reusable scratch buffer (e.g. the output of
+    /// [`mine_direction_into`](super::mining::mine_direction_into), which
+    /// normalizes in place and returns the pre-normalization norm). The slice
+    /// is copied once into a `Box<[f32]>` (the frozen-artifact storage), and
+    /// the BLAKE3 commitment is computed via the same
+    /// [`compute_direction_commitment`] used by [`finalize_direction`].
+    ///
+    /// # Caller invariants
+    ///
+    /// - `direction` MUST already be unit L2 norm (callers using
+    ///   `mine_direction_into` inherit this from the substrate's
+    ///   `normalize_in_place` step). This constructor does NOT re-validate —
+    ///   re-normalizing would diverge from the `finalize_direction` path, and
+    ///   re-validating on every construction would defeat the purpose of the
+    ///   zero-alloc hot-path variant.
+    /// - The diagnostics (`recon_error`, `cosine`) start as `NaN`; stamp them
+    ///   via [`with_diagnostics`](Self::with_diagnostics) if needed.
+    ///
+    /// [`finalize_direction`]: super::mining::finalize_direction
+    /// [`compute_direction_commitment`]: super::types::compute_direction_commitment
+    #[inline]
+    pub fn from_unit_slice(direction: &[f32]) -> Self {
+        let blake3 = compute_direction_commitment(direction);
+        Self {
+            direction: direction.into(),
+            recon_error: f32::NAN,
+            cosine: f32::NAN,
+            blake3,
+        }
+    }
+
     /// Stamp the linearity diagnostic fields onto a mined direction. Builder
     /// style — typically called after [`reconstruction_error`] returns the values.
     ///
@@ -314,6 +348,33 @@ mod tests {
         assert!((d.recon_error - 0.1).abs() < 1e-6);
         assert!((d.cosine - 0.95).abs() < 1e-6);
         assert_eq!(d.dim(), 2);
+    }
+
+    #[test]
+    fn from_unit_slice_computes_commitment() {
+        // from_unit_slice should produce the same BLAKE3 commitment as the
+        // internal compute_direction_commitment path.
+        let dir = [1.0_f32, 0.0, 0.0, 0.0];
+        let d = MagDirection::from_unit_slice(&dir);
+        assert_eq!(d.as_slice(), &dir[..]);
+        assert_eq!(d.blake3, compute_direction_commitment(&dir));
+        assert!(d.recon_error.is_nan());
+        assert!(d.cosine.is_nan());
+        assert_eq!(d.dim(), 4);
+    }
+
+    #[test]
+    fn from_unit_slice_parity_with_finalize() {
+        // from_unit_slice on an already-unit vector must match the BLAKE3
+        // produced by the full mine_direction path (which calls
+        // finalize_direction → compute_direction_commitment).
+        // Construct a known unit vector (normalized [3.0, 4.0]).
+        let mut buf = [3.0_f32, 4.0];
+        let _pre = normalize_in_place(&mut buf);
+        // buf is now [0.6, 0.8]
+        let from_new = MagDirection::from_unit_slice(&buf);
+        let direct = compute_direction_commitment(&buf);
+        assert_eq!(from_new.blake3, direct);
     }
 
     #[test]
