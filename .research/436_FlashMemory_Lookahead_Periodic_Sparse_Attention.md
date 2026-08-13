@@ -2,11 +2,12 @@
 
 > **Source:** [FlashMemory-DeepSeek-V4: Lightning Index Ultra-Long Context via Lookahead Sparse Attention](https://arxiv.org/abs/2606.09079) — Yan Wang, Qifan Zhang, Jiachen Yu, Tian Liang, et al. (Tencent / HKUST-GZ / Tsinghua), 2026-06-07
 > **Date:** 2026-06-17
-> **Status:** Active — GOAT verdict
+> **Status:** Gain — actionable (revised 2026-08-13). Originally PASS (micro-transformer scale, no long-context serving). Revised to Gain after verifying: 4090 (24GB) + Kimi-K3-0.40B (395M, hybrid MLA/KDA, stack already has `kimi_k3/decoder_layer.rs`) + Bonsai dspark-Q4_1 (1.95GB, Qwen3.5, 256K native context) form a concrete validation path. FlashMemory's 90% KV reduction directly solves the "256K context KV cache (≈67GB) doesn't fit in 24GB VRAM" problem. Tracked in Issue 584.
 > **Classification:** Public (katgpt-rs modelless inference primitive)
 > **Related Research:** 176 (VortexFlow), 225 (MSA), 086 (RTPurbo), 145 (Wall Attention), 213 (Still Perceiver), 233 (Attention Matching), 109 (Shard), 063 (OCTOPUS), 100 (EGA spectral salience)
-> **Related Plans:** TBD (pending GOAT gate)
-> **Training redirect:** The paper's dual-encoder indexer training (BCE/Focal loss on pre-computed hidden states) → riir-train. This note distills only the modelless inference paradigm.
+> **Related Plans:** TBD (pending Issue 584 GOAT gate)
+> **Related Issues:** 584 (FlashMemory sparse attention validation on 4090 + Kimi-K3-0.40B → Bonsai dspark-Q4_1)
+> **Training redirect:** The paper's dual-encoder indexer training (BCE/Focal loss on pre-computed hidden states) → riir-train. This note distills only the modelless inference paradigm. Issue 584 Phase 2 will file a riir-train Plan for the indexer training recipe scaled to a single 4090.
 >
 > **PASS-Redirects (synthesis):** Fu et al. [arXiv:2606.04511 "SparDA: Sparse Decoupled Attention for Efficient Long-Context LLM Inference"] — concurrent lookahead sparse attention (NVIDIA/ByteDance/MIT, same month as FlashMemory). Adds a trained 4th "Forecast" projection (KL-divergence, 0.41% params, frozen backbone) for one-layer-ahead block selection + async UVA CPU→GPU prefetch overlap. The lookahead CONCEPT is already distilled here (R436); SparDA's genuinely-novel piece (trained Forecast) is a training recipe → riir-train, not modelless; the UVA persistent kernel is H100/A100 PCIe Gen5 serving infrastructure, out of scope for the CPU/modelless stack. Per-layer lookahead (SparDA) vs periodic τ=64 refresh (FlashMemory) are two solutions to the same amortize-selection-cost problem — neither applies at micro-transformer scale (n_layer=1). Closest substrate: `VortexFlow::forward_indexer` takes the attention Query (not a separate Forecast); `PerGroupTopKRouter` already does per-GQA-group routing.
 
