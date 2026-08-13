@@ -2,7 +2,7 @@
 
 **Filed:** 2026-08-13
 **Source:** Research 436 (FlashMemory-DeepSeek-V4, arXiv:2606.09079) + PASS-Redirect from SparDA (arXiv:2606.04511)
-**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); G3 PASS (2026-08-13); **G4 PASS** (Bench 022, alloc-free steady state, 2026-08-13); Phase 2 scale test + G2 perf blocked on 4090 (Bench 456)
+**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); G3 PASS (2026-08-13); **G4 PASS** (Bench 022, alloc-free steady state, 2026-08-13); NIAH diagnostic (Bench 023, 2026-08-13); **Plan 337 filed** (riir-train indexer training recipe, 2026-08-13); Phase 2 scale test + G2 perf blocked on 4090 (Bench 456)
 **Scope:** POC — validate FlashMemory's sigmoid-threshold periodic sparse attention mechanism + scale benefit on real hardware
 
 ---
@@ -90,9 +90,9 @@ Threshold sweep (512 tokens): 0.3 → cos 1.0000 (52.9% blocks, no sparsity bene
 
 FlashMemory's dual-encoder indexer training (BCE/Focal loss on pre-computed hidden states) is a training recipe → riir-train.
 
-- [ ] File a riir-train Plan for the indexer training recipe scaled to a single 4090
-- [ ] The paper's recipe: pre-compute hidden states offline (batch-by-batch at any context length), train indexer with BCE on pre-computed data → **more 4090-friendly than SparDA's KL-divergence approach** (which needs full forward at 65K context)
-- [ ] GOAT gate: compare trained indexer vs modelless sigmoid threshold (FlashMemory's periodic batch-scoring works with ANY scorer — the trained indexer is an upgrade, not a requirement)
+- [x] File a riir-train Plan for the indexer training recipe scaled to a single 4090 — **DONE (Plan 337, 2026-08-13)**: [riir-train/.plans/337_flashmemory_indexer_training_recipe.md](../riir-train/.plans/337_flashmemory_indexer_training_recipe.md). Consumes existing `asym_bce_loss` (w+/w− = 8 — recall-prioritized, better than paper's plain BCE) + `KimiK3LoraAdapter` GPU train path. Builds the genuinely-new dual-encoder indexer + cross-layer majority-vote label pipeline. 5 phases (A-E); Phases A-D blocked on 4090.
+- [x] The paper's recipe: pre-compute hidden states offline (batch-by-batch at any context length), train indexer with BCE on pre-computed data → **more 4090-friendly than SparDA's KL-divergence approach** (which needs full forward at 65K context) — **documented in Plan 337 §"Key advantage over SparDA"**
+- [ ] GOAT gate: compare trained indexer vs modelless sigmoid threshold (FlashMemory's periodic batch-scoring works with ANY scorer — the trained indexer is an upgrade, not a requirement) — **Plan 337 Phase D (G1-trained + D2-sparsity + D3-recall + D4-transfer); blocked on 4090**
 
 **SparDA comparison (PASS — stays secondary):** SparDA's trained Forecast head (KL divergence, 0.41% params) is a speed optimization (async CPU→GPU prefetch overlap) that only matters once you're already in the offloading regime. FlashMemory's memory reduction is the primary win for the 4090's 24GB constraint. SparDA's PCIe Gen4 benefit is halved vs H100 Gen5. SparDA PASS-Redirect logged in R436.
 
@@ -121,7 +121,7 @@ Repo sync: DIVERGED — M3 at 9bd8e170, 4090 at 04e77fda (Bench 456 WIP)
 
 **Blocked tasks (need 4090):**
 - [ ] Phase 2 scale test at 256K context
-- [ ] Indexer training (riir-train Plan)
+- [-] Indexer training (riir-train Plan) — **Plan 337 filed (2026-08-13)**; execution blocked on 4090
 - [ ] GOAT gate G2 (decode latency on 4090)
 
 ---
