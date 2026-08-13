@@ -319,7 +319,7 @@ This is the original 2607.01232 claim, now tested correctly:
 |---|---|---|---|---|---|---|---|
 | A (lm_head) | 1 (output) | — | 83.5 ms (M3) | — | 4.2006 (M3) / 3.353 (4090) | — | PASS |
 | B (mid-layer) | 1 (layer 32 Q+V) | 50 | 309s | 5.7265 | **3.8435** | -32.88% | PASS |
-| C (full-layer) | 48 (all DeltaNet Q+V) | 50 | 584s | 5.7265 | _TBD (T5 running, ETA ~18:49)_ | _TBD_ | PASS (smoke) |
+| C (full-layer) | 48 (all DeltaNet Q+V) | 50 | 619s | 5.7265 | _TBD (T5 step 10 ckpt confirmed 12:15, ETA ~19:18)_ | _TBD_ | PASS (smoke) |
 
 **G1 (accuracy parity):** arm B 3.8435 vs arm C _TBD_. Bar: arm B <= 1.10 x arm C. **PASS if arm C >= 3.494.**
 **G2 (train speed):** arm B 309s vs arm C 584s = **1.89x faster. PASS** (>1.5x bar).
