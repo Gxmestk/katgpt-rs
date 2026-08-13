@@ -149,3 +149,15 @@ The gain is in the SR²AM → reflection → config evolution loop. Implementati
 - Alex L. Zhang, Tim Kraska, Omar Khattab. "Recursive Language Models." arXiv:2512.24601 v3, May 2026.
 - Lakshya A. Agrawal et al. "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning." ICLR 2026 Oral. arXiv:2507.19457 v2, Feb 2026.
 - Gabriel Lespérance. "Going recursive (part I): Applying RLM-GEPA to AppWorld." X article, May 2026.
+
+---
+
+## PASS-Redirects Addendum (2026-08-13)
+
+> Zhou, Wan et al. [arXiv:2502.02533 "Multi-Agent Design: Optimizing Agents with Better Prompts and Topologies"](https://arxiv.org/abs/2502.02533) (ICLR 2026, the **Mass** framework) — **PASS, outside modelless scope.**
+>
+> Mass jointly optimizes LLM-MAS prompts (MIPRO/APE/DSPy) and workflow topologies (aggregate/reflect/debate/summarize/tool-use) via a 3-stage interleave (block-PO → topology → workflow-PO) for *LLM inference calls*. The headline finding ("prompts matter more than topology; optimize agents locally before scaling topology") is a finding about LLM-MAS specifically — it does not transfer to our modelless stack, where (a) there are no LLM prompts in the hot path (NPC cognitive stacks are modelless runtimes: HLA, MAG, KARC, CLR, CGSP), (b) the dev tools that touch LLM-shaped patterns (riir-clippy's TernaryDraftModel, riir-agents' BLAKE3-deterministic latent reasoning) are explicitly modelless, not LLM-orchestration, and (c) "topology" in our vocabulary means node-tier chain consensus / spatial crowd structure / cognitive-stack layers — not LLM workflow graphs.
+>
+> The modelless core of Mass (softmax-influence rejection sampling for topology pruning, `p_a = Softmax(I_a, t)`, reject if `u > p_a`) is generic NAS/MAB-style search with dense prior art (ADAS, AFlow, GPTSwarm, DyLAN, Archon — all cited in-paper; 119 citations on the paper itself). Too thin to be a Super-GOAT primitive — it's standard influence-weighted rejection sampling.
+>
+> Same verdict class as the RLM/GEPA line at the top of this note: LLM-orchestration optimization does not map onto modelless direction-vector / freeze-thaw / shard / LatCal substrates. No `.plans/`, no `.issues/` filed.
