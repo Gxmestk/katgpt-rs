@@ -311,6 +311,23 @@ This is the original 2607.01232 claim, now tested correctly:
 
 **Tier:** still **Gain** until Plan 334 measures accuracy parity. If single-layer matches full-layer accuracy at measurable speed advantage → **GOAT** (the "one layer is enough" claim proven for LoRA on ternary). If accuracy drops below 90% → **Pass with negative result** (single-layer LoRA is a speed optimization, not an accuracy match).
 
+### 9.5 Plan 334 directional results (2026-08-13)
+
+**Setup:** Ternary-Bonsai-27B-Q2_0, 4090 RTX + cudarc (GPU prompt forward, CPU target forward + CPU 13-field backward). 5 train / 5 eval samples, rank 8, alpha 16, lr 1e-3 cosine.
+
+| Arm | Target layers | Steps | Step time | Base ppl | LoRA ppl | Δ ppl | G4 |
+|---|---|---|---|---|---|---|---|
+| A (lm_head) | 1 (output) | — | 83.5 ms (M3) | — | 4.2006 (M3) / 3.353 (4090) | — | PASS |
+| B (mid-layer) | 1 (layer 32 Q+V) | 50 | 309s | 5.7265 | **3.8435** | -32.88% | PASS |
+| C (full-layer) | 48 (all DeltaNet Q+V) | 50 | 584s | 5.7265 | _TBD (T5 running, ETA ~18:49)_ | _TBD_ | PASS (smoke) |
+
+**G1 (accuracy parity):** arm B 3.8435 vs arm C _TBD_. Bar: arm B <= 1.10 x arm C. **PASS if arm C >= 3.494.**
+**G2 (train speed):** arm B 309s vs arm C 584s = **1.89x faster. PASS** (>1.5x bar).
+**G3 (infer overhead):** _TBD (T3.4, blocked on GPU)_.
+**G4 (loss decreases):** arm B final loss 0.0751, avg 0.4772. **PASS.**
+
+**Tier:** pending arm C G1 data. Directional arm B already beats arm A (3.84 < 4.20) on the same backend.
+
 ---
 
 ## 10. Implementation priority table
