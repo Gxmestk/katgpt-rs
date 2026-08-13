@@ -253,10 +253,16 @@ pub struct PerHeadSelection {
 }
 
 impl PerHeadSelection {
-    pub fn new(n_heads: usize) -> Self {
-        Self {
-            blocks_per_head: vec![Vec::new(); n_heads],
-        }
+    /// Create a new per-head selection with pre-reserved capacity.
+    ///
+    /// Pre-reserving `max_blocks` per head ensures `push` in the refresh path
+    /// never reallocates after construction — the G4 (alloc-free steady state)
+    /// gate holds from the first call, not just after warm-up.
+    pub fn new(n_heads: usize, max_blocks: usize) -> Self {
+        let blocks_per_head = (0..n_heads)
+            .map(|_| Vec::with_capacity(max_blocks))
+            .collect();
+        Self { blocks_per_head }
     }
 
     /// Total number of (head, block) pairs selected.
@@ -301,7 +307,7 @@ impl FlashMemorySelector {
     pub fn new(config: FlashMemoryConfig, n_heads: usize, max_blocks: usize) -> Self {
         Self {
             config,
-            last_selection: PerHeadSelection::new(n_heads),
+            last_selection: PerHeadSelection::new(n_heads, max_blocks),
             last_refresh_step: 0,
             selection_valid: false,
             scores_buf: vec![0.0; n_heads * max_blocks],
@@ -496,11 +502,13 @@ pub fn mla_forward_token_flashmemory<'s>(
         let selected_blocks = &selection.blocks_per_head[head];
 
         // Fallback: if no blocks selected, attend the most recent block only.
-        let blocks_to_attend: Vec<usize> = if selected_blocks.is_empty() {
-            let last_block = block_cache.n_active_blocks().saturating_sub(1);
-            vec![last_block]
+        // Uses a stack array (no heap allocation — G4 alloc-free steady state).
+        let mut fallback = [0usize; 1];
+        let blocks_to_attend: &[usize] = if selected_blocks.is_empty() {
+            fallback[0] = block_cache.n_active_blocks().saturating_sub(1);
+            &fallback[..]
         } else {
-            selected_blocks.clone()
+            selected_blocks
         };
 
         // First pass: compute attention scores for selected tokens.
@@ -508,7 +516,7 @@ pub fn mla_forward_token_flashmemory<'s>(
         let mut n_scored = 0usize;
         let mut max_score = f32::NEG_INFINITY;
 
-        for &block_idx in &blocks_to_attend {
+        for &block_idx in blocks_to_attend {
             let (tok_start, tok_end) = block_cache.block_token_range(block_idx, seq);
             for tok in tok_start..tok_end {
                 let c_kv_j = cache.latent_kv_at(tok);
@@ -548,7 +556,7 @@ pub fn mla_forward_token_flashmemory<'s>(
         let v_c_j_h_scratch = &mut scratch.gate_buf[..v_h];
 
         let mut score_idx = 0usize;
-        for &block_idx in &blocks_to_attend {
+        for &block_idx in blocks_to_attend {
             let (tok_start, tok_end) = block_cache.block_token_range(block_idx, seq);
             for tok in tok_start..tok_end {
                 let c_kv_j = cache.latent_kv_at(tok);

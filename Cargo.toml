@@ -1075,6 +1075,15 @@ path = "benches/bench_021_flashmemory_real_weights_retrieval.rs"
 required-features = ["kimi_k3_loader", "flashmemory_sparse"]
 harness = false
 
+# Issue 584 Phase 3 G4 — FlashMemory sparse MLA forward alloc-free steady state.
+# CountingAllocator audit of the per-token decode hot path. Asserts 0 allocations
+# after warm-up. Matches bench_013 pattern. harness=false.
+[[bench]]
+name = "bench_022_flashmemory_alloc_free"
+path = "benches/bench_022_flashmemory_alloc_free.rs"
+required-features = ["flashmemory_sparse"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant

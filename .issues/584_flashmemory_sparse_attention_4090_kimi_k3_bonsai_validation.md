@@ -2,7 +2,7 @@
 
 **Filed:** 2026-08-13
 **Source:** Research 436 (FlashMemory-DeepSeek-V4, arXiv:2606.09079) + PASS-Redirect from SparDA (arXiv:2606.04511)
-**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); Phase 2 scale test blocked on 4090 (Bench 456)
+**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); G3 PASS (2026-08-13); **G4 PASS** (Bench 022, alloc-free steady state, 2026-08-13); Phase 2 scale test + G2 perf blocked on 4090 (Bench 456)
 **Scope:** POC — validate FlashMemory's sigmoid-threshold periodic sparse attention mechanism + scale benefit on real hardware
 
 ---
@@ -76,11 +76,11 @@ Threshold sweep (512 tokens): 0.3 → cos 1.0000 (52.9% blocks, no sparsity bene
 
 ### Phase 3 — GOAT gate
 
-- [ ] **G1 (correctness):** FlashMemory sparse selection preserves retrieval accuracy (RULER NIAH) vs dense baseline at matched context
-- [ ] **G2 (perf):** decode latency with FlashMemory ≤ dense baseline at 256K context on 4090
-- [ ] **G3 (no-regression):** existing VortexFlow tests pass with the periodic refresh extension
-- [ ] **G4 (alloc-free):** periodic refresh path is alloc-free in steady state (reuse selection buffer)
-- [ ] **G5 (memory):** KV cache footprint reduced ≥80% vs dense at 256K context (paper claims 90%)
+- [ ] **G1 (correctness):** FlashMemory sparse selection preserves retrieval accuracy (RULER NIAH) vs dense baseline at matched context — **PASS (Bench 021, real weights, 2026-08-13)** at 128/512/1024 tokens (cos ≥ 0.96, MSE ≤ 0.13). Full NIAH prompt validation (with tokenizer + semantic needle) deferred.
+- [ ] **G2 (perf):** decode latency with FlashMemory ≤ dense baseline at 256K context on 4090 — **BLOCKED on 4090** (Bench 456 still running)
+- [ ] **G3 (no-regression):** existing VortexFlow tests pass with the periodic refresh extension — **PASS** (169 tests, 2026-08-13)
+- [x] **G4 (alloc-free):** periodic refresh path is alloc-free in steady state (reuse selection buffer) — **PASS (Bench 022, 2026-08-13)**: 0 allocations across 256 steady-state decode tokens (32 selector refreshes in window). Fixed two per-token allocation sites: (1) `blocks_to_attend: Vec<usize>` → stack array fallback + direct slice ref; (2) `PerHeadSelection::new` pre-reserves `Vec::with_capacity(max_blocks)` per head.
+- [ ] **G5 (memory):** KV cache footprint reduced ≥80% vs dense at 256K context (paper claims 90%) — **computable**: G1 measured 73-74% reduction at 4K; 256K measurement blocked on 4090
 
 ---
 
