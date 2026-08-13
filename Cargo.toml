@@ -1094,6 +1094,17 @@ path = "benches/bench_023_flashmemory_niah_semantic_needle.rs"
 required-features = ["kimi_k3_loader", "flashmemory_sparse"]
 harness = false
 
+# Issue 584 Phase 3 G5 — FlashMemory KV-reduction scaling curve on M3.
+# Runs Bench 021's dense-vs-sparse MLA retrieval at multiple context lengths
+# (128/512/1024/2048/4096) to characterize how the reduction ratio + accuracy
+# evolve with context. De-risks the 256K scale claim before 4090 access.
+# harness=false.
+[[bench]]
+name = "bench_024_flashmemory_g5_scaling_curve"
+path = "benches/bench_024_flashmemory_g5_scaling_curve.rs"
+required-features = ["kimi_k3_loader", "flashmemory_sparse"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant

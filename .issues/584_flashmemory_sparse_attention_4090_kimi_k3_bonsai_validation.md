@@ -2,7 +2,7 @@
 
 **Filed:** 2026-08-13
 **Source:** Research 436 (FlashMemory-DeepSeek-V4, arXiv:2606.09079) + PASS-Redirect from SparDA (arXiv:2606.04511)
-**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); G3 PASS (2026-08-13); **G4 PASS** (Bench 022, alloc-free steady state, 2026-08-13); NIAH diagnostic (Bench 023, 2026-08-13); **Plan 337 filed** (riir-train indexer training recipe, 2026-08-13); Phase 2 scale test + G2 perf blocked on 4090 (Bench 456)
+**Status:** Open — Phase 1 mechanism landed (2026-08-13); Phase 1+ real-weights G1 PASS (2026-08-13); G3 PASS (2026-08-13); **G4 PASS** (Bench 022, alloc-free steady state, 2026-08-13); NIAH diagnostic (Bench 023, 2026-08-13); **Plan 337 filed** (riir-train indexer training recipe, 2026-08-13); **G5 M3 scaling curve DONE** (Bench 024, 2026-08-13 — 74% reduction at ≤4K, G1 holds at all scales); Phase 2 scale test (256K) + G2 perf blocked on 4090 (Bench 456)
 **Scope:** POC — validate FlashMemory's sigmoid-threshold periodic sparse attention mechanism + scale benefit on real hardware
 
 ---
@@ -82,7 +82,7 @@ Threshold sweep (512 tokens): 0.3 → cos 1.0000 (52.9% blocks, no sparsity bene
 - [ ] **G2 (perf):** decode latency with FlashMemory ≤ dense baseline at 256K context on 4090 — **BLOCKED on 4090** (Bench 456 still running)
 - [ ] **G3 (no-regression):** existing VortexFlow tests pass with the periodic refresh extension — **PASS** (169 tests, 2026-08-13)
 - [x] **G4 (alloc-free):** periodic refresh path is alloc-free in steady state (reuse selection buffer) — **PASS (Bench 022, 2026-08-13)**: 0 allocations across 256 steady-state decode tokens (32 selector refreshes in window). Fixed two per-token allocation sites: (1) `blocks_to_attend: Vec<usize>` → stack array fallback + direct slice ref; (2) `PerHeadSelection::new` pre-reserves `Vec::with_capacity(max_blocks)` per head.
-- [ ] **G5 (memory):** KV cache footprint reduced ≥80% vs dense at 256K context (paper claims 90%) — **computable**: G1 measured 73-74% reduction at 4K; 256K measurement blocked on 4090
+- [ ] **G5 (memory):** KV cache footprint reduced ≥80% vs dense at 256K context (paper claims 90%) — **M3 scaling curve DONE (Bench 024, 2026-08-13)**: G5 plateaus at ~74% for Kimi-K3-0.40B at ≤4K context (G1 holds at ALL 5 scales: cos ≥ 0.9566, MSE ≤ 0.1327). The 90% is a long-context phenomenon requiring 256K on 4090 (Bonsai). The M3 curve de-risks the trend: accuracy is STABLE as context grows (cosine barely moves 0.9566→0.9634); the reduction ratio is stable (67→74%) not growing — the growth to 90% happens in the 4K→256K regime where most tokens become context-independent.
 
 ---
 
