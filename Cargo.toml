@@ -636,6 +636,12 @@ kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64", "dep:fancy-regex",
 # NOTE: currently requires kimi_k3_loader because KimiK3ModelWeights lives
 # in the loader module. A future refactor could split the weights struct out.
 kimi_k3_backward = ["kimi_k3_loader", "katgpt-attn/mla_backward", "katgpt-attn/kda_backward", "katgpt-transformer/moe_backward"]
+# FlashMemory-style periodic sparse attention for MLA (Issue 584 Phase 1).
+# Implements the lookahead periodic sparse selection from FlashMemory-DeepSeek-V4
+# (arXiv:2606.09079, Research 436) adapted for Multi-head Latent Attention.
+# Implies mla_attention + dash_attn (forwarded from katgpt-attn). Opt-in,
+# default-off until GOAT gate (Issue 584 Phase 3).
+flashmemory_sparse = ["katgpt-attn/flashmemory_sparse"]
 
 personality_composition = ["katgpt-core/personality_composition"]  # PersonalityWeightedComposition — sigmoid-gated N-layer latent direction composition + reward-surprise drift + BLAKE3 snapshot (Plan 297, Research 276). Open primitive for the Entity Cognition Stack Super-GOAT (riir-ai Plan 327 consumes this). DEFAULT-ON after GOAT G4 (79.585ns < 1µs target, 12.6× margin) + G5 (zero alloc) passed (Plan 297 Phase 4, Bench 297). Passthrough to katgpt-core.
 committed_field_blend = ["katgpt-core/committed_field_blend"]  # CommittedFieldBlend — sampling-invariant per-entity MoE: frozen sigmoid blend of K archetype operator fields, weights computed ONCE from trajectory summary + BLAKE3-committed (Plan 321, Research 302, arXiv:2510.00621 FAME). Defining property: sampling invariance (FAME Prop. 3) — dense vs sparse observation of same trajectory → identical committed pi + identical dynamics. Implies personality_composition. DEFAULT-ON (2026-06-28, Issue 005 executed): Plan 321 G1–G5 ALL PASS + riir-ai Plan 336 G6a–G6e + G7a ALL PASS (2026-06-26). Modelless gain: closed-form sigmoid projection + BLAKE3 commit, no training. Zero runtime cost unless a caller invokes commit/apply_blended. Passthrough to katgpt-core.
@@ -1055,6 +1061,18 @@ harness = false
 name = "bench_020_generation_trajectory"
 path = "benches/bench_020_generation_trajectory.rs"
 required-features = ["kimi_k3_loader", "swe_trajectory_freeze"]
+harness = false
+
+# Issue 584 Phase 1+ — FlashMemory real-weights retrieval accuracy validation.
+# Loads real Kimi-K3-0.40B model.safetensors, extracts MLA weights from layer 3,
+# runs dense vs sparse (FlashMemory) MLA forward on real token embeddings, and
+# compares per-token outputs (cosine similarity + relative MSE). Validates that
+# sigmoid-threshold sparse selection preserves real-weight attention quality.
+# G1 gate: median cosine ≥ 0.90 AND median relative MSE ≤ 0.50. harness=false.
+[[bench]]
+name = "bench_021_flashmemory_real_weights_retrieval"
+path = "benches/bench_021_flashmemory_real_weights_retrieval.rs"
+required-features = ["kimi_k3_loader", "flashmemory_sparse"]
 harness = false
 
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
