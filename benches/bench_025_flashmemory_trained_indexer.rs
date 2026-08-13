@@ -9,11 +9,16 @@
 //! but the quality result is NOT meaningful on this model. The real validation
 //! needs Bonsai (27B, all full-attention layers, strong learned patterns) on the 4090.
 //!
-//! **Training convergence note:** The bilinear σ(q·k) form has vanishing gradient
-//! issues with SGD when both scores are near 0 (which they are with random init).
-//! The paper uses Adam; this bench uses SGD+momentum. Convergence requires either
-//! Adam or non-zero bias init to break the bilinear symmetry. This is a Phase C
-//! refinement — the pipeline is correct, the optimizer needs upgrading.
+//! **Phase C upgrade (2026-08-13):** the IndexerTrainer now uses Adam
+//! (β1=0.9, β2=0.999, ε=1e-8) instead of SGD+momentum. This resolves the
+//! bilinear σ(q·k) vanishing gradient issue that prevented convergence.
+//! See bench_026 for the synthetic convergence proof (100% accuracy with
+//! Adam + bias init on clear-pattern data).
+//!
+//! **Training convergence note:** Even with Adam, the training may not
+//! converge on Kimi-K3-0.40B because the golden labels are low-signal
+//! (near-uniform attention at 395M scale). The real validation needs
+//! Bonsai (27B, strong learned patterns) on the 4090.
 //!
 //! This bench runs ENTIRELY on M3 Metal (no GPU needed):
 //! 1. Load real Kimi-K3-0.40B model.safetensors
@@ -75,23 +80,40 @@ struct TrainingTriple {
     label: f32,
 }
 
-/// Simple SGD trainer for the DualEncoderIndexer MLPs.
+/// Adam trainer for the DualEncoderIndexer MLPs (Phase C upgrade from SGD).
 ///
 /// Manual backprop for Linear(d, hidden) → ReLU → Linear(hidden, 1).
 /// Uses BCE loss: L = -(y·log(σ(z)) + (1-y)·log(1-σ(z))) where z = q_score · k_score.
+///
+/// Upgraded from SGD+momentum to Adam (Phase C, Plan 337). Adam handles the
+/// bilinear σ(q·k) dynamics far better — the vanishing gradient that plagued
+/// SGD (`dq = dz * k_score ≈ 0` at random init) is resolved by Adam's
+/// per-parameter adaptive learning rates. See bench_026 for the synthetic
+/// convergence proof.
 struct IndexerTrainer {
     d_h: usize,
     hidden: usize,
     lr: f32,
+    beta1: f32,
+    beta2: f32,
+    epsilon: f32,
+    timestep: usize,
 
-    // Q-Indexer weights + gradients
+    // Q-Indexer weights
     q_w1: Vec<f32>, q_b1: Vec<f32>, q_w2: Vec<f32>, q_b2: f32,
-    // K-Indexer weights + gradients
+    // K-Indexer weights
     k_w1: Vec<f32>, k_b1: Vec<f32>, k_w2: Vec<f32>, k_b2: f32,
 
-    // Momentum buffers (SGD with momentum)
-    q_w1_m: Vec<f32>, q_b1_m: Vec<f32>, q_w2_m: Vec<f32>, q_b2_m: f32,
-    k_w1_m: Vec<f32>, k_b1_m: Vec<f32>, k_w2_m: Vec<f32>, k_b2_m: f32,
+    // Adam first moment (m) + second moment (v) buffers
+    q_w1_m: Vec<f32>, q_w1_v: Vec<f32>,
+    q_b1_m: Vec<f32>, q_b1_v: Vec<f32>,
+    q_w2_m: Vec<f32>, q_w2_v: Vec<f32>,
+    q_b2_m: f32, q_b2_v: f32,
+
+    k_w1_m: Vec<f32>, k_w1_v: Vec<f32>,
+    k_b1_m: Vec<f32>, k_b1_v: Vec<f32>,
+    k_w2_m: Vec<f32>, k_w2_v: Vec<f32>,
+    k_b2_m: f32, k_b2_v: f32,
 
     // Forward scratch
     q_hidden: Vec<f32>,
@@ -106,25 +128,31 @@ impl IndexerTrainer {
         let hidden = indexer.hidden_dim();
         let (qw1, qb1, qw2, qb2, kw1, kb1, kw2, kb2) = indexer.extract_weights();
 
-        let z = vec![0.0f32; 0];
         Self {
             d_h, hidden, lr,
+            beta1: 0.9, beta2: 0.999, epsilon: 1e-8, timestep: 0,
             q_w1: qw1.clone(), q_b1: qb1.clone(), q_w2: qw2.clone(), q_b2: qb2,
             k_w1: kw1.clone(), k_b1: kb1.clone(), k_w2: kw2.clone(), k_b2: kb2,
-            q_w1_m: vec![0.0; hidden * d_h], q_b1_m: vec![0.0; hidden],
-            q_w2_m: vec![0.0; hidden], q_b2_m: 0.0,
-            k_w1_m: vec![0.0; hidden * d_h], k_b1_m: vec![0.0; hidden],
-            k_w2_m: vec![0.0; hidden], k_b2_m: 0.0,
+            q_w1_m: vec![0.0; hidden * d_h], q_w1_v: vec![0.0; hidden * d_h],
+            q_b1_m: vec![0.0; hidden], q_b1_v: vec![0.0; hidden],
+            q_w2_m: vec![0.0; hidden], q_w2_v: vec![0.0; hidden],
+            q_b2_m: 0.0, q_b2_v: 0.0,
+            k_w1_m: vec![0.0; hidden * d_h], k_w1_v: vec![0.0; hidden * d_h],
+            k_b1_m: vec![0.0; hidden], k_b1_v: vec![0.0; hidden],
+            k_w2_m: vec![0.0; hidden], k_w2_v: vec![0.0; hidden],
+            k_b2_m: 0.0, k_b2_v: 0.0,
             q_hidden: vec![0.0; hidden],
             k_hidden: vec![0.0; hidden],
         }
     }
 
-    /// Forward + backward + update on a single triple.
+    /// Forward + backward + Adam update on a single triple.
     /// Returns the BCE loss for this sample.
     fn train_step(&mut self, q_c_h: &[f32], k_centroid_h: &[f32], label: f32) -> f32 {
         let d = self.d_h;
         let h = self.hidden;
+        self.timestep += 1;
+        let t = self.timestep as f32;
 
         // ── Forward: Q-Indexer ──
         simd_matmul_rows(&mut self.q_hidden, &self.q_w1, q_c_h, h, d);
@@ -139,66 +167,50 @@ impl IndexerTrainer {
         for i in 0..h { k_score += self.k_w2[i] * self.k_hidden[i]; }
 
         // ── Prediction: σ(q_score · k_score) ──
-        // Note: the bilinear σ(q·k) form is hard to optimize with plain SGD.
-        // The paper uses Adam. We use Adam here too (moment + velocity).
-        let z = (q_score * k_score).clamp(-30.0, 30.0); // clamp to avoid sigmoid saturation
+        let z = (q_score * k_score).clamp(-30.0, 30.0);
         let p = katgpt_core::sigmoid(z);
         let p_clamped = p.clamp(1e-7, 1.0 - 1e-7);
 
         // ── BCE loss ──
-        // Asymmetric BCE (Plan 337 substrate decision): w+ = 8 penalizes
-        // false-elimination 8× harder. Recall-prioritized for sparse block selection.
-        // NOTE: with plain BCE (w+ = w- = 1) the training also doesn't converge on
-        // Kimi-K3-0.40B due to the data quality issue (see file header).
+        // Asymmetric BCE: w+ = 8 penalizes false-elimination 8× harder.
         let w_pos = 8.0f32;
         let w_neg = 1.0f32;
         let loss = -(w_pos * label * p_clamped.ln() + w_neg * (1.0 - label) * (1.0 - p_clamped).ln());
 
         // ── Backward: dL/dz for asymmetric BCE ──
-        // dL/dz = w_neg·p + y·(p·(w_pos - w_neg) - w_pos)
-        // For w_pos=8, w_neg=1: dL/dz = p + y·(7p - 8)
         let mut dz = w_neg * p + label * (p * (w_pos - w_neg) - w_pos);
-        // Gradient clipping to prevent NaN blowup.
         dz = dz.clamp(-5.0, 5.0);
 
-        // z = q_score * k_score → dq_score = dz * k_score, dk_score = dz * q_score
         let dq_score = dz * k_score;
         let dk_score = dz * q_score;
 
-        // ── Backward Q-Indexer ──
-        // q_score = W2·h + b2 → dW2 = dq_score * h, db2 = dq_score
-        // dh = dq_score * W2 (then ReLU mask)
+        // ── Backward Q-Indexer + Adam update ──
         let mut dq_hidden = vec![0.0f32; h];
         for i in 0..h {
             dq_hidden[i] = dq_score * self.q_w2[i];
-            // ReLU mask
             if self.q_hidden[i] <= 0.0 { dq_hidden[i] = 0.0; }
         }
 
-        // Update Q weights with momentum
-        let momentum = 0.9;
         for i in 0..h {
-            let gw2 = dq_score * self.q_hidden[i];
-            self.q_w2_m[i] = momentum * self.q_w2_m[i] + gw2;
-            self.q_w2[i] -= self.lr * self.q_w2_m[i];
+            let grad = dq_score * self.q_hidden[i];
+            Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                &mut self.q_w2, &mut self.q_w2_m, &mut self.q_w2_v, i, grad, t);
         }
-        self.q_b2_m = momentum * self.q_b2_m + dq_score;
-        self.q_b2 -= self.lr * self.q_b2_m;
+        Self::adam_scalar(self.beta1, self.beta2, self.epsilon, self.lr,
+            &mut self.q_b2, &mut self.q_b2_m, &mut self.q_b2_v, dq_score, t);
 
-        // dW1 = outer(dh, x), db1 = dh
         for i in 0..h {
-            self.q_b1_m[i] = momentum * self.q_b1_m[i] + dq_hidden[i];
-            self.q_b1[i] -= self.lr * self.q_b1_m[i];
+            Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                &mut self.q_b1, &mut self.q_b1_m, &mut self.q_b1_v, i, dq_hidden[i], t);
             let row_off = i * d;
             for j in 0..d {
-                let gw1 = dq_hidden[i] * q_c_h[j];
-                let idx = row_off + j;
-                self.q_w1_m[idx] = momentum * self.q_w1_m[idx] + gw1;
-                self.q_w1[idx] -= self.lr * self.q_w1_m[idx];
+                let grad = dq_hidden[i] * q_c_h[j];
+                Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                    &mut self.q_w1, &mut self.q_w1_m, &mut self.q_w1_v, row_off + j, grad, t);
             }
         }
 
-        // ── Backward K-Indexer (same structure) ──
+        // ── Backward K-Indexer + Adam update ──
         let mut dk_hidden = vec![0.0f32; h];
         for i in 0..h {
             dk_hidden[i] = dk_score * self.k_w2[i];
@@ -206,26 +218,54 @@ impl IndexerTrainer {
         }
 
         for i in 0..h {
-            let gw2 = dk_score * self.k_hidden[i];
-            self.k_w2_m[i] = momentum * self.k_w2_m[i] + gw2;
-            self.k_w2[i] -= self.lr * self.k_w2_m[i];
+            let grad = dk_score * self.k_hidden[i];
+            Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                &mut self.k_w2, &mut self.k_w2_m, &mut self.k_w2_v, i, grad, t);
         }
-        self.k_b2_m = momentum * self.k_b2_m + dk_score;
-        self.k_b2 -= self.lr * self.k_b2_m;
+        Self::adam_scalar(self.beta1, self.beta2, self.epsilon, self.lr,
+            &mut self.k_b2, &mut self.k_b2_m, &mut self.k_b2_v, dk_score, t);
 
         for i in 0..h {
-            self.k_b1_m[i] = momentum * self.k_b1_m[i] + dk_hidden[i];
-            self.k_b1[i] -= self.lr * self.k_b1_m[i];
+            Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                &mut self.k_b1, &mut self.k_b1_m, &mut self.k_b1_v, i, dk_hidden[i], t);
             let row_off = i * d;
             for j in 0..d {
-                let gw1 = dk_hidden[i] * k_centroid_h[j];
-                let idx = row_off + j;
-                self.k_w1_m[idx] = momentum * self.k_w1_m[idx] + gw1;
-                self.k_w1[idx] -= self.lr * self.k_w1_m[idx];
+                let grad = dk_hidden[i] * k_centroid_h[j];
+                Self::adam_vec(self.beta1, self.beta2, self.epsilon, self.lr,
+                    &mut self.k_w1, &mut self.k_w1_m, &mut self.k_w1_v, row_off + j, grad, t);
             }
         }
 
         loss
+    }
+
+    /// Adam update for a single element in a slice. Free function pattern
+    /// to avoid `&mut self` borrow conflicts.
+    #[inline]
+    fn adam_vec(
+        beta1: f32, beta2: f32, epsilon: f32, lr: f32,
+        param: &mut [f32], m: &mut [f32], v: &mut [f32],
+        idx: usize, grad: f32, t: f32,
+    ) {
+        m[idx] = beta1 * m[idx] + (1.0 - beta1) * grad;
+        v[idx] = beta2 * v[idx] + (1.0 - beta2) * grad * grad;
+        let m_hat = m[idx] / (1.0 - beta1.powf(t));
+        let v_hat = v[idx] / (1.0 - beta2.powf(t));
+        param[idx] -= lr * m_hat / (v_hat.sqrt() + epsilon);
+    }
+
+    /// Adam update for a scalar parameter.
+    #[inline]
+    fn adam_scalar(
+        beta1: f32, beta2: f32, epsilon: f32, lr: f32,
+        param: &mut f32, m: &mut f32, v: &mut f32,
+        grad: f32, t: f32,
+    ) {
+        *m = beta1 * *m + (1.0 - beta1) * grad;
+        *v = beta2 * *v + (1.0 - beta2) * grad * grad;
+        let m_hat = *m / (1.0 - beta1.powf(t));
+        let v_hat = *v / (1.0 - beta2.powf(t));
+        *param -= lr * m_hat / (v_hat.sqrt() + epsilon);
     }
 
     /// Build a trained DualEncoderIndexer from the current weights.
@@ -392,7 +432,7 @@ fn run_bench() {
     println!("Indexer params: {} (d_h={d_h}, hidden={})",
         init_indexer.param_count(), init_indexer.hidden_dim());
 
-    let mut trainer = IndexerTrainer::from_indexer(&init_indexer, 0.01);
+    let mut trainer = IndexerTrainer::from_indexer(&init_indexer, 0.001);
 
     let n_epochs = 100;
     for epoch in 0..n_epochs {
