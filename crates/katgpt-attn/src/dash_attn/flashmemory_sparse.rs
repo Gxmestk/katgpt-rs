@@ -794,6 +794,30 @@ impl DualEncoderIndexer {
         // K-Indexer: same
         2 * (self.hidden * self.d_h + self.hidden + self.hidden + 1)
     }
+
+    /// Get d_h dimension (for training access).
+    pub fn d_h_dim(&self) -> usize { self.d_h }
+
+    /// Get hidden dimension (for training access).
+    pub fn hidden_dim(&self) -> usize { self.hidden }
+
+    /// Extract all weights as a tuple (for training initialization).
+    #[allow(clippy::type_complexity)]
+    pub fn extract_weights(&self) -> (Vec<f32>, Vec<f32>, Vec<f32>, f32, Vec<f32>, Vec<f32>, Vec<f32>, f32) {
+        (
+            self.q_w1.clone(), self.q_b1.clone(), self.q_w2.clone(), self.q_b2,
+            self.k_w1.clone(), self.k_b1.clone(), self.k_w2.clone(), self.k_b2,
+        )
+    }
+
+    /// Clone for evaluation (resets refresh state but keeps weights).
+    pub fn clone_for_eval(&self) -> Self {
+        Self::from_weights(
+            self.config.clone(), self.d_h, self.n_heads, self.max_blocks,
+            self.q_w1.clone(), self.q_b1.clone(), self.q_w2.clone(), self.q_b2,
+            self.k_w1.clone(), self.k_b1.clone(), self.k_w2.clone(), self.k_b2,
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------

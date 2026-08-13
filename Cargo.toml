@@ -1110,6 +1110,16 @@ path = "benches/bench_024_flashmemory_g5_scaling_curve.rs"
 required-features = ["kimi_k3_loader", "flashmemory_sparse"]
 harness = false
 
+# Plan 337 Phase A+C+D — FlashMemory trained dual-encoder indexer.
+# Trains the DualEncoderIndexer on real Kimi-K3-0.40B attention patterns
+# (M3 Metal, no GPU) + compares recall/precision vs modelless selector.
+# harness=false.
+[[bench]]
+name = "bench_025_flashmemory_trained_indexer"
+path = "benches/bench_025_flashmemory_trained_indexer.rs"
+required-features = ["kimi_k3_loader", "trained_indexer"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant
