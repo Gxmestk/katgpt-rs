@@ -38,6 +38,10 @@ pub mod adaptive_k;
 pub mod block_topk;
 pub mod channel_aware;
 pub mod entmax_router;
+// FlashMemory-style periodic sparse attention for MLA (Issue 584 Phase 1).
+// Gated by `flashmemory_sparse` (implies `mla_attention` + `dash_attn`).
+#[cfg(feature = "flashmemory_sparse")]
+pub mod flashmemory_sparse;
 pub mod kv_outer_prefill;
 pub mod meta_router;
 pub mod msa_distill;

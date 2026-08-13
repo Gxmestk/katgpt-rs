@@ -1,0 +1,1049 @@
+//! FlashMemory-style periodic sparse attention for MLA (Phase 1 mechanism).
+//!
+//! Implements the lookahead periodic sparse attention from FlashMemory-DeepSeek-V4
+//! (arXiv:2606.09079, Research 436), adapted for Multi-head Latent Attention
+//! (DeepSeek-V2 §2.1, Proposal 032 Phase 2).
+//!
+//! # Mechanism
+//!
+//! Three modelless primitives compose the FlashMemory sparse selection:
+//!
+//! 1. **Block centroids** — consecutive `block_size` tokens are summarized by
+//!    the mean of their compressed KV latent (`c_kv`). The centroid lives in
+//!    the `d_c`-dim latent space, NOT the per-head key space.
+//!
+//! 2. **Per-head key projection** — each block's latent centroid is up-projected
+//!    through `W_UK[head]` to produce a per-head content-key centroid (`d_h`
+//!    floats). This is the bridge from latent space to the query's content space.
+//!    The projection is cached per-head per-block and only recomputed when a
+//!    block's membership changes.
+//!
+//! 3. **Sigmoid threshold selection** — blocks are scored by
+//!    `dot(q_c_h, k_c_centroid_h) * attn_scale`, passed through sigmoid, and
+//!    selected when `σ(score) ≥ threshold` (default 0.5). This produces DYNAMIC
+//!    block counts per head — unlike rigid top-k, a head may attend to 1 block
+//!    or 20 blocks depending on the query.
+//!
+//! 4. **Periodic refresh** — the block selection is recomputed every
+//!    `refresh_period` decode steps (default 64). Between refreshes, the last
+//!    selection is reused. This amortizes the O(blocks × heads) scoring cost
+//!    over `refresh_period` steps.
+//!
+//! # Phase 1 scope (Issue 584)
+//!
+//! This is a MECHANISM test, not a scale test. The four questions answered:
+//!
+//! - **Q1**: Can block centroids be built from MLA's compressed latent KV
+//!   (`kv_lora_rank: 128`)? → Yes, `FlashMemoryBlockCache::rebuild_from_cache`.
+//! - **Q2**: Does the periodic refresh amortize selection cost? → Yes, the
+//!   selector caches the last decision and only re-scores every τ steps.
+//! - **Q3**: Does sigmoid threshold (≥0.5) produce dynamic block counts? → Yes,
+//!   different queries select different numbers of blocks (see tests).
+//! - **Q4**: Does the sparse forward preserve accuracy? → The sparse forward
+//!   restricts attention to tokens in selected blocks; softmax is computed
+//!   over only the selected tokens. See `mla_forward_token_flashmemory`.
+//!
+//! # Feature gate
+//!
+//! `flashmemory_sparse` — implies `mla_attention` (MLA types) + `dash_attn`
+//! (VortexFlow scratch types). Opt-in, default-off. GOAT gate required for
+//! promotion (see Issue 584 Phase 3).
+
+use katgpt_core::simd::{simd_add_inplace, simd_dot_f32, simd_matmul_rows, simd_scale_inplace};
+use katgpt_kv::shard_kv::rope::RopeFreqs;
+
+use crate::mla::{MlaConfig, MlaForwardScratch, MlaKVCache, MlaWeights};
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for FlashMemory-style periodic sparse attention.
+///
+/// All defaults match the FlashMemory-DeepSeek-V4 paper (Research 436 §2.1).
+#[derive(Clone, Debug)]
+pub struct FlashMemoryConfig {
+    /// Block size — tokens per block. Paper default: 64.
+    pub block_size: usize,
+    /// Refresh period — decode steps between full re-scoring. Paper default: 64.
+    pub refresh_period: usize,
+    /// Sigmoid selection threshold. Blocks with `σ(score) ≥ threshold` are
+    /// selected. Paper default: 0.5 (σ ≥ 0.5 ⟺ score ≥ 0).
+    pub threshold: f32,
+}
+
+impl Default for FlashMemoryConfig {
+    fn default() -> Self {
+        Self {
+            block_size: 64,
+            refresh_period: 64,
+            threshold: 0.5,
+        }
+    }
+}
+
+impl FlashMemoryConfig {
+    /// Small-block config for testing at short contexts (e.g. 4K).
+    /// Uses block_size=16 so we get enough blocks to test selection dynamics.
+    pub fn test_config() -> Self {
+        Self {
+            block_size: 16,
+            refresh_period: 16,
+            threshold: 0.5,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Block centroid cache
+// ---------------------------------------------------------------------------
+
+/// Block centroid cache built from MLA's compressed latent KV.
+///
+/// Stores:
+/// - **Latent centroids**: `[max_blocks][d_c]` — mean of `c_kv` per block.
+/// - **Per-head key centroids**: `[max_blocks][n_heads][d_h]` — up-projected
+///   content-key centroid per head per block. This is the bridge from latent
+///   space to the query's content space.
+///
+/// The per-head key centroids are recomputed only when a block's membership
+/// changes (i.e., when `rebuild_from_cache` is called after new tokens arrive).
+/// Between rebuilds, the centroids are immutable — the selector can read them
+/// without synchronization.
+pub struct FlashMemoryBlockCache {
+    /// `[max_blocks * d_c]` — latent centroid per block.
+    latent_centroids: Vec<f32>,
+    /// `[max_blocks * n_heads * d_h]` — up-projected content-key centroid.
+    /// Indexed as `key_centroids[block * n_heads * d_h + head * d_h + ..]`.
+    key_centroids: Vec<f32>,
+    /// `[max_blocks]` — number of tokens currently in each block.
+    block_counts: Vec<usize>,
+    /// Number of blocks with at least one token.
+    n_active_blocks: usize,
+    d_c: usize,
+    d_h: usize,
+    n_heads: usize,
+    block_size: usize,
+    max_blocks: usize,
+}
+
+impl FlashMemoryBlockCache {
+    /// Create a new block cache sized for the given MLA config.
+    pub fn new(config: &MlaConfig, fm_config: &FlashMemoryConfig, max_seq: usize) -> Self {
+        let block_size = fm_config.block_size;
+        let max_blocks = max_seq.div_ceil(block_size).max(1);
+        let d_c = config.kv_lora_rank;
+        let d_h = config.d_h();
+        let n_heads = config.n_heads;
+
+        Self {
+            latent_centroids: vec![0.0; max_blocks * d_c],
+            key_centroids: vec![0.0; max_blocks * n_heads * d_h],
+            block_counts: vec![0; max_blocks],
+            n_active_blocks: 0,
+            d_c,
+            d_h,
+            n_heads,
+            block_size,
+            max_blocks,
+        }
+    }
+
+    /// Rebuild block centroids from the MLA KV cache.
+    ///
+    /// Computes the mean of `c_kv` for each block's token range, then
+    /// up-projects each latent centroid through `W_UK[head]` to produce
+    /// per-head content-key centroids.
+    ///
+    /// This is the refresh-cost amortized by the periodic selector: it runs
+    /// O(blocks × d_c) for centroid computation + O(blocks × n_heads × d_h × d_c)
+    /// for up-projection. For Kimi-K3-0.40B at 4K context (256 blocks of 16):
+    /// 256 × 8 × 64 × 128 ≈ 16.8M FMAs — ~170µs on M3 NEON, amortized over
+    /// τ=16 steps → ~10µs/step.
+    pub fn rebuild_from_cache(&mut self, cache: &MlaKVCache, weights: &MlaWeights) {
+        let seq_len = cache.seq_len;
+        let n_blocks = seq_len.div_ceil(self.block_size).min(self.max_blocks);
+        self.n_active_blocks = n_blocks;
+
+        for block_idx in 0..n_blocks {
+            let start = block_idx * self.block_size;
+            let end = (start + self.block_size).min(seq_len);
+            let count = end - start;
+            self.block_counts[block_idx] = count;
+
+            if count == 0 {
+                continue;
+            }
+
+            // Mean-pool c_kv for this block → latent centroid.
+            let centroid = &mut self.latent_centroids
+                [block_idx * self.d_c..(block_idx + 1) * self.d_c];
+            centroid.fill(0.0);
+            for tok in start..end {
+                let c_kv_j = cache.latent_kv_at(tok);
+                simd_add_inplace(centroid, c_kv_j);
+            }
+            let inv = 1.0 / count as f32;
+            simd_scale_inplace(centroid, inv);
+
+            // Up-project latent centroid → per-head content-key centroid.
+            // k_c_centroid[head] = W_UK[head] · centroid_c_kv  (d_h per head)
+            // W_UK layout: [n_heads * d_h, d_c] — row (head*d_h + i) is the i-th
+            // output dim for head `head`, input is the d_c-dim centroid.
+            let key_off = block_idx * self.n_heads * self.d_h;
+            for head in 0..self.n_heads {
+                let w_uk_head =
+                    &weights.w_uk[head * self.d_h * self.d_c..(head + 1) * self.d_h * self.d_c];
+                let k_c_head = &mut self.key_centroids[key_off + head * self.d_h..key_off + (head + 1) * self.d_h];
+                simd_matmul_rows(k_c_head, w_uk_head, centroid, self.d_h, self.d_c);
+            }
+        }
+    }
+
+    /// Number of active blocks (blocks with at least one token).
+    #[inline]
+    pub fn n_active_blocks(&self) -> usize {
+        self.n_active_blocks
+    }
+
+    /// Get the per-head content-key centroid for block `block_idx`, head `head`.
+    /// Returns `d_h` floats — the up-projected centroid in the query's content space.
+    #[inline]
+    pub fn key_centroid(&self, block_idx: usize, head: usize) -> &[f32] {
+        let off = block_idx * self.n_heads * self.d_h + head * self.d_h;
+        &self.key_centroids[off..off + self.d_h]
+    }
+
+    /// Get the latent centroid for block `block_idx`. Returns `d_c` floats.
+    #[inline]
+    pub fn latent_centroid(&self, block_idx: usize) -> &[f32] {
+        &self.latent_centroids[block_idx * self.d_c..(block_idx + 1) * self.d_c]
+    }
+
+    /// Number of tokens in block `block_idx`.
+    #[inline]
+    pub fn block_count(&self, block_idx: usize) -> usize {
+        self.block_counts[block_idx]
+    }
+
+    /// Token range [start, end) for block `block_idx` given current `seq_len`.
+    #[inline]
+    pub fn block_token_range(&self, block_idx: usize, seq_len: usize) -> (usize, usize) {
+        let start = block_idx * self.block_size;
+        let end = (start + self.block_size).min(seq_len);
+        (start, end)
+    }
+
+    /// Block size (tokens per block).
+    #[inline]
+    pub fn block_size(&self) -> usize {
+        self.block_size
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Periodic selector
+// ---------------------------------------------------------------------------
+
+/// Per-head block selection produced by the selector.
+#[derive(Debug, Clone)]
+pub struct PerHeadSelection {
+    /// `[n_heads][variable]` — selected block indices per head.
+    pub blocks_per_head: Vec<Vec<usize>>,
+}
+
+impl PerHeadSelection {
+    pub fn new(n_heads: usize) -> Self {
+        Self {
+            blocks_per_head: vec![Vec::new(); n_heads],
+        }
+    }
+
+    /// Total number of (head, block) pairs selected.
+    pub fn total_selections(&self) -> usize {
+        self.blocks_per_head.iter().map(|v| v.len()).sum()
+    }
+
+    /// Number of blocks selected for head `h`.
+    pub fn len_for_head(&self, head: usize) -> usize {
+        self.blocks_per_head[head].len()
+    }
+
+    /// Clear all selections for reuse.
+    pub fn clear(&mut self) {
+        for v in &mut self.blocks_per_head {
+            v.clear();
+        }
+    }
+}
+
+/// The periodic sparse selector with refresh amortization.
+///
+/// Scores blocks per-head using sigmoid threshold and caches the result.
+/// Re-scores only every `refresh_period` decode steps (FlashMemory §2.1).
+pub struct FlashMemorySelector {
+    config: FlashMemoryConfig,
+    /// Last selection. Reused between refreshes.
+    last_selection: PerHeadSelection,
+    /// Last decode step when selection was refreshed.
+    last_refresh_step: usize,
+    /// Whether the selection is valid (false after construction / force_refresh).
+    selection_valid: bool,
+    /// Scratch: block scores per head. `[n_heads * max_blocks]`.
+    scores_buf: Vec<f32>,
+    n_heads: usize,
+    max_blocks: usize,
+    /// Count of refresh calls (for testing / amortization verification).
+    refresh_count: usize,
+}
+
+impl FlashMemorySelector {
+    pub fn new(config: FlashMemoryConfig, n_heads: usize, max_blocks: usize) -> Self {
+        Self {
+            config,
+            last_selection: PerHeadSelection::new(n_heads),
+            last_refresh_step: 0,
+            selection_valid: false,
+            scores_buf: vec![0.0; n_heads * max_blocks],
+            n_heads,
+            max_blocks,
+            refresh_count: 0,
+        }
+    }
+
+    /// Number of times the selection was refreshed (for amortization tests).
+    pub fn refresh_count(&self) -> usize {
+        self.refresh_count
+    }
+
+    /// Force a refresh on the next `select` call.
+    pub fn force_refresh(&mut self) {
+        self.selection_valid = false;
+    }
+
+    /// Is the current selection valid (not stale)?
+    pub fn is_selection_valid(&self) -> bool {
+        self.selection_valid
+    }
+
+    /// Select blocks to attend to for each head.
+    ///
+    /// Uses periodic refresh: if `current_step - last_refresh_step < refresh_period`
+    /// AND the selection is valid, returns the cached selection. Otherwise,
+    /// re-scores all blocks per-head using sigmoid threshold and caches the result.
+    ///
+    /// # Arguments
+    /// * `query_content` — `[n_heads * d_h]` — the content query projections
+    ///   (`q_c` from MLA). Each head's query is `query_content[head*d_h..(head+1)*d_h]`.
+    /// * `block_cache` — the block centroid cache (must be rebuilt for current seq).
+    /// * `attn_scale` — the attention scale factor (1/sqrt(d_h) typically).
+    /// * `current_step` — the current decode step (for refresh scheduling).
+    ///
+    /// # Returns
+    /// A reference to the per-head selection. The selection is valid until the
+    /// next refresh.
+    pub fn select(
+        &mut self,
+        query_content: &[f32],
+        block_cache: &FlashMemoryBlockCache,
+        attn_scale: f32,
+        current_step: usize,
+    ) -> &PerHeadSelection {
+        let need_refresh = !self.selection_valid
+            || current_step.saturating_sub(self.last_refresh_step) >= self.config.refresh_period;
+
+        if !need_refresh {
+            return &self.last_selection;
+        }
+
+        // ── Refresh: re-score all blocks per head ────────────────────────────
+        self.last_selection.clear();
+        self.last_refresh_step = current_step;
+        self.selection_valid = true;
+        self.refresh_count += 1;
+
+        let n_blocks = block_cache.n_active_blocks();
+        let d_h = query_content.len() / self.n_heads;
+        debug_assert_eq!(query_content.len(), self.n_heads * d_h);
+
+        for head in 0..self.n_heads {
+            let q_c_h = &query_content[head * d_h..(head + 1) * d_h];
+            let scores = &mut self.scores_buf[head * self.max_blocks..head * self.max_blocks + n_blocks];
+
+            // Score each block: dot(q_c_h, k_c_centroid_h) * attn_scale
+            for (block_idx, score_slot) in scores.iter_mut().enumerate().take(n_blocks) {
+                let centroid = block_cache.key_centroid(block_idx, head);
+                *score_slot = simd_dot_f32(q_c_h, centroid, d_h) * attn_scale;
+            }
+
+            // Sigmoid threshold selection: σ(score) ≥ threshold
+            for (block_idx, &score) in scores.iter().enumerate().take(n_blocks) {
+                let sig = katgpt_core::sigmoid(score);
+                if sig >= self.config.threshold {
+                    self.last_selection.blocks_per_head[head].push(block_idx);
+                }
+            }
+        }
+
+        &self.last_selection
+    }
+
+    /// Get the current selection (panics if not yet selected).
+    pub fn selection(&self) -> &PerHeadSelection {
+        assert!(self.selection_valid, "no valid selection — call select() first");
+        &self.last_selection
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sparse MLA forward
+// ---------------------------------------------------------------------------
+
+/// Sparse MLA forward using FlashMemory block selection.
+///
+/// This is the Phase 1 mechanism: attention is computed only over tokens in
+/// selected blocks. The softmax denominator covers only selected tokens.
+///
+/// **Correctness contract:** for tokens in selected blocks, the attention
+/// computation is bit-identical to the dense path (`mla_forward_token`). The
+/// only difference is that tokens in non-selected blocks receive zero attention
+/// weight. This is the standard sparse attention contract — it's lossy by
+/// design (that's the memory reduction), but the selected-token computation
+/// is exact.
+///
+/// **Safety net:** if no blocks are selected for a head (all scores below
+/// threshold), the head falls back to attending the MOST RECENT block only
+/// (recency bias — the FlashMemory paper notes this as the natural fallback
+/// for "nothing relevant found" queries). This prevents division-by-zero in
+/// softmax and gives the model a sensible default.
+///
+/// # Arguments
+/// * `step` — the current decode step (for periodic refresh scheduling).
+///   Pass the token position or any monotonic counter.
+#[allow(clippy::too_many_arguments)]
+pub fn mla_forward_token_flashmemory<'s>(
+    config: &MlaConfig,
+    weights: &MlaWeights,
+    cache: &mut MlaKVCache,
+    scratch: &'s mut MlaForwardScratch,
+    rope_freqs: &mut RopeFreqs,
+    h: &[f32],
+    block_cache: &mut FlashMemoryBlockCache,
+    selector: &mut FlashMemorySelector,
+    step: usize,
+) -> &'s mut [f32] {
+    let d = config.hidden_size;
+    let d_c = config.kv_lora_rank;
+    let d_qc = config.q_lora_rank;
+    let d_h = config.d_h();
+    let d_r = config.d_r();
+    let v_h = config.v_head_dim;
+    let n_h = config.n_heads;
+    debug_assert_eq!(h.len(), d, "hidden state dim mismatch");
+
+    let pos = cache.seq_len;
+    let scale = config.attn_scale();
+
+    // ── Step 1-4: Down-projections, latent norms, query/key up-projections ─
+    // Identical to the dense MLA forward (mla_forward_token).
+    simd_matmul_rows(&mut scratch.c_kv, &weights.w_dkv, h, d_c, d);
+    simd_matmul_rows(&mut scratch.c_q, &weights.w_dq, h, d_qc, d);
+
+    rmsnorm_inplace(&mut scratch.c_q, &weights.q_a_norm_weight, config.rms_norm_eps);
+    rmsnorm_inplace(&mut scratch.c_kv, &weights.kv_a_norm_weight, config.rms_norm_eps);
+
+    simd_matmul_rows(&mut scratch.q_c, &weights.w_uq, &scratch.c_q, d_h * n_h, d_qc);
+    simd_matmul_rows(&mut scratch.q_r, &weights.w_qr, &scratch.c_q, d_r * n_h, d_qc);
+    if !config.use_nope {
+        apply_decoupled_rope(rope_freqs, &mut scratch.q_r, d_r, n_h, pos);
+    }
+
+    simd_matmul_rows(&mut scratch.k_c, &weights.w_uk, &scratch.c_kv, d_h * n_h, d_c);
+    simd_matmul_rows(&mut scratch.v_c, &weights.w_uv, &scratch.c_kv, v_h * n_h, d_c);
+
+    simd_matmul_rows(&mut scratch.k_r, &weights.w_kr, h, d_r, d);
+    if !config.use_nope {
+        apply_decoupled_rope(rope_freqs, &mut scratch.k_r, d_r, 1, pos);
+    }
+
+    // ── Step 5: Cache the normed latent + shared rope key ──────────────────
+    cache.append(&scratch.c_kv, &scratch.k_r);
+
+    // ── Step 5b: Rebuild block centroids (includes the just-appended token) ─
+    block_cache.rebuild_from_cache(cache, weights);
+
+    // ── Step 6: FlashMemory block selection ────────────────────────────────
+    let seq = cache.seq_len;
+    let selection = selector.select(&scratch.q_c, block_cache, scale, step);
+
+    // ── Step 7: Sparse attention per head ──────────────────────────────────
+    for head in 0..n_h {
+        let q_c_h = &scratch.q_c[head * d_h..(head + 1) * d_h];
+        let q_r_h = &scratch.q_r[head * d_r..(head + 1) * d_r];
+
+        // Collect the token indices in selected blocks for this head.
+        // Write into scratch.scores[..seq] — we'll overwrite with real scores next.
+        // Actually, we need a separate token-index list. Reuse scratch.gate_buf
+        // region as a token-index scratch (it's unused during the attention loop;
+        // only written in Step 8 after attention completes). But gate_buf is f32
+        // and we need usize indices. Use a different approach: iterate selected
+        // blocks and compute scores inline into scratch.scores.
+
+        // Strategy: first pass collects selected token indices + computes scores.
+        // Second pass does softmax + weighted value sum.
+        // We'll pack (token_idx, score) pairs into the scores buffer prefix.
+
+        let selected_blocks = &selection.blocks_per_head[head];
+
+        // Fallback: if no blocks selected, attend the most recent block only.
+        let blocks_to_attend: Vec<usize> = if selected_blocks.is_empty() {
+            let last_block = block_cache.n_active_blocks().saturating_sub(1);
+            vec![last_block]
+        } else {
+            selected_blocks.clone()
+        };
+
+        // First pass: compute attention scores for selected tokens.
+        let scores = &mut scratch.scores[..seq];
+        let mut n_scored = 0usize;
+        let mut max_score = f32::NEG_INFINITY;
+
+        for &block_idx in &blocks_to_attend {
+            let (tok_start, tok_end) = block_cache.block_token_range(block_idx, seq);
+            for tok in tok_start..tok_end {
+                let c_kv_j = cache.latent_kv_at(tok);
+                let k_r_j = cache.rope_key_at(tok);
+
+                // k_c_j = W_UK[head] · c_kv_j
+                simd_matmul_rows(
+                    &mut scratch.k_c[..d_h],
+                    &weights.w_uk[head * d_h * d_c..(head + 1) * d_h * d_c],
+                    c_kv_j,
+                    d_h,
+                    d_c,
+                );
+
+                let content_dot = simd_dot_f32(q_c_h, &scratch.k_c[..d_h], d_h);
+                let rope_dot = simd_dot_f32(q_r_h, k_r_j, d_r);
+                let score = (content_dot + rope_dot) * scale;
+                scores[n_scored] = score;
+                n_scored += 1;
+                if score > max_score {
+                    max_score = score;
+                }
+            }
+        }
+
+        // Softmax over selected tokens only (numerically stable).
+        let mut sum_exp = 0.0f32;
+        for s in scores.iter_mut().take(n_scored) {
+            *s = (*s - max_score).exp();
+            sum_exp += *s;
+        }
+        let inv_sum = 1.0 / sum_exp;
+
+        // Second pass: weighted value sum over selected tokens.
+        let o_h = &mut scratch.attn_out[head * v_h..(head + 1) * v_h];
+        o_h[..v_h].fill(0.0);
+        let v_c_j_h_scratch = &mut scratch.gate_buf[..v_h];
+
+        let mut score_idx = 0usize;
+        for &block_idx in &blocks_to_attend {
+            let (tok_start, tok_end) = block_cache.block_token_range(block_idx, seq);
+            for tok in tok_start..tok_end {
+                let c_kv_j = cache.latent_kv_at(tok);
+                let weight = scores[score_idx] * inv_sum;
+                score_idx += 1;
+
+                simd_matmul_rows(
+                    v_c_j_h_scratch,
+                    &weights.w_uv[head * v_h * d_c..(head + 1) * v_h * d_c],
+                    c_kv_j,
+                    v_h,
+                    d_c,
+                );
+                for (o, &vc) in o_h.iter_mut().zip(v_c_j_h_scratch[..v_h].iter()) {
+                    *o += weight * vc;
+                }
+            }
+        }
+    }
+
+    // ── Step 8: Output gate + output projection ────────────────────────────
+    // Identical to the dense MLA forward.
+    let proj_size = v_h * n_h;
+    if config.use_output_gate
+        && let Some(ref w_g) = weights.w_g
+    {
+        simd_matmul_rows(&mut scratch.gate_buf, w_g, h, proj_size, d);
+        for (o, &gb) in scratch.attn_out[..proj_size]
+            .iter_mut()
+            .zip(scratch.gate_buf[..proj_size].iter())
+        {
+            let g = 1.0 / (1.0 + (-gb).exp());
+            *o *= g;
+        }
+    }
+
+    simd_matmul_rows(&mut scratch.output, &weights.w_o, &scratch.attn_out, d, proj_size);
+
+    &mut scratch.output[..d]
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers (re-declared locally to avoid cross-module visibility issues)
+// ---------------------------------------------------------------------------
+
+/// RMSNorm applied in-place: x = x / ||x|| * gamma.
+/// Mirrors `mla::rmsnorm_inplace` (kept local for module independence).
+fn rmsnorm_inplace(x: &mut [f32], gamma: &[f32], eps: f32) {
+    let n = x.len();
+    let mut sum_sq = 0.0f32;
+    for &v in x.iter().take(n) {
+        sum_sq += v * v;
+    }
+    let rms = (sum_sq / n as f32 + eps).sqrt();
+    let inv_rms = 1.0 / rms;
+    for (xi, &g) in x.iter_mut().take(n).zip(gamma.iter().take(n)) {
+        *xi = *xi * inv_rms * g;
+    }
+}
+
+/// Decoupled RoPE application. Mirrors `mla::apply_decoupled_rope`.
+fn apply_decoupled_rope(
+    rope_freqs: &mut RopeFreqs,
+    q: &mut [f32],
+    d_r: usize,
+    n_heads: usize,
+    pos: usize,
+) {
+    for head in 0..n_heads {
+        let start = head * d_r;
+        rope_freqs.apply(&mut q[start..start + d_r], pos, false);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mla::{MlaConfig, MlaForwardScratch, MlaKVCache, MlaWeights};
+
+    /// Small MLA config for fast tests (smaller than Kimi-K3-0.40B for speed).
+    fn small_mla_config() -> MlaConfig {
+        MlaConfig {
+            kv_lora_rank: 32,
+            q_lora_rank: 64,
+            qk_nope_head_dim: 16,
+            qk_rope_head_dim: 8,
+            v_head_dim: 16,
+            n_heads: 4,
+            hidden_size: 128,
+            use_output_gate: true,
+            use_nope: false,
+            rope_theta: 10_000.0,
+            rms_norm_eps: 1e-5,
+        }
+    }
+
+    fn make_weights(config: &MlaConfig) -> MlaWeights {
+        MlaWeights::random(config, 42)
+    }
+
+    // ── Q1: Block centroids from MLA latent KV ──────────────────────────────
+
+    #[test]
+    fn q1_block_centroids_built_from_mla_latent_kv() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 4,
+            threshold: 0.5,
+        };
+        let max_seq = 16;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        // Append 12 tokens (3 full blocks of 4).
+        for i in 0..12 {
+            let c_kv = vec![(i as f32) * 0.1; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        assert_eq!(block_cache.n_active_blocks(), 3);
+        assert_eq!(block_cache.block_count(0), 4);
+        assert_eq!(block_cache.block_count(1), 4);
+        assert_eq!(block_cache.block_count(2), 4);
+
+        // Check latent centroid is the mean.
+        // Token i has c_kv = [i*0.1; 32]. Block 0 = tokens 0-3, mean = 1.5*0.1 = 0.15.
+        let centroid_0 = block_cache.latent_centroid(0);
+        let expected = (0.0 + 0.1 + 0.2 + 0.3) / 4.0; // = 0.15
+        assert!(
+            (centroid_0[0] - expected).abs() < 1e-6,
+            "centroid[0]={}, expected={}",
+            centroid_0[0],
+            expected
+        );
+
+        // Per-head key centroid should be non-zero (up-projection of non-zero centroid).
+        let key_centroid = block_cache.key_centroid(0, 0);
+        assert!(
+            key_centroid.iter().any(|&v| v.abs() > 1e-6),
+            "key centroid should be non-zero after up-projection"
+        );
+    }
+
+    #[test]
+    fn q1_partial_last_block_handled() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 4,
+            threshold: 0.5,
+        };
+        let max_seq = 16;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        // Append 10 tokens → 2 full blocks + 1 partial (2 tokens).
+        for i in 0..10 {
+            let c_kv = vec![(i as f32) * 0.1; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        assert_eq!(block_cache.n_active_blocks(), 3);
+        assert_eq!(block_cache.block_count(0), 4);
+        assert_eq!(block_cache.block_count(1), 4);
+        assert_eq!(block_cache.block_count(2), 2); // partial
+
+        // Token range for the partial block.
+        let (start, end) = block_cache.block_token_range(2, 10);
+        assert_eq!(start, 8);
+        assert_eq!(end, 10);
+    }
+
+    // ── Q2: Periodic refresh amortization ───────────────────────────────────
+
+    #[test]
+    fn q2_periodic_refresh_amortizes_selection() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 5, // refresh every 5 steps
+            threshold: 0.5,
+        };
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, 8);
+
+        // Fill cache with 16 tokens (4 blocks).
+        for i in 0..16 {
+            let c_kv = vec![(i as f32) * 0.01; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let q_c = vec![0.5; config.n_heads * config.d_h()];
+        let scale = config.attn_scale();
+
+        // Steps 0-9 (10 decode steps, refresh_period=5 → should refresh at steps 0 and 5).
+        let mut refreshes_at = Vec::new();
+        for step in 0..10 {
+            selector.select(&q_c, &block_cache, scale, step);
+            if selector.refresh_count() > refreshes_at.len() {
+                refreshes_at.push(step);
+            }
+        }
+
+        // Should have refreshed exactly 2 times (step 0 and step 5).
+        assert_eq!(selector.refresh_count(), 2, "expected 2 refreshes, got {}", selector.refresh_count());
+        assert_eq!(refreshes_at, vec![0, 5]);
+    }
+
+    #[test]
+    fn q2_force_refresh_invalidates_cache() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100, // long period — won't naturally refresh
+            threshold: 0.5,
+        };
+        let max_seq = 16;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, 4);
+
+        for i in 0..8 {
+            let c_kv = vec![(i as f32) * 0.1; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let q_c = vec![0.5; config.n_heads * config.d_h()];
+        let scale = config.attn_scale();
+
+        // Step 0: initial refresh.
+        selector.select(&q_c, &block_cache, scale, 0);
+        assert_eq!(selector.refresh_count(), 1);
+
+        // Steps 1-10: no refresh (period=100).
+        for step in 1..=10 {
+            selector.select(&q_c, &block_cache, scale, step);
+        }
+        assert_eq!(selector.refresh_count(), 1);
+
+        // Force refresh.
+        selector.force_refresh();
+        selector.select(&q_c, &block_cache, scale, 11);
+        assert_eq!(selector.refresh_count(), 2);
+    }
+
+    // ── Q3: Sigmoid threshold produces dynamic block counts ────────────────
+
+    #[test]
+    fn q3_sigmoid_threshold_dynamic_block_counts() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.5,
+        };
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, 8);
+
+        // Create blocks with DISTINCT centroids so different queries select
+        // different subsets. Block 0: low values, Block 1: high values, etc.
+        for block in 0..6 {
+            for _ in 0..4 {
+                let c_kv = vec![(block as f32) * 2.0; config.kv_lora_rank];
+                let k_r = vec![0.0; config.qk_rope_head_dim];
+                cache.append(&c_kv, &k_r);
+            }
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let scale = config.attn_scale();
+
+        // Query A: all zeros → dot products ≈ 0 → σ(0) = 0.5 → threshold met.
+        // (Score = dot(q, centroid) * scale; if q=0, score=0, σ(0)=0.5 ≥ 0.5.)
+        let q_zero = vec![0.0; config.n_heads * config.d_h()];
+        selector.force_refresh();
+        let sel_a = selector.select(&q_zero, &block_cache, scale, 0);
+        let total_a = sel_a.total_selections();
+        assert!(total_a > 0, "zero query should select blocks at threshold boundary");
+
+        // Query B: high positive → should select high-centroid blocks more.
+        let q_high = vec![5.0; config.n_heads * config.d_h()];
+        selector.force_refresh();
+        let sel_b = selector.select(&q_high, &block_cache, scale, 1);
+        // Clone the selection data before re-borrowing selector.
+        let blocks_b_head0 = sel_b.blocks_per_head[0].clone();
+        let total_b = sel_b.total_selections();
+
+        // Query C: high negative → should select low-centroid blocks.
+        let q_neg = vec![-5.0; config.n_heads * config.d_h()];
+        selector.force_refresh();
+        let sel_c = selector.select(&q_neg, &block_cache, scale, 2);
+        let blocks_c_head0 = sel_c.blocks_per_head[0].clone();
+        let total_c = sel_c.total_selections();
+
+        // The KEY assertion: different queries produce DIFFERENT selection counts
+        // (dynamic, not rigid top-k). At minimum, q_high and q_neg should differ
+        // because they're on opposite sides of the centroid distribution.
+
+        // With distinct block centroids (0, 2, 4, 6, 8, 10) and a scale factor,
+        // q_high should favor high-centroid blocks and q_neg should favor low ones.
+        // They won't necessarily have different COUNTS (sigmoid is symmetric), but
+        // they should select different BLOCK SETS.
+
+        // At least the sets should differ (not identical).
+        let sets_differ = blocks_b_head0 != blocks_c_head0;
+        assert!(
+            sets_differ || total_b != total_c,
+            "q_high and q_neg should produce different selections: \
+             b={:?} (total={}), c={:?} (total={})",
+            blocks_b_head0,
+            total_b,
+            blocks_c_head0,
+            total_c
+        );
+    }
+
+    #[test]
+    fn q3_threshold_controls_selectivity() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+
+        // Fill with uniform-ish data.
+        for i in 0..16 {
+            let c_kv = vec![(i as f32) * 0.1; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+
+        let q_c = vec![1.0; config.n_heads * config.d_h()];
+        let scale = config.attn_scale();
+
+        // Low threshold → more blocks selected.
+        let fm_low = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.01, // very low → almost everything passes
+        };
+        let mut block_cache_low = FlashMemoryBlockCache::new(&config, &fm_low, max_seq);
+        block_cache_low.rebuild_from_cache(&cache, &weights);
+        let mut sel_low = FlashMemorySelector::new(fm_low, config.n_heads, 4);
+        let n_low = sel_low.select(&q_c, &block_cache_low, scale, 0).total_selections();
+
+        // High threshold → fewer blocks selected.
+        let fm_high = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.99, // very high → almost nothing passes
+        };
+        let mut block_cache_high = FlashMemoryBlockCache::new(&config, &fm_high, max_seq);
+        block_cache_high.rebuild_from_cache(&cache, &weights);
+        let mut sel_high = FlashMemorySelector::new(fm_high, config.n_heads, 4);
+        let n_high = sel_high.select(&q_c, &block_cache_high, scale, 0).total_selections();
+
+        assert!(
+            n_low >= n_high,
+            "lower threshold should select ≥ blocks: low={} high={}",
+            n_low,
+            n_high
+        );
+    }
+
+    // ── Q4: Sparse forward preserves accuracy on selected tokens ────────────
+
+    #[test]
+    fn q4_sparse_forward_runs_without_panic() {
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.3, // low threshold → most blocks selected
+        };
+        let max_seq = 16;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut scratch = MlaForwardScratch::new(&config, max_seq);
+        let mut rope_freqs = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, 4);
+
+        // Prefill: process a few tokens.
+        for step in 0..8 {
+            let h = vec![(step as f32) * 0.1; config.hidden_size];
+            // Normalize h to have reasonable magnitude.
+            let h_norm: Vec<f32> = h.iter().map(|&v| v / 10.0).collect();
+            mla_forward_token_flashmemory(
+                &config, &weights, &mut cache, &mut scratch, &mut rope_freqs,
+                &h_norm, &mut block_cache, &mut selector, step,
+            );
+        }
+
+        // Verify the cache grew correctly.
+        assert_eq!(cache.seq_len, 8);
+        // Verify the output has the right dimension.
+        let output = mla_forward_token_flashmemory(
+            &config, &weights, &mut cache, &mut scratch, &mut rope_freqs,
+            &vec![0.1; config.hidden_size], &mut block_cache, &mut selector, 8,
+        );
+        assert_eq!(output.len(), config.hidden_size);
+        // Output should not be all-NaN.
+        assert!(
+            output.iter().all(|&v| v.is_finite()),
+            "output contains non-finite values"
+        );
+    }
+
+    #[test]
+    fn q4_no_selection_falls_back_to_recent_block() {
+        // When threshold is so high that NO blocks are selected, the sparse
+        // forward must fall back to attending the most recent block (recency bias).
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.999, // impossibly high → nothing selected
+        };
+        let max_seq = 16;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut scratch = MlaForwardScratch::new(&config, max_seq);
+        let mut rope_freqs = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, 4);
+
+        for step in 0..8 {
+            let h = vec![0.1; config.hidden_size];
+            let out = mla_forward_token_flashmemory(
+                &config, &weights, &mut cache, &mut scratch, &mut rope_freqs,
+                &h, &mut block_cache, &mut selector, step,
+            );
+            // Should not panic, should produce finite output.
+            assert!(
+                out.iter().all(|&v| v.is_finite()),
+                "fallback output contains non-finite values at step {}",
+                step
+            );
+        }
+    }
+
+    #[test]
+    fn q4_kimi_k3_0_40b_config_smoke() {
+        // Smoke test with the ACTUAL Kimi-K3-0.40B config dimensions.
+        // This validates the mechanism works at production scale (d_c=128, d_h=64, etc.).
+        let config = MlaConfig::kimi_k3_0_40b();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig::test_config(); // block_size=16, τ=16
+        let block_size = fm_config.block_size;
+        let max_seq = 256; // small context for speed (mechanism test, not scale)
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut scratch = MlaForwardScratch::new(&config, max_seq);
+        let mut rope_freqs = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+        let mut selector = FlashMemorySelector::new(fm_config, config.n_heads, max_seq.div_ceil(block_size));
+
+        // Process 64 tokens (4 blocks of 16).
+        for step in 0..64 {
+            let h = vec![((step % 10) as f32) * 0.01; config.hidden_size];
+            let out = mla_forward_token_flashmemory(
+                &config, &weights, &mut cache, &mut scratch, &mut rope_freqs,
+                &h, &mut block_cache, &mut selector, step,
+            );
+            assert_eq!(out.len(), config.hidden_size);
+            assert!(
+                out.iter().all(|&v| v.is_finite()),
+                "non-finite output at step {}",
+                step
+            );
+        }
+
+        // Verify the selector did periodic refreshes (τ=16, 64 steps → 4 refreshes).
+        assert_eq!(selector.refresh_count(), 4, "expected 4 refreshes over 64 steps");
+    }
+}

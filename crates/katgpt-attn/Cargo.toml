@@ -132,3 +132,9 @@ kda_linear = ["gdn2_attention"]
 # modelless-by-mandate — this is the training-time reference consumed by
 # riir-train, never on the production inference path. Opt-in, default-off.
 kda_backward = ["kda_linear"]
+# FlashMemory-style periodic sparse attention for MLA (Issue 584 Phase 1).
+# Implements the lookahead periodic sparse selection from FlashMemory-DeepSeek-V4
+# (arXiv:2606.09079, Research 436) adapted for Multi-head Latent Attention.
+# Implies `mla_attention` (MLA types + forward) + `dash_attn` (VortexFlow scratch
+# types). Opt-in, default-off until GOAT gate (Issue 584 Phase 3).
+flashmemory_sparse = ["mla_attention", "dash_attn"]
