@@ -402,6 +402,401 @@ impl FlashMemorySelector {
 }
 
 // ---------------------------------------------------------------------------
+// Trained dual-encoder indexer (Plan 337 Phase B)
+// ---------------------------------------------------------------------------
+
+/// Trained dual-encoder indexer for FlashMemory sparse attention.
+///
+/// Replaces the modelless centroid-dot-product scorer (`FlashMemorySelector`)
+/// with two tiny trained MLPs (FlashMemory-DeepSeek-V4 §3.2, Plan 337):
+/// - **Q-Indexer**: `Linear(d_h, d_h/4) → ReLU → Linear(d_h/4, 1)` — scores
+///   the query's retrieval intent per head.
+/// - **K-Indexer**: same architecture — scores each block's retrieval value
+///   per head.
+///
+/// Block importance: `I = σ(q_score · k_score)`, selected when `I ≥ threshold`.
+///
+/// The MLPs are shared across heads (per-head differentiation comes from the
+/// per-head query/key projections feeding into the MLPs). Total params for
+/// Kimi-K3-0.40B (d_h=64): ~2.1K — 0.0005% of the 395M model.
+///
+/// # Periodic refresh
+///
+/// Like `FlashMemorySelector`, this indexer re-scores only every
+/// `refresh_period` decode steps. Between refreshes, the cached k_scores
+/// (per-head per-block) are reused; only the q_score (per-head scalar) is
+/// recomputed each step — making the per-step cost O(heads · MLP + heads ·
+/// blocks) instead of O(heads · blocks · d_h) for the modelless dot-product.
+///
+/// # Feature gate
+///
+/// `trained_indexer` — requires `flashmemory_sparse`. Opt-in, **never
+/// default-on** (requires training → violates the modelless-first mandate).
+/// The modelless `FlashMemorySelector` is the production default.
+#[cfg(feature = "trained_indexer")]
+pub struct DualEncoderIndexer {
+    // ── Q-Indexer weights: Linear(d_h, hidden) + ReLU + Linear(hidden, 1) ──
+    /// `[hidden * d_h]` — row-major weight matrix for the hidden layer.
+    q_w1: Vec<f32>,
+    /// `[hidden]` — bias for the hidden layer.
+    q_b1: Vec<f32>,
+    /// `[hidden]` — weight vector for the output layer.
+    q_w2: Vec<f32>,
+    /// Output bias.
+    q_b2: f32,
+
+    // ── K-Indexer weights: same shape ──
+    k_w1: Vec<f32>,
+    k_b1: Vec<f32>,
+    k_w2: Vec<f32>,
+    k_b2: f32,
+
+    // ── Config ──
+    config: FlashMemoryConfig,
+    d_h: usize,
+    /// Hidden layer width = `d_h / 4` (min 4).
+    hidden: usize,
+
+    // ── Periodic refresh state ──
+    last_selection: PerHeadSelection,
+    last_refresh_step: usize,
+    selection_valid: bool,
+    refresh_count: usize,
+
+    // ── Cached k_scores per head per block: `[n_heads * max_blocks]` ──
+    /// Recomputed only on refresh (block centroids are fixed between refreshes).
+    k_scores_cache: Vec<f32>,
+
+    // ── Scratch ──
+    /// MLP hidden-layer scratch `[hidden]` — reused across calls (G4 alloc-free).
+    mlp_scratch: Vec<f32>,
+
+    n_heads: usize,
+    max_blocks: usize,
+}
+
+#[cfg(feature = "trained_indexer")]
+impl DualEncoderIndexer {
+    /// Create a randomly-initialized indexer (for training).
+    ///
+    /// Uses Xavier/Glorot initialization for the weight matrices.
+    /// `hidden` defaults to `d_h / 4` (min 4).
+    pub fn new_random(
+        config: FlashMemoryConfig,
+        d_h: usize,
+        n_heads: usize,
+        max_blocks: usize,
+        seed: u64,
+    ) -> Self {
+        let hidden = (d_h / 4).max(4);
+        // Simple deterministic PRNG (xorshift) for reproducible init.
+        let mut rng = seed.max(1);
+        let mut next_f32 = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            // Map to [-limit, limit] for Xavier init.
+            let u = (rng >> 40) as f32 / (1u64 << 40) as f32; // [0, 1)
+            u * 2.0 - 1.0
+        };
+
+        let xavier_w1 = (6.0 / (d_h + hidden) as f32).sqrt();
+        let xavier_w2 = (6.0 / (hidden + 1) as f32).sqrt();
+
+        let q_w1 = (0..hidden * d_h).map(|_| next_f32() * xavier_w1).collect();
+        let q_b1 = vec![0.0; hidden];
+        let q_w2 = (0..hidden).map(|_| next_f32() * xavier_w2).collect();
+        let q_b2 = 0.0;
+
+        let k_w1 = (0..hidden * d_h).map(|_| next_f32() * xavier_w1).collect();
+        let k_b1 = vec![0.0; hidden];
+        let k_w2 = (0..hidden).map(|_| next_f32() * xavier_w2).collect();
+        let k_b2 = 0.0;
+
+        Self {
+            q_w1,
+            q_b1,
+            q_w2,
+            q_b2,
+            k_w1,
+            k_b1,
+            k_w2,
+            k_b2,
+            config,
+            d_h,
+            hidden,
+            last_selection: PerHeadSelection::new(n_heads, max_blocks),
+            last_refresh_step: 0,
+            selection_valid: false,
+            refresh_count: 0,
+            k_scores_cache: vec![0.0; n_heads * max_blocks],
+            mlp_scratch: vec![0.0; hidden],
+            n_heads,
+            max_blocks,
+        }
+    }
+
+    /// Create an indexer from pre-trained weights (for inference).
+    ///
+    /// Weight layout matches `to_bytes()` / `from_bytes()` for freeze/thaw.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_weights(
+        config: FlashMemoryConfig,
+        d_h: usize,
+        n_heads: usize,
+        max_blocks: usize,
+        q_w1: Vec<f32>,
+        q_b1: Vec<f32>,
+        q_w2: Vec<f32>,
+        q_b2: f32,
+        k_w1: Vec<f32>,
+        k_b1: Vec<f32>,
+        k_w2: Vec<f32>,
+        k_b2: f32,
+    ) -> Self {
+        let hidden = q_b1.len();
+        debug_assert_eq!(q_w1.len(), hidden * d_h);
+        debug_assert_eq!(q_w2.len(), hidden);
+        debug_assert_eq!(k_w1.len(), hidden * d_h);
+        debug_assert_eq!(k_b1.len(), hidden);
+        debug_assert_eq!(k_w2.len(), hidden);
+
+        Self {
+            q_w1,
+            q_b1,
+            q_w2,
+            q_b2,
+            k_w1,
+            k_b1,
+            k_w2,
+            k_b2,
+            config,
+            d_h,
+            hidden,
+            last_selection: PerHeadSelection::new(n_heads, max_blocks),
+            last_refresh_step: 0,
+            selection_valid: false,
+            refresh_count: 0,
+            k_scores_cache: vec![0.0; n_heads * max_blocks],
+            mlp_scratch: vec![0.0; hidden],
+            n_heads,
+            max_blocks,
+        }
+    }
+
+    /// Serialize all weights to a flat byte buffer (for freeze/thaw).
+    ///
+    /// Layout (all f32, little-endian):
+    /// `[hidden][d_h][q_w1 (hidden*d_h)][q_b1 (hidden)][q_w2 (hidden)][q_b2 (1)]
+    ///  [k_w1 (hidden*d_h)][k_b1 (hidden)][k_w2 (hidden)][k_b2 (1)]`
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let total_floats = 2 + // hidden, d_h
+            self.hidden * self.d_h + self.hidden + self.hidden + 1 + // Q-Indexer
+            self.hidden * self.d_h + self.hidden + self.hidden + 1;  // K-Indexer
+        let mut buf = Vec::with_capacity(total_floats * 4);
+        let push_f32 = |v: f32, buf: &mut Vec<u8>| {
+            buf.extend_from_slice(&v.to_le_bytes());
+        };
+        push_f32(self.hidden as f32, &mut buf);
+        push_f32(self.d_h as f32, &mut buf);
+        for &v in &self.q_w1 { push_f32(v, &mut buf); }
+        for &v in &self.q_b1 { push_f32(v, &mut buf); }
+        for &v in &self.q_w2 { push_f32(v, &mut buf); }
+        push_f32(self.q_b2, &mut buf);
+        for &v in &self.k_w1 { push_f32(v, &mut buf); }
+        for &v in &self.k_b1 { push_f32(v, &mut buf); }
+        for &v in &self.k_w2 { push_f32(v, &mut buf); }
+        push_f32(self.k_b2, &mut buf);
+        buf
+    }
+
+    /// Deserialize from a flat byte buffer (inverse of `to_bytes()`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_bytes(
+        config: FlashMemoryConfig,
+        n_heads: usize,
+        max_blocks: usize,
+        data: &[u8],
+    ) -> Result<Self, &'static str> {
+        let read_f32 = |offset: &mut usize| -> Result<f32, &'static str> {
+            if *offset + 4 > data.len() {
+                return Err("buffer too short");
+            }
+            let v = f32::from_le_bytes([
+                data[*offset], data[*offset + 1], data[*offset + 2], data[*offset + 3],
+            ]);
+            *offset += 4;
+            Ok(v)
+        };
+
+        let mut off = 0usize;
+        let hidden = read_f32(&mut off)? as usize;
+        let d_h = read_f32(&mut off)? as usize;
+
+        let need = 2 + hidden * d_h * 2 + hidden * 4 + 2;
+        if data.len() < need * 4 {
+            return Err("buffer too short for declared dimensions");
+        }
+
+        let read_vec = |n: usize, off: &mut usize| -> Result<Vec<f32>, &'static str> {
+            let mut v = Vec::with_capacity(n);
+            for _ in 0..n {
+                v.push(read_f32(off)?);
+            }
+            Ok(v)
+        };
+
+        let q_w1 = read_vec(hidden * d_h, &mut off)?;
+        let q_b1 = read_vec(hidden, &mut off)?;
+        let q_w2 = read_vec(hidden, &mut off)?;
+        let q_b2 = read_f32(&mut off)?;
+        let k_w1 = read_vec(hidden * d_h, &mut off)?;
+        let k_b1 = read_vec(hidden, &mut off)?;
+        let k_w2 = read_vec(hidden, &mut off)?;
+        let k_b2 = read_f32(&mut off)?;
+
+        Ok(Self::from_weights(
+            config, d_h, n_heads, max_blocks,
+            q_w1, q_b1, q_w2, q_b2, k_w1, k_b1, k_w2, k_b2,
+        ))
+    }
+
+    /// Number of times the selection was refreshed (for amortization tests).
+    pub fn refresh_count(&self) -> usize {
+        self.refresh_count
+    }
+
+    /// Force a refresh on the next `select` call.
+    pub fn force_refresh(&mut self) {
+        self.selection_valid = false;
+    }
+
+    /// Is the current selection valid?
+    pub fn is_selection_valid(&self) -> bool {
+        self.selection_valid
+    }
+
+    /// MLP forward: `Linear(d, hidden) → ReLU → Linear(hidden, 1)`.
+    ///
+    /// Returns a scalar score. Uses `scratch` for the hidden layer
+    /// (zero allocation in steady state). Free function to avoid `self`
+    /// borrow conflicts when called with `&self.weights` + `&mut self.scratch`.
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    fn mlp_forward(
+        w1: &[f32],
+        b1: &[f32],
+        w2: &[f32],
+        b2: f32,
+        input: &[f32],
+        scratch: &mut [f32],
+        hidden: usize,
+        d: usize,
+    ) -> f32 {
+        debug_assert_eq!(input.len(), d);
+        debug_assert_eq!(scratch.len(), hidden);
+
+        // Hidden layer: h = ReLU(W1 · x + b1)
+        simd_matmul_rows(scratch, w1, input, hidden, d);
+        for i in 0..hidden {
+            scratch[i] = (scratch[i] + b1[i]).max(0.0);
+        }
+
+        // Output: o = W2 · h + b2
+        let mut o = b2;
+        for i in 0..hidden {
+            o += w2[i] * scratch[i];
+        }
+        o
+    }
+
+    /// Select blocks to attend to for each head (drop-in replacement for
+    /// `FlashMemorySelector::select`).
+    ///
+    /// Uses periodic refresh: if `current_step - last_refresh_step <
+    /// refresh_period` AND the selection is valid, returns the cached
+    /// selection. Otherwise, recomputes k_scores for all blocks per head,
+    /// then re-scores using the trained dual-encoder.
+    ///
+    /// # Arguments
+    /// * `query_content` — `[n_heads * d_h]` — the content query projections.
+    /// * `block_cache` — the block centroid cache (must be rebuilt for current seq).
+    /// * `current_step` — the current decode step (for refresh scheduling).
+    pub fn select(
+        &mut self,
+        query_content: &[f32],
+        block_cache: &FlashMemoryBlockCache,
+        current_step: usize,
+    ) -> &PerHeadSelection {
+        let need_refresh = !self.selection_valid
+            || current_step.saturating_sub(self.last_refresh_step) >= self.config.refresh_period;
+
+        if !need_refresh {
+            // Return the cached selection (amortized — same as FlashMemorySelector).
+            return &self.last_selection;
+        }
+
+        // ── Full refresh: recompute k_scores + re-score ────────────────────────
+        self.last_selection.clear();
+        self.last_refresh_step = current_step;
+        self.selection_valid = true;
+        self.refresh_count += 1;
+
+        let n_blocks = block_cache.n_active_blocks();
+        let n_h = self.n_heads;
+        let d_h = self.d_h;
+        let hidden = self.hidden;
+        debug_assert_eq!(query_content.len(), n_h * d_h);
+
+        // Recompute k_scores cache: K-Indexer(key_centroid) per head per block.
+        for head in 0..n_h {
+            for block_idx in 0..n_blocks {
+                let centroid = block_cache.key_centroid(block_idx, head);
+                let k_score = Self::mlp_forward(
+                    &self.k_w1, &self.k_b1, &self.k_w2, self.k_b2,
+                    centroid, &mut self.mlp_scratch, hidden, d_h,
+                );
+                self.k_scores_cache[head * self.max_blocks + block_idx] = k_score;
+            }
+        }
+
+        // Score: for each head, compute q_score then select blocks where
+        // σ(q_score · k_score) ≥ threshold.
+        for head in 0..n_h {
+            let q_c_h = &query_content[head * d_h..(head + 1) * d_h];
+            let q_score = Self::mlp_forward(
+                &self.q_w1, &self.q_b1, &self.q_w2, self.q_b2,
+                q_c_h, &mut self.mlp_scratch, hidden, d_h,
+            );
+
+            let k_off = head * self.max_blocks;
+            for block_idx in 0..n_blocks {
+                let k_score = self.k_scores_cache[k_off + block_idx];
+                let importance = katgpt_core::sigmoid(q_score * k_score);
+                if importance >= self.config.threshold {
+                    self.last_selection.blocks_per_head[head].push(block_idx);
+                }
+            }
+        }
+
+        &self.last_selection
+    }
+
+    /// Get the current selection (panics if not yet selected).
+    pub fn selection(&self) -> &PerHeadSelection {
+        assert!(self.selection_valid, "no valid selection — call select() first");
+        &self.last_selection
+    }
+
+    /// Total parameter count (for reporting / size verification).
+    pub fn param_count(&self) -> usize {
+        // Q-Indexer: hidden*d_h + hidden + hidden + 1
+        // K-Indexer: same
+        2 * (self.hidden * self.d_h + self.hidden + self.hidden + 1)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Sparse MLA forward
 // ---------------------------------------------------------------------------
 
@@ -1053,5 +1448,219 @@ mod tests {
 
         // Verify the selector did periodic refreshes (τ=16, 64 steps → 4 refreshes).
         assert_eq!(selector.refresh_count(), 4, "expected 4 refreshes over 64 steps");
+    }
+
+    // ── Phase B: DualEncoderIndexer (Plan 337) ───────────────────────────────
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b1_dual_encoder_indexer_forward_produces_valid_scores() {
+        // B1+B3: The indexer produces valid scalar scores + the threshold produces
+        // dynamic block counts.
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.5,
+        };
+        let d_h = config.d_h();
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        // Create blocks with distinct centroids.
+        for block in 0..6 {
+            for _ in 0..4 {
+                let c_kv = vec![(block as f32) * 2.0; config.kv_lora_rank];
+                let k_r = vec![0.0; config.qk_rope_head_dim];
+                cache.append(&c_kv, &k_r);
+            }
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let mut indexer = DualEncoderIndexer::new_random(
+            fm_config, d_h, config.n_heads, 8, 42,
+        );
+
+        // Sanity: param count matches expected for d_h=16 (test config).
+        // hidden = d_h/4 = 4. Params = 2 * (4*16 + 4 + 4 + 1) = 2 * 73 = 146.
+        assert_eq!(indexer.param_count(), 146, "param count for d_h=16, hidden=4");
+
+        // Forward: indexer.select should produce a non-empty selection.
+        let q_c = vec![1.0; config.n_heads * d_h];
+        let sel = indexer.select(&q_c, &block_cache, 0);
+        assert!(
+            sel.total_selections() > 0,
+            "indexer should select at least one block"
+        );
+        assert_eq!(indexer.refresh_count(), 1);
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b3_dual_encoder_threshold_controls_selectivity() {
+        // B3: Lower threshold selects more blocks than higher threshold.
+        // This is the robust test that the mechanism supports dynamic selection
+        // (same pattern as the modelless q3_threshold_controls_selectivity).
+        let config = MlaConfig::kimi_k3_0_40b();
+        let weights = make_weights(&config);
+        let d_h = config.d_h();
+        let max_seq: usize = 256;
+
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        for i in 0..128 {
+            let c_kv = vec![(i as f32) * 0.01; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+
+        let q_c = vec![0.5; config.n_heads * d_h];
+
+        // Low threshold → more blocks.
+        let fm_low = FlashMemoryConfig {
+            block_size: 16, refresh_period: 100, threshold: 0.01,
+        };
+        let mut bc_low = FlashMemoryBlockCache::new(&config, &fm_low, max_seq);
+        bc_low.rebuild_from_cache(&cache, &weights);
+        let mut idx_low = DualEncoderIndexer::new_random(fm_low, d_h, config.n_heads, 16, 42);
+        let n_low = idx_low.select(&q_c, &bc_low, 0).total_selections();
+
+        // High threshold → fewer blocks.
+        let fm_high = FlashMemoryConfig {
+            block_size: 16, refresh_period: 100, threshold: 0.99,
+        };
+        let mut bc_high = FlashMemoryBlockCache::new(&config, &fm_high, max_seq);
+        bc_high.rebuild_from_cache(&cache, &weights);
+        let mut idx_high = DualEncoderIndexer::new_random(fm_high, d_h, config.n_heads, 16, 42);
+        let n_high = idx_high.select(&q_c, &bc_high, 0).total_selections();
+
+        assert!(
+            n_low >= n_high,
+            "lower threshold should select >= blocks: low={} high={}",
+            n_low, n_high
+        );
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b3_dual_encoder_periodic_refresh() {
+        // The indexer respects refresh_period (amortizes k_score computation).
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 5,
+            threshold: 0.5,
+        };
+        let d_h = config.d_h();
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        for i in 0..16 {
+            let c_kv = vec![(i as f32) * 0.01; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let mut indexer = DualEncoderIndexer::new_random(
+            fm_config, d_h, config.n_heads, 8, 99,
+        );
+
+        let q_c = vec![0.5; config.n_heads * d_h];
+
+        // Steps 0-9, refresh_period=5 → refresh at steps 0 and 5.
+        let mut refreshes_at = Vec::new();
+        for step in 0..10 {
+            indexer.select(&q_c, &block_cache, step);
+            if indexer.refresh_count() > refreshes_at.len() {
+                refreshes_at.push(step);
+            }
+        }
+        assert_eq!(indexer.refresh_count(), 2);
+        assert_eq!(refreshes_at, vec![0, 5]);
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b3_dual_encoder_serialize_roundtrip() {
+        // Freeze/thaw: to_bytes → from_bytes produces identical selection.
+        let config = small_mla_config();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig {
+            block_size: 4,
+            refresh_period: 100,
+            threshold: 0.5,
+        };
+        let d_h = config.d_h();
+        let max_seq = 32;
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        for i in 0..16 {
+            let c_kv = vec![(i as f32) * 0.1; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let mut indexer = DualEncoderIndexer::new_random(
+            fm_config.clone(), d_h, config.n_heads, 8, 7,
+        );
+
+        let q_c = vec![1.0; config.n_heads * d_h];
+        indexer.force_refresh();
+        let sel_original = indexer.select(&q_c, &block_cache, 0).blocks_per_head[0].clone();
+
+        // Serialize → deserialize.
+        let bytes = indexer.to_bytes();
+        let indexer2 = DualEncoderIndexer::from_bytes(
+            fm_config, config.n_heads, 8, &bytes,
+        ).expect("deserialization should succeed");
+
+        // Same query → same selection.
+        let mut indexer2 = indexer2;
+        let sel_restored = indexer2.select(&q_c, &block_cache, 0).blocks_per_head[0].clone();
+
+        assert_eq!(
+            sel_original, sel_restored,
+            "serialized + deserialized indexer should produce identical selection"
+        );
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b3_dual_encoder_kimi_k3_scale_smoke() {
+        // Smoke test at Kimi-K3-0.40B dimensions (d_h=64, hidden=16).
+        let config = MlaConfig::kimi_k3_0_40b();
+        let weights = make_weights(&config);
+        let fm_config = FlashMemoryConfig::test_config(); // block_size=16, τ=16
+        let block_size = fm_config.block_size;
+        let d_h = config.d_h();
+        let max_seq: usize = 256; // 16 blocks
+        let max_blocks = max_seq.div_ceil(block_size);
+
+        let mut cache = MlaKVCache::new(&config, max_seq);
+        let mut block_cache = FlashMemoryBlockCache::new(&config, &fm_config, max_seq);
+
+        for i in 0..64 {
+            let c_kv = vec![(i as f32) * 0.01; config.kv_lora_rank];
+            let k_r = vec![0.0; config.qk_rope_head_dim];
+            cache.append(&c_kv, &k_r);
+        }
+        block_cache.rebuild_from_cache(&cache, &weights);
+
+        let mut indexer = DualEncoderIndexer::new_random(
+            fm_config, d_h, config.n_heads, max_blocks, 42,
+        );
+
+        // Kimi-K3: d_h=64, hidden=16. Params = 2*(16*64 + 16 + 16 + 1) = 2*1057 = 2114.
+        assert_eq!(indexer.param_count(), 2114);
+
+        let q_c = vec![0.5; config.n_heads * d_h];
+        let sel = indexer.select(&q_c, &block_cache, 0);
+        assert!(sel.total_selections() > 0);
     }
 }

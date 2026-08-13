@@ -138,3 +138,8 @@ kda_backward = ["kda_linear"]
 # Implies `mla_attention` (MLA types + forward) + `dash_attn` (VortexFlow scratch
 # types). Opt-in, default-off until GOAT gate (Issue 584 Phase 3).
 flashmemory_sparse = ["mla_attention", "dash_attn"]
+# Trained dual-encoder indexer for FlashMemory (Plan 337 Phase B). Two tiny
+# MLPs (Q-Indexer + K-Indexer) that replace the modelless centroid-dot scorer.
+# Requires training (riir-train Plan 337) → NEVER default-on (modelless-first
+# mandate). The modelless FlashMemorySelector is the production default.
+trained_indexer = ["flashmemory_sparse"]
