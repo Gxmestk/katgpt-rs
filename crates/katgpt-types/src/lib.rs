@@ -101,7 +101,8 @@ mod tests_types;
 pub use binary::{BinaryWeights, GROUP_SIZE};
 #[cfg(feature = "ternary_group_scale")]
 pub use ternary_group::{
-    TernaryFfnHook, TernaryGroupWeights, TernaryInputProjHook, TernaryMatvecHook,
+    TernaryBlockAoS, TernaryBlockContiguousWeights, TernaryFfnHook, TernaryGroupWeights,
+    TernaryInputProjHook, TernaryMatvecHook,
 };
 #[cfg(feature = "ternary_trit_pack")]
 pub use ternary_trit::{

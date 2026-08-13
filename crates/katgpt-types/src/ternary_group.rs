@@ -33,6 +33,9 @@
 use crate::GROUP_SIZE;
 use half::f16;
 
+/// u64 blocks per group — `GROUP_SIZE / 64` = 2 at the shipped group size.
+const BLOCKS_PER_GROUP: usize = GROUP_SIZE / 64;
+
 /// Ternary `{-1, 0, +1}` bit-plane weights with a per-128-weight f16 scale.
 ///
 /// 64 weights per block stored as two `u64` bitmasks:
@@ -350,5 +353,302 @@ impl TernaryGroupWeights {
     /// `GROUP_SIZE = 128`.
     pub fn encoded_bytes(&self) -> usize {
         self.pos_bits.len() * 8 + self.neg_bits.len() * 8 + self.group_scale.len() * 2
+    }
+
+    /// Convert to block-contiguous (AoS) layout (Issue 650).
+    ///
+    /// Produces a `Vec<TernaryBlockAoS>` where each 128-weight group stores
+    /// its scale + pos_bits + neg_bits contiguously. This eliminates the 3×
+    /// global-memory-access overhead of the SoA layout in GPU kernels.
+    ///
+    /// The conversion is a one-time cost at model load (GPU upload). The
+    /// per-inference benefit is the co-located memory access pattern.
+    ///
+    /// Footprint is identical: 34 bytes per 128 weights in both layouts.
+    pub fn to_block_contiguous(&self) -> Vec<TernaryBlockAoS> {
+        let total_groups = self.rows * self.groups_per_row;
+        let mut blocks = Vec::with_capacity(total_groups);
+        for r in 0..self.rows {
+            let row_block_base = r * self.blocks64;
+            let group_base = r * self.groups_per_row;
+            for g in 0..self.groups_per_row {
+                let b_start = g * BLOCKS_PER_GROUP;
+                let mut blk = TernaryBlockAoS {
+                    scale: self.group_scale[group_base + g].to_bits(),
+                    pos_bits: [0u8; BLOCKS_PER_GROUP * 8],
+                    neg_bits: [0u8; BLOCKS_PER_GROUP * 8],
+                };
+                for i in 0..BLOCKS_PER_GROUP {
+                    let b = b_start + i;
+                    if b < self.blocks64 {
+                        blk.set_pos_word(i, self.pos_bits[row_block_base + b]);
+                        blk.set_neg_word(i, self.neg_bits[row_block_base + b]);
+                    }
+                }
+                blocks.push(blk);
+            }
+        }
+        blocks
+    }
+}
+
+/// Block-contiguous (AoS) ternary weight block (Issue 650).
+///
+/// 128 ternary weights packed with their group scale into a single
+/// `#[repr(C)]` struct. This layout co-locates the scale + pos plane + neg
+/// plane for one group, so GPU kernels can load all three in a single
+/// global-memory access instead of three separate fetches.
+///
+/// ## Footprint
+///
+/// 34 bytes per 128 weights — identical to [`crate::TernaryGroupWeights`]
+/// (SoA) and to `BlockQ2_0` in riir-engine's quant layer. Uses `u16` scale +
+/// `[u8; 16]` bit-arrays (not `u64`) to keep alignment at 2 and avoid padding.
+///
+/// ## Why block-contiguous
+///
+/// The SoA layout ([`crate::TernaryGroupWeights`]) stores pos_bits, neg_bits,
+/// and group_scale in separate arrays. In a GPU kernel, each K-tile iteration
+/// loads from 3 different global-memory addresses → 3 cache-line fetches.
+/// This layout co-locates them → 1 fetch. For large weight matrices
+/// (e.g. ffn_down at N=17408), this is a 3× reduction in global-memory
+/// accesses, which is the structural explanation for the 1.89× vs llama.cpp's
+/// 9.4× speedup gap (Bench 645, riir-ai).
+#[cfg(feature = "ternary_group_scale")]
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct TernaryBlockAoS {
+    /// Per-128-weight group scale (f16 bits).
+    pub scale: u16,
+    /// 128 pos bits = 16 bytes (2 × u64, stored as raw bytes).
+    pub pos_bits: [u8; BLOCKS_PER_GROUP * 8],
+    /// 128 neg bits = 16 bytes (2 × u64, stored as raw bytes).
+    pub neg_bits: [u8; BLOCKS_PER_GROUP * 8],
+}
+
+impl TernaryBlockAoS {
+    /// Get the group scale as f32.
+    #[inline]
+    pub fn scale_f32(&self) -> f32 {
+        f16::from_bits(self.scale).to_f32()
+    }
+
+    /// Read u64 word `word` (0 or 1) from the pos plane.
+    #[inline]
+    pub fn pos_word(&self, word: usize) -> u64 {
+        let start = word * 8;
+        u64::from_le_bytes(
+            self.pos_bits[start..start + 8]
+                .try_into()
+                .expect("word index in range"),
+        )
+    }
+
+    /// Read u64 word `word` (0 or 1) from the neg plane.
+    #[inline]
+    pub fn neg_word(&self, word: usize) -> u64 {
+        let start = word * 8;
+        u64::from_le_bytes(
+            self.neg_bits[start..start + 8]
+                .try_into()
+                .expect("word index in range"),
+        )
+    }
+
+    /// Write u64 word `word` (0 or 1) to the pos plane.
+    #[inline]
+    pub fn set_pos_word(&mut self, word: usize, val: u64) {
+        let start = word * 8;
+        self.pos_bits[start..start + 8].copy_from_slice(&val.to_le_bytes());
+    }
+
+    /// Write u64 word `word` (0 or 1) to the neg plane.
+    #[inline]
+    pub fn set_neg_word(&mut self, word: usize, val: u64) {
+        let start = word * 8;
+        self.neg_bits[start..start + 8].copy_from_slice(&val.to_le_bytes());
+    }
+}
+
+/// Block-contiguous ternary weight matrix (Issue 650).
+///
+/// The AoS counterpart to [`crate::TernaryGroupWeights`]. Each group's
+/// scale + pos + neg are contiguous in memory. Construct via
+/// [`crate::TernaryGroupWeights::to_block_contiguous`].
+#[cfg(feature = "ternary_group_scale")]
+#[derive(Clone, Debug)]
+pub struct TernaryBlockContiguousWeights {
+    pub rows: usize,
+    pub cols: usize,
+    pub groups_per_row: usize,
+    pub blocks: Vec<TernaryBlockAoS>, // [rows * groups_per_row]
+}
+
+#[cfg(feature = "ternary_group_scale")]
+impl TernaryBlockContiguousWeights {
+    /// Construct from a `Vec<TernaryBlockAoS>` + shape metadata.
+    pub fn from_blocks(
+        blocks: Vec<TernaryBlockAoS>,
+        rows: usize,
+        cols: usize,
+    ) -> Self {
+        let groups_per_row = cols.div_ceil(GROUP_SIZE);
+        assert_eq!(
+            blocks.len(),
+            rows * groups_per_row,
+            "block count must match rows × groups_per_row"
+        );
+        Self {
+            rows,
+            cols,
+            groups_per_row,
+            blocks,
+        }
+    }
+
+    /// `y = w @ x` — block-contiguous matvec (Issue 650).
+    ///
+    /// Computes the same result as `simd_ternary_group_matvec` but reads
+    /// from the AoS layout. This is the CPU reference implementation; the
+    /// GPU kernel will mirror this access pattern.
+    ///
+    /// `x.len() == cols`, `y.len() == rows`.
+    pub fn matvec(&self, x: &[f32], y: &mut [f32]) {
+        assert_eq!(x.len(), self.cols, "x length must match cols");
+        assert_eq!(y.len(), self.rows, "y length must match rows");
+        for (r, y_slot) in y.iter_mut().enumerate() {
+            let mut row_sum = 0.0f32;
+            for g in 0..self.groups_per_row {
+                let blk = &self.blocks[r * self.groups_per_row + g];
+                let g_start = g * GROUP_SIZE;
+                let g_end = (g_start + GROUP_SIZE).min(self.cols);
+                let mut group_acc = 0.0f32;
+                for (local, &x_val) in x[g_start..g_end].iter().enumerate() {
+                    let word = local >> 6;
+                    let mask = 1u64 << (local & 63);
+                    let pos = (blk.pos_word(word) & mask) != 0;
+                    let neg = (blk.neg_word(word) & mask) != 0;
+                    let sign = pos as i32 - neg as i32;
+                    group_acc += sign as f32 * x_val;
+                }
+                row_sum += blk.scale_f32() * group_acc;
+            }
+            *y_slot = row_sum;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Deterministic pseudo-random f32 in [-1, 1). No rand dep, reproducible.
+    fn pseudo(seed: &mut u64) -> f32 {
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((*seed >> 33) as f32 / (1u64 << 31) as f32) - 1.0
+    }
+
+    fn filled(rows: usize, cols: usize, seed: u64) -> TernaryGroupWeights {
+        let mut s = seed;
+        let mut w = TernaryGroupWeights::new(rows, cols);
+        for r in 0..rows {
+            for c in 0..cols {
+                let v = pseudo(&mut s);
+                let q = match v {
+                    v if v > 0.33 => 1i8,
+                    v if v < -0.33 => -1i8,
+                    _ => 0i8,
+                };
+                w.set(r, c, q);
+            }
+            for g in 0..w.groups_per_row {
+                w.set_scale(r, g, 0.5 + 0.25 * (g % 4) as f32);
+            }
+        }
+        w
+    }
+
+    /// G1: `to_block_contiguous` + `matvec` must produce bit-identical results
+    /// to the SoA reference matvec. This is the correctness gate for Issue 650
+    /// Phase 1 — if this fails, the block-contiguous layout has a repack or
+    /// indexing bug.
+    #[test]
+    fn block_contiguous_matvec_matches_soa() {
+        // Test multiple shapes including Bonsai-relevant dimensions.
+        let shapes: &[(usize, usize)] = &[
+            (1, 128),      // single group
+            (3, 256),      // multi-group
+            (48, 512),     // ssm_alpha/beta shape
+            (1024, 512),   // attn_k/v shape
+            (128, 4096),   // small Bonsai projection
+            (512, 17408),  // ffn_gate shape (large, multi-group)
+        ];
+
+        for &(rows, cols) in shapes {
+            let w = filled(rows, cols, 42 + rows as u64);
+            let w_bc = TernaryBlockContiguousWeights::from_blocks(
+                w.to_block_contiguous(),
+                rows,
+                cols,
+            );
+
+            // Random input vector.
+            let mut seed = 100 + rows as u64;
+            let x: Vec<f32> = (0..cols).map(|_| pseudo(&mut seed)).collect();
+
+            let mut y_soa = vec![0.0f32; rows];
+            let mut y_aos = vec![0.0f32; rows];
+
+            // SoA reference: the scalar matvec from the simd module.
+            crate::simd::ternary_group::ternary_group_matvec_scalar(&w, &x, &mut y_soa);
+            // AoS: the new block-contiguous matvec.
+            w_bc.matvec(&x, &mut y_aos);
+
+            // Bit-identical (not just approximate) — same weights, same math,
+            // just different memory layout.
+            assert_eq!(
+                y_soa, y_aos,
+                "SoA vs AoS matvec mismatch at shape ({rows}×{cols})"
+            );
+        }
+    }
+
+    /// Block size sanity: `TernaryBlockAoS` must be 34 bytes.
+    #[test]
+    fn block_size_is_34_bytes() {
+        assert_eq!(
+            std::mem::size_of::<TernaryBlockAoS>(),
+            34,
+            "TernaryBlockAoS must be 34 bytes (2 scale + 16 pos + 16 neg)"
+        );
+    }
+
+    /// Footprint parity: block-contiguous total bytes == SoA total bytes.
+    #[test]
+    fn footprint_matches_soa() {
+        let w = filled(64, 512, 7);
+        let w_bc = w.to_block_contiguous();
+        let soa_bytes = w.encoded_bytes();
+        let aos_bytes = w_bc.len() * std::mem::size_of::<TernaryBlockAoS>();
+        assert_eq!(soa_bytes, aos_bytes, "SoA and AoS footprints must match");
+    }
+
+    /// Invariant: pos & neg == 0 preserved through the conversion.
+    #[test]
+    fn invariant_holds_after_conversion() {
+        let w = filled(32, 256, 99);
+        assert!(w.invariant_holds(), "source must hold invariant");
+        let bc = w.to_block_contiguous();
+        for blk in &bc {
+            for i in 0..BLOCKS_PER_GROUP {
+                assert_eq!(
+                    blk.pos_bits[i] & blk.neg_bits[i],
+                    0,
+                    "pos & neg != 0 after conversion"
+                );
+            }
+        }
     }
 }
