@@ -7,6 +7,8 @@
 > **Related Research:** 176 (VortexFlow), 225 (MSA), 086 (RTPurbo), 145 (Wall Attention), 213 (Still Perceiver), 233 (Attention Matching), 109 (Shard), 063 (OCTOPUS), 100 (EGA spectral salience)
 > **Related Plans:** TBD (pending GOAT gate)
 > **Training redirect:** The paper's dual-encoder indexer training (BCE/Focal loss on pre-computed hidden states) → riir-train. This note distills only the modelless inference paradigm.
+>
+> **PASS-Redirects (synthesis):** Fu et al. [arXiv:2606.04511 "SparDA: Sparse Decoupled Attention for Efficient Long-Context LLM Inference"] — concurrent lookahead sparse attention (NVIDIA/ByteDance/MIT, same month as FlashMemory). Adds a trained 4th "Forecast" projection (KL-divergence, 0.41% params, frozen backbone) for one-layer-ahead block selection + async UVA CPU→GPU prefetch overlap. The lookahead CONCEPT is already distilled here (R436); SparDA's genuinely-novel piece (trained Forecast) is a training recipe → riir-train, not modelless; the UVA persistent kernel is H100/A100 PCIe Gen5 serving infrastructure, out of scope for the CPU/modelless stack. Per-layer lookahead (SparDA) vs periodic τ=64 refresh (FlashMemory) are two solutions to the same amortize-selection-cost problem — neither applies at micro-transformer scale (n_layer=1). Closest substrate: `VortexFlow::forward_indexer` takes the attention Query (not a separate Forecast); `PerGroupTopKRouter` already does per-GQA-group routing.
 
 ---
 
