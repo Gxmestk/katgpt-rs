@@ -1,6 +1,6 @@
 ---
 name: research
-description: Research workflow for distilling ML/AI papers into modelless inference primitives, freeze/thaw runtime patterns, latent-space operations, AND model-based training plans across the katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train / riir-game-sdk / riir-armageddon 7-repo stack. Use when reading arxiv papers, deciding which repo a paper belongs in, creating .research/ notes or .plans/ files, implementing modelless inference primitives, or routing training-vs-inference insights. Enforces the 7-repo commercial strategy (public engine / private runtime / private chain / private neuron-db / private training / private SDK facade / private product-domain), modelless-first constraint (with model-based track actively pursued), latent-to-latent preference, and freeze/thaw-over-fine-tuning rule.
+description: Research workflow for distilling ML/AI papers into modelless inference primitives, freeze/thaw runtime patterns, latent-space operations, AND model-based training plans across the katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train / riir-game-sdk / riir-armageddon 7-repo stack. Use when reading arxiv papers, deciding which repo a paper belongs in, creating .research/ notes or .plans/ files, implementing modelless inference primitives, or routing training-vs-inference insights. Enforces the 7-repo commercial strategy (public engine / private runtime / private chain / private neuron-db / private training / private SDK facade / private product-domain), three-track system (modelless inference + self-adaptive runtime + model-based trained weights — all three exist across the stack, not just riir-train), latent-to-latent preference, and freeze/thaw-over-fine-tuning rule.
 ---
 
 # Research Workflow — Modelless Inference, Freeze/Thaw, Latent-to-Latent
@@ -36,12 +36,13 @@ Do NOT activate for: pure refactor, bug fixes with no research angle, or ordinar
 
 ## Pre-flight — MANDATORY before any verdict/file
 
-Do all four before creating any file:
+Do all five before creating any file:
 
 1. **`read_file` 5 READMEs + `riir-ai/.docs/README.md` + (for training papers) `riir-train/.docs/02_pipelines/training_data_pipeline.md`** — defines scope boundaries. Skipping = #1 cause of false Super-GOAT claims + false PASS on training papers.
 2. **`list_directory` all 5 `.research/` folders** (katgpt-rs, riir-ai, riir-chain, riir-neuron-db, riir-train — create missing ones on first use).
 3. **`list_directory` the 4 runtime/chain/db src trees** — module names are vocab. Skipping = #2 cause of false Super-GOATs.
 4. **`web_search` for published prior art** on the paper's headline technique (see §4). Skipping = #4 false-novelty failure mode.
+5. **`grep` ALL repos for existing training/model-based/self-adaptive code** — the system is three-track, not modelless-only. Skipping = #5 false-PASS mode (canonical failure: arXiv:2511.18538 Code LLM survey was falsely PASSed because the agent only checked riir-train for training code, missing quest_grammar's LoRA training in riir-ai + TernaryDraftModel in riir-clippy + self_evolve). Grep patterns: `*_training.rs|*_train*.rs|LoRA|SFT|GRPO|DPO|ternary|TernaryDraftModel|self_evolve|with_weights|\.bits` across `riir-ai/crates/**/src/`, `riir-clippy/src/`, `riir-neuron-db/src/`. Training pipelines ship OUTSIDE riir-train — the three tracks are: (a) modelless inference, (b) self-adaptive runtime latent updates, (c) model-based trained weights.
 
 **`list_directory` the src trees** (vocab; skipping causes the vocabulary-miss class of false verdicts — mechanisms ship under non-obvious names):
 - `riir-ai/crates/riir-engine/src/` (`latent_functor/`, `cgsp_runtime/`, `hla/`, ...), `riir-ai/crates/riir-games/src/`
@@ -49,7 +50,7 @@ Do all four before creating any file:
 - `riir-neuron-db/src/` (`shard.rs`, `index.rs`, `merkle.rs`, `freeze.rs`, `mape_k.rs`, `consolidation.rs`, `gateway.rs`, `vibe.rs`, `spectral_flatness.rs`, `shard_compactor.rs`)
 - `riir-train/crates/riir-train-{gpu,engine}/src/` (`distill_attention.rs`, `loss_grpo.rs`, `loss_dpo.rs`, `delta_filter.rs`)
 
-Do NOT create any file until all four done.
+Do NOT create any file until all five done.
 
 ## Primary focus — Fusion-first
 
@@ -85,13 +86,15 @@ The highest-value latent Super-GOATs cluster in seven module trees. `list_direct
 
 **As of 2026-08-06:** training is actively pursued, not lazily redirected. Applicable training papers (optimizer, loss, schedule, recipe, LoRA/OFT/IA3/QLoRA/DPO/GRPO/SFT/RL) get a **Plan in `riir-train/.plans/`** with recipe + GPU-hours estimate + GOAT gate comparing trained-vs-modelless baseline. Only genuinely out-of-scope training (image-specific DiT we'll never train, medical imaging) gets the one-line redirect with explicit justification.
 
-Runtime GRPO self-play stays in `riir-ai` — it updates latent state, not weights. Quant-aware **inference** stays here; quant-aware **training** → riir-train.
+Runtime GRPO self-play stays in `riir-ai` (self-adaptive track — updates latent state, not weights). Model-based training (LoRA/SFT/GRPO on actual weights) lives in BOTH `riir-train` AND in-repo training pipelines (`quest_grammar/grammar_training.rs` in riir-ai, `TernaryDraftModel` `.bits` files in riir-ai/riir-clippy). Quant-aware **inference** stays here; quant-aware **training** → riir-train. **Never assume a repo is modelless-only** — grep for existing training/model-based code first (pre-flight #5).
 
 ## Workflow
 
 ### 0. Read & classify
 
 Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}`. Ask: *is the value in the training loop itself (optimizer/loss/schedule/RL), or in the math the training computes (closed-form drift, conditional score, Riemannian correction, steering formula)?* Optimizer/loss/schedule → riir-train. **Math → run §3.5 Path 0 first.**
+
+**Three-track system — do NOT classify a repo as "modelless only" without checking pre-flight #5.** The system runs three concurrent tracks: (a) **modelless inference** (primary hot path — no weights, BLAKE3-deterministic), (b) **self-adaptive** (runtime latent updates — `self_evolve`, EMA direction vectors, freeze/thaw cycles), (c) **model-based** (trained weights — ternary `.bits` files, LoRA/QLoRA adapters, Bonsai model comparison). A paper touching ANY track is actionable. The model-based track exists in repos OUTSIDE riir-train: `quest_grammar/grammar_training.rs` + `quest_training.rs` (LoRA rank=16-32, alpha=32-64, QLoRA 4-bit) in riir-ai; `TernaryDraftModel` with `.bits` weight files in riir-ai/riir-clippy; `self_evolve` feature in riir-clippy (shipped, G1-G7 ALL PASS). Before classifying a paper as "training-only, deferred" → grep for existing training code in the target repo (pre-flight #5).
 
 **Substrate ≠ value.** Hardware/NMP/PIM/ASIC papers: the value is usually the *technique* (LUT INT→FP, shared ALU, sideband-tag) stripped of the hardware — grep `simd_*`, `ternary`, `Plasma`, `Q4_K`, `LUT`, `from_bits` for the software analog. Database/systems papers: `riir-neuron-db` IS a database (Pod + ShardIndex + Merkle + MAPE-K + Raven/δ-Mem + vibe KG) — the value is usually the *access pattern*. OS/kernel papers (io_uring, DPDK): substrate is Linux, value is usually the technique (lock-free queue, batching, zero-copy). Pure math/combinatorics: value may be a guaranteed-peak property on a per-entity scalar — see §1 step 4 game-context reframe.
 
@@ -156,7 +159,7 @@ Must include arxiv ID AND full title (so `grep arxiv:ID` AND `grep "Title"` hit)
 
 **Reverse-grep before PASS (mandatory).** Before any PASS, grep the codebase for documented gaps the paper could fill: `.docs/` for `Limitation|deferred|TODO|FIXME|gap|pending`; `.benchmarks/` for `Caveat|deferred|artifact`; `.rs` comments for `TODO|FIXME|deferred|limitation` near the paper's vocab. If ANY hit maps → Gain, not Pass. *Compact heuristic: "Is there any documented limitation this paper could fix?"* — if you can't answer "no, I checked" with evidence, don't PASS.
 
-**Training papers third defense:** both defenses above can return clean and still produce a false PASS if "model-based track" is narrowed to one pipeline. Before PASS-ing any training paper, `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` and ask: does a training pipeline for this domain already exist? (RL, distillation, linear attention, trajectory collection). If yes → Gain.
+**Training papers third defense:** both defenses above can return clean and still produce a false PASS if "model-based track" is narrowed to one pipeline or one repo. Before PASS-ing any training paper: (1) `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` and ask: does a training pipeline for this domain already exist? (RL, distillation, linear attention, trajectory collection). (2) **`grep` ALL repos for existing training/model-based code** (pre-flight #5) — training pipelines ship OUTSIDE riir-train: `quest_grammar/grammar_training.rs` + `quest_training.rs` (LoRA training in riir-ai), `TernaryDraftModel` (ternary weights in riir-ai/riir-clippy), `self_evolve` (self-adaptive in riir-clippy). If ANY existing training/model-based code maps to the paper's domain → Gain, not Pass. Canonical failure (arXiv:2511.18538): Code LLM survey falsely PASSed because agent checked only riir-train (game AI pipeline), missing quest_grammar's code-domain LoRA training + riir-clippy's ternary drafter + Issue 010 (generalization gap that RLVR would fix).
 
 ### 1.6. MOAT gate per domain + promote/demote
 
@@ -196,7 +199,7 @@ Before deferring ANY gate/task/mechanism to riir-train, exhaust modelless paths 
 
 **Path 0.5 — training-cost-weighted re-evaluation (DEFAULT for training-efficiency papers as of 2026-08-06).** Training efficiency is actively pursued. Applicable training paper → Plan in `riir-train/.plans/` with recipe + GPU-hours estimate + GOAT gate comparing trained-vs-modelless baseline. Only genuinely out-of-scope → one-line redirect with justification.
 
-**The model-based track = ALL training pipelines in `riir-train/`, not just one** (GDN-blog lesson). `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` before PASS-ing any training paper — RL/distillation/linear-attention/trajectory-collection pipelines all count.
+**The model-based track = ALL training pipelines across ALL repos, not just riir-train** (GDN-blog lesson + arXiv:2511.18538 lesson). `read_file riir-train/.docs/02_pipelines/training_data_pipeline.md` before PASS-ing any training paper — RL/distillation/linear-attention/trajectory-collection pipelines all count. **BUT ALSO grep non-riir-train repos for training code** (pre-flight #5): `quest_grammar/grammar_training.rs` + `quest_training.rs` in riir-ai (LoRA training for quest grammar + quest corpus), `TernaryDraftModel` in riir-ai/riir-clippy (ternary-weighted drafter loaded from `.bits` files), `self_evolve` in riir-clippy (self-adaptive latent-first loop). Training is NEVER "deferred indefinitely" — it is actively pursued across the whole stack.
 
 **Systematic backstop:** when ≥3 training-recipe gaps accumulate from PASS-Redirects across repos, batch them into a single `riir-train/.plans/NNN_training_recipe_gap_backlog.md` plan.
 
@@ -259,7 +262,7 @@ If §4 surfaces rich landscape, use web search for deeper exploration of specifi
 
 ## Constraints (non-negotiable)
 
-1. **Modelless first** — inference-time only. No LLM training, no backprop through base weights. Closest to "training": freeze/thaw cycles, raw/lora hot-swap with **deterministically constructed** adapters (not trained), latent direction-vector updates at runtime. **Before any riir-train deferral, exhaust §3.5.**
+1. **Three-track system (not modelless-only)** — the stack runs three concurrent tracks: (a) **modelless inference** (primary hot path — no weights, BLAKE3-deterministic, zero-alloc), (b) **self-adaptive** (runtime latent updates — `self_evolve`, EMA direction vectors, freeze/thaw cycles, CommittedFieldBlend — NO base weight mutation), (c) **model-based** (trained weights — ternary `.bits` files via `TernaryDraftModel`, LoRA/QLoRA adapters, Bonsai model comparison, quest_grammar training pipelines). Do NOT characterize any repo as "modelless only" without checking pre-flight #5. Closest to "training" for the modelless track: freeze/thaw cycles, raw/lora hot-swap with **deterministically constructed** adapters (not trained), latent direction-vector updates at runtime. **Before any riir-train deferral, exhaust §3.5. AND check for existing model-based code in the target repo.**
 2. **Latent-to-latent preferred** — operate in latent space as long as possible. Decode/project only at boundary. **Sigmoid, never softmax**, for projections onto learned directions. Semantic (emotion/mood/curiosity/style) → latent. Physical (position/HP/wallet) → raw, deterministic, synced.
 3. **Freeze/thaw over fine-tuning** — only runtime weight mutation is swapping a frozen snapshot (atomic, versioned, BLAKE3-checked) or applying a deterministically-constructed LoRA overlay (raw/lora hot-swap, no GD). Never mutate weights in-place during inference. Gradient updates (after §3.5) → riir-train.
 4. **Self-learn / adaptive CoT welcome** — runtime curiosity, latent prediction, trajectory folding, collapse detection. Update latent state / direction vectors / routing tables, NOT base weights.
