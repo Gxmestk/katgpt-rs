@@ -416,6 +416,21 @@ impl MlaForwardScratch {
             output: vec![0.0; config.hidden_size],
         }
     }
+
+    /// Read-only access to the content query projections `[d_h * n_heads]`.
+    ///
+    /// Valid after a forward call. Used by diagnostic benches that compute
+    /// per-block attention scores for retrieval-quality analysis (e.g. NIAH).
+    pub fn q_c_view(&self) -> &[f32] {
+        &self.q_c
+    }
+
+    /// Read-only access to the RoPE query projections `[d_r * n_heads]`.
+    ///
+    /// Valid after a forward call. Paired with `q_c_view` for full query access.
+    pub fn q_r_view(&self) -> &[f32] {
+        &self.q_r
+    }
 }
 
 /// Apply RoPE to the decoupled query/key sub-vectors.

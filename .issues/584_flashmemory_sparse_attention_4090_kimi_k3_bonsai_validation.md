@@ -59,7 +59,9 @@ Threshold sweep (512 tokens): 0.3 → cos 1.0000 (52.9% blocks, no sparsity bene
 
 **Phase 1+ real-weights bench:** `benches/bench_021_flashmemory_real_weights_retrieval.rs` (feature gate `kimi_k3_loader + flashmemory_sparse`). Loads real Kimi-K3-0.40B `model.safetensors`, runs dense vs sparse MLA on real token embeddings, validates G1 gate (correctness). Runs on M3 Metal (no GPU needed). **G1 PASSES — Phase 2 scale test de-risked on correctness axis.**
 
-**Model:** `riir-train/data/kimi-k3-0.40b/model.safetensors` (downloaded, ~1.5GB F32)
+**Model:** `riir-train/data/kimi-k3-0.40b/model.safetensors` (downloaded, ~1.5GB F32) + `tiktoken.model` (downloaded, 2.8MB)
+
+**Phase 1++ NIAH semantic-needle diagnostic (Bench 023, 2026-08-13):** loaded real `tiktoken.model` + `model.safetensors`, built a genuine needle-in-haystack text prompt ("The magic password is sunset7742." in filler text + query), tokenized → embedded → ran dense vs sparse MLA. **Honest negative result for NIAH retrieval at single-layer depth**: the needle block has near-uniform dense attention (rank 34/34, mass ~0.03) at layer 3/8 on raw-embedding inputs — retrieval is an emergent multi-layer property, not testable at a single MLA layer. **Positive diagnostic for pattern preservation**: median per-head Pearson r between FlashMemory centroid block-mass and dense per-token block-mass = 0.965 (min 0.765 on Head 2). The centroid selection is a heuristic — the actual sparse forward attends to real per-token keys in selected blocks, so output accuracy (Bench 021 cos ≥ 0.96) is the load-bearing gate, not this diagnostic. Full-model NIAH (all 8 layers) deferred to Phase 2.
 
 ### Phase 2 — Scale test: Bonsai dspark-Q4_1 (1.95GB, 256K context)
 

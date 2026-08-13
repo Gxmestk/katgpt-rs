@@ -1084,6 +1084,16 @@ path = "benches/bench_022_flashmemory_alloc_free.rs"
 required-features = ["flashmemory_sparse"]
 harness = false
 
+# Issue 584 Phase 1++ — FlashMemory real-text NIAH (Needle-In-A-Haystack)
+# semantic-needle validation. Loads real tiktoken tokenizer + model.safetensors,
+# builds a genuine needle-in-haystack prompt, measures needle-block selection
+# rate + dense attention mass comparison. harness=false.
+[[bench]]
+name = "bench_023_flashmemory_niah_semantic_needle"
+path = "benches/bench_023_flashmemory_niah_semantic_needle.rs"
+required-features = ["kimi_k3_loader", "flashmemory_sparse"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant
