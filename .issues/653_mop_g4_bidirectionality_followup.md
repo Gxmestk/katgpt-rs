@@ -1,6 +1,6 @@
 # Issue 653 — MOP G4 bidirectionality follow-up (tie-break symmetry + γ regime)
 
-> **Source:** [Issue 585](585_mop_defend_wrong_poc.md) G4 refutation → [riir-ai Bench 675](../../riir-ai/.benchmarks/675_mop_defend_wrong_poc.md)
+> **Source:** [Issue 585](585_mop_defend_wrong_poc.md) G4 refutation → [riir-ai Bench 677](../../riir-ai/.benchmarks/677_mop_defend_wrong_poc.md)
 > **Type:** POC refinement / falsification-cause isolation
 > **Filed:** 2026-08-14
 > **Status:** Open
@@ -8,7 +8,7 @@
 
 ## The refutation being followed up
 
-Bench 675's G4 gate: MOP's pooled CW-move ratio on the prey-predator ring =
+Bench 677's G4 gate: MOP's pooled CW-move ratio on the prey-predator ring =
 **0.6117**, 1.9pp outside the [0.4, 0.6] band, at paper defaults (α=1, β=0,
 γ=0.95). Per-seed strongly bimodal (mean 0.556, sd 0.270, min 0.067 /
 max 0.903): individual episodes are *directional*; the policy itself does not
@@ -42,7 +42,7 @@ collapse. Two identified causes, neither yet isolated by experiment:
 - [ ] T4 — Optionally: longer-episode variant (cap 50 000, matching G2) to
   test whether within-episode direction alternates over long horizons, which
   would move the pooled ratio toward band without any arena change.
-- [ ] T5 — Update Bench 675 (append the isolation result) + Issue 585's G4
+- [ ] T5 — Update Bench 677 (append the isolation result) + Issue 585's G4
   entry with the outcome; close or re-mark the gate accordingly.
 
 ## Non-goals
@@ -55,6 +55,6 @@ collapse. Two identified causes, neither yet isolated by experiment:
 ## Related
 
 - [Issue 585](585_mop_defend_wrong_poc.md) — the parent PoC
-- [riir-ai Bench 675](../../riir-ai/.benchmarks/675_mop_defend_wrong_poc.md) — full record
+- [riir-ai Bench 677](../../riir-ai/.benchmarks/677_mop_defend_wrong_poc.md) — full record
 - `riir-ai/crates/riir-poc/src/mop_poc.rs` — `PreyPredatorRing::env()` is the
   tie-break site; `g4_diagnostic_gamma_sensitivity` is the γ-sweep harness
