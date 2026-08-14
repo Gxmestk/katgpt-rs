@@ -197,7 +197,7 @@ This note **triggers** the mandatory outputs in this session. They are:
 
 3. **Plan(s)** → `katgpt-rs/.plans/NNN_mop_value_iteration_primitive.md` (open primitive + GOAT gate) and `riir-ai/.plans/NNN_per_npc_mop_runtime.md` (runtime wiring). Plans come AFTER the guide — guide is strategy, plan is execution.
 
-4. **Issue** to track defend-wrong PoC obligation (research skill §3.6) — MOP's quality claim ("emergent behavior in our civ/game domain matches paper Fig. 2-5") is **architectural-only until a PoC runs**. Issue file goes in `katgpt-rs/.issues/`.
+4. **Issue** to track defend-wrong PoC obligation (research skill §3.6) — MOP's quality claim ("emergent behavior in our civ/game domain matches paper Fig. 2-5") is **architectural-only until a PoC runs**. Issue file goes in `katgpt-rs/.issues/`. **Status: RUN 2026-08-14 → [Issue 585](../.issues/585_mop_defend_wrong_poc.md) / [riir-ai Bench 675](../../riir-ai/.benchmarks/675_mop_defend_wrong_poc.md): 3/4 gates PASS (survival, coverage 1.00 vs 0.19, post-convergence entropy 1.03 vs 0.04), G4 bidirectionality refuted by 1.9pp (γ-regime + arena tie-break attributable — [Issue 653](../.issues/653_mop_g4_bidirectionality_followup.md)). Super-GOAT stands on the confirmed axes; the `MopSolver` reference implementation lives in `riir-ai/crates/riir-poc/src/mop_poc.rs` (log-space LSE form; note it corrects §2.1's pseudocode π\* normalizer — the exact normalizer at the fixed point is `z^{1/γ}`, not `z^{-1}`).**
 
 ### 3.4 Tier framing
 

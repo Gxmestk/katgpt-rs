@@ -3,9 +3,9 @@
 > **Source:** [Research 478](../.research/478_MOP_Maximum_Occupancy_Principle.md) — Maximum Occupancy Principle (Ramírez-Ruiz et al. 2024 Nature Comms, [s41467-024-49711-1](https://www.nature.com/articles/s41467-024-49711-1)).
 > **Type:** POC / proof / optimization task
 > **Filed:** 2026-08-14
-> **Status:** Open
+> **Status:** PoC RUN 2026-08-14 — **3/4 gates PASS, G4 refuted (marginal)** → Super-GOAT stays on confirmed axes; G4 axis tracked as [Issue 653](653_mop_g4_bidirectionality_followup.md). Full record: [riir-ai Bench 675](../../riir-ai/.benchmarks/675_mop_defend_wrong_poc.md). Stays OPEN — still gates §3.3 outputs #3 (open primitive plan) + #4 (private runtime guide), both now unblocked by the PoC verdict.
 > **Priority:** High — gates §3.3 Super-GOAT mandatory outputs #3 (open primitive plan) + #4 (private runtime guide)
-> **Scope:** This issue tracks the **defend-wrong PoC obligation** from research skill §3.6. The Super-GOAT verdict in Research 478 is architectural-only on the quality axis until this PoC runs.
+> **Scope:** This issue tracks the **defend-wrong PoC obligation** from research skill §3.6. The Super-GOAT verdict in Research 478 is architectural-only on the quality axis until this PoC runs. **→ PoC obligation DISCHARGED (Bench 675); the remaining scope is the plan/guide outputs.**
 
 ## Context
 
@@ -27,10 +27,10 @@ The math is correct (paper Theorem 3 + Supplement §C proves convergence of the 
 
 ## Gates (must defend on all four)
 
-- [ ] **G1 — Survival instinct (no reward function):** Arm C average lifetime ≥ 0.5 × Arm B lifetime, *without any extrinsic reward function*. The paper proves absorbing states have `V^π(s+) = 0` regardless of policy (Eq. 3) — Arm C should avoid death *emergently*.
-- [ ] **G2 — Physical-space coverage:** Arm C visits ≥ 80% of gridworld locations in 5×10⁴ steps; ≥ 20pp above Arm B. Paper Fig. 2d: MOP ~100%, R-agent ~30-50%, RW dies early.
-- [ ] **G3 — Behavioral variability post-convergence:** After value iteration converges, average `H(π*(·|s)) ≥ 0.5·ln(|A(s)|)` for Arm C; Arm B collapses to ≤ 0.1·ln(|A(s)|). Paper §Discussion: MOP's optimal policy is non-deterministic by construction.
-- [ ] **G4 — Hide-and-seek emergence:** In prey-predator arena, Arm C's clockwise-rotation ratio ∈ [0.4, 0.6] (paper Fig. 3c, MOP does both directions); Arm B collapses to ≥ 0.85 (paper Fig. 3c, R-agent prefers one direction).
+- [x] **G1 — Survival instinct (no reward function): PASS.** Arm C = 10 000/10 000 mean/median lifetime (all 32 seeds hit the 10k cap), identical to reward-driven Arm B; RW reference 66 median. Note: the C ≥ 0.5×B clause is near-unfalsifiable once both arms cap — the load-bearing contrast is C vs RW. **Honest finding:** RW median 66 (not the paper's <50) — our trap placement is less path-critical than Fig 2a; recorded as arena-fidelity note in Bench 675, not a gate revision.
+- [x] **G2 — Physical-space coverage: PASS.** Arm C = **1.0000** (8 seeds × 50k steps, min=max=1.0) vs Arm B = 0.1922 (orbits one food source — the paper's R-agent "lingers" behavior) vs RW = 0.2705. Both clauses clear with large margin (≥80% ✓, Δ=80.8pp ≥ 20pp ✓).
+- [x] **G3 — Behavioral variability post-convergence: PASS.** Arm C avg H(π\*) = **1.0280** ≥ 0.5·ln(3.104)=0.5664; Arm B = 0.0445 ≤ 0.1133. MOP's optimal policy stays stochastic by construction, exactly as the paper claims.
+- [ ] **G4 — Hide-and-seek emergence: REFUTED (marginal, 1.9pp).** Arm C pooled CW ratio = **0.6117** ∉ [0.4, 0.6] at paper defaults (α=1, β=0, γ=0.95); Arm B collapsed to 0.94 as predicted. Per-seed strongly bimodal (mean 0.556, sd 0.270, min 0.067/max 0.903) — episodes are directional but the policy itself does not collapse. γ-diagnostic monotone: in-band at γ ≤ 0.90 (0.4006 / 0.4489), out-of-band at γ ≥ 0.95. Part of the tilt is attributable to the spec's fixed CW antipode tie-break. **Tracked as [Issue 653](653_mop_g4_bidirectionality_followup.md).**
 
 ## Verdict rules (from Research 478 §8)
 
@@ -95,6 +95,20 @@ fn g4_mop_hide_and_seek_bidirectional() { /* gate G4 */ }
 - The prey-predator arena needs to be constructed for this PoC — ~50 LOC, mirrors paper Fig. 3a.
 - `CARGO_TARGET_DIR=/tmp/mop_poc` to avoid contention with sibling agents.
 - The PoC stays in `riir-poc/` as a permanent regression check regardless of verdict (per research skill §3.6 "PoC defends OR refutes... PoC stays as permanent regression check").
+
+## PoC result (2026-08-14, Bench 675)
+
+**Implemented:** `riir-ai/crates/riir-poc/src/mop_poc.rs` (~1500 LOC) — `FourRoomArena` (N=82, A=4), `PreyPredatorRing` (N=17, A=3), `MopSolver<N,A>` (Eq. 7 in log-space LSE form, absorbing pinning, exact V(s+)=0), three arms (RW / Plan-274-reward Q-learning / MOP π* sampling), 7 unit tests + 4 gate tests + γ-diagnostic. Clippy clean; 231/231 lib tests pass (G4 follows the honest-negative-result pattern — asserts the correctness invariants that hold, prints the recorded FAIL verdict, omits the bidirectionality assertion).
+
+**Verdict per the rules above: 3/4 PASS, 1 refuted on quality → Super-GOAT stays on the confirmed axes.** The math primitive is correct (all solver invariants pass: V(s+)=0 exactly, π* normalized, Theorem-3 init-invariance at 0.0 max diff, convergence in 290/86 iters) and two of the three headline behaviors (coverage 1.0 vs 0.19; post-convergence entropy 1.03 vs 0.04) reproduce decisively. The refuted axis (G4 bidirectionality) is γ-regime-sensitive and partly arena-tie-break-attributable — see Issue 653.
+
+**Deviations from this issue's spec (recorded in Bench 675):**
+1. Arm B consumes the Plan 274 **reward formula** per-cell rather than the `cgsp` direction-pool trait wiring — the trait suite is puzzle-domain-shaped, not MDP-policy-shaped; forcing it would be a category error, not substrate consumption.
+2. No existing four-room substrate was found (the issue's "already ships" claim was aspirational — grep `FourRoom|GridWorld|Rooms` across all repos returned only riir-train's unrelated ReMax envs); the arena is built inline per the issue's own outline.
+3. Door gaps placed adjacent to center so the mandated (4,4) start is walkable.
+4. π\* normalization uses the explicit log-sum-exp (the fixed-point normalizer is `z^{1/γ}`, not the `z^{-1}` in Research 478 §2.1's pseudocode line — corrected in the implementation, noted in the file header).
+
+**Remaining scope (this issue stays open):** §3.3 outputs #3 (`.plans/` open primitive plan — now carries the 3/4 verdict + the G4 caveat) and #4 (riir-ai private runtime guide). Per Research 478 next-steps: guide before plan.
 
 ## Related
 
