@@ -1948,7 +1948,7 @@ A consolidated section for standalone opt-in features with their own plans but n
 |---|---|---|
 | `rim_slots` | 172 | RiM Reasoning Buffer Slots — fixed latent workspace for DDTree |
 | `product_key_memory_freeze` | 408 Phase 4 | FrozenProductKeyMemory — freeze/thaw wrapper with BLAKE3 commitment |
-| `product_key_memory_episodic` | 408 Phase 5 | PkmEpisodicStore — δ-rule write gate (PKM × δ-Mem fusion) |
+| `product_key_memory_episodic` | 408 Phase 5 / Issue 650 | PkmEpisodicStore — δ-rule write gate (PKM × δ-Mem fusion) + TF-IDF non-interference slot selection (`write_idf`/`write_weighted_idf` + `BackgroundAccessStats` + `write_selected`; Bench 636 GOAT G1 +12.5pp retention at matched learning) |
 | `chunked_net_fetch` | 272 T3.3 | NetChunkFetcher — network chunk fetcher stub for ChunkedContentStore |
 
 ### Direction & steering diagnostics

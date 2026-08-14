@@ -78,6 +78,28 @@
 //! should prefer `write_weighted`; consumers that want uniform consolidation
 //! (every retrieved slot learns the association equally) should use `write`.
 //!
+//! # TF-IDF write-gate selection (Issue 650 / Research 481)
+//!
+//! The plain `write`/`write_weighted` paths select write targets by raw
+//! retrieval activation (TF-only ranking). Under dot-product scoring this
+//! gravitates every write toward the handful of high-norm "magnate" slots
+//! that every query retrieves — so successive fact sets overwrite the slots
+//! general queries rely on. The paper's ablation ("Continual Learning via
+//! Sparse Memory Finetuning", arXiv:2510.15103 §6 Fig 6) shows TF-only
+//! selection forgets significantly more than TF-IDF selection, with the gap
+//! widening as the write set shrinks — and our per-event write top-k is the
+//! smallest write set in the stack.
+//!
+//! [`write_idf`](PkmEpisodicStore::write_idf) / [`write_weighted_idf`](PkmEpisodicStore::write_weighted_idf)
+//! fix this: they retrieve a top-`k` candidate pool, re-rank by
+//! `weight × idf(slot)` where `idf` comes from a static
+//! [`BackgroundAccessStats`] table built once from a consumer-supplied
+//! background query corpus, and apply the unchanged δ-rule to the top-`t`.
+//! The δ-rule update itself is untouched; only selection changes.
+//! [`write_selected`](PkmEpisodicStore::write_selected) is the escape hatch
+//! for custom selection policies. See `.benchmarks/636_idf_write_gate.md`
+//! for the measured GOAT evidence.
+//!
 //! # References
 //!
 //! - Plan: `katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md` §Phase 5
@@ -352,6 +374,401 @@ impl<const SQRT_N: usize, const D_K: usize, const D_V: usize> PkmEpisodicStore<S
             self.gate_sum / self.writes_applied as f64
         }
     }
+
+    /// TF-IDF-ranked δ-rule write (Issue 650 / Research 481): retrieve a
+    /// top-`k` candidate pool, re-rank by `weight × idf(slot)`, apply the
+    /// unchanged unweighted δ-rule to the top-`t`.
+    ///
+    /// Selection: `score(idx) = weight[idx] * idf(idx)` where `idf` comes from
+    /// a consumer-supplied [`BackgroundAccessStats`] built once from a
+    /// background query corpus. Slots retrieved by many background batches
+    /// (generally-hot / "magnate" slots) get low idf and are avoided — so a
+    /// new fact set does not overwrite the slots general queries rely on
+    /// ("Continual Learning via Sparse Memory Finetuning", arXiv:2510.15103
+    /// §6 Fig 6: TF-only selection forgets significantly more, and the gap
+    /// widens as the write set shrinks).
+    ///
+    /// Application: identical to [`write`](Self::write) — every selected slot
+    /// receives the same `gate`-scaled move. The idf is a **selection
+    /// statistic only** (not applied as an update scale, not a probability —
+    /// not UQ-bearing; conformal floor N/A).
+    ///
+    /// # Arguments
+    ///
+    /// Same as [`write`](Self::write), plus:
+    /// - `t`: the write width (`<= k`, `<= out.len()`). The top-`t` of the
+    ///   candidate pool by `weight × idf` is written.
+    /// - `stats`: background access statistics. `N` MUST equal
+    ///   `SQRT_N * SQRT_N` (debug-asserted).
+    ///
+    /// # Returns
+    ///
+    /// The number of slots written (`min(t, n)`), or `0` if `gate <= 0`.
+    ///
+    /// # Degenerate stats = TF-only selection
+    ///
+    /// With an all-zero `slot_batch_counts`, idf is the constant `ln(|B|+1)`
+    /// and selection reduces to top-`t` by retrieval weight — the baseline
+    /// arm the Issue 650 bench measures against (matched candidate pool).
+    #[allow(clippy::too_many_arguments)]
+    pub fn write_idf<const K: usize, const N: usize>(
+        &mut self,
+        q: &[f32; D_K],
+        target: &[f32; D_V],
+        gate: f32,
+        score_fn: ScoreFn,
+        k: usize,
+        t: usize,
+        stats: &BackgroundAccessStats<N>,
+        out: &mut [(usize, f32)],
+        scratch: &mut PkmScratch<SQRT_N, K>,
+    ) -> usize {
+        debug_assert!(N == SQRT_N * SQRT_N, "stats N must equal SQRT_N^2");
+        self.writes_total = self.writes_total.wrapping_add(1);
+        let g = clamp_gate(gate);
+        if g <= 0.0 {
+            return 0;
+        }
+
+        // Step 1: candidate pool (top-k by retrieval score, softmax weights).
+        let n = self.working.query_into(q, score_fn, k, out, scratch);
+
+        // Step 2: re-rank by weight × idf, select top-t in place.
+        //
+        // `scratch.scores_1` is dead scratch at this point — query_into only
+        // reads it back through its own top_1 selection, which has already
+        // run. Reusing it for the selection scores keeps the call zero-alloc
+        // with no new scratch parameter (contract: scores_1 is scratch, fully
+        // rewritten by the next query_into call).
+        let t_eff = select_top_t_by_idf(out, &mut scratch.scores_1, stats, n, t);
+
+        // Step 3: unchanged unweighted δ-rule on the selected slots.
+        for &(idx, _weight) in &out[..t_eff] {
+            let row = &mut self.working.values[idx * D_V..(idx + 1) * D_V];
+            for (v_j, &t_j) in row.iter_mut().zip(target.iter()) {
+                *v_j += g * (t_j - *v_j);
+            }
+        }
+
+        self.writes_applied = self.writes_applied.wrapping_add(1);
+        self.gate_sum += g as f64;
+        t_eff
+    }
+
+    /// TF-IDF-ranked weighted δ-rule write: same selection as
+    /// [`write_idf`](Self::write_idf), but the application scales by the
+    /// softmax retrieval weight (identical to
+    /// [`write_weighted`](Self::write_weighted) on the selected slots).
+    ///
+    /// `V[idx] += gate * weight[idx] * (target - V[idx])` for each of the
+    /// top-`t` slots by `weight[idx] × idf(idx)`. The idf ranks selection
+    /// only — it never scales the update.
+    // See `write` above: each argument is independently meaningful on this
+    // hot path, so bundling them into a struct would not improve clarity.
+    #[allow(clippy::too_many_arguments)]
+    pub fn write_weighted_idf<const K: usize, const N: usize>(
+        &mut self,
+        q: &[f32; D_K],
+        target: &[f32; D_V],
+        gate: f32,
+        score_fn: ScoreFn,
+        k: usize,
+        t: usize,
+        stats: &BackgroundAccessStats<N>,
+        out: &mut [(usize, f32)],
+        scratch: &mut PkmScratch<SQRT_N, K>,
+    ) -> usize {
+        debug_assert!(N == SQRT_N * SQRT_N, "stats N must equal SQRT_N^2");
+        self.writes_total = self.writes_total.wrapping_add(1);
+        let g = clamp_gate(gate);
+        if g <= 0.0 {
+            return 0;
+        }
+
+        let n = self.working.query_into(q, score_fn, k, out, scratch);
+        let t_eff = select_top_t_by_idf(out, &mut scratch.scores_1, stats, n, t);
+
+        for &(idx, weight) in &out[..t_eff] {
+            let scaled_gate = g * weight;
+            let row = &mut self.working.values[idx * D_V..(idx + 1) * D_V];
+            for (v_j, &t_j) in row.iter_mut().zip(target.iter()) {
+                *v_j += scaled_gate * (t_j - *v_j);
+            }
+        }
+
+        self.writes_applied = self.writes_applied.wrapping_add(1);
+        self.gate_sum += g as f64;
+        t_eff
+    }
+
+    /// Apply the unweighted δ-rule to a caller-selected set of slots
+    /// (advanced escape hatch for custom selection policies).
+    ///
+    /// `V[idx] += gate * (target - V[idx])` for each `idx` in `indices`.
+    /// This is the substrate under [`write_idf`](Self::write_idf)'s
+    /// application step, exposed so consumers can implement their own
+    /// selection policy (the Issue 650 bench's random-`t` control arm uses
+    /// it) without reaching into the working table.
+    ///
+    /// # Contract
+    ///
+    /// Every `idx` MUST be `< SQRT_N * SQRT_N` (out-of-range panics via the
+    /// value-row slice — fail-loud, not fail-wrong). Entries are the
+    /// `(slot, weight)` pairs from [`ProductKeyMemory::query_into`]; the
+    /// weight is ignored (uniform gate application).
+    pub fn write_selected(
+        &mut self,
+        selected: &[(usize, f32)],
+        target: &[f32; D_V],
+        gate: f32,
+    ) -> usize {
+        self.writes_total = self.writes_total.wrapping_add(1);
+        let g = clamp_gate(gate);
+        if g <= 0.0 {
+            return 0;
+        }
+        for &(idx, _weight) in selected {
+            let row = &mut self.working.values[idx * D_V..(idx + 1) * D_V];
+            for (v_j, &t_j) in row.iter_mut().zip(target.iter()) {
+                *v_j += g * (t_j - *v_j);
+            }
+        }
+        self.writes_applied = self.writes_applied.wrapping_add(1);
+        self.gate_sum += g as f64;
+        selected.len()
+    }
+}
+
+/// Static background access-count table for TF-IDF write-gate selection
+/// (Issue 650 / Research 481, distilled from arXiv:2510.15103 §6).
+///
+/// Built ONCE from a consumer-supplied background query corpus (the analog
+/// of the paper's static background indices stored in the checkpoint).
+/// `slot_batch_counts[i]` is the document frequency: the number of background
+/// batches whose retrieved-slot union contained slot `i`. The IDF,
+///
+/// ```text
+/// idf(i) = ln((|B| + 1) / (1 + slot_batch_counts[i]))
+///
+/// (|B| = n_batches)
+/// ```
+///
+/// is the same smoothed log-ratio the riir-neuron-db `Bm25Index` applies to
+/// term selection, applied here to slot selection. It is `ln(|B|+1)` for
+/// never-retrieved slots and `0` for slots retrieved by every batch — so a
+/// generally-hot "magnate" slot scores `weight × 0 = 0` and is never
+/// selected ahead of a specific slot with any positive weight.
+///
+/// # Modelless + sync boundary
+///
+/// Pure static statistics — no training, no learning-rate, built once from a
+/// retrieval pass. `u32` counts; fixed-size arrays (no heap). The selection
+/// score is a ranking statistic, **not** a probability — not UQ-bearing,
+/// conformal floor N/A. Nothing here crosses the sync boundary (the stats
+/// table is local to the write path; only the BLAKE3 table commitment
+/// crosses via [`PkmEpisodicStore::publish`]).
+///
+/// # Example
+///
+/// ```
+/// use katgpt_core::product_key_memory::BackgroundAccessStats;
+///
+/// let mut stats = BackgroundAccessStats::<4>::new();
+/// stats.record_batch(&[0, 3]);       // batch 1 retrieved slots 0 and 3
+/// stats.record_batch(&[0]);           // batch 2 retrieved slot 0
+///
+/// // Slot 0 (in both batches) has lower idf than slot 3 (in one).
+/// assert!(stats.idf(0) < stats.idf(3));
+/// // Never-retrieved slot 2: idf = ln(|B| + 1) = ln(3).
+/// assert!((stats.idf(2) - 3.0f32.ln()).abs() < 1e-6);
+/// ```
+pub struct BackgroundAccessStats<const N: usize> {
+    /// Number of background batches recorded (|B|).
+    n_batches: u32,
+    /// Document frequency: number of batches whose retrieved-slot union
+    /// contained slot `i`. Capped implicitly at `n_batches`.
+    slot_batch_counts: [u32; N],
+}
+
+impl<const N: usize> BackgroundAccessStats<N> {
+    /// Zero-initialized stats (no batches recorded). idf is uniformly `0`
+    /// until the first `record_batch` — build stats before use.
+    pub fn new() -> Self {
+        Self {
+            n_batches: 0,
+            slot_batch_counts: [0; N],
+        }
+    }
+
+    /// Record one background batch: bump the count for each of the batch's
+    /// **distinct** retrieved slots.
+    ///
+    /// # Contract
+    ///
+    /// - `slots` must contain **distinct** indices (the constructor
+    ///   [`build_background_stats`](Self::build_background_stats) dedups
+    ///   internally; duplicates here would double-count).
+    /// - Every index must be `< N` (out-of-range panics via the array index
+    ///   — fail-loud).
+    pub fn record_batch(&mut self, slots: &[usize]) {
+        self.n_batches = self.n_batches.wrapping_add(1);
+        for &idx in slots {
+            self.slot_batch_counts[idx] += 1;
+        }
+    }
+
+    /// Smoothed inverse document frequency of `slot`:
+    /// `ln((n_batches + 1) / (1 + slot_batch_counts[slot]))`.
+    ///
+    /// `ln(|B|+1)` for never-retrieved slots, strictly decreasing in the
+    /// count, `0` for slots retrieved by every batch. Bounds-checked
+    /// (panics if `slot >= N`).
+    #[inline]
+    pub fn idf(&self, slot: usize) -> f32 {
+        ((self.n_batches as f32 + 1.0) / (1.0 + self.slot_batch_counts[slot] as f32)).ln()
+    }
+
+    /// Number of background batches recorded so far (`|B|`).
+    #[inline]
+    pub fn n_batches(&self) -> u32 {
+        self.n_batches
+    }
+
+    /// Document frequency of `slot` — number of batches whose retrieved-slot
+    /// union contained it. Bounds-checked.
+    #[inline]
+    pub fn slot_batch_count(&self, slot: usize) -> u32 {
+        self.slot_batch_counts[slot]
+    }
+
+    /// Build stats from a background query corpus against `table` (the
+    /// recommended source is the published snapshot,
+    /// `store.slot().current()`).
+    ///
+    /// Queries are grouped into consecutive batches of `batch_size`; for each
+    /// batch, every query retrieves its top-`k` slots and the **union** of
+    /// the retrieved slots is recorded as one batch (mirrors the paper's
+    /// batch-level document frequency). The trailing partial batch counts as
+    /// one batch.
+    ///
+    /// # Arguments
+    ///
+    /// - `table`: the table to retrieve against (frozen snapshot recommended
+    ///   — the stats are static like the paper's checkpoint-stored indices).
+    /// - `background_queries`: flat slice of `D_K`-dim queries.
+    /// - `batch_size`: queries per background batch (≥ 1).
+    /// - `score_fn` / `k`: retrieval config for the background pass.
+    /// - `out` / `scratch`: retrieval scratch (same buffers the write path
+    ///   uses; reused across the whole build).
+    /// - `batch_slots`: scratch for one batch's slot union, capacity ≥
+    ///   `batch_size * k` (deduped in place via sort + compaction).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `batch_size == 0` or `batch_slots.len() < batch_size * k`.
+    /// Debug-asserts `N == SQRT_N * SQRT_N`.
+    ///
+    /// # Alloc
+    ///
+    /// Zero-alloc (sort + compaction in place on the caller buffer).
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_background_stats<
+        const SQRT_N: usize,
+        const D_K: usize,
+        const D_V: usize,
+        const K: usize,
+    >(
+        table: &ProductKeyMemory<SQRT_N, D_K, D_V>,
+        background_queries: &[[f32; D_K]],
+        batch_size: usize,
+        score_fn: ScoreFn,
+        k: usize,
+        out: &mut [(usize, f32)],
+        batch_slots: &mut [usize],
+        scratch: &mut PkmScratch<SQRT_N, K>,
+    ) -> Self {
+        debug_assert!(
+            N == SQRT_N * SQRT_N,
+            "BackgroundAccessStats<N> with N={} but table has SQRT_N^2={} slots",
+            N,
+            SQRT_N * SQRT_N
+        );
+        assert!(batch_size >= 1, "batch_size must be >= 1");
+        assert!(
+            batch_slots.len() >= batch_size * k,
+            "batch_slots must hold batch_size*k = {} entries (got {})",
+            batch_size * k,
+            batch_slots.len()
+        );
+        let mut stats = Self::new();
+        for batch in background_queries.chunks(batch_size) {
+            // Collect this batch's retrieved slots (with duplicates).
+            let mut len = 0usize;
+            for q in batch {
+                let n = table.query_into(q, score_fn, k, out, scratch);
+                for &(idx, _w) in &out[..n] {
+                    batch_slots[len] = idx;
+                    len += 1;
+                }
+            }
+            // Distinct slots: sort + compaction (zero-alloc dedup). Indexed
+            // access — the compaction writes while iterating the same buffer.
+            batch_slots[..len].sort_unstable();
+            let mut write = 0usize;
+            let mut prev = usize::MAX;
+            for read in 0..len {
+                let idx = batch_slots[read];
+                if idx != prev {
+                    batch_slots[write] = idx;
+                    write += 1;
+                    prev = idx;
+                }
+            }
+            stats.record_batch(&batch_slots[..write]);
+        }
+        stats
+    }
+}
+
+impl<const N: usize> Default for BackgroundAccessStats<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Re-rank `out[..n]` by `weight × idf(slot)` and select the top-`t` in
+/// place (partial selection sort, co-swapping `out` and `scores`).
+///
+/// Deterministic: ties keep the earlier entry (query_into returns `out`
+/// sorted weight-descending, so ties preserve retrieval order). `scores`
+/// must have length ≥ `n` — the write paths reuse the dead
+/// `PkmScratch::scores_1` buffer for this.
+#[inline]
+fn select_top_t_by_idf<const N: usize>(
+    out: &mut [(usize, f32)],
+    scores: &mut [f32],
+    stats: &BackgroundAccessStats<N>,
+    n: usize,
+    t: usize,
+) -> usize {
+    debug_assert!(scores.len() >= n, "scores scratch must hold n entries");
+    let t = t.min(n);
+    for i in 0..n {
+        scores[i] = out[i].1 * stats.idf(out[i].0);
+    }
+    // Partial selection sort: top-t by score descending. Strict `>` keeps
+    // the earliest (highest retrieval-ranked) entry on ties.
+    for i in 0..t {
+        let mut best = i;
+        for j in (i + 1)..n {
+            if scores[j] > scores[best] {
+                best = j;
+            }
+        }
+        scores.swap(i, best);
+        out.swap(i, best);
+    }
+    t
 }
 
 #[cfg(test)]
@@ -886,5 +1303,370 @@ mod tests {
         // The contract here is just that both write paths run without panic
         // and produce non-empty results.
         assert!(n_dot > 0);
+    }
+
+    // ── Issue 650 / Research 481: TF-IDF write gate ─────────────────────────
+
+    #[test]
+    fn idf_monotone_decreasing_in_count() {
+        let mut stats = BackgroundAccessStats::<8>::new();
+        // 3 batches; slot 0 in all 3, slot 1 in 2, slot 2 in 1, slot 3 in none.
+        stats.record_batch(&[0, 1, 2]);
+        stats.record_batch(&[0, 1]);
+        stats.record_batch(&[0]);
+        assert_eq!(stats.n_batches(), 3);
+        // Strictly decreasing in count.
+        assert!(stats.idf(0) < stats.idf(1));
+        assert!(stats.idf(1) < stats.idf(2));
+        // Slots 3+ never accessed → equal idf (ln(|B|+1)).
+        assert!((stats.idf(3) - stats.idf(4)).abs() < 1e-6);
+        // Slot retrieved by EVERY batch: idf = ln((3+1)/(3+1)) = ln(1) = 0.
+        assert!(stats.idf(0) >= 0.0);
+        assert!(stats.idf(0) < 1e-6);
+    }
+
+    #[test]
+    fn idf_never_accessed_is_ln_nb_plus_one() {
+        let mut stats = BackgroundAccessStats::<4>::new();
+        stats.record_batch(&[0]);
+        stats.record_batch(&[0]);
+        // |B| = 2 → never-accessed idf = ln(3).
+        let expected = 3.0f32.ln();
+        assert!((stats.idf(1) - expected).abs() < 1e-6);
+        assert!((stats.idf(2) - expected).abs() < 1e-6);
+        // Empty stats: |B| = 0 → idf = ln(1/1) = 0 (degenerate, documented).
+        let empty = BackgroundAccessStats::<4>::new();
+        assert!(empty.idf(0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn build_background_stats_counts_match_direct_queries() {
+        // batch_size=1 → each query is one batch; counts must equal the
+        // per-query top-k membership (top-k indices are distinct by
+        // construction — cartesian pairs are unique (i,j) cells).
+        let table: ProductKeyMemory<16, 8, 4> = ProductKeyMemory::from_random(7);
+        let queries: Vec<[f32; 8]> = (0..6)
+            .map(|i| {
+                let mut q = [0.0f32; 8];
+                for (j, x) in q.iter_mut().enumerate() {
+                    *x = ((i * 13 + j * 7) as f32 * 0.37).sin();
+                }
+                q
+            })
+            .collect();
+        let stats = BackgroundAccessStats::<256>::build_background_stats(
+            &table,
+            &queries,
+            1,
+            ScoreFn::Dot,
+            4,
+            &mut [(0usize, 0.0f32); 4],
+            &mut [0usize; 4],
+            &mut PkmScratch::<16, 4>::new(),
+        );
+        assert_eq!(stats.n_batches(), 6);
+        // Total counts == total (query, slot) retrievals.
+        let mut out = [(0usize, 0.0f32); 4];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let mut direct_total = 0u32;
+        for q in &queries {
+            let n = table.query_into(q, ScoreFn::Dot, 4, &mut out, &mut scratch);
+            direct_total += n as u32;
+            for &(idx, _) in &out[..n] {
+                assert!(stats.slot_batch_count(idx) >= 1);
+            }
+        }
+        let total: u32 = (0..256).map(|i| stats.slot_batch_count(i)).sum();
+        assert_eq!(total, direct_total);
+    }
+
+    #[test]
+    fn build_background_stats_dedups_within_batch() {
+        // Two identical queries in one batch → the union is one query's
+        // top-k, not double-counted.
+        let table: ProductKeyMemory<16, 8, 4> = ProductKeyMemory::from_random(7);
+        let queries = vec![[0.5f32; 8], [0.5f32; 8]];
+        let stats = BackgroundAccessStats::<256>::build_background_stats(
+            &table,
+            &queries,
+            2,
+            ScoreFn::Dot,
+            4,
+            &mut [(0usize, 0.0f32); 4],
+            &mut [0usize; 8],
+            &mut PkmScratch::<16, 4>::new(),
+        );
+        assert_eq!(stats.n_batches(), 1);
+        let mut out = [(0usize, 0.0f32); 4];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let n = table.query_into(&queries[0], ScoreFn::Dot, 4, &mut out, &mut scratch);
+        for i in 0..256 {
+            let expected = if out[..n].iter().any(|&(idx, _)| idx == i) {
+                1
+            } else {
+                0
+            };
+            assert_eq!(stats.slot_batch_count(i), expected, "slot {}", i);
+        }
+    }
+
+    #[test]
+    fn write_idf_degenerate_stats_selects_by_weight() {
+        // All-zero counts → uniform idf → selection = top-t by weight from
+        // the SAME candidate pool (the matched-pool TF-only baseline the
+        // bench uses). Expected = first t of the pool (out is weight-desc).
+        let mut store = store_from_seed(3);
+        let mut stats = BackgroundAccessStats::<256>::new();
+        stats.record_batch(&[]); // |B|=1, no counts → idf = ln(2) uniform
+
+        let q = [0.3f32, -0.7, 0.1, 0.9, -0.4, 0.2, 0.8, -0.6];
+        let target = [1.0f32, 0.0, 0.5, -0.25];
+
+        // Reference pool from an identical untouched store.
+        let reference = store_from_seed(3);
+        let mut pool = [(0usize, 0.0f32); 8];
+        let mut scratch_ref = PkmScratch::<16, 4>::new();
+        let n = reference
+            .working()
+            .query_into(&q, ScoreFn::Dot, 8, &mut pool, &mut scratch_ref);
+        let expected: Vec<usize> = pool[..n].iter().map(|&(idx, _)| idx).take(4).collect();
+
+        let mut out = [(0usize, 0.0f32); 8];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let t_written = store.write_idf(
+            &q,
+            &target,
+            0.5,
+            ScoreFn::Dot,
+            8,
+            4,
+            &stats,
+            &mut out,
+            &mut scratch,
+        );
+        assert_eq!(t_written, 4);
+        let got: Vec<usize> = out[..4].iter().map(|&(idx, _)| idx).collect();
+        assert_eq!(got, expected, "uniform idf must select top-t by weight");
+    }
+
+    #[test]
+    fn write_idf_avoids_zero_idf_slots() {
+        // "Magnate" slots retrieved by EVERY background batch score
+        // weight × 0 = 0 and must never be selected ahead of any positive-idf
+        // candidate.
+        let mut store = store_from_seed(5);
+        let q = [0.25f32, -0.5, 0.75, 0.1, -0.9, 0.4, 0.6, -0.2];
+        let target = [0.5f32, 0.5, -0.5, 0.5];
+
+        // Pool + magnate identification (top-3 by weight).
+        let reference = store_from_seed(5);
+        let mut pool = [(0usize, 0.0f32); 8];
+        let mut scratch0 = PkmScratch::<16, 4>::new();
+        let n = reference
+            .working()
+            .query_into(&q, ScoreFn::Dot, 8, &mut pool, &mut scratch0);
+        let magnates = [pool[0].0, pool[1].0, pool[2].0];
+
+        // 10 background batches, each retrieving exactly the magnates.
+        let mut stats = BackgroundAccessStats::<256>::new();
+        for _ in 0..10 {
+            stats.record_batch(&magnates);
+        }
+
+        let mut out = [(0usize, 0.0f32); 8];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let t_written = store.write_idf(
+            &q,
+            &target,
+            1.0,
+            ScoreFn::Dot,
+            8,
+            4,
+            &stats,
+            &mut out,
+            &mut scratch,
+        );
+        assert_eq!(t_written, 4);
+        let selected: Vec<usize> = out[..4].iter().map(|&(idx, _)| idx).collect();
+        for m in magnates {
+            assert!(
+                !selected.contains(&m),
+                "zero-idf magnate {} must not be selected (got {:?})",
+                m,
+                selected
+            );
+        }
+        // Selected = top-4 by weight among the survivors = pool ranks 3..7
+        // (weights are distinct almost surely under softmax).
+        for &s in &selected {
+            let rank = pool[..n].iter().position(|&(idx, _)| idx == s).unwrap();
+            assert!(rank >= 3, "selected rank {} should be >= 3", rank);
+        }
+        // Magnates' value rows are bit-identical to the reference.
+        for m in magnates {
+            let got = store.working().value(m);
+            let old = reference.working().value(m);
+            assert_eq!(got, old, "magnate {} must be untouched", m);
+        }
+    }
+
+    #[test]
+    fn write_idf_gate_zero_is_noop() {
+        let mut store = store_from_seed(11);
+        let reference = store_from_seed(11);
+        let mut stats = BackgroundAccessStats::<256>::new();
+        for _ in 0..4 {
+            stats.record_batch(&[0, 5, 10]);
+        }
+        let q = [0.1f32; 8];
+        let target = [1.0f32; 4];
+        let mut out = [(0usize, 0.0f32); 8];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let n = store.write_idf(
+            &q,
+            &target,
+            0.0,
+            ScoreFn::Dot,
+            8,
+            4,
+            &stats,
+            &mut out,
+            &mut scratch,
+        );
+        assert_eq!(n, 0);
+        assert_eq!(store.writes_total(), 1);
+        assert_eq!(store.writes_applied(), 0);
+        for i in 0..256 {
+            assert_eq!(store.working().value(i), reference.working().value(i));
+        }
+    }
+
+    #[test]
+    fn write_idf_is_deterministic() {
+        let q = [0.4f32, -0.2, 0.6, -0.8, 0.3, 0.7, -0.1, 0.5];
+        let target = [0.25f32, -0.75, 0.5, 1.0];
+        let mut stats = BackgroundAccessStats::<256>::new();
+        for _ in 0..4 {
+            stats.record_batch(&[1, 2, 3, 250]);
+        }
+
+        let run = |seed: u64| -> Vec<u8> {
+            let mut store = store_from_seed(seed);
+            let mut out = [(0usize, 0.0f32); 8];
+            let mut scratch = PkmScratch::<16, 4>::new();
+            for i in 0..8 {
+                let q_i = {
+                    let mut q2 = q;
+                    q2[0] += i as f32 * 0.01;
+                    q2
+                };
+                store.write_idf(
+                    &q_i,
+                    &target,
+                    0.7,
+                    ScoreFn::Dot,
+                    8,
+                    4,
+                    &stats,
+                    &mut out,
+                    &mut scratch,
+                );
+            }
+            store.working().values.iter().map(|b| b.to_bits() as u8).collect()
+        };
+        assert_eq!(run(21), run(21), "same seed → bit-identical");
+    }
+
+    #[test]
+    fn write_weighted_idf_scales_by_weight_on_selected() {
+        // With uniform stats (selection = top-t by weight from pool),
+        // write_weighted_idf(pool=8, t=4) applies the softmax-over-8 weights
+        // of the pool's top-4 entries (NOTE: not bit-identical to
+        // write_weighted(k=4) — softmax normalizes over the selected k, so
+        // the weight VALUES differ between pool-8 and direct-k=4 despite the
+        // same selected set). Pin the actual contract: same slots as the
+        // pool's top-4, each scaled by its pool-8 softmax weight.
+        let q = [-0.3f32, 0.8, 0.2, -0.6, 0.5, -0.4, 0.9, 0.1];
+        let target = [0.75f32, -0.25, 1.0, 0.5];
+        let mut stats = BackgroundAccessStats::<256>::new();
+        stats.record_batch(&[]); // uniform idf = ln(2)
+
+        // Reference pool (softmax-over-8 weights, weight-desc order).
+        let reference = store_from_seed(33);
+        let mut pool = [(0usize, 0.0f32); 8];
+        let mut scratch_ref = PkmScratch::<16, 4>::new();
+        let n = reference
+            .working()
+            .query_into(&q, ScoreFn::Dot, 8, &mut pool, &mut scratch_ref);
+        let expected: Vec<(usize, f32)> = pool[..n].iter().copied().take(4).collect();
+
+        let mut store = store_from_seed(33);
+        let mut out = [(0usize, 0.0f32); 8];
+        let mut scratch = PkmScratch::<16, 4>::new();
+        let t_written = store.write_weighted_idf(
+            &q,
+            &target,
+            0.8,
+            ScoreFn::Dot,
+            8,
+            4,
+            &stats,
+            &mut out,
+            &mut scratch,
+        );
+        assert_eq!(t_written, 4);
+
+        // Selected slots match the pool's top-4 by weight.
+        let selected: Vec<(usize, f32)> = out[..4].to_vec();
+        let sel_idx: Vec<usize> = selected.iter().map(|e| e.0).collect();
+        let exp_idx: Vec<usize> = expected.iter().map(|e| e.0).collect();
+        assert_eq!(sel_idx, exp_idx);
+
+        // Each selected slot moved by gate * pool-8-weight toward target.
+        for &(idx, weight) in &expected {
+            let got = store.working().value(idx);
+            let old = reference.working().value(idx);
+            let scaled = 0.8 * weight;
+            for ((g, o), t) in got.iter().zip(old.iter()).zip(target.iter()) {
+                let e = o + scaled * (t - o);
+                assert!(
+                    (g - e).abs() < 1e-6,
+                    "slot {} weight {} diverged: got {:?} expected {}",
+                    idx,
+                    weight,
+                    got,
+                    e
+                );
+            }
+        }
+        // Non-selected slots are bit-identical to the reference.
+        for i in 0..256 {
+            if !expected.iter().any(|&(idx, _)| idx == i) {
+                assert_eq!(store.working().value(i), reference.working().value(i));
+            }
+        }
+    }
+
+    #[test]
+    fn write_selected_applies_delta_to_caller_slots() {
+        let mut store = store_from_seed(9);
+        let reference = store_from_seed(9);
+        let target = [2.0f32, -1.0, 0.5, 0.0];
+        // Arbitrary slots + dummy weights (the weight must be ignored).
+        let selected = [(3usize, 0.9f32), (17usize, 0.1f32)];
+        let n = store.write_selected(&selected, &target, 0.5);
+        assert_eq!(n, 2);
+        assert_eq!(store.writes_total(), 1);
+        assert_eq!(store.writes_applied(), 1);
+        for &(idx, _) in &selected {
+            let got = store.working().value(idx);
+            let old = reference.working().value(idx);
+            for ((g, o), t) in got.iter().zip(old.iter()).zip(target.iter()) {
+                let expected = o + 0.5 * (t - o);
+                assert!((g - expected).abs() < 1e-6);
+            }
+        }
+        // Untouched slot is bit-identical.
+        assert_eq!(store.working().value(100), reference.working().value(100));
     }
 }
