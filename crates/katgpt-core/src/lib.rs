@@ -1469,6 +1469,17 @@ pub use bisimulation::{
     StateClassId, StateId, Transition, TransitionGraph, TransitionGraphBuilder, partition_refine,
     plan as bisimulation_plan,
 };
+// Issue 586 — rule-application consistency metric (BDH-CQ §6.4 analog):
+// 3-bin strict/partial/none task histogram + sigmoid-guarded gap +
+// structure-preservation breakdown + complexity-cluster regime detection.
+// Gates `infer_operators` output via `promotion_verdict`; the
+// ComplexityClustered regime is the exemplar-seeking trigger consumed by
+// riir-ai Issue 672.
+#[cfg(feature = "operator_consistency")]
+pub use bisimulation::consistency::{
+    ApplicationOutcome, ConsistencyGateConfig, ConsistencyRegime, ConsistencyReport,
+    PromotionVerdict, promotion_verdict, rule_consistency,
+};
 
 // ── FORE — Fitted Occupancy-Ratio Estimator (Plan 438, Research 423, arxiv 2607.05375) ─
 //

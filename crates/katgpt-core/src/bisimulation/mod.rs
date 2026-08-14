@@ -103,6 +103,8 @@ pub mod operator;
 pub mod planner;
 pub mod refine;
 pub mod types;
+#[cfg(feature = "operator_consistency")]
+pub mod consistency;
 
 // ── Public API re-exports ─────────────────────────────────────────────────
 //
@@ -117,6 +119,11 @@ pub use operator::{OperatorDef, OperatorSchema, infer_operators};
 pub use planner::{Plan, plan};
 pub use refine::{BisimulationQuotient, partition_refine};
 pub use types::{OperatorLabel, QuotientEdge, StateClassId, StateId, Transition};
+#[cfg(feature = "operator_consistency")]
+pub use consistency::{
+    ApplicationOutcome, ConsistencyGateConfig, ConsistencyRegime, ConsistencyReport,
+    PromotionVerdict, promotion_verdict, rule_consistency,
+};
 
 // ── Quotient definition lives here (re-exported from refine) ───────────────
 //

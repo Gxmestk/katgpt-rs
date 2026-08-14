@@ -95,7 +95,7 @@ demonstrations (observed (x, y) pairs of a skilled actor) → surprise-gated δ-
 
 ## 4. Action items filed
 
-- **katgpt-rs Issue 586** — operator consistency-gap metric (PoC + gate design; the one mechanism with zero shipped cousin).
+- **katgpt-rs Issue 586** — operator consistency-gap metric (PoC + gate design; the one mechanism with zero shipped cousin). **RESOLVED + removed 2026-08-14** (Bench 633): `bisimulation/consistency.rs` shipped behind opt-in `operator_consistency`; GOAT G1+G2+G4 ALL PASS (regime separation; 208ns @ N=64; 0 allocs). Design notes recorded in the bench doc — notably the lookup-binding divergence: the trained model partially transfers one exemplar to neighboring levels (0/24→13/24), the modelless analog repairs exactly the demonstrated level and must **re-target after re-measure** (Issue 672 implements that loop).
 - **riir-ai Issue 672** — demonstration-coverage curiosity targeting (supported-context effect → exemplar-seeking curiosity + engram write policy).
 
 ## 5. Relationship to existing research
