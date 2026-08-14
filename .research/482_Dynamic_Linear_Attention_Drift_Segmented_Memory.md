@@ -2,7 +2,7 @@
 
 > **Source:** "Dynamic Linear Attention" ([arXiv:2606.10650](https://arxiv.org/abs/2606.10650)), Xin Wang, Hui Shen, Boyuan Zheng et al. (OSU + UMich + ByteDance Seed, Jun 2026; ICML 2026 poster)
 > **Date:** 2026-08-14
-> **Status:** Active
+> **Status:** Validated — PoC PASS ([Bench 635](../.benchmarks/635_drift_segment_goat.md), 2026-08-15: training-free drift segmentation beats fixed-LFU by +46pp needle recall on change-point streams / +75pp stationary at matched budget; feature `drift_segment` stays opt-in, promotion unblocked at next re-gate; F2 → riir-ai Issue 677, F3 → riir-neuron-db Issue 595)
 > **Related Research:** 199 (Memory Caching — closest cousin, shipped as Plan 223b), 435 (Temporal Derivative Kernel — the I_t analog), 378 (HOLA capacity-W evict cache), 024 (δ-Mem + surprise write gate), 070 (GDN2), 028 (HLA), 006 (Raven slots); riir-ai 084 (MC game AI), 007 (four-tier memory), 161 (ICT branching snapshots)
 > **Related Plans:** 223b (`katgpt-kv/segment_checkpoint`), 277 (temporal_deriv), 395 (HOLA), 053 (δ-Mem MSW), 105 (GDN2)
 > **Cross-ref (riir-neuron-db):** `hope_compactor.rs` (Plan 321 — global lowest-J_merge pair merge, offline)

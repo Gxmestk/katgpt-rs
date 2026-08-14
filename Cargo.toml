@@ -554,6 +554,7 @@ self_cond_draft = ["katgpt-core/self_cond_draft", "katgpt-speculative/self_cond_
 outlier_guard = ["katgpt-spectral/outlier_guard"]  # ON BY DEFAULT — KS D-statistic outlier detection at model load (Plan 224)
 regime_transition = ["and_or_dtree", "bandit", "decision_trace", "fol_constraints", "rule_extraction", "katgpt-pruners/regime_transition"]  # ON BY DEFAULT — Regime-Transition Inference, self-revising discovery (Plan 215, GOAT PROVED -0.3% overhead vs real decode)
 segment_checkpoint = ["katgpt-kv/segment_checkpoint"]  # ON BY DEFAULT — core GRM segment caching (Plan 223b). Phase 5: moved to katgpt-kv (Proposal 003).
+drift_segment = ["katgpt-kv/drift_segment"]  # Opt-in — DriftSegmentStore training-free drift-segmented multi-state memory (Issue 652 / Research 482, arXiv:2606.10650 modelless). GOAT pending bench_635.
 ssc_spec_draft = ["segment_checkpoint", "regime_transition", "katgpt-kv/ssc_spec_draft"]  # Opt-in — SSC sparse speculative drafting
 memory_soup_dtree = ["segment_checkpoint", "regime_transition"]  # Opt-in — experimental DDTree branch merging
 # Memory Soup LoRA Artifact Importer (Plan 253 T19 G5).
@@ -1078,6 +1079,18 @@ harness = false
 name = "bench_021_flashmemory_real_weights_retrieval"
 path = "benches/bench_021_flashmemory_real_weights_retrieval.rs"
 required-features = ["kimi_k3_loader", "flashmemory_sparse"]
+harness = false
+
+# Issue 652 — DriftSegmentStore GOAT gate (training-free drift-segmented
+# multi-state memory, Research 482 / arXiv:2606.10650 modelless adaptation).
+# G1 needle-recall PoC: 3 arms at matched budget (single-state vs fixed-LFU
+# vs drift) on change-point + stationary streams, 16 paired seeds.
+# G2 latency ns/token. G4 CountingAllocator alloc-free steady state.
+# harness=false.
+[[bench]]
+name = "bench_635_drift_segment_goat"
+path = "benches/bench_635_drift_segment_goat.rs"
+required-features = ["drift_segment"]
 harness = false
 
 # Issue 584 Phase 3 G4 — FlashMemory sparse MLA forward alloc-free steady state.

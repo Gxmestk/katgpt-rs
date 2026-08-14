@@ -3,8 +3,8 @@
 **Research:** [katgpt-rs/.research/482_Dynamic_Linear_Attention_Drift_Segmented_Memory.md](../.research/482_Dynamic_Linear_Attention_Drift_Segmented_Memory.md)
 **Source paper:** [arXiv:2606.10650](https://arxiv.org/abs/2606.10650) — "Dynamic Linear Attention" (OSU + UMich + ByteDance Seed, Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-kv/src/drift_segment/` (new module beside `segment_checkpoint/`) + benches
-**Status:** Open
-**Date:** 2026-08-14
+**Status:** DONE — GOAT PASS ([Bench 635](../.benchmarks/635_drift_segment_goat.md), 2026-08-15)
+**Date:** 2026-08-14 (filed) / 2026-08-15 (executed)
 
 ---
 
@@ -25,11 +25,11 @@ Not UQ-bearing (recall metric, no probability/interval claim) — conformal floo
 
 ## Tasks
 
-- [ ] **T1** — Type + unit tests: boundary fires at planted change points (synthetic key-stream regime switches); capacity invariant (never > K slots); chronological order preserved across merges; density accounting (info_sum/n monotone bookkeeping); zero-alloc over 1000 steady tokens.
-- [ ] **T2** — **G1 PoC bench (load-bearing, defend-wrong §3.6):** synthetic non-stationary streams (planted regime changes + needles to recall), three arms at **matched budget** (same slot count / bytes): (a) single-state accumulator (vanilla linear attention), (b) `SegmentStore` policy (fixed 128-token segments + LFU evict), (c) `DriftSegmentStore`. PASS: (c) beats (b) by a clear margin on change-point streams (target ≥ +10pp needle recall) AND is ≥ (b) on stationary streams (no regression where fixed blocking is fine). This measures the Area-7 training-free claim ourselves — the paper only proves the co-trained version.
-- [ ] **T3** — G2 latency: per-token overhead stays O(d + K) (score + argmin scan); report ns/token all arms. G4 alloc-free (covered by T1 assertion in bench form).
-- [ ] **T4** — G3 no-regression: existing `segment_checkpoint` benches/tests unchanged (new module, opt-in feature `drift_segment`).
-- [ ] **T5** — Verdict recording: PASS → `.benchmarks/482_drift_segment_goat.md`, evaluate promotion at next re-gate, file F2 (riir-ai per-NPC episodic memory) + F3 (riir-neuron-db consolidation policy) follow-ups. FAIL → honest negative result in the same bench doc (co-training was load-bearing; training-free transfer does not hold), keep opt-in, note the riir-train Path-0.5 follow-up (DLA-style soft-gate co-training recipe) in the bench doc.
+- [x] **T1** — Type + unit tests: boundary fires at planted change points (synthetic key-stream regime switches); capacity invariant (never > K slots); chronological order preserved across merges; density accounting (info_sum/n monotone bookkeeping); zero-alloc over 1000 steady tokens. — DONE: 7/7 unit tests in `drift_segment/mod.rs` (G4 zero-alloc asserted at bench level via CountingAllocator; the struct is heap-free by construction — fixed arrays only). Two empirical lessons baked into the tests: (a) random unit directions can be nearly parallel on unlucky seeds → Gram–Schmidt-orthogonalized planted change points; (b) a noise floor above τ permanently disarms the rising-edge detector (hysteresis trap).
+- [x] **T2** — **G1 PoC bench (load-bearing, defend-wrong §3.6):** DONE — [Bench 635](../.benchmarks/635_drift_segment_goat.md): **drift 0.578 vs fixed-LFU 0.117 (change-point, +46.09pp) and 0.930 vs 0.180 (stationary, +75.00pp)**, both targets exceeded (+10pp / −2pp); also beats single-state (0.172/0.133). 16 paired seeds, matched budget (K=30 slots × identical representation × identical readout). The Area-7 training-free claim is now measured, not just argued.
+- [x] **T3** — G2 latency: DONE — 12 ns/token observe (O(d + K), d=32 K=30), 307 ns/query readout; all arms reported.
+- [x] **T4** — G3 no-regression: DONE — `segment_checkpoint` lib tests unchanged (38 PASS); `--all-features` combo clean (253 PASS); clippy 0 warnings (module + bench).
+- [x] **T5** — Verdict recording: DONE — PASS recorded in [Bench 635](../.benchmarks/635_drift_segment_goat.md) (bench number allocated per `.benchmarks/.highwater` discipline — 634→635; the issue's prescribed 482 is the Research number and was never allocated as a bench). **Stays opt-in** per this task's wording: promotion is evaluated at the next re-gate (synthetic-only validation, no consumer wiring yet — the same bar as segment_checkpoint's blocked real-model NIAH). F2 + F3 filed: [riir-ai Issue 677](../../riir-ai/.issues/677_per_npc_episodic_belief_memory.md) + [riir-neuron-db Issue 595](../../riir-neuron-db/.issues/595_consolidation_density_aware_adjacent_merge.md).
 
 ## Out of scope (Research 482 §2.4)
 

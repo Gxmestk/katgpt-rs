@@ -79,6 +79,13 @@ cache_prune = []
 # Segment Checkpoint — GRM segment caching (Plan 223b). DEFAULT-ON in root.
 segment_checkpoint = []
 
+# DriftSegmentStore — training-free drift-segmented multi-state memory
+# (Issue 652 / Research 482, arXiv:2606.10650 modelless adaptation).
+# Composes temporal_deriv (drift score) × segment_checkpoint (bounded slots)
+# × hope_compactor's pair-merge pattern (adjacent-density merge).
+# Opt-in pending bench_635 GOAT gate.
+drift_segment = []
+
 # SSC Sparse Speculative Drafting — opt-in sub-module of segment_checkpoint
 # (Plan 223c). Gates `pub mod ssc;` in segment_checkpoint/mod.rs. Root forwards
 # this from the `ssc_spec_draft` feature; the example
