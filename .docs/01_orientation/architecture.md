@@ -903,7 +903,7 @@ solver.pi_star(&sol, state, &mut out /* [f32; A] */);              // closed-for
 
 Two honest gate re-specifications are recorded in the bench: G1's absolute 1e-6 is sub-ulp at this arena's value scale (f32 eps at 55 ≈ 3.3e-6), and G2's original `< 1 ms @ N=256` needs ~375 GFLOP/s — arithmetically infeasible on any CPU for this access pattern; the PoC-anchored gridworld gate is the honest form. UQ floor N/A (no predictive distribution claimed).
 
-**Promotion decision:** STAYS OPT-IN — G1–G4 pass but no in-tree default-path consumer today; the consumer is riir-ai Plan 538 (per-NPC runtime wiring, opts in via path-dep feature). The Super-GOAT quality evidence lives in riir-ai (Bench 679 defend-wrong PoC: 3/4 hard PASS + G4 pass-with-caveat). Re-evaluate at Plan 538's integration gate.
+**Promotion decision:** STAYS OPT-IN — G1–G4 pass but no in-tree default-path consumer; the consumer is riir-ai `mop_runtime` (Plan 538, opts in via path-dep feature). **The integration gate has now run (2026-08-15): riir-ai Bench 680 G1–G4 PASS + Bench 681 G8 civ-arena ALL PASS** (survival/coverage/entropy margins through the production kernel path) — the primitive's quality evidence is complete end-to-end; any default-on promotion is a separate product decision.
 
 ## SpeculativeVerifier (Strategy Pattern)
 
