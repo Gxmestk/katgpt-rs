@@ -424,7 +424,7 @@ mod tests {
             kill_weight: 0.6,
         };
         let mut arena = EvolutionArena::new(base, Box::new(BomberConfigMutator), 100);
-        let mut configs = Vec::new();
+        let mut configs = Vec::with_capacity(10);
         for _ in 0..10 {
             configs.push(arena.next_config());
         }

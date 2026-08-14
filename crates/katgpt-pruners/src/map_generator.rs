@@ -255,7 +255,7 @@ impl MapGenerator {
         }
 
         // Place stairs connecting adjacent floors at matching positions
-        let mut stairs = Vec::new();
+        let mut stairs = Vec::with_capacity(num_floors.saturating_sub(1));
         for floor_idx in 0..num_floors.saturating_sub(1) {
             let floor = &floors[floor_idx];
             let next_floor = &floors[floor_idx + 1];

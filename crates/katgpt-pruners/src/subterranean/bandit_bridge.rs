@@ -173,7 +173,7 @@ pub fn extract_decision_points<G: ProcedureGraph>(
 where
     G::NodeId: Copy + Eq,
 {
-    let mut points = Vec::new();
+    let mut points = Vec::with_capacity(trajectory.path.len().saturating_sub(1));
 
     for i in 0..trajectory.path.len().saturating_sub(1) {
         let current = trajectory.path[i];

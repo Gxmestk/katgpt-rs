@@ -431,7 +431,7 @@ mod tests {
             .collect();
         let mut rng = Rng::new(42);
 
-        let mut consolidation_episodes = Vec::new();
+        let mut consolidation_episodes = Vec::with_capacity(15);
         for _ in 0..15 {
             if let Some(r) = pipeline.on_episode_complete(&arms, &mut rng) {
                 consolidation_episodes.push(r.episode);

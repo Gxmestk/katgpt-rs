@@ -252,7 +252,7 @@ mod tests {
         let acts_neg: Vec<Vec<f32>> = (0..10)
             .map(|i| vec![-2.0 + 0.1 * (i as f32 - 5.0), 0.0, 0.0, 0.0])
             .collect();
-        let mut samples = Vec::new();
+        let mut samples = Vec::with_capacity(acts_pos.len());
         for a in &acts_pos {
             samples.push(LabeledActivation {
                 activation: a,

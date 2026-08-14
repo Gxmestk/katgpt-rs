@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn test_complexity_high_for_complex_partition() {
         // Many mixed regions → high entropy → high complexity
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(30);
         for i in 0..30 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_route_deep_for_complex() {
         // Many mixed regions
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(30);
         for i in 0..30 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -283,7 +283,7 @@ mod tests {
         );
 
         // Complex partition
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(50);
         for i in 0..50 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_entropy_of_uniform_labels() {
         // Equal distribution: 10 accept, 10 reject, 10 maybe
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(10);
         for _ in 0..10 {
             regions.push(BorelRegion::new(RegionLabel::Accept, vec![], 5));
         }

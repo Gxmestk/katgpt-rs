@@ -170,7 +170,7 @@ impl<'a, G: ProcedureGraph> PathSampler<'a, G> {
         graph: &G,
         filter: &SampleFilter,
     ) -> Vec<Sample<G::NodeId>> {
-        let mut samples = Vec::new();
+        let mut samples = Vec::with_capacity(trajectory.path.len().saturating_sub(1));
 
         // Each turn is a decision point: at node i, we chose to go to node i+1
         for turn_index in 0..trajectory.path.len().saturating_sub(1) {

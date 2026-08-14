@@ -111,7 +111,7 @@ impl ActiveEffect {
 /// Apply all ticking effects for all alive units.
 /// Returns events generated from ticks, expirations, and deaths.
 pub fn apply_tick_effects(units: &mut [Unit], effects: &mut Vec<ActiveEffect>) -> Vec<GameEvent> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(effects.len());
 
     for active in effects.iter_mut() {
         if active.remaining_ticks == 0 {

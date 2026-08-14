@@ -192,7 +192,7 @@ pub fn consolidate_facts(pairs: &[ReflectionQA]) -> Vec<ReflectionQA> {
         }
     }
 
-    let mut consolidated = Vec::new();
+    let mut consolidated = Vec::with_capacity(groups.len());
     for (domain, group_pairs) in &groups {
         if group_pairs.len() < 2 {
             continue;
