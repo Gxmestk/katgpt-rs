@@ -1976,7 +1976,7 @@ A consolidated section for standalone opt-in features with their own plans but n
 |---|---|---|
 | `binary_plasma` | Issue 145 | Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale. The fastest Plasma tier; ternary (plasma_path) moved to Hot. |
 | `ternary_trit_pack` | Issue 582 | `TernaryTritWeights` — base-3 packing, 5 trits/byte, **1.725 bits/weight** vs the bit-plane tier's 2.125 (−18.8%; Bonsai-27B 5.82 GB vs 7.16 GB). G1–G4 GOAT ALL PASS and, against the filed prediction, **1.10–1.15× faster** than the bit-plane kernel on NEON as well as smaller ([Bench 582](../../.benchmarks/582_trit_pack_goat.md)). The AVX2 leg is measured too: on x86_64 trit is **15–31% slower** than bit-plane SIMD ([Bench 586](../../.benchmarks/586_avx2_ternary_t4_measurements.md)) — the wider AVX2 lanes favour SWAR over LUT decode. Implies `ternary_group_scale`. Opt-in for the same policy reason as its parent; on CPU it is the better choice for a ternary consumer **on aarch64**, and a footprint-only choice on x86_64. |
-| `ternary_group_scale` | Issue 578 (closed) | `TernaryGroupWeights` — ternary {-1,0,+1} bit-planes + per-128 f16 group scale, the `Q2_0_g128` container (Ternary-Bonsai-27B). G1–G4 GOAT gate ALL PASS (2026-08-12), stays opt-in by policy: promoting it would transitively promote `binary_plasma` (opt-in by deliberate Issue 145 decision) and the tier is a model-specific container 1.3× slower than row-scale ternary. Implies `binary_plasma`. See [`../08_performance/ternary_group_q2_0_tier.md`](../08_performance/ternary_group_q2_0_tier.md). |
+| `ternary_group_scale` | Issue 578 (closed) | `TernaryGroupWeights` — ternary {-1,0,+1} bit-planes + per-128 f16 group scale, the `Q2_0_g128` container (Ternary-Bonsai-27B). G1–G4 GOAT gate ALL PASS (2026-08-12), stays opt-in by policy: promoting it would transitively promote `binary_plasma` (opt-in by deliberate Issue 145 decision) and the tier is a model-specific container 1.3× slower than row-scale ternary. **Issue 650 (2026-08-13) added the block-contiguous AoS companion layout** (`TernaryBlockAoS` + `TernaryBlockContiguousWeights`, same feature gate — one 34-byte `#[repr(C)]` block per 128-weight group, G1 bit-identical to the SoA matvec) — and the GPU investigation **resolved as a negative result on M3 Metal**: 3.12× vs sequential but **0.82× vs the existing SoA simdgroup kernel** (worse coalescing). Bonus finding that closed it: SoA simdgroup already measures 5.89–6.27× vs sequential on M3 Metal, so the motivating 1.89× ceiling is not reproducible. The types stay in-tree as validated code for potential CUDA use. Implies `binary_plasma`. See [`../08_performance/ternary_group_q2_0_tier.md`](../08_performance/ternary_group_q2_0_tier.md) (incl. the §AoS negative result). |
 | `gpart_adapter` | 257 | GPart isometric partition adapter loading |
 | `gpart_pruning` | Issue 008 | GPart top-k group pruning — zero out low-magnitude groups at apply time (implies gpart_adapter) |
 | `simd_sigmoid` | Issues 024/025 | SIMD-vectorized sigmoid→tanh→clamp fused pass for AttractorKernel::step() + BoMSampler |
@@ -2509,3 +2509,40 @@ This is a **training-time reference**, NOT a production inference path — consu
 🔧 Feature flags: `kda_backward` + `mla_backward` (katgpt-attn), `moe_backward` (katgpt-transformer), `kimi_k3_backward` (root, composes all three + the model-level backward). All opt-in (default-off).
 
 📖 Substrate: `crates/katgpt-attn/src/{kda,mla}/backward.rs` + `crates/katgpt-transformer/src/` + `src/kimi_k3/backward.rs`. Related: §33 (Kimi-K3 forward). The backward work landed across commits `e896771c` (KDA + grad check), `8d3bd4f8` (MLA), `25d0c031` (MoE), `1de0e634` (KDA multi-token BPTT), `beffe760` (full-model), `5b232f33` (gradient checkpointing), `b7d5b33f` (weight init), `dfd139ea` + `9bb31500` (f64 accumulation NaN fix).
+
+## 77. FlashMemory — Periodic Sigmoid-Threshold Sparse Attention for MLA (Issue 584)
+
+Distills FlashMemory-DeepSeek-V4's lookahead sparse attention ([arXiv:2606.09079](https://arxiv.org/abs/2606.09079), Research 436) into the shipped `VortexFlow` substrate, adapted for **Multi-head Latent Attention** (the 2 MLA layers of Kimi-K3's hybrid 6-KDA/2-MLA stack). Three mechanisms:
+
+- **Periodic refresh (τ-step)** — `FlashMemorySelector::select()` caches the last decision and refreshes only when `step − last_refresh ≥ τ`, amortizing selection cost (the R436 §2.1 gap: every shipped scorer ran per-step).
+- **Sigmoid threshold selection** — `sigmoid(score) ≥ threshold` per-head per-block (paper default 0.5), producing dynamic block counts per query instead of rigid top-k. Sigmoid, never softmax.
+- **Block centroids from MLA latent KV** — `FlashMemoryBlockCache::rebuild_from_cache` builds block centroids from `MlaKVCache::latent_kv_at()` + `W_UK` per-head up-projection. The centroid is only the selection heuristic — the sparse forward (`mla_forward_token_flashmemory`) attends to real per-token keys inside selected blocks.
+
+### GOAT gate (Issue 584 Phase 1-3, real Kimi-K3-0.40B weights, M3 Metal, 2026-08-13)
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| **G1** correctness | ✅ **PASS** | Dense-vs-sparse MLA on real `model.safetensors` weights: median cos 0.9566/0.9663/0.9663 + median rel MSE 0.1327/0.0929/0.0993 at 128/512/1024 tokens, ~73-74% KV reduction (`bench_021_flashmemory_real_weights_retrieval`). Threshold sweep: 0.5 is the calibrated sweet spot (0.3 → cos 1.0 but no sparsity; 0.7 → cos 0.72). |
+| **G3** no-regression | ✅ **PASS** | 169 VortexFlow tests incl. the periodic-refresh extension (2026-08-13). |
+| **G4** alloc-free | ✅ **PASS** | 0 allocations across 256 steady-state decode tokens / 32 selector refreshes (`bench_022_flashmemory_alloc_free`). Fixed two per-token alloc sites: `blocks_to_attend` stack-array fallback + `PerHeadSelection::new` pre-reserved capacity. |
+| **G5** KV reduction | ◐ **M3 curve done** | Plateaus at ~74% for ≤8K context (128/512/1024/2048/4096/8192 tested, `bench_024_flashmemory_g5_scaling_curve`); G1 holds at ALL scales (cos 0.9566→0.9624). Paper's 90% is a 256K-context phenomenon — accuracy is stable, the ratio's growth to 90% lives in the 8K→256K regime. Needs Bonsai-27B on the 4090. |
+| **G2** decode latency @ 256K | ⏸ **BLOCKED** | Requires the 4090 (held by a sibling riir-train training run — Bench 456 in that repo's namespace — during the landing window). |
+
+**Honest negative result (NIAH semantic-needle diagnostic, `bench_023`):** single-layer retrieval is **not testable** — the needle block has near-uniform dense attention (rank 34/34, mass ~0.03) at layer 3/8 on raw-embedding inputs; retrieval is an emergent multi-layer property. Positive diagnostic: per-head Pearson r between FlashMemory centroid block-mass and dense per-token block-mass = 0.965 (min 0.765). Output accuracy (G1) is the load-bearing gate; full-model NIAH deferred to Phase 2.
+
+### Trained dual-encoder indexer (`trained_indexer`, riir-train Plan 337)
+
+Two tiny trained MLPs (Q-Indexer + K-Indexer, 2114 params at Kimi-K3 d_h=64) that replace the modelless centroid-dot scorer — an upgrade, never a requirement. FlashMemory's periodic batch-scoring works with ANY scorer.
+
+- **Bench 025** (`bench_025_flashmemory_trained_indexer`): the full training pipeline works end-to-end on M3 (dense-MLA attention-mass extraction → golden labels → manual-backprop dual-encoder training → GOAT gate). **Honest caveat:** Kimi-K3-0.40B (395M) has near-uniform attention → golden labels are low-signal; modelless baseline recall = 59.05%; the trained indexer's training does not converge on this data. Meaningful quality results need Bonsai-27B on the 4090.
+- **Bench 026** (`bench_026_flashmemory_indexer_synthetic_convergence`): synthetic convergence proof that **definitively separates algorithm from data** — Adam optimizer (β1=0.9, β2=0.999) + non-zero bias init (breaks the bilinear σ(q·k) symmetry) converge to 100% accuracy from Epoch 1, beating modelless by 50pp; gradient check rel-err 0.000075 (< 0.01%). Also fixed the PRNG pathology (xorshift64 + Box-Muller outliers → warm-up + Irwin-Hall Gaussian). Conclusion: the Bench 025 non-convergence is a **data-quality** issue, not an algorithm bug.
+
+### Why opt-in
+
+1. **GOAT gate incomplete.** G2 (decode latency at 256K) + the 90% KV-reduction claim are blocked on 4090 availability (Issue 584 Phase 2). Default-on waits for the full gate.
+2. **Mechanism-to-scale mismatch at M3 scale.** Validated at ≤8K context on a 395M model's 2 MLA layers; the serving regime it targets (67GB→6.7GB KV at 256K on Bonsai-27B) is 4090-only.
+3. **`trained_indexer` is training-dependent** — never default-on per the modelless-first mandate; the modelless `FlashMemorySelector` is the production default.
+
+🔧 Feature flags: `flashmemory_sparse` (root → `katgpt-attn/flashmemory_sparse`, implies `mla_attention` + `dash_attn`, opt-in) + `trained_indexer` (root → `katgpt-attn/trained_indexer`, implies `flashmemory_sparse`, opt-in never default-on).
+
+📖 Substrate: `crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs` (14 tests; both the modelless selector and the `trained_indexer` DualEncoderIndexer live in this one module) — landed across commits `8f030de2` (Phase 1 mechanism), `5ab63aef` (G1 bench_021), `7030cefa` (G4 bench_022), `865362e3` (G5 bench_024), `5e2b5f2b` (Plan 337 Phase B DualEncoderIndexer), `bca98f08` (Plan 337 bench_025), `4cdd0dec` (Plan 337 Phase C bench_026). Issue: [`.issues/584`](../../.issues/584_flashmemory_sparse_attention_4090_kimi_k3_bonsai_validation.md) (Open — Phase 2 + G2 blocked on 4090). Training recipe: [riir-train Plan 337](../../../riir-train/.plans/337_flashmemory_indexer_training_recipe.md) (NOT the katgpt-rs Plan 337 — that is Tropical algebra).

@@ -85,6 +85,22 @@ The `FaithfulnessProfile` has four delta fields:
 
 `is_faithfully_used(threshold)` returns `true` iff all four conditions hold.
 
+### Zero-alloc scratch API (Session 42, commit `605af19a`, 2026-08-12)
+
+```rust
+// scratch is the same type as the memory — reuse one buffer across audits.
+let mut scratch = memory.clone(); // or any pre-allocated buffer of the same shape
+let profile = probe.faithfulness_profile_into(&memory, &mut scratch, &mut rng);
+```
+
+`probe_intervention_into` + `faithfulness_profile_into` take a caller-provided scratch
+buffer instead of cloning memory per intervention (the clone-based API clones **5× per
+audit NPC**). Eliminates ~5000 heap allocations per audit tick at 1000 NPCs. **Bit-identical
+to the clone-based API** — same RNG draw order, same perturbation sequence, same
+aggregation (`test_scratch_api_bit_identical_to_clone_api`). The clone-based API is
+retained for backward compatibility; the scratch path is zero-alloc by construction.
+Additive methods — no feature-gate change.
+
 ### `AttributionProbe` — rank segments by causal influence
 
 ```rust
@@ -314,4 +330,4 @@ Probes NEVER substitute latent for raw in anti-cheat validation. The "raw signat
 
 ## TL;DR
 
-Generic, modelless, zero-alloc causal intervention diagnostic for injected memory. Three primitives: `FaithfulnessProbe` (detect dead injections), `AttributionProbe` (IG surrogate ranking), `TriggeredInjectionGate` (saturated-regime skip). All Plan 278 GOAT gates pass. `triggered_injection` default-on; `faithfulness_probe` opt-in. **Plan 298 adds `SmearClassifier`** — a ternary (CoherentSingle / TokenSmear / SequenceSmear) latent-mass vocabulary extending the binary probe, distilled from arXiv:2606.20560. All Plan 298 GOAT gates pass (G1 6/6, G2 ratio 2.11×, G3 107.6 ns). `smear_classifier` stays opt-in pending real-workload evidence. Unblocks riir-ai Plan 308.
+Generic, modelless, zero-alloc causal intervention diagnostic for injected memory. Three primitives: `FaithfulnessProbe` (detect dead injections), `AttributionProbe` (IG surrogate ranking), `TriggeredInjectionGate` (saturated-regime skip). All Plan 278 GOAT gates pass. `triggered_injection` default-on; `faithfulness_probe` opt-in. **Plan 298 adds `SmearClassifier`** — a ternary (CoherentSingle / TokenSmear / SequenceSmear) latent-mass vocabulary extending the binary probe, distilled from arXiv:2606.20560. All Plan 298 GOAT gates pass (G1 6/6, G2 ratio 2.11×, G3 107.6 ns). `smear_classifier` stays opt-in pending real-workload evidence. Unblocks riir-ai Plan 308. **Session 42 (2026-08-12) adds the zero-alloc scratch API** — `probe_intervention_into` / `faithfulness_profile_into` reuse a caller-provided buffer instead of cloning per intervention (5 clones per audit NPC), eliminating ~5000 heap allocations per audit tick at 1000 NPCs, bit-identical to the clone-based API.

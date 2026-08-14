@@ -52,6 +52,7 @@ so `GROUP_SIZE` stays a single source of truth.
 | Container (`new`/`set`/`get`/`scale_at`/`set_scale`/`checksum`/`encoded_bytes`/`invariant_holds`/`quantize_from_f32`/`from_ternary`) | `katgpt-types/src/ternary_group.rs` |
 | Kernels — scalar, NEON, AVX2+FMA, batch, row-parallel | `katgpt-types/src/simd/ternary_group.rs` |
 | Loader `load_ternary_group_bits` (`TGPLSMA1` magic) | `katgpt-transformer/src/contiguous.rs` |
+| Block-contiguous AoS companion (`TernaryBlockAoS` + `TernaryBlockContiguousWeights` + `to_block_contiguous`) | `katgpt-types/src/ternary_group.rs` |
 | GOAT harnesses | `katgpt-types/tests/bench_578_ternary_group_goat.rs`, `bench_578_avx2_goat.rs`, `katgpt-core/tests/ternary_group_parallel_alloc_check.rs` |
 
 `from_ternary` widens a row-scale `TernaryWeights` by broadcasting `row_scale`
@@ -251,6 +252,47 @@ which would also close the 2.125 → 1.71 bits/weight footprint gap. Not
 attempted; it is a real, bounded, katgpt-rs-side optimization with a measured
 ~10% Metal ceiling as its prize, and it would touch every kernel + the
 `TGPLSMA1` wire format.
+
+## Block-contiguous AoS companion layout (Issue 650 — negative result on Metal, kept for CUDA)
+
+The SoA layout above (three global `Vec`s: `pos_bits` / `neg_bits` / `group_scale`) costs
+**3× global-memory-access overhead** in GPU kernels — every block score touches three
+distant allocations (riir-ai Bench 645 follow-up #5, tracked as riir-ai Issue 650
+`ternary_weight_format_block_contiguous` — resolved 2026-08-13 + removed per the
+noise-reduction rule; resolution recorded in riir-ai commit `a64925c0e` + this section).
+The AoS companion co-locates them:
+
+```rust
+#[repr(C)]
+pub struct TernaryBlockAoS {
+    scale: u16,          // f16 bits, 2 bytes
+    pos_bits: [u8; 16],  // 128 weights / 8
+    neg_bits: [u8; 16],
+}                       // 34 bytes per 128 weights — matches BlockQ2_0 exactly
+```
+
+- `u8` arrays (not `u64`) keep alignment at 2 and avoid padding to 40 B — the footprint
+  is bit-for-bit the on-disk `block_q2_0` (2.125 bits/weight, 34 B/group).
+- `TernaryGroupWeights::to_block_contiguous()` — one-time SoA→AoS conversion.
+- `TernaryBlockContiguousWeights::from_blocks()` + `matvec()` — CPU reference for the
+  AoS layout (the G1 oracle).
+
+**G1 correctness gate PASS:** AoS `matvec` is bit-identical to
+`simd::ternary_group_matvec_scalar` across 6 shapes including real Bonsai dimensions
+(48×512, 1024×512, 128×4096, 512×17408). 149 `katgpt-types` tests, 0 clippy warnings.
+
+**G2 on M3 Metal — ❌ NEGATIVE RESULT (riir-ai Issue 650, resolved 2026-08-13):** the
+GPU-validated block-contiguous path beats sequential (3.12×) but **loses to the
+existing SoA simdgroup kernel at 0.82×** — worse memory coalescing on Metal. Not a
+promotion candidate on Metal. **Bonus finding that closed the issue:** a bench_645
+re-run showed the SoA simdgroup kernel already achieves **5.89–6.27×** vs sequential
+on M3 Metal — the 1.89× ceiling that motivated this layout is not reproducible
+([riir-ai Bench 645](../../../riir-ai/.benchmarks/645_ternary_gemm_simdgroup.md)).
+
+The CPU foundation (`TernaryBlockAoS` + conversion + reference kernel) and the GPU
+upload infra stay in-tree as validated code for **potential CUDA (4090) use**, where
+the coalescing trade-off may differ. Same feature gate (`ternary_group_scale`) — no
+new flag, additive types.
 
 ## Non-goals
 

@@ -781,3 +781,25 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Lesson.** A modelless estimator that passes a synthetic micro-env GOAT can fail catastrophically (8× worse) on the real arena. The 5-bin discretization is the smoking gun — discretization resolution must match the real feature distribution, not the synthetic one. Always validate estimator gains on the real target distribution before promoting.
 
 📖 Features: `binned_blend` (opt-in, harmful — do not use), `kernel_blend` (opt-in, recommended), `contextual_bandit` (opt-in, baseline). All gated behind `bomber`.
+
+## 38. Block-Contiguous Ternary Layout (AoS) — G2 FAIL on Metal: 0.82× vs SoA Simdgroup (KEPT FOR CUDA)
+
+**Issue:** 650 (riir-ai, resolved + removed) · **Bench:** [riir-ai 645](../../../riir-ai/.benchmarks/645_ternary_gemm_simdgroup.md) follow-up #5 · **Feature:** `ternary_group_scale` (same gate — additive types, no new flag)
+
+**What it is.** `TernaryBlockAoS` — a `#[repr(C)]` 34-byte block co-locating `{u16 scale, [u8;16] pos_bits, [u8;16] neg_bits}` per 128-weight group, replacing the SoA three-`Vec` layout (`pos_bits` / `neg_bits` / `group_scale` in three distant allocations) to eliminate its 3× global-memory-access overhead in GPU kernels. Matches the on-disk `block_q2_0` footprint exactly. Shipped as CPU foundation in `katgpt-types/src/ternary_group.rs` (commit `a8e73737`): `to_block_contiguous()` conversion + `TernaryBlockContiguousWeights::matvec()` reference kernel.
+
+**Gate results:**
+
+| Gate | Metric | Measured | Verdict |
+|---|---|---|---|
+| **G1** | Correctness — AoS matvec vs `ternary_group_matvec_scalar` | Bit-identical across 6 shapes incl. real Bonsai dims (48×512, 1024×512, 128×4096, 512×17408) | ✅ PASS |
+| **G2** | GEMM vs sequential (M3 Metal) | **3.12×** | ✅ PASS (gate ≥3×) |
+| **G2** | GEMM vs SoA simdgroup kernel (M3 Metal) | **0.82×** — SLOWER | ❌ **FAIL** |
+
+**Root cause.** The block-contiguous layout has worse memory coalescing on Metal than the SoA simdgroup kernel it aimed to beat — the 1-fetch-per-group win does not offset the lost coalescing on this backend.
+
+**Bonus finding that closed the issue.** The motivating premise was Bench 645's 1.89× simdgroup ceiling. A re-run on M3 Metal measured the SoA simdgroup kernel at **5.89× (8×8) / 6.27× (8×32)** vs sequential — the 1.89× is not reproducible (different device, GPU contention per Bench 649, or pre-8×32-optimization measurement). The investigation target evaporated.
+
+**Outcome.** No promotion. The CPU foundation + GPU upload infra stay in-tree as validated code for **potential CUDA (4090) use**, where the coalescing trade-off may differ. The `ternary_gemm_simdgroup` re-promotion question is filed separately in riir-ai.
+
+**Lesson.** Re-measure the baseline before optimizing against it — a stale ceiling (1.89×, likely contention- or device-skewed) can motivate a whole layout redesign that the current kernel already beats (5.89–6.27×). Mirrors the AGENTS.md GPU-exclusivity rule: a gate measured under contention is not evidence.

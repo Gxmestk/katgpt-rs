@@ -1150,6 +1150,10 @@ Distills Engels et al. 2026 (arXiv:2606.20560 §5.2, Research 277) into a **tern
 
 Feature gate: `smear_classifier` (**opt-in**, implies `faithfulness_probe`). 📖 Plan: [`.plans/298_smear_aware_faithfulness_probe.md`](.plans/298_smear_aware_faithfulness_probe.md), Research: [`.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md`](.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md), Benchmark: [`.benchmarks/298_smear_classifier_goat.md`](.benchmarks/298_smear_classifier_goat.md), Docs: [`.docs/04_calibration/faithfulness_probe.md`](.docs/04_calibration/faithfulness_probe.md).
 
+#### Zero-alloc scratch API (Session 42, commit `605af19a`, 2026-08-12)
+
+`probe_intervention_into` + `faithfulness_profile_into` take a caller-provided scratch buffer instead of cloning memory per intervention (the clone-based API clones 5× per audit NPC). Eliminates ~5000 heap allocations per audit tick at 1000 NPCs. **Bit-identical to the clone-based API** (same RNG draw order, same perturbation sequence, same aggregation — verified by `test_scratch_api_bit_identical_to_clone_api`). The clone-based API is retained for backward compatibility; the scratch path is zero-alloc by construction (G4). No feature-gate change — same `faithfulness_probe` gate, additive methods.
+
 ### 🧠 Engram — Hash-Addressed Conditional Pattern Memory (Plan 299)
 
 Distills Cheng et al. 2026 (arXiv:2601.07372, DeepSeek-AI / Peking U., Research 278) into the **first conditional-memory axis** in the katgpt stack. Where Raven (RSM/dMoE, Research 006) routes **computation** per token (active parameters), Engram routes **memory lookups** per token (static lookup slots). The paper's U-shape scaling law (§3) proves the hybrid is strictly better than either axis alone.
@@ -2750,6 +2754,30 @@ matvec_into(&x, &mut out)                       // caller-supplied output buffer
 
 Feature gate: `channel_simd_align` (**DEFAULT-ON** since 2026-08-11, Plan 227 Phase 5 — the last of 6 QAT Infusion phases to reach DEFAULT-ON). Pure modelless (memory layout optimization; no training). Zero runtime cost unless a caller uses the aligned path. 📖 Plan: [`227`](.plans/227_qat_infusion_modelless.md), GOAT bench: [`.benchmarks/580_channel_simd_align_release_goat.md`](.benchmarks/580_channel_simd_align_release_goat.md), Source: [`crates/katgpt-core/src/channel_simd.rs`](crates/katgpt-core/src/channel_simd.rs).
 
+### ⚡ FlashMemory — Periodic Sigmoid-Threshold Sparse Attention for MLA (Issue 584, arxiv 2606.09079)
+
+Distills FlashMemory-DeepSeek-V4's lookahead sparse attention (Research 436) into the shipped `VortexFlow` substrate, adapted for **Multi-head Latent Attention** (Kimi-K3's 2 MLA layers). Three mechanisms: **periodic refresh** (block scores recomputed every τ steps, not per-step — `FlashMemorySelector::select()` caches the last decision), **sigmoid threshold selection** (`sigmoid(score) ≥ 0.5` per-head per-block — dynamic block counts instead of rigid top-k), and **block centroids from MLA latent KV** (`FlashMemoryBlockCache::rebuild_from_cache` builds centroids from `MlaKVCache::latent_kv_at()` + `W_UK` up-projection). The sparse forward attends to real per-token keys inside selected blocks — the centroid is only the selection heuristic.
+
+**GOAT status (Issue 584 Phase 1-3, real Kimi-K3-0.40B weights on M3 Metal, 2026-08-13):**
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| **G1** correctness (dense-vs-sparse MLA cosine/MSE) | ✅ PASS | cos ≥ 0.9566, MSE ≤ 0.1327 at 128/512/1024 tokens; ~74% KV reduction (bench_021). Threshold 0.5 = paper-calibrated sweet spot (0.3 → no sparsity, 0.7 → cos 0.72) |
+| **G3** no-regression | ✅ PASS | 169 VortexFlow tests incl. the periodic-refresh extension |
+| **G4** alloc-free steady state | ✅ PASS | 0 allocations / 256 decode tokens (bench_022; fixed 2 per-token alloc sites) |
+| **G5** KV reduction (memory) | ◐ M3 curve done | plateaus at ~74% for ≤8K context (bench_024, 128→8192 tokens); G1 holds at ALL scales. Paper's 90% is a 256K-context phenomenon — needs Bonsai-27B on the 4090 (Phase 2, blocked) |
+| **G2** decode latency @ 256K | ⏸ BLOCKED | needs the 4090 (held by a sibling riir-train training run during the landing window) |
+
+**Honest negative result (NIAH diagnostic, bench_023):** single-layer semantic-needle retrieval is **not testable** at one MLA layer — the needle block has near-uniform dense attention (rank 34/34) at layer 3/8 on raw-embedding inputs; retrieval is an emergent multi-layer property. Positive diagnostic: per-head Pearson r between FlashMemory centroid block-mass and dense per-token block-mass = **0.965** (pattern preservation). The load-bearing gate is output accuracy (G1 cos ≥ 0.96), not this diagnostic; full-model NIAH deferred to Phase 2.
+
+Feature gate: `flashmemory_sparse` (**opt-in**, implies `mla_attention` + `dash_attn`; default-off until the GOAT gate completes on 4090). 📖 Issue: [`.issues/584_flashmemory_sparse_attention_4090_kimi_k3_bonsai_validation.md`](.issues/584_flashmemory_sparse_attention_4090_kimi_k3_bonsai_validation.md) (Open — Phase 2 + G2 blocked on 4090), Research: [`.research/436_FlashMemory_Lookahead_Periodic_Sparse_Attention.md`](.research/436_FlashMemory_Lookahead_Periodic_Sparse_Attention.md), Source: [`crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs`](crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs). The trained-indexer sibling ships as `trained_indexer` — see the Opt-In table below.
+
+#### Trained dual-encoder indexer (`trained_indexer`, riir-train Plan 337)
+
+Two tiny trained MLPs (Q-Indexer + K-Indexer, 2114 params at Kimi-K3 d_h=64) replacing the modelless centroid-dot scorer — an upgrade, never a requirement (the modelless `FlashMemorySelector` is the production default). Benches: **025** — the full training pipeline works end-to-end on M3 (attention-mass extraction → manual-backprop training → GOAT gate), honest caveat: Kimi-K3-0.40B attention is too uniform for meaningful quality results (modelless baseline recall 59.05%); needs Bonsai-27B on the 4090. **026** — synthetic convergence proof **definitively separates algorithm from data**: Adam + non-zero bias init converges to 100% accuracy (beats modelless by 50pp) with gradient check rel-err 0.000075 — the Kimi-K3 non-convergence is a **data-quality** issue, not an algorithm bug.
+
+Feature gate: `trained_indexer` (**opt-in, NEVER default-on** — requires training, riir-train [Plan 337](../riir-train/.plans/337_flashmemory_indexer_training_recipe.md); modelless-first mandate). 📖 Benches: `benches/bench_025_flashmemory_trained_indexer.rs` + `benches/bench_026_flashmemory_indexer_synthetic_convergence.rs`.
+
 ---
 
 ## 🔧 KV Compression
@@ -2872,6 +2900,8 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Energy-Gated Attention** (`ega_attn`) | Spectral salience gating — per-head energy projection → z-normalize → sigmoid gate → renormalized attention. | Opt-in — gates ALL PASS. `w_proj` is a trained parameter (not modelless); consumers opt in when they have trained gates. See [catalog §47](.docs/09_feature_catalog/opt_in_features.md). |
 | **Epiplexity Scoring** (`epiplexity_scoring`) | Structural information as area-under-loss-curve-above-final: `S_T = Σ max(0, loss_i − final)`. Screening pruner for modelless distillation data selection. | Opt-in — ALL PASS. Correct building block; `epiplexity_bandit` (SR²AM extension) is DEFAULT-ON. See [catalog §48](.docs/09_feature_catalog/opt_in_features.md). |
 | **GPU Inference (CubeCL Metal)** (`gpu_inference` + `inference_router`) | Metal GPU backend via CubeCL for Gemma 2 2B on Apple Silicon. Autotune GEMV variant selection. Fixed the subtle GeGLU double-gate bug (`g·gelu_tanh(g)·u` → `gelu_tanh(g)·u`). | Opt-in — Metal-specific (Apple Silicon). Correctness + autotune PASS; CubeCL/WGSL F32 parity pending. See [catalog §49](.docs/09_feature_catalog/opt_in_features.md). |
+| **FlashMemory Sparse Attention** (`flashmemory_sparse`) | Periodic sigmoid-threshold sparse attention for MLA (Issue 584, arxiv 2606.09079, Research 436): τ-step refresh + `sigmoid(score) ≥ 0.5` block selection + centroids from MLA latent KV, on the `VortexFlow` substrate. | Opt-in — **G1 PASS** (real Kimi-K3-0.40B weights: cos ≥ 0.9566 at ~74% KV reduction, bench_021), **G3 PASS** (169 tests), **G4 PASS** (0 allocs/256 decode tokens, bench_022), **G5-M3** ~74% plateau at ≤8K with G1 holding at all scales (bench_024). **G2 + the 90%/256K claim BLOCKED on 4090** (Phase 2, Bonsai-27B). Honest NIAH negative: single-layer retrieval not testable (bench_023). See [catalog §77](.docs/09_feature_catalog/opt_in_features.md). |
+| **FlashMemory Trained Indexer** (`trained_indexer`) | Dual-encoder indexer (Q+K MLPs, 2114 params @ d_h=64) replacing the modelless centroid-dot scorer — riir-train Plan 337 Phase B/C. | Opt-in, **NEVER default-on** (requires training; modelless-first mandate). Bench 025: pipeline works end-to-end but Kimi-K3-0.40B attention too uniform (modelless baseline recall 59.05%) — needs Bonsai-27B. Bench 026: synthetic proof the algorithm is correct (Adam + bias init → 100% accuracy, +50pp over modelless; gradient check 0.000075) — non-convergence is a data-quality issue. See [catalog §77](.docs/09_feature_catalog/opt_in_features.md). |
 
 📖 **Full detail for ALL opt-in features + complete feature flag reference:** [`.docs/09_feature_catalog/opt_in_features.md`](.docs/09_feature_catalog/opt_in_features.md) and [`Cargo.toml`](Cargo.toml).
 
