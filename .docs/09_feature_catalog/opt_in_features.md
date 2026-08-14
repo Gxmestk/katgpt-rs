@@ -2246,7 +2246,7 @@ A second consolidated table for standalone opt-in features with their own plans,
 | Feature | Plan | Role |
 |---|---|---|
 | `flashar_anchor` | 166 | FlashAR strided anchor-then-fill D2F (Research 149). Forwards to `katgpt-forward`. |
-| `flashar_consensus` | 166 | FlashAR Consensus Tri-Mode with Ternary Thermal Paths (Research 149) |
+| `flashar_consensus` | 166 / 651 | FlashAR Consensus Tri-Mode with Ternary Thermal Paths (Research 149). Issue 651: Warm/Cold = FLARE Eq 21 exact acceptance, slot-aligned; Plasma/Hot skip-biased by design |
 | `hardware_aware_scheduler` | 339 | Hardware-Aware Prefix Scheduler — multi-request verification budget allocator (DSpark §3.2.2) |
 | `moka_ane` | — | Moka on Apple Neural Engine via CoreML |
 

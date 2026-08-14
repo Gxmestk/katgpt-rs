@@ -81,8 +81,11 @@ pub enum DraftAcceptPolicy {
 
 /// Outcome of one acceptance-policy step: accept the draft token, or emit a
 /// correction token sampled per-policy (and stop the verify loop).
+///
+/// `pub(crate)` (Issue 651): the step type crosses into `flashar_consensus`
+/// for its Warm/Cold verification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PolicyStep {
+pub(crate) enum PolicyStep {
     Accept,
     Correct(usize),
 }
@@ -393,7 +396,10 @@ fn sample_excluding(p: &[f32], exclude: usize, rng: &mut Rng) -> usize {
 /// Legacy Plan 089 prefix-match step (GOAT control): accept iff the draft
 /// token IS the target argmax; correct with the argmax. Distribution-biasing
 /// by construction (Issue 587 problem statement).
-fn prefix_match_step(p: &[f32], d: usize) -> PolicyStep {
+///
+/// `pub(crate)` (Issue 651): reused by `flashar_consensus`'s Warm/Cold
+/// verification under [`DraftAcceptPolicy::PrefixMatch`].
+pub(crate) fn prefix_match_step(p: &[f32], d: usize) -> PolicyStep {
     let am = argmax_total_cmp(p);
     if d == am {
         PolicyStep::Accept
@@ -403,8 +409,13 @@ fn prefix_match_step(p: &[f32], d: usize) -> PolicyStep {
 }
 
 /// FLARE Eq 21 (Softmax-Argmax) step: accept `d ⟺ u ≤ p(d)`; correction
-/// `y* ~ p∖{d}`. Exact for point-mass draft laws (greedy drafting).
-fn softmax_argmax_step(p: &[f32], d: usize, rng: &mut Rng) -> PolicyStep {
+/// `y* ~ p∖{d}`. Exact for point-mass draft laws (greedy drafting, or any
+/// deterministic proposal — Issue 651 uses it for FlashAR's consensus
+/// winner, which is a deterministic pick).
+///
+/// `pub(crate)` (Issue 651): reused by `flashar_consensus`'s Warm/Cold
+/// verification.
+pub(crate) fn softmax_argmax_step(p: &[f32], d: usize, rng: &mut Rng) -> PolicyStep {
     let pd = p.get(d).copied().unwrap_or(0.0);
     let u = rng.uniform();
     if u <= pd {
@@ -453,7 +464,10 @@ fn topk_into(p: &[f32], ids: &mut [usize; TRUNC_TOPK], probs: &mut [f32; TRUNC_T
 
 /// FLARE Eq 22 (Truncated-Argmax) step: verify on the top-k truncated
 /// target distribution only. Approximate — tail mass is discarded.
-fn truncated_argmax_step(p: &[f32], d: usize, rng: &mut Rng) -> PolicyStep {
+///
+/// `pub(crate)` (Issue 651): reused by `flashar_consensus`'s Warm/Cold
+/// verification.
+pub(crate) fn truncated_argmax_step(p: &[f32], d: usize, rng: &mut Rng) -> PolicyStep {
     let mut ids = [0usize; TRUNC_TOPK];
     let mut probs = [0.0f32; TRUNC_TOPK];
     let (used, z_k) = topk_into(p, &mut ids, &mut probs);

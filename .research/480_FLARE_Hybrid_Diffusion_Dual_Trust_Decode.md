@@ -2,7 +2,7 @@
 
 > **Source:** [FLARE: Diffusion for Hybrid Language Model](https://arxiv.org/abs/2606.01774) — Zhu, Shi, Ge, Tan, Xu, Zhu, Kuen, Goswami, Jain, Chen, Tao, Gu (Adobe Research + Georgia Tech), arXiv:2606.01774v2, 2026-06-01 (v2 2026-08-04)
 > **Date:** 2026-08-14
-> **Status:** Implemented — Issue 587 closed (all T1–T7 done, T8 deferred); GOAT G1–G4 PASS, `SoftmaxArgmax` promoted to default per [Bench 634](../.benchmarks/634_self_spec_acceptance_policy_goat.md). Audit follow-up: Issue 651 (FlashAR Cold/Warm paths).
+> **Status:** Implemented — Issue 587 closed (all T1–T7 done, T8 deferred); GOAT G1–G4 PASS, `SoftmaxArgmax` promoted to default per [Bench 634](../.benchmarks/634_self_spec_acceptance_policy_goat.md). Audit follow-up: Issue 651 (FlashAR Cold/Warm paths) — **RESOLVED 2026-08-15** (Bench 637): Warm/Cold run Eq 21 against the slot-aligned law (also fixed FlashAR's own instance of the 587 off-by-one — H-win positions had auto-accepted); Plasma/Hot stay skip-biased by design.
 > **Related Research:** 055 (Nemotron TriMode — closest shipped cousin), 034 (D2F), 072 (DMax SPD), 149 (FlashAR), 154 (DFlare — **name collision, different paper**), 376 Phase 4 (SetDiffusion), 070 (Gated DeltaNet 2)
 > **Related Plans:** 066 (D2F), 089 (D2fDrafterVerifier / tri_mode), 109 (DMax SPD), 116 (DiffusionSampler), 166 (FlashAR consensus)
 > **Cross-ref (riir-ai / riir-train):** riir-ai Research 036 (Luce hybrid DeltaNet megakernel), riir-train Research 003 (D2F training)

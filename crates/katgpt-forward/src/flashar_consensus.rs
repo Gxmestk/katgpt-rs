@@ -15,8 +15,39 @@
 //!   Thermal routing:
 //!     PLASMA  (ternary=0, high conf)   → accept immediately
 //!     HOT     (ternary=±1, high conf)  → accept winner
-//!     WARM    (ternary=±1, mid conf)   → AR spot-check
-//!     COLD    (both low conf)          → fallback prefix-match
+//!     WARM    (ternary=±1, mid conf)   → policy-step verify
+//!     COLD    (both low conf)          → policy-step verify
+//!
+//! # Issue 651 (2026-08-15): exact verified paths + slot alignment
+//!
+//! Warm/Cold verification now runs the FLARE acceptance policy
+//! (default [`DraftAcceptPolicy::SoftmaxArgmax`], Eq 21) against the
+//! **slot-aligned** target distribution, instead of the legacy argmax
+//! prefix-match:
+//!
+//! - **Aligned conditioning** — draft token `i` is tested against
+//!   `p_i = P(· | anchor, accepted prefix d_0..d_{i-1})`. The pre-651 code
+//!   had the same off-by-one Issue 587 fixed in `D2fDrafterVerifier`: it
+//!   tested `d_i` against the position-`i+1` distribution *conditioned on
+//!   the draft token being tested* (Phase 2 fed `v_0` then the H tokens),
+//!   making H-win positions auto-accept and V-win positions compare against
+//!   a self-conditioned argmax. The interleave now feeds the ACCEPTED token
+//!   after each acceptance (the Leviathan/D2f streaming pattern).
+//! - **Exact verified paths** — the consensus winner is a deterministic
+//!   (point-mass) proposal, for which Eq 21 `u ≤ p(d)` + correction
+//!   `y ~ p∖{d}` is the exact rejection-sampling rule. `ExactQ` is honored
+//!   as this same identity (Eq 8 with q = δ_d degenerates to Eq 21);
+//!   `TruncatedArgmax` (Eq 22) is honored via the shared step helper.
+//! - **PLASMA/HOT REMAIN DISTRIBUTION-BIASED BY DESIGN** — they skip
+//!   verification entirely (that skipping IS the latency feature; making
+//!   them exact would require the rejection sampling they exist to avoid).
+//!   Consumers needing sampled (temperature-faithful) output should route
+//!   everything to Warm/Cold (raise `plasma_threshold`/`hot_threshold` above
+//!   1.0) — the Issue 651 exactness test does exactly this.
+//! - **Streaming memory win** (mirrors 587 T5): the
+//!   `(MAX_DRAFT_WIDTH+1) × vocab` `p_flat` buffer and the separate
+//!   `forward_scratch` are deleted — one vocab-sized `probs_buf` streams
+//!   position by position, and target forwards stop at the first rejection.
 //!
 //! Plan 400 (2026-07-05): moved from root `src/speculative/flashar_consensus.rs`.
 //! All 10 tests moved with the file (no training dependencies). Root re-exports
@@ -27,6 +58,7 @@
 
 use crate::d2f::{D2fDecodeConfig, d2f_decode_block_with_prompt_with};
 use crate::d2f_context::D2fContext;
+use crate::d2f_verifier::{DraftAcceptPolicy, PolicyStep, prefix_match_step, softmax_argmax_step, truncated_argmax_step};
 use crate::{ForwardContext, forward};
 use katgpt_core::simd::simd_max_f32;
 use katgpt_core::speculative::sampling::sample_from_distribution;
@@ -75,6 +107,13 @@ pub struct ConsensusConfig {
     /// If true, use `simd_ternary_matvec` fusion gate instead of heuristic.
     /// Requires `plasma_path` feature.
     pub use_ternary_gate: bool,
+    /// Warm/Cold acceptance policy (Issue 651). Default `SoftmaxArgmax`
+    /// (FLARE Eq 21 — the verified paths are distribution-preserving).
+    /// `PrefixMatch` is the legacy Plan 166 mode-biasing control.
+    /// `ExactQ` is honored as its point-mass identity (Eq 8 with q = δ_d IS
+    /// Eq 21 — the consensus winner is a deterministic proposal).
+    /// Plasma/Hot paths are unaffected (they skip verification by design).
+    pub accept_policy: DraftAcceptPolicy,
 }
 
 impl Default for ConsensusConfig {
@@ -84,6 +123,7 @@ impl Default for ConsensusConfig {
             hot_threshold: 0.5,
             warm_threshold: 0.3,
             use_ternary_gate: false,
+            accept_policy: DraftAcceptPolicy::SoftmaxArgmax,
         }
     }
 }
@@ -174,6 +214,20 @@ pub fn dual_path_draft(
 // T3: compute_ternary_consensus
 // ---------------------------------------------------------------------------
 
+/// Per-position ternary consensus kernel (Issue 651): the unit the aligned
+/// `speculate` loop interleaves. Returns `(code, accepted_token)` where code
+/// is +1 (H wins) / 0 (AGREE) / -1 (V wins).
+#[inline]
+pub fn ternary_consensus_one(h_tok: usize, v_tok: usize, h_c: f32, v_c: f32) -> (i8, usize) {
+    if h_tok == v_tok {
+        (0, h_tok)
+    } else if h_c > v_c {
+        (1, h_tok)
+    } else {
+        (-1, v_tok)
+    }
+}
+
 /// Compute per-position ternary consensus code and accepted token.
 ///
 /// For each position:
@@ -182,6 +236,7 @@ pub fn dual_path_draft(
 ///   - ternary = -1 if `h_tokens[i] != v_tokens[i]` AND `v_conf[i] >= h_conf[i]` (V wins)
 ///
 /// Accepted token is `h_tokens[i]` if ternary >= 0, else `v_tokens[i]`.
+/// Delegates to [`ternary_consensus_one`] per position (Issue 651 DRY).
 pub fn compute_ternary_consensus(
     h_tokens: &[usize],
     v_tokens: &[usize],
@@ -193,25 +248,9 @@ pub fn compute_ternary_consensus(
     let mut accepted = [0usize; MAX_DRAFT_WIDTH];
 
     for i in 0..len.min(MAX_DRAFT_WIDTH) {
-        let h_tok = h_tokens[i];
-        let v_tok = v_tokens[i];
-
-        if h_tok == v_tok {
-            // Consensus: both paths agree
-            ternary[i] = 0;
-            accepted[i] = h_tok;
-        } else {
-            // Dispute: higher confidence wins
-            let h_c = h_conf[i];
-            let v_c = v_conf[i];
-            if h_c > v_c {
-                ternary[i] = 1; // H wins
-                accepted[i] = h_tok;
-            } else {
-                ternary[i] = -1; // V wins
-                accepted[i] = v_tok;
-            }
-        }
+        let (code, tok) = ternary_consensus_one(h_tokens[i], v_tokens[i], h_conf[i], v_conf[i]);
+        ternary[i] = code;
+        accepted[i] = tok;
     }
 
     (ternary, accepted)
@@ -221,6 +260,33 @@ pub fn compute_ternary_consensus(
 // T4: route_thermal_paths
 // ---------------------------------------------------------------------------
 
+/// Per-position thermal routing kernel (Issue 651): the unit the aligned
+/// `speculate` loop interleaves.
+#[inline]
+pub fn route_one(code: i8, h_conf: f32, v_conf: f32, config: &ConsensusConfig) -> ThermalPath {
+    if code == 0 {
+        let min_conf = h_conf.min(v_conf);
+        if min_conf >= config.plasma_threshold {
+            ThermalPath::Plasma
+        } else if min_conf >= config.hot_threshold {
+            ThermalPath::Hot
+        } else if min_conf >= config.warm_threshold {
+            ThermalPath::Warm
+        } else {
+            ThermalPath::Cold
+        }
+    } else {
+        let winner_conf = if code > 0 { h_conf } else { v_conf };
+        if winner_conf >= config.hot_threshold {
+            ThermalPath::Hot
+        } else if winner_conf >= config.warm_threshold {
+            ThermalPath::Warm
+        } else {
+            ThermalPath::Cold
+        }
+    }
+}
+
 /// Route each position to a thermal path based on ternary code + confidence.
 ///
 /// Thermal routing table:
@@ -228,6 +294,8 @@ pub fn compute_ternary_consensus(
 ///   HOT    (ternary=±1, winner_conf >= hot_threshold)
 ///   WARM   (ternary=±1, winner_conf >= warm_threshold)
 ///   COLD   (everything else)
+///
+/// Delegates to [`route_one`] per position (Issue 651 DRY).
 pub fn route_thermal_paths(
     ternary: &[i8; MAX_DRAFT_WIDTH],
     h_conf: &[f32],
@@ -245,34 +313,8 @@ pub fn route_thermal_paths(
     for i in 0..len.min(MAX_DRAFT_WIDTH) {
         let code = ternary[i];
         result.ternary_codes[i] = code;
-
-        if code == 0 {
-            // Consensus — both agree
-            let min_conf = h_conf[i].min(v_conf[i]);
-            if min_conf >= config.plasma_threshold {
-                result.thermal_paths[i] = ThermalPath::Plasma;
-            } else if min_conf >= config.hot_threshold {
-                result.thermal_paths[i] = ThermalPath::Hot;
-            } else if min_conf >= config.warm_threshold {
-                result.thermal_paths[i] = ThermalPath::Warm;
-            } else {
-                result.thermal_paths[i] = ThermalPath::Cold;
-            }
-            result.accepted_tokens[i] = h_tokens[i]; // same as v_tokens[i]
-        } else {
-            // Disputed — pick winner
-            let winner_conf = if code > 0 { h_conf[i] } else { v_conf[i] };
-            let winner_tok = if code > 0 { h_tokens[i] } else { v_tokens[i] };
-
-            if winner_conf >= config.hot_threshold {
-                result.thermal_paths[i] = ThermalPath::Hot;
-            } else if winner_conf >= config.warm_threshold {
-                result.thermal_paths[i] = ThermalPath::Warm;
-            } else {
-                result.thermal_paths[i] = ThermalPath::Cold;
-            }
-            result.accepted_tokens[i] = winner_tok;
-        }
+        result.thermal_paths[i] = route_one(code, h_conf[i], v_conf[i], config);
+        result.accepted_tokens[i] = if code >= 0 { h_tokens[i] } else { v_tokens[i] };
     }
 
     result
@@ -335,14 +377,11 @@ pub struct FlashARConsensusVerifier<'a> {
     target_ctx: ForwardContext,
     target_cache: MultiLayerKVCache,
     d2f_ctx: D2fContext,
+    /// Streaming per-position target distribution (Issue 651, mirrors 587
+    /// T5): `probs_buf` holds `p_i = P(· | anchor, accepted d_0..d_{i-1})`
+    /// exactly when position `i` is tested. The old `(MAX_DRAFT_WIDTH+1) ×
+    /// vocab` `p_flat` buffer + `forward_scratch` are deleted.
     probs_buf: Vec<f32>,
-    /// Pre-allocated flat storage for per-position target distributions.
-    /// Layout: `p_flat[(i+1) * vocab_size .. (i+2) * vocab_size]` holds the
-    /// softmaxed target distribution used to score position `i`.
-    /// Length = `(MAX_DRAFT_WIDTH + 1) * vocab_size`, allocated once.
-    p_flat: Vec<f32>,
-    /// Reusable scratch for a single forward's softmax output (alias-safe).
-    forward_scratch: Vec<f32>,
 }
 
 impl<'a> FlashARConsensusVerifier<'a> {
@@ -371,8 +410,6 @@ impl<'a> FlashARConsensusVerifier<'a> {
             target_cache: MultiLayerKVCache::new(target_config),
             d2f_ctx: D2fContext::new(target_config),
             probs_buf: vec![0.0f32; target_config.vocab_size],
-            p_flat: vec![0.0f32; (MAX_DRAFT_WIDTH + 1) * target_config.vocab_size],
-            forward_scratch: vec![0.0f32; target_config.vocab_size],
         }
     }
 }
@@ -388,10 +425,13 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
         rng: &mut Rng,
     ) -> Vec<usize> {
         let target_temp = self.target_config.temperature;
+        let inv_target_temp = 1.0 / target_temp;
         let draft_width = self.draft_width;
         let vocab_size = self.target_config.vocab_size;
+        let policy = self.consensus_config.accept_policy;
 
         // ── Phase 0: Score initial token with target model ──────────
+        // probs_buf ends holding p_0 = P(draft position 0 | anchor).
         self.target_cache.reset();
         {
             let logits = forward(
@@ -403,12 +443,10 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
                 self.target_config,
             );
             self.probs_buf.copy_from_slice(logits);
-            softmax_scaled(&mut self.probs_buf, 1.0 / target_temp);
-            // Store p_dist[0] into the flat buffer (slot 0).
-            self.p_flat[..vocab_size].copy_from_slice(&self.probs_buf);
+            softmax_scaled(&mut self.probs_buf, inv_target_temp);
         }
 
-        // ── Phase 1: Path V — D2F block decode ──────────────────────
+        // ── Phase 1: Path V — D2F block draft ──────────────────
         let prompt = &[token];
         let d2f_result = d2f_decode_block_with_prompt_with(
             &mut self.d2f_ctx,
@@ -428,24 +466,20 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
             return vec![sample_from_distribution(&self.probs_buf, rng)];
         }
 
-        // Copy D2F tokens to stack
+        // Copy D2F tokens to stack.
         let mut v_tokens = [0usize; MAX_DRAFT_WIDTH];
         let mut v_conf = [0.0f32; MAX_DRAFT_WIDTH];
         let k_bounded = k.min(MAX_DRAFT_WIDTH);
         v_tokens[..k_bounded].copy_from_slice(&v_tokens_raw[..k_bounded]);
 
-        // Extract D2F confidence per position from the logits.
-        // Single-pass softmax+argmax: compute max_logit, then sum_exp + top1 in
-        // one fold to halve iterations over the vocab.
+        // Extract D2F confidence per position from the logits (draft side —
+        // independent of the target scoring loop below).
         for i in 0..k_bounded {
             let logits_offset = i * draft_config.vocab_size;
             if logits_offset + draft_config.vocab_size <= self.d2f_ctx.logits_flat.len() {
                 let logits_p = &self.d2f_ctx.logits_flat
                     [logits_offset..logits_offset + draft_config.vocab_size];
                 let max_logit = simd_max_f32(logits_p);
-                // Fused pass: accumulate sum_exp and track top1 prob.
-                // Scalar `fast_exp` (not SIMD): top1 tracking branch interleaved
-                // with the exp.
                 use katgpt_core::simd::fast_exp;
                 let mut sum_exp = 0.0f32;
                 let mut top1 = 0.0f32;
@@ -462,177 +496,105 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
             }
         }
 
-        // ── Phase 2: Path H — AR sequential draft ───────────────────
-        // We use the target model's KV cache which already has the initial token.
-        // Run AR draft using the same draft_weights.
-        let mut h_tokens = [0usize; MAX_DRAFT_WIDTH];
-        let mut h_conf = [0.0f32; MAX_DRAFT_WIDTH];
-        // Cache the target argmax per position (avoids recomputing it in
-        // Phase 5 for Warm/Cold segments — each p_dist is scanned once here).
-        let mut target_argmax = [0usize; MAX_DRAFT_WIDTH];
+        // ── Phases 2–5: aligned interleaved consensus + routing + verify ──
+        // (Issue 651 — the 587-aligned streaming pattern.)
+        //
+        // probs_buf holds p_i = P(· | anchor, accepted d_0..d_{i-1}) exactly
+        // when position i is tested. Per position:
+        //   1. H scores p_i: h_i = argmax(p_i), h_conf_i = max(p_i) — the
+        //      target's greedy proposal conditioned on the ACCEPTED prefix
+        //      (the pre-651 code conditioned on a v_0/h hybrid and tested
+        //      d_i against the position-i+1 law — the 587 off-by-one).
+        //   2. Ternary consensus + thermal route (per-position kernels).
+        //   3. Plasma/Hot: accept the winner unverified (biased by design).
+        //      Warm/Cold: run the accept-policy step against p_i.
+        //   4. Feed the ACCEPTED token → p_{i+1} (skipped on rejection —
+        //      the loop stops; the bonus feed covers the last position).
+        let mut accepted: Vec<usize> = Vec::with_capacity(k_bounded + 1);
+        let mut all_accepted = true;
 
-        // Sequential AR scoring: for each position, get target distribution,
-        // extract argmax as H's prediction, and top1 as H's confidence.
-        // Write softmaxed distribution into p_flat slot (i+1).
         for i in 0..k_bounded {
-            // Use D2F token as input for sequential scoring (like D2fDrafterVerifier)
-            let input_tok = if i == 0 { v_tokens[0] } else { h_tokens[i - 1] };
+            // 1. H scores the aligned distribution.
+            let mut h_tok = 0usize;
+            let mut h_c = f32::NEG_INFINITY;
+            for (idx, &p) in self.probs_buf.iter().enumerate() {
+                if p > h_c {
+                    h_c = p;
+                    h_tok = idx;
+                }
+            }
+            if h_c == f32::NEG_INFINITY {
+                h_c = 0.0;
+            }
+
+            // 2. Consensus + route.
+            let (code, consensus_tok) = ternary_consensus_one(h_tok, v_tokens[i], h_c, v_conf[i]);
+            let path = route_one(code, h_c, v_conf[i], &self.consensus_config);
+
+            // 3. Selective verification.
+            match path {
+                ThermalPath::Plasma | ThermalPath::Hot => {
+                    accepted.push(consensus_tok);
+                }
+                ThermalPath::Warm | ThermalPath::Cold => {
+                    let p_dist = &self.probs_buf[..vocab_size];
+                    let step = match policy {
+                        DraftAcceptPolicy::PrefixMatch => prefix_match_step(p_dist, consensus_tok),
+                        DraftAcceptPolicy::SoftmaxArgmax
+                        | DraftAcceptPolicy::ExactQ => {
+                            // Eq 21; ExactQ ≡ Eq 21 under the consensus
+                            // winner's point-mass proposal law.
+                            softmax_argmax_step(p_dist, consensus_tok, rng)
+                        }
+                        DraftAcceptPolicy::TruncatedArgmax => {
+                            truncated_argmax_step(p_dist, consensus_tok, rng)
+                        }
+                    };
+                    match step {
+                        PolicyStep::Accept => accepted.push(consensus_tok),
+                        PolicyStep::Correct(y) => {
+                            accepted.push(y);
+                            all_accepted = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 4. Advance: feed the accepted token → p_{i+1}.
+            if all_accepted && i + 1 < k_bounded {
+                let logits = forward(
+                    &mut self.target_ctx,
+                    self.target_weights,
+                    &mut self.target_cache,
+                    consensus_tok,
+                    pos + 1 + i,
+                    self.target_config,
+                );
+                self.probs_buf.copy_from_slice(logits);
+                softmax_scaled(&mut self.probs_buf, inv_target_temp);
+            }
+        }
+
+        // ── Bonus token if all accepted ─────────────────────
+        // p(· | anchor, d_0..d_{k-1}) — one extra feed after the last accept.
+        if all_accepted {
+            let last = accepted[k_bounded - 1];
             let logits = forward(
                 &mut self.target_ctx,
                 self.target_weights,
                 &mut self.target_cache,
-                input_tok,
-                pos + 1 + i,
+                last,
+                pos + k_bounded,
                 self.target_config,
             );
-            self.forward_scratch.copy_from_slice(logits);
-            softmax_scaled(&mut self.forward_scratch, 1.0 / target_temp);
-
-            // H path: argmax of target distribution (this is what the target model prefers).
-            // Single pass — extract both best_idx and best_prob.
-            let mut best_idx = 0usize;
-            let mut best_prob = f32::NEG_INFINITY;
-            for (idx, &p) in self.forward_scratch.iter().enumerate() {
-                if p > best_prob {
-                    best_prob = p;
-                    best_idx = idx;
-                }
-            }
-
-            h_tokens[i] = best_idx;
-            h_conf[i] = if best_prob == f32::NEG_INFINITY {
-                0.0
-            } else {
-                best_prob
-            };
-            target_argmax[i] = best_idx;
-
-            // Persist this distribution into p_flat slot (i+1).
-            let start = (i + 1) * vocab_size;
-            self.p_flat[start..start + vocab_size].copy_from_slice(&self.forward_scratch);
+            self.probs_buf.copy_from_slice(logits);
+            softmax_scaled(&mut self.probs_buf, inv_target_temp);
+            accepted.push(sample_from_distribution(&self.probs_buf, rng));
         }
 
-        // ── Phase 3: Ternary consensus ──────────────────────────────
-        let (ternary, consensus_tokens) =
-            compute_ternary_consensus(&h_tokens, &v_tokens, &h_conf, &v_conf, k_bounded);
-
-        // ── Phase 4: Thermal routing ────────────────────────────────
-        let result = route_thermal_paths(
-            &ternary,
-            &h_conf,
-            &v_conf,
-            &h_tokens,
-            &v_tokens,
-            &self.consensus_config,
-            k_bounded,
-        );
-
-        // ── Phase 5: Selective verification ─────────────────────────
-        // Plasma/Hot: accept immediately
-        // Warm: verify single position (we already have target_argmax from Phase 2)
-        // Cold: fall back to prefix-match for that segment
-        let mut accepted = Vec::with_capacity(k_bounded + 1);
-        let mut all_accepted = true;
-
-        // Track contiguous cold segments for prefix-match fallback
-        let mut cold_start: Option<usize> = None;
-
-        // Helper: flush a cold segment [start..end) using cached target_argmax.
-        // Returns false on first mismatch (caller breaks out).
-        let flush_cold = |start: usize,
-                          end: usize,
-                          consensus_tokens: &[usize; MAX_DRAFT_WIDTH],
-                          target_argmax: &[usize; MAX_DRAFT_WIDTH],
-                          accepted: &mut Vec<usize>|
-         -> bool {
-            for j in start..end {
-                let draft_tok = consensus_tokens[j];
-                let target_tok = target_argmax[j];
-                if draft_tok == target_tok {
-                    accepted.push(draft_tok);
-                } else {
-                    accepted.push(target_tok);
-                    return false;
-                }
-            }
-            true
-        };
-
-        for i in 0..k_bounded {
-            match result.thermal_paths[i] {
-                ThermalPath::Plasma | ThermalPath::Hot => {
-                    // Flush any pending cold segment
-                    if let Some(start) = cold_start.take()
-                        && !flush_cold(start, i, &consensus_tokens, &target_argmax, &mut accepted)
-                    {
-                        all_accepted = false;
-                        break;
-                    }
-                    // Accept Plasma/Hot position
-                    accepted.push(result.accepted_tokens[i]);
-                }
-                ThermalPath::Warm => {
-                    // Flush any pending cold segment
-                    if let Some(start) = cold_start.take()
-                        && !flush_cold(start, i, &consensus_tokens, &target_argmax, &mut accepted)
-                    {
-                        all_accepted = false;
-                        break;
-                    }
-                    // Spot-check: verify this single position against cached target argmax
-                    let draft_tok = result.accepted_tokens[i];
-                    let target_tok = target_argmax[i];
-                    if draft_tok == target_tok {
-                        accepted.push(draft_tok);
-                    } else {
-                        accepted.push(target_tok);
-                        all_accepted = false;
-                        break;
-                    }
-                }
-                ThermalPath::Cold => {
-                    // Accumulate cold positions for prefix-match fallback
-                    if cold_start.is_none() {
-                        cold_start = Some(i);
-                    }
-                }
-            }
-
-            if !all_accepted {
-                break;
-            }
-        }
-
-        // Flush trailing cold segment
-        if all_accepted {
-            if let Some(start) = cold_start.take()
-                && !flush_cold(
-                    start,
-                    k_bounded,
-                    &consensus_tokens,
-                    &target_argmax,
-                    &mut accepted,
-                )
-            {
-                all_accepted = false;
-            }
-
-            // Bonus token if all accepted
-            if all_accepted {
-                let bonus_start = k_bounded * vocab_size;
-                let bonus_end = bonus_start + vocab_size;
-                let bonus_dist = &self.p_flat[bonus_start..bonus_end];
-                let bonus = sample_from_distribution(bonus_dist, rng);
-                accepted.push(bonus);
-            }
-        }
-
-        // Safety: always return at least one token
-        if accepted.is_empty() {
-            let p0 = &self.p_flat[..vocab_size];
-            accepted.push(sample_from_distribution(p0, rng));
-        }
-
+        // Safety: always return at least one token (position 0 always pushes
+        // accept-or-correction; the k==0 early return above covers the rest).\n        debug_assert!(!accepted.is_empty());
         accepted
     }
 }
@@ -751,6 +713,95 @@ mod tests {
         assert!((config.hot_threshold - 0.5).abs() < 1e-6);
         assert!((config.warm_threshold - 0.3).abs() < 1e-6);
         assert!(!config.use_ternary_gate);
+        // Issue 651: Eq 21 (SoftmaxArgmax) is the default verified-path policy.
+        assert_eq!(config.accept_policy, DraftAcceptPolicy::SoftmaxArgmax);
+    }
+
+    // ── Issue 651: exact verified paths ─────────────────────────────────────
+
+    /// Issue 651 G1 harness (mirrors the 587 T2 E2E level): force every
+    /// position to Warm/Cold (thresholds > 1.0 — confidences are ≤ 1), then
+    /// measure the empirical marginal of the FIRST accepted token against the
+    /// reference target law p_0 = softmax(forward(anchor)). Position 0 is
+    /// always verified under this config, and its accept-or-correct step is
+    /// the only contributor to the first output token — so the marginal must
+    /// match p_0 exactly under Eq 21, and collapse to a point mass under
+    /// PrefixMatch.
+    #[test]
+    fn test_eq21_exactness_first_token_all_warm_cold() {
+        let mut config = Config::micro();
+        config.vocab_size = 64;
+        let mut rng = Rng::new(42);
+        let target_weights = TransformerWeights::new(&config, &mut rng);
+        let mut draft_rng = Rng::new(99);
+        let draft_weights = TransformerWeights::new(&config, &mut draft_rng);
+
+        // Reference: p_0 = softmax_scaled(forward(anchor), 1/temp).
+        let mut ctx = crate::ForwardContext::new(&config);
+        let mut cache = MultiLayerKVCache::new(&config);
+        let logits = crate::forward(
+            &mut ctx,
+            &target_weights,
+            &mut cache,
+            config.bos_token,
+            0,
+            &config,
+        );
+        let mut p0: Vec<f32> = logits.to_vec();
+        softmax_scaled(&mut p0, 1.0 / config.temperature);
+
+        let n_rounds = 8000usize;
+        let run_arm = |policy: DraftAcceptPolicy| -> Vec<f32> {
+            let consensus = ConsensusConfig {
+                plasma_threshold: 2.0, // unreachable: conf ≤ 1
+                hot_threshold: 2.0,
+                accept_policy: policy,
+                ..Default::default()
+            };
+            let mut verifier = FlashARConsensusVerifier::new(
+                &target_weights,
+                &config,
+                D2fDecodeConfig::with_block_size(4),
+                consensus,
+                4,
+            );
+            let mut hist = vec![0u32; config.vocab_size];
+            for round in 0..n_rounds {
+                let out = verifier.speculate(
+                    &draft_weights,
+                    &config,
+                    config.bos_token,
+                    0,
+                    &mut Rng::new(round as u64),
+                );
+                hist[out[0]] += 1;
+            }
+            hist.iter().map(|&c| c as f32 / n_rounds as f32).collect()
+        };
+
+        let tv = |emp: &[f32]| -> f32 {
+            0.5 * emp
+                .iter()
+                .zip(p0.iter())
+                .map(|(e, p)| (e - p).abs())
+                .sum::<f32>()
+        };
+
+        let tv_eq21 = tv(&run_arm(DraftAcceptPolicy::SoftmaxArgmax));
+        let tv_prefix = tv(&run_arm(DraftAcceptPolicy::PrefixMatch));
+
+        println!("eq21 TV = {:.4}, prefix-match TV = {:.4}", tv_eq21, tv_prefix);
+        // Eq 21: exact up to sampling noise (n=8000, vocab 64 → expected
+        // TV noise ≈ 0.02-0.04; 0.06 is the honest gate).
+        assert!(
+            tv_eq21 < 0.06,
+            "SoftmaxArgmax first-token marginal must match p_0 (TV={tv_eq21:.4})"
+        );
+        // PrefixMatch: collapses to the argmax point mass — TV ≈ 1 − p0(am).
+        assert!(
+            tv_prefix > 0.3,
+            "PrefixMatch must collapse toward the mode (TV={tv_prefix:.4})"
+        );
     }
 
     #[test]

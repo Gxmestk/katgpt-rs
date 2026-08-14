@@ -289,10 +289,12 @@ gated_mlp = ["katgpt-transformer/gated_mlp"]
 flashar_anchor = []
 
 # FlashAR Consensus Tri-Mode with Ternary Thermal Paths (Plan 166). Gates
-# the `pub mod flashar_consensus` declaration + re-exports. Empty tracking
-# flag — all consumed symbols resolve through katgpt_core + this crate
-# (the optional `ternary_fusion_gate` fn has its own `plasma_path` cfg below).
-flashar_consensus = []
+# the `pub mod flashar_consensus` declaration + re-exports. Issue 651
+# (2026-08-15): now implies `tri_mode` — the Warm/Cold verification reuses
+# the Issue 587 acceptance-policy steps from `d2f_verifier` (gated
+# all(dllm, tri_mode)); the module cfg already requires dllm, so this makes
+# the import always resolve for direct consumers too.
+flashar_consensus = ["tri_mode"]
 
 # Bit-plane ternary SIMD matvec — multiplication-free CPU inference (Plan 148).
 # Plan 400: forwarded to katgpt-forward so the moved flashar_consensus.rs's
