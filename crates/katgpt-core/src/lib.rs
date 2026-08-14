@@ -1891,8 +1891,10 @@ pub use inversion::{
 // correlation device ω from interaction history. NOT a sync-boundary primitive
 // (ω is latent per-focal; only the final cooperate/defect u8 action crosses).
 // Sigmoid, not softmax (ω is a posterior probability, not a categorical).
-// Opt-in — Plan 526 Phase 1 GOAT G1 (closed-form reproduction) + G8 (PD
-// threshold = 0.5) PASS; Phases 2–7 pending.
+// DEFAULT-ON (2026-08-11) — Plan 526 Phase 1-5 GOAT G1–G8 ALL PASS (Bench 579:
+// G1 closed-form reproduction, G2 emergent cooperation, G5 indirect inference,
+// G7 UQ floor, G8 PD threshold); see the Cargo.toml feature-def comment for the
+// full gate record.
 #[cfg(feature = "similarity_inference")]
 pub mod similarity_inference;
 #[cfg(feature = "similarity_inference")]
@@ -2287,7 +2289,8 @@ pub use poincare::{
 // guarantee no existing primitive provides. Three modelless paths (O(N),
 // O(N²), O(N log N)) + two bridge helpers (raw time-phase, latent projection).
 // Pure modelless (closed-form modular arithmetic + sigmoid + dot-product).
-// Opt-in until GOAT gate G1–G4 PASS — Phase 1 skeleton ships now.
+// DEFAULT-ON (2026-08-07, Plan 571) — G1–G4 GOAT gate ALL PASS
+// (bench_571_phase_separation_goat).
 #[cfg(feature = "phase_separation")]
 pub mod phase_separation;
 #[cfg(feature = "phase_separation")]

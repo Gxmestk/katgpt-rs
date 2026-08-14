@@ -46,10 +46,13 @@
 //! ## Status
 //!
 //! DEFAULT-ON (Plan 457 Phase 5 promotion, 2026-07-18). Plan 457 Phase 1 —
-//! implementation complete. Phase 2 GOAT gate G1+G2+G3 PASS, G4 DEFERRED
-//! with offline-only rationale (8.40µs/32-node identify is well outside
-//! the 20Hz tick). Phase 4 T4.5 synthetic Consumer A bench
-//! (`.benchmarks/464_causal_id_consumer_a_synthetic.md`) cleared the T4.7
+//! implementation complete. Phase 2 GOAT gate G1+G2+G3 PASS; G4 was initially
+//! DEFERRED with offline-only rationale (8.40µs/32-node identify is well
+//! outside the 20Hz tick), then closed 2026-07-18 as an INFORMATIONAL PASS
+//! (Issue 183 / Benchmark 465: Scratch refactor cut per-call allocs 284→198
+//! (−30%) and latency 8.26→6.07 µs (−27%) on the 32-node scenario; remaining
+//! graph-construction allocs out of G4 scope). Phase 4 T4.5 synthetic Consumer
+//! A bench (`.benchmarks/464_causal_id_consumer_a_synthetic.md`) cleared the T4.7
 //! promotion gate: 71.7% non-trivial Ok rate (43/60 queries) on a 100-node
 //! game-world KG with 3 faction confounder cliques, 43 actionable
 //! interventional signatures S1 (Canvas FlowGraph reachability) cannot

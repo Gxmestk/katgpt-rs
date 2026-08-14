@@ -49,7 +49,16 @@ This is the **documented G2 risk** from Plan 449 Phase 3 T3.2: "closed-form PCA-
 2. The inverse navigation G3 achieves Hit@0.3 = **1.000** on the same fixture — the closed-form `z + W†·Δtarget` path is exact for the linear target maps it's designed for.
 3. The "beat linear-only" check is a **strict-domination** criterion that depends on fixture curvature. On a heavily curved manifold (where the linear baseline R² collapses below 0), the modelless adapter would dominate. The moderate-curvature fixture chosen here is realistic for game-runtime targets (HLA ↔ MapPos), where linear baselines are strong.
 
-**Implication for promotion:** The modelless primitive ships **opt-in** (Phase 3 T3.1 decision). Default-on promotion requires the gradient-fit φ from riir-train to satisfy the strict-domination criterion. The Super-GOAT novelty claim (Research 449) holds regardless — the primitive's value is the closed-form inverse navigation (G3), not the forward unrolling (G2).
+**Implication for promotion:** At the time of this bench, the modelless
+primitive shipped **opt-in** (Phase 3 T3.1 decision), with default-on
+promotion originally gated on the gradient-fit φ from riir-train satisfying
+the strict-domination criterion. (Post-promotion update, 2026-07-18, Phase
+19): promoted DEFAULT-ON without strict-domination — the load-bearing value
+is the closed-form inverse navigation (G3), and the G2 caveat was later
+closed by riir-train Plan 317 (`bench_317_poincare_g2_strict`, R²=0.9997
+trained φ vs 0.9255 linear-only) — see the banner above. The Super-GOAT
+novelty claim (Research 449) holds regardless — the primitive's value is the
+closed-form inverse navigation (G3), not the forward unrolling (G2).
 
 ## Latency Breakdown
 
