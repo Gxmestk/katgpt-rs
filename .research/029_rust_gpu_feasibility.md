@@ -542,6 +542,8 @@ When GPU batching becomes necessary:
 4. **HLA on GPU**: needs WGSL kernels for `hla_state_update`, `hla_readout`, `ahla_step` — these don't exist yet
 5. **Shared matmuls** (QKV, MLP, LM head): can reuse existing WGSL matmul kernels in batched mode
 
+> **PASS-Redirects (synthesis):** VectorWare [https://www.vectorware.com/blog/simd-on-gpu/ "Rust SIMD on the GPU"] (2026-08-10) — maps `core::simd` onto GPU warp lanes (SIMT-is-SIMD) so unmodified CPU SIMD libraries run on-device. PASS for us: our deferral grounds still hold (nightly `portable_simd`, unreleased proprietary compiler fork, NVIDIA-only, zero published timings — the crossover point is unknown), and our own measured crossover already encodes the decision (Bench 268 ~1.7ms Metal launch floor vs ~2.25µs CPU ternary SIMD matvec; `DEFAULT_MAXSIM_THRESHOLD = 256`, crossover ≈800). Revisit trigger: they open-source the compiler + `std` bits (stated intent on HN) — then re-evaluate as the single-source CPU/GPU kernel path closing the dual-implementation DRY gap (`katgpt-types/src/simd/*` vs hand-written `riir-gpu` kernels).
+
 ## Appendix A: rust-gpu Compute Example (Reference)
 
 The canonical compute shader from `crates/katgpt-hla/src/lib.rs`:
