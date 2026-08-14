@@ -181,6 +181,10 @@ pub struct SelfSpecConfig {
     pub draft_width: usize,
     /// D2F decode parameters.
     pub d2f_config: crate::speculative::d2f::D2fDecodeConfig,
+    /// Acceptance policy (Issue 587 / FLARE Eq 8/21/22 taxonomy).
+    /// Default: `SoftmaxArgmax` — exact + cheapest. See
+    /// `crate::speculative::d2f_verifier::DraftAcceptPolicy`.
+    pub accept_policy: crate::speculative::d2f_verifier::DraftAcceptPolicy,
     /// Optional trained sampler for adaptive confidence (Plan 116 T3).
     /// When `Some`, uses per-position features to decide accept/reject instead
     /// of the fixed `tau_conf` threshold in the D2F denoising loop.
@@ -193,6 +197,7 @@ impl Default for SelfSpecConfig {
         Self {
             draft_width: 8,
             d2f_config: crate::speculative::d2f::D2fDecodeConfig::default(),
+            accept_policy: crate::speculative::d2f_verifier::DraftAcceptPolicy::default(),
             sampler: None,
         }
     }

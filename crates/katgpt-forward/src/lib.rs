@@ -631,7 +631,7 @@ pub mod d2f;
 #[cfg(all(feature = "dllm", feature = "tri_mode"))]
 pub mod d2f_verifier;
 #[cfg(all(feature = "dllm", feature = "tri_mode"))]
-pub use d2f_verifier::D2fDrafterVerifier;
+pub use d2f_verifier::{D2fDrafterVerifier, DraftAcceptPolicy};
 
 #[cfg(all(feature = "dllm", feature = "tri_mode"))]
 pub mod diffusion_sampler;

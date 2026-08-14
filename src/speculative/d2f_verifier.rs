@@ -9,4 +9,4 @@
 //! to leaf crates. See `katgpt-forward/src/d2f_verifier.rs` for the
 //! implementation.
 
-pub use katgpt_forward::d2f_verifier::D2fDrafterVerifier;
+pub use katgpt_forward::d2f_verifier::{D2fDrafterVerifier, DraftAcceptPolicy};
