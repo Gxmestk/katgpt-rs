@@ -340,7 +340,7 @@ This is the original 2607.01232 claim, now tested correctly:
 
 **G1 (accuracy parity):** arm B 3.8435 vs arm C 3.8380 = **ratio 1.0014**. Bar: arm B <= 1.10 x arm C. ✅ **PASS** (0.14% gap vs 10% threshold).
 **G2 (train speed):** arm B 35.5s (GPU bwd) vs arm C ~595s (CPU bwd) = **16.8× faster**. Even vs estimated arm C GPU bwd (~71s): **2.0×**. Bar: ≥1.5×. ✅ **PASS**.
-**G3 (infer overhead):** arm B 1 LoRA layer (0.0003% of backbone) vs arm C 48 layers (0.014%). Both negligible. ✅ **PASS** (measured 2026-08-14, Plan 334 T3.4): CPU decode with LoRA = **1.76 tok/s** (569.8 ms/tok, 50 tokens); GPU prompt prefill (frozen, no LoRA) = **61.6 tok/s**. The LoRA adds 2 rank-8 matvecs (~82K FLOPs) at layer 32 only — **<0.01%** of the 64-layer backbone forward. The 1.76 tok/s bottleneck is the CPU decode path (not the LoRA); a GPU LoRA kernel would preserve ~66 tok/s with negligible overhead.
+**G3 (infer overhead):** arm B 1 LoRA layer (0.0003% of backbone) vs arm C 48 layers (0.014%). Both negligible. ✅ **PASS** (measured 2026-08-14, Plan 334 T3.4): CPU decode with LoRA = **1.76 tok/s** (569.8 ms/tok, 50 tokens); GPU prompt prefill (frozen, no LoRA) = **61.6 tok/s**. The LoRA adds 2 rank-8 matvecs (~82K FLOPs) at layer 32 only — **<0.01%** of the 64-layer backbone forward. The 1.76 tok/s bottleneck is the CPU decode path (not the LoRA); a GPU LoRA kernel would preserve ~66 tok/s with negligible overhead. **→ MEASURED 2026-08-14 (riir-ai Issue 666 / Bench 672): GPU decode with LoRA = 65.70 tok/s (0.72% overhead vs 65.23 baseline) = 37.3× the CPU path. The GPU Q+V LoRA decode kernel is shipped — the prediction held.**
 **G4 (loss decreases):** arm B final loss 0.0751, avg 0.4772. ✅ **PASS**.
 
 ### ✅ Tier: **GOAT** (upgraded from "pending arm C" 2026-08-14)
