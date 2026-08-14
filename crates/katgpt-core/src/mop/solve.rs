@@ -37,6 +37,59 @@ pub fn state_conditional_entropy(p_row: &[f32]) -> f32 {
     entropy_nats(p_row)
 }
 
+/// Sentinel for [`MopScratch::onehot`]: the row is NOT one-hot (0 or ≥2
+/// nonzeros) → dense-SIMD dot. `u32::MAX` can never be a valid column.
+const DENSE_ROW: u32 = u32::MAX;
+
+/// One-hot row detection (Issue 654): the single nonzero column `j` of a
+/// kernel row, or [`DENSE_ROW`] when the row has ≠ 1 nonzeros.
+///
+/// `pj != 0.0` treats `-0.0` as zero (IEEE: `-0.0 == 0.0`) and NaN as a
+/// nonzero (degenerate kernels are out of contract — both paths yield NaN).
+/// Early-exits on the 2nd nonzero so dense rows cost O(2), not O(N) — the
+/// Bench 638 dense fixtures must not pay a scan tax.
+#[inline]
+fn row_onehot(row: &[f32]) -> u32 {
+    let mut nz = DENSE_ROW;
+    let mut seen = 0u8;
+    for (j, &pj) in row.iter().enumerate() {
+        if pj != 0.0 {
+            seen += 1;
+            if seen > 1 {
+                return DENSE_ROW;
+            }
+            nz = j as u32;
+        }
+    }
+    nz
+}
+
+/// Row-scaled log-occupancy dot `Σ_j p[j]·ζ[j]` — one-hot fast path (Issue
+/// 654) with dense-SIMD fallback.
+///
+/// **Bit-identity argument** (why the fast path is NOT a behavior change):
+/// when `onehot = j*` is the row's single nonzero column, the dense dot
+/// reduces to that one term — every zero entry contributes `±0`, an exact
+/// no-op against finite accumulators (`acc + ±0 = acc`, and every
+/// accumulation starts at `+0`, so any all-zero partial stays `+0`), while
+/// the surviving term is correctly rounded in both paths (an FMA into a
+/// zero accumulator equals the plain product). The only bit divergence is
+/// the sign of a ±0 dot, which the caller's `h_bar + dot` absorbs exactly
+/// (`h_bar` is never `-0`: β, α, H(S'|s,a) are all validated ≥ 0). Arch-
+/// independent: the proof does not depend on the SIMD lane layout. Rows
+/// with ≥2 nonzeros keep the dense path — f32 addition order is not
+/// associative, and replicating per-arch lane structure would be fragile
+/// for marginal gain (blended zone-KG rows are the minority).
+#[inline]
+fn row_dot(row: &[f32], ln_z: &[f32], onehot: u32, n: usize) -> f32 {
+    if onehot == DENSE_ROW {
+        simd_dot_f32(row, ln_z, n)
+    } else {
+        let j = onehot as usize;
+        row[j] * ln_z[j]
+    }
+}
+
 /// H(A|s) — action entropy under the uniform-over-available convention
 /// (`ln m_i` for `m_i` available actions).
 ///
@@ -63,6 +116,11 @@ pub struct MopScratch<const N: usize, const A: usize> {
     h_bar: [[f32; A]; N],
     /// Pin mask: 1 = absorbing/terminal, ζ held at exactly 0.
     pin: [u8; N],
+    /// One-hot fast-path column per row (Issue 654): `onehot[i][k] = j`
+    /// when `p[i][k]` has exactly one nonzero at column j, else
+    /// [`DENSE_ROW`]. Scanned once in `solve`'s prepare phase; amortized
+    /// over the whole iteration (the kernel is frozen across sweeps).
+    onehot: [[u32; A]; N],
 }
 
 impl<const N: usize, const A: usize> MopScratch<N, A> {
@@ -72,6 +130,7 @@ impl<const N: usize, const A: usize> MopScratch<N, A> {
             ln_z_next: [0.0; N],
             h_bar: [[0.0; A]; N],
             pin: [0; N],
+            onehot: [[DENSE_ROW; A]; N],
         }
     }
 }
@@ -146,6 +205,7 @@ impl<const N: usize, const A: usize> MopSolver<N, A> {
                     sole_action = k;
                 }
                 scratch.h_bar[i][k] = beta_over_alpha * state_conditional_entropy(&p[i][k]);
+                scratch.onehot[i][k] = row_onehot(&p[i][k]);
             }
             // Pin rule: terminal (no actions) OR absorbing (exactly one
             // available action AND it deterministically self-loops). A state
@@ -174,14 +234,16 @@ impl<const N: usize, const A: usize> MopSolver<N, A> {
                     scratch.ln_z_next[i] = 0.0;
                     continue;
                 }
-                // LSE over available actions of (H̄ + Σ_j p·ζ_j) — single
-                // dot-product pass (SIMD), args stashed on the stack.
+                // LSE over available actions of (H̄ + Σ_j p·ζ_j) — one-hot
+                // rows take the O(1) fast-path dot (Issue 654), dense rows
+                // the SIMD dot; bit-identical (see `row_dot`).
+                let onehot_i = &scratch.onehot[i];
                 let mut max_arg = f32::NEG_INFINITY;
                 for k in 0..A {
                     if mask[i][k] == 0 {
                         continue;
                     }
-                    let dot = simd_dot_f32(&p[i][k], &scratch.ln_z, N);
+                    let dot = row_dot(&p[i][k], &scratch.ln_z, onehot_i[k], N);
                     let arg = scratch.h_bar[i][k] + dot;
                     args[k] = arg;
                     if arg > max_arg {
@@ -221,7 +283,7 @@ impl<const N: usize, const A: usize> MopSolver<N, A> {
                     solution.lse_args[i][k] = f32::NEG_INFINITY;
                     continue;
                 }
-                let dot = simd_dot_f32(&p[i][k], &scratch.ln_z, N);
+                let dot = row_dot(&p[i][k], &scratch.ln_z, scratch.onehot[i][k], N);
                 solution.lse_args[i][k] = scratch.h_bar[i][k] + dot;
             }
         }
@@ -379,6 +441,22 @@ mod tests {
         let sol = solver.solve(&p, &mask, &mut scratch);
 
         let (v_ref, _) = reference_eq7(&p, &mask, &cfg, 1.0);
+
+        // Issue 654 coverage pin: this arena's rows are one-hot, so the
+        // golden gate exercises the sparse fast path end-to-end. A future
+        // arena change to stochastic rows would silently un-exercise it.
+        let mut fast_rows = 0usize;
+        for i in 0..GRID_N {
+            for k in 0..4 {
+                if scratch.onehot[i][k] != DENSE_ROW {
+                    fast_rows += 1;
+                }
+            }
+        }
+        assert!(
+            fast_rows >= 250,
+            "golden arena no longer exercises the one-hot fast path ({fast_rows} rows)"
+        );
 
         let mut max_rel = 0.0f32;
         for (i, (&v_sol, &v_r)) in sol.v_star.iter().zip(v_ref.iter()).enumerate() {
@@ -544,5 +622,130 @@ mod tests {
         assert!((action_entropy_nats(&[1, 1, 0]) - 2.0f32.ln()).abs() < 1e-6);
         assert_eq!(state_conditional_entropy(&[1.0, 0.0, 0.0]), 0.0);
         assert!((state_conditional_entropy(&[0.5, 0.5]) - 2.0f32.ln()).abs() < 1e-6);
+    }
+
+    /// Issue 654: the one-hot scan marks rows correctly — early-exit on the
+    /// 2nd nonzero, `-0.0` counts as zero, all-zero rows take the dense
+    /// fallback (their dense dot is exactly `+0`).
+    #[test]
+    fn onehot_scan_marks_rows() {
+        assert_eq!(row_onehot(&[0.0, 0.0, 1.0, 0.0]), 2);
+        assert_eq!(row_onehot(&[0.0, 0.0, 0.7, 0.0]), 2);
+        assert_eq!(row_onehot(&[-1.0, 0.0]), 0);
+        assert_eq!(row_onehot(&[0.0, -0.0, 5.0, 0.0]), 2); // -0.0 is zero
+        assert_eq!(row_onehot(&[0.0, 0.0, 1.0, 0.0, 1.0]), DENSE_ROW);
+        assert_eq!(row_onehot(&[0.0; 64]), DENSE_ROW);
+    }
+
+    /// Issue 654: the one-hot fast path is bit-identical to the dense SIMD
+    /// dot at the consumer's accumulation point (`h_bar + dot`).
+    ///
+    /// Raw dots can differ ONLY in the sign of a ±0 result: the dense path
+    /// starts every accumulator at `+0` and same/opposite-signed zero adds
+    /// stay `+0`, while `fl(p·ζ)` may be `-0`. Adding a finite `h_bar`
+    /// (never `-0`: β, α, H ≥ 0) absorbs the sign exactly. The test pins
+    /// BOTH accumulation regimes (`h_bar = +0` — the β=0 default — and a
+    /// finite positive `h_bar`), bit-for-bit, across a ζ vector with planted
+    /// edge values (+0, −0, subnormal, huge, tiny).
+    #[test]
+    fn onehot_fast_path_bit_identical_to_dense_dot() {
+        const N: usize = 64;
+        let mut z = [0.0f32; N];
+        for (j, z_j) in z.iter_mut().enumerate() {
+            *z_j = ((j as f32) * 0.37 - 8.0) / 3.0;
+        }
+        z[3] = 0.0;
+        z[4] = -0.0;
+        z[5] = -1.75;
+        z[6] = f32::from_bits(1); // smallest subnormal
+        z[7] = 1e30;
+        z[8] = -1e-30;
+        let mut checked = 0usize;
+        for j_star in 0..N {
+            for &w in &[1.0f32, 0.5, 0.123456, 0.999_999] {
+                let mut row = [0.0f32; N];
+                row[j_star] = w;
+                let dense = simd_dot_f32(&row, &z, N);
+                let fast = row_dot(&row, &z, row_onehot(&row), N);
+                assert_eq!(
+                    (fast + 0.0).to_bits(),
+                    (dense + 0.0).to_bits(),
+                    "j*={j_star} w={w}: h_bar=+0 regime — fast {fast:e} vs dense {dense:e}"
+                );
+                assert_eq!(
+                    (fast + 3.25).to_bits(),
+                    (dense + 3.25).to_bits(),
+                    "j*={j_star} w={w}: finite h_bar regime"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked >= 64 * 4);
+    }
+
+    /// Issue 654: a kernel mixing one-hot rows (fast path), 2- and 3-nonzero
+    /// rows (dense fallback), an absorbing state, and a terminal state still
+    /// matches the structurally-different reference within the golden gate —
+    /// per-row branch selection preserves correctness end-to-end, and the
+    /// fixture exercises both paths.
+    #[test]
+    fn mixed_sparsity_kernel_golden_parity() {
+        const N: usize = 24;
+        const A: usize = 3;
+        let mut p = [[[0.0f32; N]; A]; N];
+        let mut mask = [[1u8; A]; N];
+        for i in 0..N {
+            p[i][0][(i + 1) % N] = 1.0; // one-hot hop
+            p[i][1][(i + 2) % N] = 0.75; // 2-nonzero split
+            p[i][1][(i + 7) % N] = 0.25;
+            if i % 2 == 0 {
+                p[i][2][i] = 1.0; // one-hot stay
+            } else {
+                p[i][2][(i + 3) % N] = 0.5; // 3-nonzero spread
+                p[i][2][(i + 5) % N] = 0.3;
+                p[i][2][(i + 11) % N] = 0.2;
+            }
+        }
+        // Absorbing state 5 (sole self-loop) + terminal state 7. Masked-off
+        // rows are never read by either implementation.
+        mask[5] = [1, 0, 0];
+        p[5][0][5] = 1.0;
+        mask[7] = [0, 0, 0];
+
+        let cfg = MopConfig::paper_default();
+        let solver = MopSolver::<N, A>::new(cfg).unwrap();
+        let mut scratch = MopScratch::new();
+        let sol = solver.solve(&p, &mask, &mut scratch);
+        let (v_ref, _) = reference_eq7::<N, A>(&p, &mask, &cfg, 1.0);
+        let mut max_rel = 0.0f32;
+        for (i, (&v_sol, &v_r)) in sol.v_star.iter().zip(v_ref.iter()).enumerate() {
+            let d = (v_sol - v_r).abs();
+            let bound = (v_r.abs() * 1e-6).max(1e-6);
+            assert!(d <= bound, "state {i}: |ΔV| {d:e} > {bound:e} (V_ref {v_r})");
+            let rel = d / v_r.abs().max(1.0);
+            if rel > max_rel {
+                max_rel = rel;
+            }
+        }
+        assert!(max_rel <= 1e-6, "max relative diff {max_rel:e}");
+        assert_eq!(sol.v_star[5], 0.0); // absorbing pin
+        assert_eq!(sol.v_star[7], 0.0); // terminal pin
+        assert!(sol.sup_delta < cfg.tol, "did not converge");
+
+        let mut fast_rows = 0usize;
+        let mut dense_rows = 0usize;
+        for i in 0..N {
+            for k in 0..A {
+                if scratch.onehot[i][k] != DENSE_ROW {
+                    fast_rows += 1;
+                } else {
+                    dense_rows += 1;
+                }
+            }
+        }
+        assert!(
+            fast_rows > 0 && dense_rows > 0,
+            "fixture must exercise both dot paths (fast {fast_rows}, dense {dense_rows})"
+        );
     }
 }

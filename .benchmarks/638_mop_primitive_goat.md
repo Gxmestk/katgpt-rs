@@ -95,3 +95,65 @@ today (no in-tree default-path consumer; the consumer is riir-ai Plan 538,
 which opts in via path-dep feature). The Super-GOAT quality evidence lives
 in riir-ai (Bench 679); this crate ships the open math primitive.
 Re-evaluate at Plan 538's integration gate.
+
+## Issue 654 addendum (2026-08-15): one-hot sparse-row fast path
+
+**Change:** `solve`'s two dot sites + the prepare phase now detect one-hot
+kernel rows (exactly 1 nonzero of N — the zone-KG deterministic-abstraction
+shape) and compute the row dot as the single product `p[j\*]·ζ[j\*]` instead
+of the dense `simd_dot_f32`. Rows with ≠ 1 nonzeros keep the dense SIMD dot.
+Detection is a prepare-phase scan with **early exit on the 2nd nonzero** —
+dense rows (the Bench 638 random fixtures) cost O(2)/row, so the dense path
+is regression-free (re-benched: 2.21/2.80/24.76 ms vs the recorded
+2.1/2.8/24.0 — unchanged within noise).
+
+**Bit-identity (arch-independent, why this is not a re-derivation):** for a
+one-hot row the dense dot reduces to the single term — every zero entry
+contributes `±0`, an exact no-op against finite accumulators (all start at
+`+0`), and the surviving term is correctly rounded in both paths (an FMA
+into a zero accumulator equals the plain product). The only divergence —
+the sign of a ±0 dot — is absorbed by the caller's `h_bar + dot` (h\u0304 is
+never `−0`: β, α, H ≥ 0). Rows with ≥ 2 nonzeros stay dense: replicating the
+per-arch SIMD lane accumulation order (NEON 4×4-lane + ADDV tree vs AVX2
+vs wasm) would be fragile for marginal gain. Pinned by a dedicated unit
+test (`onehot_fast_path_bit_identical_to_dense_dot` — both `h_bar` regimes,
+planted ±0/subnormal/huge ζ edge values) plus the mixed-sparsity golden test.
+
+**Re-gate (Bench 638 protocol):**
+
+- **G1:** lib suite 10/10 (7 original + 3 new); the golden arena coverage is
+  pinned (`fast_rows ≥ 250` assert — the 4-room fixture is all one-hot, so
+  the golden gate exercises the fast path end-to-end). Second oracle: the
+  riir-ai parity harness 6/6 — **V\* max|Δ| = 0.0 bit-identical, identical
+  iteration counts** (86/276/229/290/284), unchanged from the pre-change
+  record.
+- **G2 (direct A/B, same fixtures, same 262 iters, this repo's LTO bench
+  profile):**
+
+  | Fixture | dense | sparse | speedup |
+  |---|---|---|---|
+  | one-hot N=64/A=4 | 682.0 µs | 391.3 µs | 1.74× |
+  | one-hot N=64/A=16 | 1984.8 µs | 1209.2 µs | 1.64× |
+  | one-hot N=256/A=16 | 20218.8 µs | 6044.0 µs | **3.35×** |
+  | 4-room gridworld N=82/A=4 | 663.4 µs | 335.1 µs | 1.98× |
+
+  N=256 gains most: the 4 MiB kernel exceeds L2, so the dense dot was
+  memory-bound (streaming the full kernel every iteration); skipping 63 of
+  64 entries per row avoids most of that traffic. N=64 kernels fit in cache
+  → the win is the eliminated multiplies. The pre-change gridworld number
+  (663.4 µs) reproduces the original Bench 638 record (663 µs) exactly.
+  G2 gate (gridworld < 1 ms): **335 µs PASS**. Production-profile caveat:
+  downstream workspaces without LTO (riir-ai compiles this crate at cgu=16,
+  no LTO) see ~2× slower loop codegen — the consumer-side numbers live in
+  riir-ai Bench 680's Issue 654 follow-up.
+- **G3/G4:** clippy 0 warnings (`--all-targets`, feature on); default build
+  compiles nothing new; **0 allocations** across solve + 1000 `pi_star`
+  calls (the one-hot table is a new private `MopScratch` field — stack,
+  no public-API change).
+
+**Honest scope notes:** (1) `state_conditional_entropy` keeps its dense
+walk — it runs once per row per solve (~0.3% of solve cost) and delegates
+to the shared `cgsp::types::entropy_nats` (the no-duplicate-entropy rule;
+re-implementing a sparse variant would duplicate substrate). (2) The G2
+ceiling-shaped win is bounded by the LSE `exp()` floor, not the dot — see
+riir-ai Bench 680's follow-up for the consumer-side decomposition.

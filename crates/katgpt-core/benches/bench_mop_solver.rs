@@ -87,6 +87,21 @@ fn random_kernel<const N: usize, const A: usize>(
     p
 }
 
+/// Random one-hot kernel: every (s,a) row sends all its mass to one random
+/// column — the zone-KG abstraction shape (deterministic single-
+/// representative zones), Issue 654's target structure. Exercises the
+/// one-hot fast-path dot.
+fn onehot_kernel<const N: usize, const A: usize>(seed: u64) -> [[[f32; N]; A]; N] {
+    let mut rng = Rng::new(seed);
+    let mut p = [[[0.0f32; N]; A]; N];
+    for p_i in p.iter_mut() {
+        for p_ik in p_i.iter_mut() {
+            p_ik[(rng.next_u64() as usize) % N] = 1.0;
+        }
+    }
+    p
+}
+
 fn bench<const N: usize, const A: usize>(
     label: &str,
     p: &[[[f32; N]; A]; N],
@@ -151,6 +166,26 @@ fn run() {
         let mask = [[1u8; 16]; N];
         let p = random_kernel::<N, 16>(2, 4);
         bench::<N, 16>("random", &p, &mask, &cfg);
+    }
+    // One-hot ladder (Issue 654): the zone-KG consumer shape — the sparse
+    // fast-path dot replaces the dense SIMD dot in the sweep.
+    {
+        const N: usize = 64;
+        let mask = [[1u8; 4]; N];
+        let p = onehot_kernel::<N, 4>(4);
+        bench::<N, 4>("one-hot", &p, &mask, &cfg);
+    }
+    {
+        const N: usize = 64;
+        let mask = [[1u8; 16]; N];
+        let p = onehot_kernel::<N, 16>(5);
+        bench::<N, 16>("one-hot", &p, &mask, &cfg);
+    }
+    {
+        const N: usize = 256;
+        let mask = [[1u8; 16]; N];
+        let p = onehot_kernel::<N, 16>(9);
+        bench::<N, 16>("one-hot", &p, &mask, &cfg);
     }
     let (us_256, iters_256) = {
         const N: usize = 256;
