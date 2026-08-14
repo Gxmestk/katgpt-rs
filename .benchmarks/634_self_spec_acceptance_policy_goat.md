@@ -91,4 +91,4 @@ ExactQ stays available (not default) for consumers that want temperature-diverse
 
 ## FlashAR audit (T7)
 
-Not distribution-preserving by design: Plasma/Hot accept unverified (Plan 166's latency trade-off), Warm/Cold use argmax prefix-match (mode-biasing — the exact failure class fixed here). Actionable slice filed as [Issue 650](../.issues/650_flashar_cold_path_prefix_match.md). No code change in this issue.
+Not distribution-preserving by design: Plasma/Hot accept unverified (Plan 166's latency trade-off), Warm/Cold use argmax prefix-match (mode-biasing — the exact failure class fixed here). Actionable slice filed as [Issue 651](../.issues/651_flashar_cold_path_prefix_match.md). No code change in this issue.
