@@ -1618,6 +1618,16 @@ pub use product_key_memory::{
     D_K_FLOOR, PkEntry, PkQuery, PkmScratch, ProductKeyMemory, SQRT_N_FLOOR, ScoreFn, score_dot,
     score_idw,
 };
+
+// MOP — Maximum Occupancy Principle value-iteration primitive (Plan 573 /
+// Research 478, arXiv:2205.10316). The paper's Eq. 7 fixed-point map in
+// log-space LSE form over a frozen tabular kernel — reward-free optimal
+// policy with emergent survival (absorbing states V=0 bit-exact) and a β
+// risk knob. Opt-in `mop_path_entropy`. Consumers: riir-ai Plan 538.
+#[cfg(feature = "mop_path_entropy")]
+pub mod mop;
+#[cfg(feature = "mop_path_entropy")]
+pub use mop::{MopConfig, MopConfigError, MopScratch, MopSolver, MopSolution};
 // Phase 4 (F4 fusion) — freeze/thaw wrapper around ProductKeyMemory. Gated
 // separately so the leaf-clean retrieval primitive (above) stays usable
 // without the Arc<RwLock<Arc<...>>> + BLAKE3 commitment machinery. See
