@@ -378,6 +378,29 @@ impl<const K: usize, const D: usize> DriftSegmentStore<K, D> {
         // of debug dumps only.
         self.slots = [DriftSlot::default(); K];
     }
+
+    /// Discard all accumulated segments, keeping the converged drift kernel
+    /// (Issue 680 consumer support — the warmup-discard primitive).
+    ///
+    /// The kernel's slow EMA converges over ~`2/α_slow` tokens during which
+    /// the relative score is elevated by construction (both EMAs near zero —
+    /// the same phenomenon τ calibrators skip a warmup prefix for).
+    /// Those elevated scores land in slot 0's `info_sum`, making the startup
+    /// transient look like a high-density needle. A consumer that wants
+    /// density to mean "moment that mattered" (recognition, salience feeds)
+    /// discards the warmup prefix with this method once the kernel has
+    /// converged: segments + boundary/merge counters reset, the kernel + the
+    /// monotonic token position continue.
+    ///
+    /// After this call the store behaves as if freshly started EXCEPT the
+    /// kernel is already converged — the next `observe` opens a clean slot
+    /// whose density reflects only post-warmup drift.
+    pub fn reset_slots(&mut self) {
+        self.n_active = 0;
+        self.boundaries_fired = 0;
+        self.merges_done = 0;
+        self.slots = [DriftSlot::default(); K];
+    }
 }
 
 #[cfg(test)]
@@ -668,5 +691,36 @@ mod tests {
             cos_b > cos_a + 0.1,
             "readout must favor the aligned regime: cos_b={cos_b} cos_a={cos_a}"
         );
+    }
+
+    #[test]
+    fn reset_slots_discards_segments_keeps_converged_kernel() {
+        // Warmup discard (Issue 680 consumer support): after ~2/α_slow
+        // tokens of a stationary regime, reset_slots must (a) clear slots +
+        // boundary counters, (b) keep the converged kernel so the next
+        // stationary token's relative score is LOW (no second transient),
+        // (c) keep the monotonic token position.
+        let mut rng = fastrand::Rng::with_seed(31);
+        let a = unit_dir(&mut rng);
+        let mut store = DriftSegmentStore::<8, D>::new(0.35, 4.0);
+        for _ in 0..200 {
+            store.observe(&noisy(&a, 0.02, &mut rng), &a);
+        }
+        let pos_before = store.tokens_seen();
+        let score_converged = store.relative_drift();
+        store.reset_slots();
+        assert_eq!(store.n_slots(), 0);
+        assert_eq!(store.boundaries_fired(), 0);
+        assert_eq!(store.merges_done(), 0);
+        // Kernel kept: next token's score stays at the converged (low) level,
+        // NOT the ~0.9 startup level a full reset() would re-produce.
+        store.observe(&noisy(&a, 0.02, &mut rng), &a);
+        assert_eq!(store.n_slots(), 1);
+        let post = store.relative_drift();
+        assert!(
+            post < 0.5,
+            "kernel must stay converged after reset_slots: post={post:.3} (converged={score_converged:.3})"
+        );
+        assert_eq!(store.tokens_seen(), pos_before + 1);
     }
 }
