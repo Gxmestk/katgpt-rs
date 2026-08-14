@@ -1947,6 +1947,7 @@ A consolidated section for standalone opt-in features with their own plans but n
 | Feature | Plan | Role |
 |---|---|---|
 | `rim_slots` | 172 | RiM Reasoning Buffer Slots — fixed latent workspace for DDTree |
+| `drift_segment` | 652 / Research 482 | DriftSegmentStore — training-free drift-segmented multi-state memory: rising-edge drift boundaries open slots, adjacent-density merge enforces capacity-K (arXiv:2606.10650 modelless; Bench 635 GOAT PASS — G1 +46.09pp change-point / +75.00pp stationary needle recall vs fixed-LFU at matched budget, 12 ns/token, 0 allocs; consumers: riir-ai `npc_episodic` Bench 675 + neuron-db wake-merge policy Bench 480; promotion candidate at next re-gate) |
 | `product_key_memory_freeze` | 408 Phase 4 | FrozenProductKeyMemory — freeze/thaw wrapper with BLAKE3 commitment |
 | `product_key_memory_episodic` | 408 Phase 5 / Issue 650 | PkmEpisodicStore — δ-rule write gate (PKM × δ-Mem fusion) + TF-IDF non-interference slot selection (`write_idf`/`write_weighted_idf` + `BackgroundAccessStats` + `write_selected`; Bench 636 GOAT G1 +12.5pp retention at matched learning) |
 | `chunked_net_fetch` | 272 T3.3 | NetChunkFetcher — network chunk fetcher stub for ChunkedContentStore |

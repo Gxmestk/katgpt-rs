@@ -554,7 +554,7 @@ self_cond_draft = ["katgpt-core/self_cond_draft", "katgpt-speculative/self_cond_
 outlier_guard = ["katgpt-spectral/outlier_guard"]  # ON BY DEFAULT — KS D-statistic outlier detection at model load (Plan 224)
 regime_transition = ["and_or_dtree", "bandit", "decision_trace", "fol_constraints", "rule_extraction", "katgpt-pruners/regime_transition"]  # ON BY DEFAULT — Regime-Transition Inference, self-revising discovery (Plan 215, GOAT PROVED -0.3% overhead vs real decode)
 segment_checkpoint = ["katgpt-kv/segment_checkpoint"]  # ON BY DEFAULT — core GRM segment caching (Plan 223b). Phase 5: moved to katgpt-kv (Proposal 003).
-drift_segment = ["katgpt-kv/drift_segment"]  # Opt-in — DriftSegmentStore training-free drift-segmented multi-state memory (Issue 652 / Research 482, arXiv:2606.10650 modelless). GOAT pending bench_635.
+drift_segment = ["katgpt-kv/drift_segment"]  # Opt-in — DriftSegmentStore training-free drift-segmented multi-state memory (Issue 652 / Research 482, arXiv:2606.10650 modelless). GOAT PASS Bench 635 (2026-08-15); consumers landed (riir-ai npc_episodic Bench 675 + neuron-db wake-merge policy Bench 480) — promotion candidate at next re-gate.
 ssc_spec_draft = ["segment_checkpoint", "regime_transition", "katgpt-kv/ssc_spec_draft"]  # Opt-in — SSC sparse speculative drafting
 memory_soup_dtree = ["segment_checkpoint", "regime_transition"]  # Opt-in — experimental DDTree branch merging
 # Memory Soup LoRA Artifact Importer (Plan 253 T19 G5).

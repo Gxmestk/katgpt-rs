@@ -83,7 +83,8 @@ segment_checkpoint = []
 # (Issue 652 / Research 482, arXiv:2606.10650 modelless adaptation).
 # Composes temporal_deriv (drift score) × segment_checkpoint (bounded slots)
 # × hope_compactor's pair-merge pattern (adjacent-density merge).
-# Opt-in pending bench_635 GOAT gate.
+# Opt-in — bench_635 GOAT PASS (2026-08-15); consumers landed (riir-ai
+# npc_episodic, neuron-db wake-merge policy) — promotion candidate at next re-gate.
 drift_segment = []
 
 # SSC Sparse Speculative Drafting — opt-in sub-module of segment_checkpoint
