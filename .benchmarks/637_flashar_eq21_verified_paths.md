@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-15
 **Machine:** M3 Max (CPU-only; no GPU used — exclusivity check N/A)
-**Source:** [Issue 651](../.issues/651_flashar_cold_path_prefix_match.md) — the Issue 587 T7 audit's actionable slice
+**Source:** Issue 651 (removed per noise-reduction rule — resolved 2026-08-15; this bench is the record) — the Issue 587 T7 audit's actionable slice
 **Source paper:** FLARE ([arXiv:2606.01774](https://arxiv.org/abs/2606.01774) §3.3) — Eq 21/22 acceptance taxonomy
 **Feature:** `flashar_consensus` (opt-in, unchanged — root feature already implies `tri_mode` + `plasma_path`; katgpt-forward's flag now implies `tri_mode` for the d2f_verifier import)
 **Run:** `cargo test -p katgpt-rs --features flashar_consensus --test bench_166_flashar_consensus_goat -- --nocapture` + the new exactness test in `katgpt-forward/src/flashar_consensus.rs`

@@ -1,7 +1,7 @@
 # Bench 634 — Self-Speculation Distribution-Preserving Acceptance (Issue 587 / FLARE Eq 8/21/22)
 
 **Date:** 2026-08-14
-**Issue:** [587](../.issues/587_self_spec_exact_acceptance_policy.md) — executing [Research 480](../.research/480_FLARE_Hybrid_Diffusion_Dual_Trust_Decode.md) (FLARE, arXiv:2606.01774 §3.3 + App B.2)
+**Issue:** 587 (removed per noise-reduction rule — resolved 2026-08-15; this bench is the record) — executing [Research 480](../.research/480_FLARE_Hybrid_Diffusion_Dual_Trust_Decode.md) (FLARE, arXiv:2606.01774 §3.3 + App B.2)
 **Target:** `crates/katgpt-forward/src/d2f_verifier.rs` + `d2f/mod.rs` (+ root re-export shims, `SelfSpecConfig`)
 **Feature gate:** `tri_mode` (unchanged — the policy is a config enum, not a Cargo feature)
 **Machine:** M3 Max (Apple Silicon), debug-mode cargo test harness. GPU: idle (CPU-only change; no GPU exclusivity concern).
@@ -91,4 +91,4 @@ ExactQ stays available (not default) for consumers that want temperature-diverse
 
 ## FlashAR audit (T7)
 
-Not distribution-preserving by design: Plasma/Hot accept unverified (Plan 166's latency trade-off), Warm/Cold use argmax prefix-match (mode-biasing — the exact failure class fixed here). Actionable slice filed as [Issue 651](../.issues/651_flashar_cold_path_prefix_match.md). No code change in this issue.
+Not distribution-preserving by design: Plasma/Hot accept unverified (Plan 166's latency trade-off), Warm/Cold use argmax prefix-match (mode-biasing — the exact failure class fixed here). Actionable slice was Issue 651 (removed per noise-reduction rule — resolved 2026-08-15 per Bench 637). No code change in this issue.

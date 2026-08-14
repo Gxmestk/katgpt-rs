@@ -7,7 +7,7 @@
 > **Related Plans:** 066 (D2F), 089 (D2fDrafterVerifier / tri_mode), 109 (DMax SPD), 116 (DiffusionSampler), 166 (FlashAR consensus)
 > **Cross-ref (riir-ai / riir-train):** riir-ai Research 036 (Luce hybrid DeltaNet megakernel), riir-train Research 003 (D2F training)
 > **Classification:** Public
-> **Issue:** [587 — distribution-preserving self-speculation acceptance](../.issues/587_self_spec_exact_acceptance_policy.md)
+**Issue:** 587 — distribution-preserving self-speculation acceptance (removed per noise-reduction rule — resolved 2026-08-15; Bench 634 is the record)
 
 ---
 

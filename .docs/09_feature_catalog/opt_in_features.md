@@ -2520,15 +2520,15 @@ Distills FlashMemory-DeepSeek-V4's lookahead sparse attention ([arXiv:2606.09079
 - **Sigmoid threshold selection** — `sigmoid(score) ≥ threshold` per-head per-block (paper default 0.5), producing dynamic block counts per query instead of rigid top-k. Sigmoid, never softmax.
 - **Block centroids from MLA latent KV** — `FlashMemoryBlockCache::rebuild_from_cache` builds block centroids from `MlaKVCache::latent_kv_at()` + `W_UK` per-head up-projection. The centroid is only the selection heuristic — the sparse forward (`mla_forward_token_flashmemory`) attends to real per-token keys inside selected blocks.
 
-### GOAT gate (Issue 584 Phase 1-3, real Kimi-K3-0.40B weights, M3 Metal, 2026-08-13)
+### GOAT gate (Issue 584 — resolved 2026-08-15; Phase 1 real weights M3 2026-08-13, Phase 2 4090 2026-08-14)
 
 | Gate | Verdict | Evidence |
 |---|---|---|
 | **G1** correctness | ✅ **PASS** | Dense-vs-sparse MLA on real `model.safetensors` weights: median cos 0.9566/0.9663/0.9663 + median rel MSE 0.1327/0.0929/0.0993 at 128/512/1024 tokens, ~73-74% KV reduction (`bench_021_flashmemory_real_weights_retrieval`). Threshold sweep: 0.5 is the calibrated sweet spot (0.3 → cos 1.0 but no sparsity; 0.7 → cos 0.72). |
 | **G3** no-regression | ✅ **PASS** | 169 VortexFlow tests incl. the periodic-refresh extension (2026-08-13). |
 | **G4** alloc-free | ✅ **PASS** | 0 allocations across 256 steady-state decode tokens / 32 selector refreshes (`bench_022_flashmemory_alloc_free`). Fixed two per-token alloc sites: `blocks_to_attend` stack-array fallback + `PerHeadSelection::new` pre-reserved capacity. |
-| **G5** KV reduction | ◐ **M3 curve done** | Plateaus at ~74% for ≤8K context (128/512/1024/2048/4096/8192 tested, `bench_024_flashmemory_g5_scaling_curve`); G1 holds at ALL scales (cos 0.9566→0.9624). Paper's 90% is a 256K-context phenomenon — accuracy is stable, the ratio's growth to 90% lives in the 8K→256K regime. Needs Bonsai-27B on the 4090. |
-| **G2** decode latency @ 256K | ⏸ **BLOCKED** | Requires the 4090 (held by a sibling riir-train training run — Bench 456 in that repo's namespace — during the landing window). |
+| **G5** KV reduction | ◐ **PARTIAL (data-dependent)** | Real Kimi-K3 weights: ~74% ≤8K (bench_024, G1 holds at all scales). Bench 671 (4090, synthetic): ~50% consistent 4K→256K — synthetic random per-block directions keep ~50% positive dot-products. Paper's 90% needs real long-context attention patterns (a trained indexer / real Bonsai serving, riir-train Plan 337). |
+| **G2** decode latency @ 256K | ✅ **PASS** | Bench 671 (RTX 4090, 2026-08-14, Bonsai GQA dims, synthetic): **1.8×** decode at 64K (6.35 vs 11.35 ms/token); at 256K sparse 22.69 vs dense 43.73 ms/token. GQA substrate: `GqaFlashMemoryBlockCache`/`GqaFlashMemorySelector` (katgpt-attn, 5 tests) + `forward_attention_layer_flashmemory` (riir-engine `flashmemory_gqa`, 4 tests). |
 
 **Honest negative result (NIAH semantic-needle diagnostic, `bench_023`):** single-layer retrieval is **not testable** — the needle block has near-uniform dense attention (rank 34/34, mass ~0.03) at layer 3/8 on raw-embedding inputs; retrieval is an emergent multi-layer property. Positive diagnostic: per-head Pearson r between FlashMemory centroid block-mass and dense per-token block-mass = 0.965 (min 0.765). Output accuracy (G1) is the load-bearing gate; full-model NIAH deferred to Phase 2.
 
@@ -2541,10 +2541,10 @@ Two tiny trained MLPs (Q-Indexer + K-Indexer, 2114 params at Kimi-K3 d_h=64) tha
 
 ### Why opt-in
 
-1. **GOAT gate incomplete.** G2 (decode latency at 256K) + the 90% KV-reduction claim are blocked on 4090 availability (Issue 584 Phase 2). Default-on waits for the full gate.
-2. **Mechanism-to-scale mismatch at M3 scale.** Validated at ≤8K context on a 395M model's 2 MLA layers; the serving regime it targets (67GB→6.7GB KV at 256K on Bonsai-27B) is 4090-only.
+1. **Serving-regime specificity.** GOAT gate complete (G2 PASS via Bench 671 on 4090, 2026-08-14; G5 PARTIAL — reduction is data-dependent: ~50% synthetic / 74% real ≤4K). Stays opt-in on scope, not gate: the win shape (KV-constrained 256K serving on Bonsai/4090) is far from the default short-context workload, and promotion waits for the trained indexer (riir-train Plan 337) to prove it beats the modelless scorer at scale.
+2. **Scale honesty.** Real-weights validation is Kimi-K3-0.40B's 2 MLA layers at ≤8K; the 4090 scale test (Bench 671) is single-layer synthetic at Bonsai dims. Real 256K Bonsai serving needs CPU-offload + GPU-prefetch (the issue documents why a dense 256K baseline is infeasible on one 4090 — ~128 GiB).
 3. **`trained_indexer` is training-dependent** — never default-on per the modelless-first mandate; the modelless `FlashMemorySelector` is the production default.
 
 🔧 Feature flags: `flashmemory_sparse` (root → `katgpt-attn/flashmemory_sparse`, implies `mla_attention` + `dash_attn`, opt-in) + `trained_indexer` (root → `katgpt-attn/trained_indexer`, implies `flashmemory_sparse`, opt-in never default-on).
 
-📖 Substrate: `crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs` (14 tests; both the modelless selector and the `trained_indexer` DualEncoderIndexer live in this one module) — landed across commits `8f030de2` (Phase 1 mechanism), `5ab63aef` (G1 bench_021), `7030cefa` (G4 bench_022), `865362e3` (G5 bench_024), `5e2b5f2b` (Plan 337 Phase B DualEncoderIndexer), `bca98f08` (Plan 337 bench_025), `4cdd0dec` (Plan 337 Phase C bench_026). Issue: [`.issues/584`](../../.issues/584_flashmemory_sparse_attention_4090_kimi_k3_bonsai_validation.md) (Open — Phase 2 + G2 blocked on 4090). Training recipe: [riir-train Plan 337](../../../riir-train/.plans/337_flashmemory_indexer_training_recipe.md) (NOT the katgpt-rs Plan 337 — that is Tropical algebra).
+📖 Substrate: `crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs` (14 tests; both the modelless selector and the `trained_indexer` DualEncoderIndexer live in this one module) — landed across commits `8f030de2` (Phase 1 mechanism), `5ab63aef` (G1 bench_021), `7030cefa` (G4 bench_022), `865362e3` (G5 bench_024), `5e2b5f2b` (Plan 337 Phase B DualEncoderIndexer), `bca98f08` (Plan 337 bench_025), `4cdd0dec` (Plan 337 Phase C bench_026). Issue 584 (removed per noise-reduction rule — resolved 2026-08-15; G1-G5 evaluated, G2 via Bench 671; Benches 021-026 + 671 are the record). Training recipe: [riir-train Plan 337](../../../riir-train/.plans/337_flashmemory_indexer_training_recipe.md) (NOT the katgpt-rs Plan 337 — that is Tropical algebra).
