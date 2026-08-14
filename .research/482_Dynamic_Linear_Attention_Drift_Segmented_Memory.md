@@ -61,7 +61,7 @@ A bounded multi-slot memory where **surprise opens a slot, density closes one**:
 
 ### 2.4 Fusion (paper × shipped primitives)
 
-- **F1 — DriftSegmentStore (katgpt-kv, this repo; Issue 652).** `segment_checkpoint` sibling: boundaries from `surprise_norm() ≥ τ` instead of fixed 128-token tiles; LFU evict → adjacent-density merge; readout via existing GRM gating. Bench: needle recall at matched budget vs SegmentStore-policy and single-state accumulator on synthetic change-point streams. This is the **Area-7 training-free variant** — no published prior art found.
+- **F1 — DriftSegmentStore (katgpt-kv, this repo; Issue 652 — resolved + removed 2026-08-15, record: [Bench 635](../.benchmarks/635_drift_segment_goat.md)).** `segment_checkpoint` sibling: boundaries from `surprise_norm() ≥ τ` instead of fixed 128-token tiles; LFU evict → adjacent-density merge; readout via existing GRM gating. Bench: needle recall at matched budget vs SegmentStore-policy and single-state accumulator on synthetic change-point streams. This is the **Area-7 training-free variant** — no published prior art found.
 - **F2 — per-NPC episodic belief memory (riir-ai).** `evolve_belief` already carries the temporal_deriv channel (Plan 277 Fusion F1). Game reframe: an NPC's day is non-stationary (patrol → ambush → trade); surprise opens an episodic slot, stable spans merge, K bounded per NPC at 20 Hz. Selling-point shape: "NPCs remember the moments that matter, at bounded cost" (Living World / four-tier memory, Research 007/084/161). File only after F1's PoC.
 - **F3 — consolidation policy (riir-neuron-db).** Wake-buffer uniform average → density-aware adjacent merge (online cousin of `sleep_diverse`, Plan 005); `hope_compactor` could adopt adjacency restriction where shard order is meaningful. Cold-path, policy transfer only.
 
@@ -77,7 +77,7 @@ A bounded multi-slot memory where **surprise opens a slot, density closes one**:
 
 ## 3. Verdict
 
-**Tier: Gain** — research note (this file) + [Issue 652](../.issues/652_drift_segmented_memory_poc.md) (PoC/proof task; plan only if the PoC passes and warrants a full build-out).
+**Tier: Gain** — research note (this file) + Issue 652 (PoC/proof task; **resolved + removed 2026-08-15** — PoC PASS via [Bench 635](../.benchmarks/635_drift_segment_goat.md), stays opt-in, F2/F3 follow-ups filed to riir-ai Issue 677 + riir-neuron-db Issue 595).
 
 **Reasoning:** Doesn't ship + modelless-validable (Path 0: score ✓ / threshold ✓ / greedy merge ✓ / readout ✓ — all components have analogs; no riir-train deferral). Not Super-GOAT: Q1 (no prior art) is weakened — AMD is concurrent published content-adaptive multi-state, Titans owns surprise-gated writes, classical min-merge owns the merge-policy shape, and DLA itself is the published art for the composite; Q3 (selling point) is plausible ("adaptive-resolution memory at bounded cost, no training") but unproven until the PoC. Per the no-candidate rule this is filed as **fusion idea, novelty TBD** — the issue is the deciding experiment.
 

@@ -54,7 +54,7 @@ collapse. Two identified causes, neither yet isolated by experiment:
 
 ## Related
 
-- [Issue 585](585_mop_defend_wrong_poc.md) — the parent PoC
+- [Issue 585](585_mop_defend_wrong_poc.md) — the parent PoC (resolved + removed 2026-08-15 per noise-reduction rule — PoC discharged via Bench 677 + §3.3 outputs shipped; record: [Research 478 §3.3](../.research/478_MOP_Maximum_Occupancy_Principle.md) + [riir-ai Research 338](../../riir-ai/.research/338_per_npc_mop_runtime_guide.md))
 - [riir-ai Bench 677](../../riir-ai/.benchmarks/677_mop_defend_wrong_poc.md) — full record
 - `riir-ai/crates/riir-poc/src/mop_poc.rs` — `PreyPredatorRing::env()` is the
   tie-break site; `g4_diagnostic_gamma_sensitivity` is the γ-sweep harness
