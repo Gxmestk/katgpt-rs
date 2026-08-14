@@ -242,6 +242,273 @@ impl FlashMemoryBlockCache {
 }
 
 // ---------------------------------------------------------------------------
+// GQA block centroid cache (Issue 584 Phase 2 — Bonsai/Qwen3.5 support)
+// ---------------------------------------------------------------------------
+
+/// Block centroid cache for standard GQA attention (no latent compression).
+///
+/// Unlike [`FlashMemoryBlockCache`] (MLA-specific, stores compressed `c_kv`
+/// latent centroids and up-projects through `W_UK`), this cache operates on
+/// **raw GQA keys** already in per-head content space. The block centroid for
+/// head `h` is simply the mean of the raw keys for KV head `h` over the block's
+/// token range.
+///
+/// # Layout
+///
+/// The raw key cache is `[seq_len * kv_dim]` where `kv_dim = n_kv_head * head_dim`.
+/// Token `t`, KV head `h` key = `keys[t * kv_dim + h * head_dim .. t * kv_dim + (h+1) * head_dim]`.
+///
+/// # Why a separate type (not a trait)
+///
+/// `FlashMemorySelector::select()` takes `&FlashMemoryBlockCache` by concrete
+/// type (not a trait). Rather than refactoring the selector to be generic over
+/// the cache type (which would ripple through the trained `DualEncoderIndexer`
+/// too), we duplicate the small read-side interface (`n_active_blocks`,
+/// `key_centroid`, `block_count`, `block_token_range`). The selector could be
+/// made generic later if a third cache variant appears — YAGNI for now.
+///
+/// # Issue 584 Phase 2
+///
+/// Bonsai-27B (Qwen3.5-arch) uses GQA in its attention layers. This cache
+/// enables FlashMemory sparse selection on Bonsai without the MLA substrate.
+/// The same `FlashMemorySelector` (modelless sigmoid threshold) is reused —
+/// only the block-centroid source differs.
+pub struct GqaFlashMemoryBlockCache {
+    /// `[max_blocks * n_kv_head * head_dim]` — per-KV-head key centroid per block.
+    /// Indexed as `key_centroids[block * n_kv_head * head_dim + head * head_dim + ..]`.
+    key_centroids: Vec<f32>,
+    /// `[max_blocks]` — number of tokens currently in each block.
+    block_counts: Vec<usize>,
+    /// Number of blocks with at least one token.
+    n_active_blocks: usize,
+    n_kv_head: usize,
+    head_dim: usize,
+    block_size: usize,
+    max_blocks: usize,
+}
+
+impl GqaFlashMemoryBlockCache {
+    /// Create a new GQA block cache.
+    ///
+    /// * `n_kv_head` — number of KV heads (GQA)
+    /// * `head_dim` — dimension per head
+    /// * `fm_config` — FlashMemory config (uses `block_size`)
+    /// * `max_seq` — maximum sequence length (determines `max_blocks`)
+    pub fn new(
+        n_kv_head: usize,
+        head_dim: usize,
+        fm_config: &FlashMemoryConfig,
+        max_seq: usize,
+    ) -> Self {
+        let block_size = fm_config.block_size;
+        let max_blocks = max_seq.div_ceil(block_size).max(1);
+        Self {
+            key_centroids: vec![0.0; max_blocks * n_kv_head * head_dim],
+            block_counts: vec![0; max_blocks],
+            n_active_blocks: 0,
+            n_kv_head,
+            head_dim,
+            block_size,
+            max_blocks,
+        }
+    }
+
+    /// Rebuild block centroids from a raw GQA key cache.
+    ///
+    /// `keys` is `[seq_len * kv_dim]` where `kv_dim = n_kv_head * head_dim`.
+    /// Computes the mean of keys per block per KV head.
+    pub fn rebuild_from_keys(&mut self, keys: &[f32], seq_len: usize) {
+        let kv_dim = self.n_kv_head * self.head_dim;
+        debug_assert!(keys.len() >= seq_len * kv_dim, "key cache too short");
+        let n_blocks = seq_len.div_ceil(self.block_size).min(self.max_blocks);
+        self.n_active_blocks = n_blocks;
+
+        for block_idx in 0..n_blocks {
+            let start = block_idx * self.block_size;
+            let end = (start + self.block_size).min(seq_len);
+            let count = end - start;
+            self.block_counts[block_idx] = count;
+
+            if count == 0 {
+                continue;
+            }
+
+            // Mean-pool keys for each KV head over [start, end).
+            let centroid_off = block_idx * self.n_kv_head * self.head_dim;
+            let centroid =
+                &mut self.key_centroids[centroid_off..centroid_off + self.n_kv_head * self.head_dim];
+            centroid.fill(0.0);
+            for tok in start..end {
+                let key_off = tok * kv_dim;
+                // Accumulate per-KV-head.
+                for h in 0..self.n_kv_head {
+                    let src = &keys[key_off + h * self.head_dim..key_off + (h + 1) * self.head_dim];
+                    let dst = &mut centroid[h * self.head_dim..(h + 1) * self.head_dim];
+                    simd_add_inplace(dst, src);
+                }
+            }
+            let inv = 1.0 / count as f32;
+            simd_scale_inplace(centroid, inv);
+        }
+    }
+
+    /// Number of active blocks (blocks with at least one token).
+    #[inline]
+    pub fn n_active_blocks(&self) -> usize {
+        self.n_active_blocks
+    }
+
+    /// Get the key centroid for block `block_idx`, KV head `head`.
+    /// Returns `head_dim` floats.
+    #[inline]
+    pub fn key_centroid(&self, block_idx: usize, head: usize) -> &[f32] {
+        let off = block_idx * self.n_kv_head * self.head_dim + head * self.head_dim;
+        &self.key_centroids[off..off + self.head_dim]
+    }
+
+    /// Number of tokens in block `block_idx`.
+    #[inline]
+    pub fn block_count(&self, block_idx: usize) -> usize {
+        self.block_counts[block_idx]
+    }
+
+    /// Token range [start, end) for block `block_idx` given current `seq_len`.
+    #[inline]
+    pub fn block_token_range(&self, block_idx: usize, seq_len: usize) -> (usize, usize) {
+        let start = block_idx * self.block_size;
+        let end = (start + self.block_size).min(seq_len);
+        (start, end)
+    }
+
+    /// Block size (tokens per block).
+    #[inline]
+    pub fn block_size(&self) -> usize {
+        self.block_size
+    }
+
+    /// Number of KV heads.
+    #[inline]
+    pub fn n_kv_head(&self) -> usize {
+        self.n_kv_head
+    }
+
+    /// Head dimension.
+    #[inline]
+    pub fn head_dim(&self) -> usize {
+        self.head_dim
+    }
+}
+
+/// GQA-compatible periodic selector. Identical scoring logic to
+/// [`FlashMemorySelector`] but reads from [`GqaFlashMemoryBlockCache`] and
+/// handles the GQA query→KV-head mapping (multiple query heads share one KV
+/// head via `kv_group = q_head * n_kv_head / n_query_head`).
+///
+/// The selector scores blocks per **KV head** (not per query head), since the
+/// block centroid lives in KV-head space. All query heads sharing a KV group
+/// use the same block selection. This is the standard GQA sparse attention
+/// pattern — it avoids redundant scoring and matches the shared-KV structure.
+pub struct GqaFlashMemorySelector {
+    config: FlashMemoryConfig,
+    /// Per-KV-head selection. `blocks_per_head[kv_head]` = selected block indices.
+    last_selection: PerHeadSelection,
+    last_refresh_step: usize,
+    selection_valid: bool,
+    /// Scratch: block scores per KV head. `[n_kv_head * max_blocks]`.
+    scores_buf: Vec<f32>,
+    n_kv_head: usize,
+    head_dim: usize,
+    max_blocks: usize,
+    refresh_count: usize,
+}
+
+impl GqaFlashMemorySelector {
+    pub fn new(
+        config: FlashMemoryConfig,
+        n_kv_head: usize,
+        head_dim: usize,
+        max_blocks: usize,
+    ) -> Self {
+        Self {
+            config,
+            last_selection: PerHeadSelection::new(n_kv_head, max_blocks),
+            last_refresh_step: 0,
+            selection_valid: false,
+            scores_buf: vec![0.0; n_kv_head * max_blocks],
+            n_kv_head,
+            head_dim,
+            max_blocks,
+            refresh_count: 0,
+        }
+    }
+
+    pub fn refresh_count(&self) -> usize {
+        self.refresh_count
+    }
+
+    pub fn force_refresh(&mut self) {
+        self.selection_valid = false;
+    }
+
+    pub fn is_selection_valid(&self) -> bool {
+        self.selection_valid
+    }
+
+    /// Select blocks per KV head using sigmoid threshold.
+    ///
+    /// `query_keys` is `[n_kv_head * head_dim]` — the query projected into
+    /// KV-head space (for GQA, this means averaging query heads within each
+    /// KV group, or equivalently computing the query at KV-head resolution).
+    pub fn select(
+        &mut self,
+        query_keys: &[f32],
+        block_cache: &GqaFlashMemoryBlockCache,
+        attn_scale: f32,
+        current_step: usize,
+    ) -> &PerHeadSelection {
+        let need_refresh = !self.selection_valid
+            || current_step.saturating_sub(self.last_refresh_step) >= self.config.refresh_period;
+
+        if !need_refresh {
+            return &self.last_selection;
+        }
+
+        self.last_selection.clear();
+        self.last_refresh_step = current_step;
+        self.selection_valid = true;
+        self.refresh_count += 1;
+
+        let n_blocks = block_cache.n_active_blocks();
+        debug_assert_eq!(query_keys.len(), self.n_kv_head * self.head_dim);
+
+        for kv_head in 0..self.n_kv_head {
+            let q_h = &query_keys[kv_head * self.head_dim..(kv_head + 1) * self.head_dim];
+            let scores = &mut self.scores_buf
+                [kv_head * self.max_blocks..kv_head * self.max_blocks + n_blocks];
+
+            for (block_idx, score_slot) in scores.iter_mut().enumerate().take(n_blocks) {
+                let centroid = block_cache.key_centroid(block_idx, kv_head);
+                *score_slot = simd_dot_f32(q_h, centroid, self.head_dim) * attn_scale;
+            }
+
+            for (block_idx, &score) in scores.iter().enumerate().take(n_blocks) {
+                let sig = katgpt_core::sigmoid(score);
+                if sig >= self.config.threshold {
+                    self.last_selection.blocks_per_head[kv_head].push(block_idx);
+                }
+            }
+        }
+
+        &self.last_selection
+    }
+
+    pub fn selection(&self) -> &PerHeadSelection {
+        assert!(self.selection_valid, "no valid selection — call select() first");
+        &self.last_selection
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Periodic selector
 // ---------------------------------------------------------------------------
 
@@ -1686,5 +1953,133 @@ mod tests {
         let q_c = vec![0.5; config.n_heads * d_h];
         let sel = indexer.select(&q_c, &block_cache, 0);
         assert!(sel.total_selections() > 0);
+    }
+
+    // ── GQA FlashMemory tests (Issue 584 Phase 2 — Bonsai/Qwen3.5 support) ──
+
+    /// GQA block cache builds correct centroids from raw keys.
+    #[test]
+    fn gqa_q1_block_centroids_built_from_raw_keys() {
+        let fm = FlashMemoryConfig { block_size: 4, refresh_period: 100, threshold: 0.5 };
+        let n_kv_head = 2;
+        let head_dim = 8;
+        let seq_len = 8; // 2 blocks
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm, seq_len);
+
+        // Keys: token t, head h = [t * 1.0 + h * 10.0; head_dim].
+        let kv_dim = n_kv_head * head_dim;
+        let mut keys = vec![0.0f32; seq_len * kv_dim];
+        for t in 0..seq_len {
+            for h in 0..n_kv_head {
+                let val = (t as f32) + (h as f32) * 10.0;
+                for d in 0..head_dim {
+                    keys[t * kv_dim + h * head_dim + d] = val;
+                }
+            }
+        }
+        cache.rebuild_from_keys(&keys, seq_len);
+
+        assert_eq!(cache.n_active_blocks(), 2);
+        assert_eq!(cache.block_count(0), 4);
+        assert_eq!(cache.block_count(1), 4);
+
+        // Block 0: tokens 0,1,2,3. Centroid head 0 = mean(0,1,2,3) = 1.5.
+        let c0_h0 = cache.key_centroid(0, 0);
+        assert!((c0_h0[0] - 1.5).abs() < 1e-5, "block 0 head 0 centroid = {}", c0_h0[0]);
+
+        // Block 0 head 1 = mean(10,11,12,13) = 11.5.
+        let c0_h1 = cache.key_centroid(0, 1);
+        assert!((c0_h1[0] - 11.5).abs() < 1e-5, "block 0 head 1 centroid = {}", c0_h1[0]);
+
+        // Block 1: tokens 4,5,6,7. Centroid head 0 = mean(4,5,6,7) = 5.5.
+        let c1_h0 = cache.key_centroid(1, 0);
+        assert!((c1_h0[0] - 5.5).abs() < 1e-5);
+    }
+
+    /// GQA block cache handles partial last block.
+    #[test]
+    fn gqa_q1_partial_last_block() {
+        let fm = FlashMemoryConfig { block_size: 4, refresh_period: 100, threshold: 0.5 };
+        let mut cache = GqaFlashMemoryBlockCache::new(1, 4, &fm, 10);
+        let keys = vec![1.0f32; 6 * 4]; // 6 tokens, 1 head, head_dim=4
+        cache.rebuild_from_keys(&keys, 6);
+        assert_eq!(cache.n_active_blocks(), 2);
+        assert_eq!(cache.block_count(0), 4);
+        assert_eq!(cache.block_count(1), 2);
+        // Block 1: mean of 2 tokens (both 1.0) = 1.0.
+        assert!((cache.key_centroid(1, 0)[0] - 1.0).abs() < 1e-5);
+    }
+
+    /// GQA selector produces valid per-KV-head selection with sigmoid threshold.
+    #[test]
+    fn gqa_q3_selector_sigmoid_threshold() {
+        let fm = FlashMemoryConfig { block_size: 2, refresh_period: 100, threshold: 0.5 };
+        let n_kv_head = 2;
+        let head_dim = 4;
+        let seq_len = 8; // 4 blocks
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm, seq_len);
+        let kv_dim = n_kv_head * head_dim;
+        // Make block 0 keys align with the query, others orthogonal.
+        let mut keys = vec![0.0f32; seq_len * kv_dim];
+        for t in 0..2 {
+            // Block 0, head 0: strong keys.
+            keys[t * kv_dim + 0] = 5.0;
+            keys[t * kv_dim + 1] = 5.0;
+        }
+        cache.rebuild_from_keys(&keys, seq_len);
+
+        let max_blocks = seq_len.div_ceil(fm.block_size);
+        let mut sel = GqaFlashMemorySelector::new(fm, n_kv_head, head_dim, max_blocks);
+
+        // Query head 0 aligned with block 0.
+        let mut query = vec![0.0f32; n_kv_head * head_dim];
+        query[0] = 5.0; query[1] = 5.0;
+
+        let selection = sel.select(&query, &cache, 1.0, 0);
+        // Block 0 should be selected for head 0 (high dot product).
+        assert!(selection.blocks_per_head[0].contains(&0),
+            "block 0 should be selected for head 0");
+    }
+
+    /// GQA selector periodic refresh amortizes scoring.
+    #[test]
+    fn gqa_q2_periodic_refresh() {
+        let fm = FlashMemoryConfig { block_size: 4, refresh_period: 5, threshold: 0.5 };
+        let mut cache = GqaFlashMemoryBlockCache::new(1, 4, &fm, 32);
+        let keys = vec![1.0f32; 16 * 4];
+        cache.rebuild_from_keys(&keys, 16);
+
+        let mut sel = GqaFlashMemorySelector::new(fm, 1, 4, 8);
+        let query = vec![1.0; 4];
+
+        let mut refreshes_at = Vec::new();
+        for step in 0..10 {
+            sel.select(&query, &cache, 1.0, step);
+            if sel.refresh_count() > refreshes_at.len() {
+                refreshes_at.push(step);
+            }
+        }
+        assert_eq!(sel.refresh_count(), 2);
+        assert_eq!(refreshes_at, vec![0, 5]);
+    }
+
+    /// Bonsai-scale smoke test: n_kv_head=8, head_dim=256, 64 tokens.
+    #[test]
+    fn gqa_bonsai_scale_smoke() {
+        let fm = FlashMemoryConfig::test_config(); // block_size=16
+        let n_kv_head = 8;
+        let head_dim = 256;
+        let seq_len = 64; // 4 blocks
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm, seq_len);
+        let kv_dim = n_kv_head * head_dim;
+        let keys = vec![0.1f32; seq_len * kv_dim];
+        cache.rebuild_from_keys(&keys, seq_len);
+        assert_eq!(cache.n_active_blocks(), 4);
+
+        let max_blocks = seq_len.div_ceil(fm.block_size);
+        let mut sel = GqaFlashMemorySelector::new(fm, n_kv_head, head_dim, max_blocks);
+        let query = vec![0.1; n_kv_head * head_dim];
+        let selection = sel.select(&query, &cache, 1.0 / (head_dim as f32).sqrt(), 0);
+        assert!(selection.total_selections() > 0);
     }
 }
