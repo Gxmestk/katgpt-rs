@@ -274,3 +274,7 @@ Where `f(T) = Σ_{b∈D} |tok(b)|` is the compression of tokenizer T, and `LP_va
 - Kudo (2018). Subword regularization. ACL 2018. (Unigram LM tokenization — similar shortest-path inference)
 - Williamson & Shmoys (2011). The Design of Approximation Algorithms. (LP rounding theory)
 - NVIDIA cuOPT (2025). GPU-accelerated LP solver — used in paper but not needed for our scales
+
+---
+
+> **PASS-Redirects (synthesis):** Saha, Li, Xue, Chaudhuri, Klivans, Kothari, Meka [arXiv:2608.11158 "New Lower and Upper Bounds for the Grothendieck Constant"] — same relax→round→certify-the-gap shape at SDP scale (Krivine rounding schemes + Arb-certified inverse-majorant gap vs our LP token rounding + dual-bound optimality gap); PASS — no SDP/sign-rounding surface in the stack, no actionable delta over ConvexTok's shipped certify pattern.
