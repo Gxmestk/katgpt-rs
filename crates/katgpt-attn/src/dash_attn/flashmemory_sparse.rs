@@ -1055,6 +1055,90 @@ impl DualEncoderIndexer {
         &self.last_selection
     }
 
+    /// Select blocks per KV head for standard GQA attention (Bonsai/Qwen3.5).
+    ///
+    /// GQA sibling of [`DualEncoderIndexer::select`]: identical scoring
+    /// semantics (`σ(q_score · k_score) ≥ threshold` with periodic refresh +
+    /// cached k-scores), but reads **raw per-KV-head key centroids** from
+    /// [`GqaFlashMemoryBlockCache`] instead of MLA latent centroids, and takes
+    /// the KV-resolution query `[n_kv_head * head_dim]` — the same
+    /// block-contiguous group-mean query contract as
+    /// [`GqaFlashMemorySelector::select`] (pinned by its mapping regression
+    /// test).
+    ///
+    /// This is the correct serving path for checkpoints trained on raw GQA key
+    /// centroids (e.g. riir-train Plan 337 Bonsai datasets): those weights were
+    /// fit to the raw-centroid feature space, so routing them through the MLA
+    /// [`select`](DualEncoderIndexer::select) (latent `c_kv` centroids)
+    /// would silently change the meaning of the inputs.
+    ///
+    /// The `n_heads` constructor argument must be the number of **KV heads**
+    /// for GQA use (selection is per KV head; all query heads in a group share
+    /// it). No `attn_scale` — the trained encoders learn their own scale,
+    /// matching [`select`](DualEncoderIndexer::select).
+    ///
+    /// Duplicated from [`select`](DualEncoderIndexer::select) rather than
+    /// genericized over the cache type, per the documented precedent at the
+    /// [`GqaFlashMemoryBlockCache`] docs ("separate type (not a trait)… YAGNI").
+    pub fn select_gqa(
+        &mut self,
+        query_keys: &[f32],
+        block_cache: &GqaFlashMemoryBlockCache,
+        current_step: usize,
+    ) -> &PerHeadSelection {
+        let need_refresh = !self.selection_valid
+            || current_step.saturating_sub(self.last_refresh_step) >= self.config.refresh_period;
+
+        if !need_refresh {
+            return &self.last_selection;
+        }
+
+        self.last_selection.clear();
+        self.last_refresh_step = current_step;
+        self.selection_valid = true;
+        self.refresh_count += 1;
+
+        let n_blocks = block_cache.n_active_blocks();
+        let n_h = self.n_heads;
+        let d_h = self.d_h;
+        let hidden = self.hidden;
+        debug_assert_eq!(query_keys.len(), n_h * d_h);
+
+        // Recompute k_scores cache: K-Indexer(raw key centroid) per KV head
+        // per block.
+        for head in 0..n_h {
+            for block_idx in 0..n_blocks {
+                let centroid = block_cache.key_centroid(block_idx, head);
+                let k_score = Self::mlp_forward(
+                    &self.k_w1, &self.k_b1, &self.k_w2, self.k_b2,
+                    centroid, &mut self.mlp_scratch, hidden, d_h,
+                );
+                self.k_scores_cache[head * self.max_blocks + block_idx] = k_score;
+            }
+        }
+
+        // Score: per KV head, q_score from the group-mean query; select blocks
+        // where σ(q_score · k_score) ≥ threshold.
+        for head in 0..n_h {
+            let q_h = &query_keys[head * d_h..(head + 1) * d_h];
+            let q_score = Self::mlp_forward(
+                &self.q_w1, &self.q_b1, &self.q_w2, self.q_b2,
+                q_h, &mut self.mlp_scratch, hidden, d_h,
+            );
+
+            let k_off = head * self.max_blocks;
+            for block_idx in 0..n_blocks {
+                let k_score = self.k_scores_cache[k_off + block_idx];
+                let importance = katgpt_core::sigmoid(q_score * k_score);
+                if importance >= self.config.threshold {
+                    self.last_selection.blocks_per_head[head].push(block_idx);
+                }
+            }
+        }
+
+        &self.last_selection
+    }
+
     /// Total parameter count (for reporting / size verification).
     pub fn param_count(&self) -> usize {
         // Q-Indexer: hidden*d_h + hidden + hidden + 1
@@ -1953,6 +2037,130 @@ mod tests {
         let q_c = vec![0.5; config.n_heads * d_h];
         let sel = indexer.select(&q_c, &block_cache, 0);
         assert!(sel.total_selections() > 0);
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b_gqa1_select_gqa_produces_valid_selection() {
+        // GQA sibling of b1: select_gqa reads raw per-KV-head centroids from
+        // GqaFlashMemoryBlockCache + the KV-resolution query, and produces a
+        // non-empty selection with distinct per-head results possible.
+        let fm = FlashMemoryConfig { block_size: 4, refresh_period: 100, threshold: 0.5 };
+        let n_kv_head = 2;
+        let head_dim = 8;
+        let seq_len = 16; // 4 blocks
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm, seq_len);
+
+        // Distinct centroids: block b, head h = b*1.0 + h*10.0.
+        let kv_dim = n_kv_head * head_dim;
+        let mut keys = vec![0.0f32; seq_len * kv_dim];
+        for t in 0..seq_len {
+            let b = t / 4;
+            for h in 0..n_kv_head {
+                let val = (b as f32) + (h as f32) * 10.0;
+                for d in 0..head_dim {
+                    keys[t * kv_dim + h * head_dim + d] = val;
+                }
+            }
+        }
+        cache.rebuild_from_keys(&keys, seq_len);
+
+        let max_blocks = seq_len.div_ceil(fm.block_size);
+        let mut indexer = DualEncoderIndexer::new_random(fm, head_dim, n_kv_head, max_blocks, 42);
+
+        let query = vec![1.0f32; n_kv_head * head_dim];
+        let first: Vec<Vec<usize>> = indexer
+            .select_gqa(&query, &cache, 0)
+            .blocks_per_head
+            .iter()
+            .map(|v| v.clone())
+            .collect();
+        assert!(
+            first.iter().map(|v| v.len()).sum::<usize>() > 0,
+            "select_gqa should select at least one block"
+        );
+        assert_eq!(indexer.refresh_count(), 1);
+
+        // Determinism: same inputs → same selection (owned copies; the
+        // returned ref borrows the indexer).
+        indexer.force_refresh();
+        let second: Vec<Vec<usize>> = indexer
+            .select_gqa(&query, &cache, 1)
+            .blocks_per_head
+            .iter()
+            .map(|v| v.clone())
+            .collect();
+        assert_eq!(first, second);
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b_gqa2_zero_weights_threshold_semantics_pinned() {
+        // Pinned semantics for checkpoint serving: with all-zero weights every
+        // score is exactly 0 → σ(0)=0.5. Threshold 0.5 (≥) selects ALL blocks;
+        // 0.5000001 selects NONE. This pins the σ(q·k) ≥ threshold contract
+        // the riir-train Plan 337 checkpoints were trained under.
+        let fm_all = FlashMemoryConfig { block_size: 4, refresh_period: 100, threshold: 0.5 };
+        let n_kv_head = 2;
+        let head_dim = 8;
+        let seq_len = 8; // 2 blocks
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm_all, seq_len);
+        let kv_dim = n_kv_head * head_dim;
+        cache.rebuild_from_keys(&vec![1.0f32; seq_len * kv_dim], seq_len);
+
+        let max_blocks = seq_len.div_ceil(fm_all.block_size);
+        let zeros_h = vec![0.0f32; head_dim / 4]; // hidden = 8/4 = 2
+        let zeros1 = vec![0.0f32; 2];
+        let zeros_w1 = vec![0.0f32; 2 * head_dim];
+        let zero_indexer = |fm: FlashMemoryConfig| {
+            DualEncoderIndexer::from_weights(
+                fm, head_dim, n_kv_head, max_blocks,
+                zeros_w1.clone(), zeros_h.clone(), zeros1.clone(), 0.0,
+                zeros_w1.clone(), zeros_h.clone(), zeros1.clone(), 0.0,
+            )
+        };
+
+        let query = vec![0.7f32; n_kv_head * head_dim];
+
+        // Threshold 0.5: σ(0·0)=0.5 ≥ 0.5 → ALL blocks selected, every head.
+        let mut idx = zero_indexer(fm_all);
+        let sel = idx.select_gqa(&query, &cache, 0);
+        for h in 0..n_kv_head {
+            assert_eq!(sel.blocks_per_head[h].len(), 2, "all blocks selected at thr 0.5");
+        }
+
+        // Threshold just above 0.5: nothing selected.
+        let fm_none = FlashMemoryConfig { block_size: 4, refresh_period: 100, threshold: 0.5000001 };
+        let mut idx2 = zero_indexer(fm_none);
+        let sel2 = idx2.select_gqa(&query, &cache, 0);
+        assert_eq!(sel2.total_selections(), 0, "no blocks selected above σ(0)");
+    }
+
+    #[cfg(feature = "trained_indexer")]
+    #[test]
+    fn b_gqa3_periodic_refresh_reuses_selection() {
+        // Same amortization contract as the modelless GQA selector: within the
+        // refresh period the cached selection is returned and refresh_count
+        // does not advance.
+        let fm = FlashMemoryConfig { block_size: 4, refresh_period: 5, threshold: 0.5 };
+        let n_kv_head = 1;
+        let head_dim = 4;
+        let seq_len = 16;
+        let mut cache = GqaFlashMemoryBlockCache::new(n_kv_head, head_dim, &fm, seq_len);
+        cache.rebuild_from_keys(&vec![1.0f32; seq_len * n_kv_head * head_dim], seq_len);
+
+        let max_blocks = seq_len.div_ceil(fm.block_size);
+        let mut indexer = DualEncoderIndexer::new_random(fm, head_dim, n_kv_head, max_blocks, 7);
+        let query = vec![1.0f32; n_kv_head * head_dim];
+
+        let _ = indexer.select_gqa(&query, &cache, 0);
+        assert_eq!(indexer.refresh_count(), 1);
+        for step in 1..5 {
+            let _ = indexer.select_gqa(&query, &cache, step);
+        }
+        assert_eq!(indexer.refresh_count(), 1, "no refresh within the period");
+        let _ = indexer.select_gqa(&query, &cache, 5);
+        assert_eq!(indexer.refresh_count(), 2, "refresh at period boundary");
     }
 
     // ── GQA FlashMemory tests (Issue 584 Phase 2 — Bonsai/Qwen3.5 support) ──
