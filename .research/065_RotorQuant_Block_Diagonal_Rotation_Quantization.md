@@ -3,6 +3,7 @@
 **Source:** [RotorQuant paper](https://www.scrya.com/rotorquant.pdf) (Pope, March 2026) + [local reference](/.raw/rotorquant/) + [IsoQuant/PlanarQuant](https://github.com/ParaMind2025/isoquant)
 **Related:** Research 20 (TurboQuant), Research 39 (SpectralQuant), Research 63 (OCTOPUS)
 **Date:** 2025-07-05
+**PASS-Redirects (synthesis):** Heightman, Orlova, Mantrov, Ustimenko [arXiv:2608.11911 "Hamilton-Zero: A Neural Tensor-Network Foundation Model for Ground States of Arbitrary Quadratic Qubit Hamiltonians"] — Hamilton-Zero parametrizes each spin as a unit quaternion q_i ∈ SU(2)≅S³ ⊂ R⁴ (4N continuous coordinates replacing 2^N Hilbert amplitudes; Haar-random m-site refresh moves in its replica-exchange MCMC; wrapped-Gaussian proposals via the Lie exponential map). The same unit-quaternion substrate already ships here as IsoQuant's SO(4) rotation blocks (`generate_unit_quaternions`, `quat_multiply`, `quat_conjugate` in `katgpt-quant/src/iso_quant/rotation.rs`) — different purpose (wavefunction domain + sampling vs KV decorrelation), no new quaternion primitive needed → PASS.
 
 ## TL;DR
 
