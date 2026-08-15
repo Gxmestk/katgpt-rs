@@ -79,9 +79,9 @@ Ship a **modelless, calibration-free, single-checkpoint multi-precision weight q
 
 ### Tasks
 
-- [ ] **T4.1** (DEFERRED) Wire `RrqWeights::prefix_dot_into(t, ...)` into a tier dispatch: Plasma tier (2-bit base only) → Hot tier (+1 stage, 4-bit) → Warm tier (+2 stages, 6-bit). Same checkpoint, three tiers, the tier transition is "include one more stage in the sum".
-- [ ] **T4.2** (DEFERRED) Freeze/thaw integration (riir-neuron-db `MerkleFrozenEnvelope`): each stage is its own shard, the prefix-t view is a runtime composition. This is the Super-GOAT angle from Research 467 §3.4 — only pursue when a consumer needs incremental precision upgrades.
-- [ ] **T4.3** (DEFERRED) G3 no-regression on existing tier tests.
+- [-] **T4.1** (DEFERRED) Wire `RrqWeights::prefix_dot_into(t, ...)` into a tier dispatch: Plasma tier (2-bit base only) → Hot tier (+1 stage, 4-bit) → Warm tier (+2 stages, 6-bit). Same checkpoint, three tiers, the tier transition is "include one more stage in the sum".
+- [-] **T4.2** (DEFERRED) Freeze/thaw integration (riir-neuron-db `MerkleFrozenEnvelope`): each stage is its own shard, the prefix-t view is a runtime composition. This is the Super-GOAT angle from Research 467 §3.4 — only pursue when a consumer needs incremental precision upgrades.
+- [-] **T4.3** (DEFERRED) G3 no-regression on existing tier tests.
 
 **Phase 4 deferral rationale:** no concrete consumer needs incremental precision upgrades today. The `quant_expert_goat.rs` per-expert precision routing uses fixed precision per expert; the per-NPC personality divergence story is handled by `CommittedFieldBlend` (different axis). Revisit when one of those consumers wants to share a multi-precision base, or when we serve a multi-precision LLM at runtime.
 
