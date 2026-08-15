@@ -334,6 +334,148 @@ fn gradient_check_nonlatent_path() {
     );
 }
 
+// ─── Wide-gamma gradient check (Issue 693 H2 regression guard) ────────────
+
+/// Finite-difference grad check with latent-norm gamma spanning [0.5, 2.0].
+///
+/// `MoeWeights::random` inits gamma at `1.0 ± 0.1`, which masks the
+/// gamma-over-application bug (`g*r*(dy - x*r²*dot/d)` — the incorrect form
+/// named in `mla_backward.rs::rmsnorm_backward`): the error is
+/// `(γ_i - 1)·correction`, inside the near-unity band. With wide gamma the
+/// analytic-vs-numeric divergence is O(1) and the bug is unmasked.
+///
+/// Checks the latent-path parameters whose gradients flow through the
+/// RMSNorm backward (routed down/up, norm weight, router, dh) — the exact
+/// surface Issue 693 H2 corrupted.
+#[test]
+fn gradient_check_wide_gamma() {
+    let config = grad_check_config();
+    let d = config.d();
+    let epsilon = 5e-3f32;
+    let tol = 1.5e-2f32;
+
+    let mut weights = MoeWeights::random(&config, 42);
+    // Wide-gamma fixture: γ spans [0.5, 2.0] deterministically.
+    let d_moe = config.routed_expert_hidden_size.unwrap();
+    let wide: Vec<f32> = (0..d_moe).map(|i| 0.5 + (i as f32 / d_moe as f32) * 1.5).collect();
+    weights.routed_expert_norm_weight = Some(wide);
+    // Adversarial shaping (both are REQUIRED to unmask the bug — see NOTE):
+    // 1. Zero the shared expert → its contribution to hidden_out is exactly 0.
+    // 2. up_proj = identity block in the top d_moe rows → output_j = postnorm_j
+    //    (j < d_moe), so dy = up^T d_output = 2·r·(x∘γ) — perfectly aligned
+    //    with x∘γ. The RMSNorm correction term is x_i·r²·dot/d with
+    //    dot = Σ xγ·dy; alignment maximizes dot, making the correction
+    //    term O(direct) instead of O(random-walk noise).
+    for shared in weights.shared_experts.iter_mut() {
+        shared.gate_proj.iter_mut().for_each(|w| *w = 0.0);
+        shared.up_proj.iter_mut().for_each(|w| *w = 0.0);
+        shared.down_proj.iter_mut().for_each(|w| *w = 0.0);
+    }
+    let up = weights.routed_expert_up_proj.as_mut().unwrap();
+    up.iter_mut().for_each(|w| *w = 0.0);
+    // up is row-major [d × d_moe]: up[row*d_moe + col]. Identity block in the
+    // top d_moe rows → output_j += postnorm_j (j < d_moe).
+    for i in 0..d_moe {
+        up[i * d_moe + i] = 1.0;
+    }
+    // Scale the routed-expert path up so x = Σ w_k·expert_out_k is O(10):
+    // the default ±0.2 weights + SiTU(β=25) leave x ≈ 1e-4, which makes the
+    // RMSNorm correction term (cubic in x) vanish against the direct term.
+    for e in weights.experts.iter_mut() {
+        e.gate_proj.iter_mut().for_each(|w| *w *= 30.0);
+        e.up_proj.iter_mut().for_each(|w| *w *= 30.0);
+        e.down_proj.iter_mut().for_each(|w| *w *= 30.0);
+    }
+    weights
+        .routed_expert_down_proj
+        .as_mut()
+        .unwrap()
+        .iter_mut()
+        .for_each(|w| *w *= 6.0);
+
+    let h: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.3).collect();
+
+    // Analytic backward
+    let scratch = &mut MoeForwardScratch::new(&config);
+    let (_output, saved) = moe_forward_token_with_saved(&weights, &config, &h, scratch);
+    let mut grads = MoeGradients::zeros_like(&weights);
+    let mut dh = vec![0.0f32; d];
+    let (_, d_output) = run_forward(&config, &weights, &h);
+    moe_backward_token(&config, &weights, &saved, &d_output, &mut dh, &mut grads);
+
+    let mut max_rel_err = 0.0f32;
+    let mut worst = String::new();
+
+    macro_rules! check_wide {
+        ($name:expr, $analytic:expr, $get:expr, $set:expr) => {
+            let analytic_slice: &[f32] = $analytic;
+            for i in 0..analytic_slice.len() {
+                let a = analytic_slice[i];
+                let n = finite_diff_one(&config, &weights, &h, |w| $get(w, i), |w, v| $set(w, i, v), epsilon);
+                let re = rel_err(a, n);
+                if re > max_rel_err {
+                    max_rel_err = re;
+                    worst = format!("{}[{}]: analytic={:.6e} numeric={:.6e}", $name, i, a, n);
+                }
+                assert!(
+                    re < tol,
+                    "{}[{}]: rel_err {:.4} >= tol {:.4} (analytic={:.6e}, numeric={:.6e})",
+                    $name, i, re, tol, a, n
+                );
+            }
+        };
+    }
+
+    // Router (topk weights are downstream of d_latent_prenorm).
+    check_wide!(
+        "router_weight",
+        &grads.router_weight,
+        |w: &MoeWeights, i: usize| w.router_weight[i],
+        |w: &mut MoeWeights, i: usize, v: f32| w.router_weight[i] = v
+    );
+    // Latent wrapper (directly through the RMSNorm backward).
+    check_wide!(
+        "routed_expert_down_proj",
+        grads.routed_expert_down_proj.as_ref().unwrap(),
+        |w: &MoeWeights, i: usize| w.routed_expert_down_proj.as_ref().unwrap()[i],
+        |w: &mut MoeWeights, i: usize, v: f32| w.routed_expert_down_proj.as_mut().unwrap()[i] = v
+    );
+    check_wide!(
+        "routed_expert_up_proj",
+        grads.routed_expert_up_proj.as_ref().unwrap(),
+        |w: &MoeWeights, i: usize| w.routed_expert_up_proj.as_ref().unwrap()[i],
+        |w: &mut MoeWeights, i: usize, v: f32| w.routed_expert_up_proj.as_mut().unwrap()[i] = v
+    );
+    check_wide!(
+        "routed_expert_norm_weight",
+        grads.routed_expert_norm_weight.as_ref().unwrap(),
+        |w: &MoeWeights, i: usize| w.routed_expert_norm_weight.as_ref().unwrap()[i],
+        |w: &mut MoeWeights, i: usize, v: f32| w.routed_expert_norm_weight.as_mut().unwrap()[i] = v
+    );
+
+    // dh (flows through prenorm → down_proj → h).
+    for i in 0..d {
+        let mut h_plus = h.clone();
+        let mut h_minus = h.clone();
+        h_plus[i] += epsilon;
+        h_minus[i] -= epsilon;
+        let (lp, _) = run_forward(&config, &weights, &h_plus);
+        let (lm, _) = run_forward(&config, &weights, &h_minus);
+        let n = (lp - lm) / (2.0 * epsilon);
+        let re = rel_err(dh[i], n);
+        if re > max_rel_err {
+            max_rel_err = re;
+            worst = format!("dh[{}]: analytic={:.6e} numeric={:.6e}", i, dh[i], n);
+        }
+        assert!(re < tol, "dh[{}]: rel_err {:.4} >= tol {:.4}", i, re, tol);
+    }
+
+    println!(
+        "MoE wide-gamma gradient check PASSED. max_rel_err = {:.4} ({})",
+        max_rel_err, worst
+    );
+}
+
 // ─── Smoke test: backward runs without panic ────────────────────────────────
 
 #[test]

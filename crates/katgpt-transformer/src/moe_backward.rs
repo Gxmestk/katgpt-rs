@@ -595,17 +595,16 @@ fn moe_backward_latent(
 
     // ── Step 8 backward: RMSNorm backward (if active) ──
     // rmsnorm: y[i] = x[i] * gamma[i] * inv_rms
-    // dx[i] = gamma[i] * inv_rms * (dy[i] - y[i] * inv_rms² * mean(x * y * gamma))
-    //       = gamma[i] * inv_rms * (dy[i] - x[i] * inv_rms² * mean(x * dy * gamma))
     //
-    // Standard RMSNorm backward:
+    // Standard RMSNorm backward (see mla_backward.rs rmsnorm_backward):
     // Let r = inv_rms, g = gamma.
-    // y[i] = x[i] * g[i] * r
-    // dy[i] given.
-    // dx[i] = g[i] * r * (dy[i] - x[i] * r² * (1/d) * sum_j(x[j] * g[j] * dy[j]))
-    //       = g[i] * r * dy[i] - y[i] * r² * (1/d) * sum_j(x[j] * g[j] * dy[j])
-    // dL/d(gamma[i]) += x[i] * r * dy[i] = y[i] / g[i] * dy[i] ... actually:
-    //   y[i] = x[i] * g[i] * r → dy[i]/dg[i] = x[i] * r → dL/dg[i] += dy[i] * x[i] * r
+    // y[i] = x[i] * g[i] * r,  dr/dx[k] = -x[k] * r³ / d
+    // dx[k] = r * g[k] * dy[k] - x[k] * r³ * dot / d
+    //      = r * (g[k] * dy[k] - x[k] * r² * dot / d)
+    //      where dot = sum_j(x[j] * g[j] * dy[j])
+    // gamma multiplies ONLY the direct dy term — `g*r*(dy - x*r²*dot/d)`
+    // over-applies gamma to the correction term (Issue 693 H2).
+    // dL/d(gamma[i]) += dy[i] * x[i] * r
     let d_latent_prenorm: Vec<f32> = if let Some(norm_w) = weights.routed_expert_norm_weight.as_ref() {
         let norm_grad = grads.routed_expert_norm_weight.as_mut().unwrap();
         let r = inv_rms;
@@ -623,8 +622,8 @@ fn moe_backward_latent(
             // x[i] = latent_output_prenorm[i]
             let x_i = saved.latent_output_prenorm[i];
             norm_grad[i] += x_i * r * d_latent_postnorm[i];
-            // dx[i] = g[i] * r * (dy[i] - x[i] * r² * dot * inv_d)
-            dx[i] = norm_w[i] * r * (d_latent_postnorm[i] - x_i * r2 * dot * inv_d);
+            // dx[i] = r * (g[i] * dy[i] - x_i * r² * dot / d)
+            dx[i] = r * (norm_w[i] * d_latent_postnorm[i] - x_i * r2 * dot * inv_d);
         }
         dx
     } else {
@@ -993,4 +992,3 @@ fn situ_backward(
         }
     }
 }
-
