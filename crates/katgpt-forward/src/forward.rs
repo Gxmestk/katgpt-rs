@@ -343,40 +343,15 @@ pub fn clustered_lm_head(
     }
 }
 
-/// Create a round-robin cluster assignment for tokens.
-///
-/// Token `i` is assigned to cluster `i / cluster_size`.
-/// Deterministic, no training needed — simple baseline.
-pub fn cluster_map_round_robin(vocab_size: usize, cluster_size: usize) -> Vec<Vec<usize>> {
-    let num_clusters = vocab_size.div_ceil(cluster_size);
-    let mut map: Vec<Vec<usize>> = (0..num_clusters)
-        .map(|_| Vec::with_capacity(cluster_size))
-        .collect();
-    for token_id in 0..vocab_size {
-        let cluster_id = token_id / cluster_size;
-        map[cluster_id].push(token_id);
-    }
-    map
-}
-
-/// Create cluster assignment from embedding similarity (K-means style).
-///
-/// Groups tokens with similar embeddings together for efficient LM head computation.
-/// Current implementation: round-robin baseline.
-///
-/// TODO: implement actual K-means using embedding cosine similarity. No plan
-/// exists for this yet — file one before implementing (the prior in-source
-/// reference to "Plan 056: riir-burner" was bogus: Plan 056 is the game-state
-/// forward model + MCTS for Bomber, unrelated to embedding clustering, and
-/// the `riir-burner` crate was never created).
-pub fn cluster_map_from_embeddings(
-    _wte: &[f32],
-    vocab_size: usize,
-    _n_embd: usize,
-    cluster_size: usize,
-) -> Vec<Vec<usize>> {
-    cluster_map_round_robin(vocab_size, cluster_size)
-}
+// Cluster-map / classifier construction moved to `crate::cluster_build`
+// (Plan 574) — it is load-time work, not forward-pass work, and the k-means
+// implementation would otherwise push this file past its size budget. The
+// former `cluster_map_from_embeddings` stub (which ignored its embeddings and
+// returned round-robin) is now a real k-means; `cluster_map_round_robin`
+// survives there unchanged as the baseline it must beat.
+pub use crate::cluster_build::{
+    cluster_classifier_from_map, cluster_map_from_embeddings, cluster_map_round_robin,
+};
 #[allow(clippy::too_many_arguments)] // forward pass: 7 fixed + 1 cfg-gated (domain_latent)
 pub fn forward_base<'a>(
     ctx: &'a mut ForwardContext,

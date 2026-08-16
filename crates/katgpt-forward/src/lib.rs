@@ -483,12 +483,16 @@ pub use hla_forward::{forward_ahla, forward_hla, generate_ahla_into, generate_hl
 // Root re-exports `forward` (and the helpers) so every historical call site at
 // `katgpt_rs::transformer::forward` continues to resolve.
 pub mod forward;
+// Plan 574: load-time construction of the clustered-LM-head artifacts.
+// Separate from `forward` because it is build-time, not hot-path.
+pub mod cluster_build;
 #[cfg(feature = "coda_fusion")]
 pub use forward::forward_coda;
 pub use forward::{
-    CPU_FORWARD_USES_DEVICE_BASE_PATH, attention_head, cluster_map_from_embeddings,
-    cluster_map_round_robin, clustered_lm_head, forward, forward_base, forward_base_f16,
-    forward_f16, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
+    CPU_FORWARD_USES_DEVICE_BASE_PATH, attention_head, cluster_classifier_from_map,
+    cluster_map_from_embeddings, cluster_map_round_robin, clustered_lm_head, forward, forward_base,
+    forward_base_f16, forward_f16, select_topk_indices, select_topk_indices_into_buf,
+    standard_lm_head,
 };
 
 // DenseMesh `node_transformer` — Plan 385 (2026-07-05).

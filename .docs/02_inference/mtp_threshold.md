@@ -67,7 +67,17 @@
 
 **Current status**: Cluster weights are never loaded (always `None`), so the standard full-vocab LM head is always used. To activate, load trained cluster weights into `TransformerWeights::mtp_cluster_classifier` and `mtp_cluster_map`.
 
-**Cluster assignment**: Round-robin by token ID (baseline). K-means from embedding similarity planned for riir-burner (Plan 056).
+**Cluster assignment**: two deterministic builders ship in
+`katgpt-forward/src/cluster_build.rs` (Plan 574) —
+`cluster_map_round_robin` (baseline, token ID / cluster_size) and
+`cluster_map_from_embeddings` (k-means over **LM-head rows** in a seeded
+Johnson–Lindenstrauss projection). `cluster_classifier_from_map` builds the
+stage-1 classifier as full-space per-cluster centroids, so its score is exactly
+the cluster's mean logit. Both are modelless — no training.
+
+> **Correction:** earlier revisions of this file said K-means was "planned for
+> riir-burner (Plan 056)". That was bogus — Plan 056 is Bomber game-state
+> MCTS, and the `riir-burner` crate was never created. Plan 574 owns this.
 
 ### LoRA-Trained Drafter (Plan 117 Phase 1)
 
@@ -181,6 +191,6 @@ MTP-Enhanced DFlash (this plan):
 - [Gemma 4 architecture](https://blog.google/technology/ai/gemma-technical-report/) — Multi-Token Prediction design
 - [DGX Spark Gemma 4 MTP benchmark](https://dev.classmethod.jp/articles/dgx-spark-gemma4-mtp-multi-token-prediction-bench/) — production params, short-text failure
 - Plan 055 — `katgpt-rs/.plans/055_gemma_mtp_drafter.md`
-- Plan 056 — riir-burner cluster weight training
+- Plan 574 — modelless clustered LM head (k-means builders + centroid classifier)
 - Plan 117 — `katgpt-rs/.plans/117_mtp_cluster_topk_efficient_embedder.md`
 - 🧪 `tests/bench_117_mtp_lora_topk_goat.rs` — LoRA acceptance, Top-K coverage, output-length gating (4/4 pass)
