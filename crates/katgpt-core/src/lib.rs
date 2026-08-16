@@ -259,6 +259,18 @@ pub use ugc_schedule::{
     dp_partition, equal_sqrt_mass_grid, estimate_interval, estimate_profile,
     inv_log_reveal_odds, log_reveal_odds, reveal_grid_from_plan, reveal_odds,
 };
+// SwitchCostTable — directed pairwise switch-difficulty table (skill-entropy
+// distillation, Research 484 / arXiv:2608.05139, Issue 663). Opt-in per the
+// issue's GOAT-gate discipline: promotion to default requires a riir-ai
+// consumer A/B (F1: SkE-gated preemptive re-estimation vs the coherence-only
+// arm on the Issue-054 stuck-rate scenario).
+#[cfg(feature = "switch_cost")]
+pub mod switch_cost;
+#[cfg(feature = "switch_cost")]
+pub use switch_cost::{
+    FactorizedSwitchCost, SwitchCostSnapshot, SwitchCostTable, DEFAULT_ALPHA, NEUTRAL_ACC,
+    cdf_rank,
+};
 // SIMD-accelerated linear algebra kernels (NEON / AVX2 / WASM-SIMD128 /
 // scalar fallback). Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::simd` for backwards
