@@ -34,14 +34,62 @@ Two evaluations + a comparison. Zero GD. LOPD's F2 finding is the empirical just
 
 ## Tasks
 
-- [ ] T1 PoC (riir-poc or katgpt-core bench): planted-drift test — table with x% poisoned entries; measure consumer error with/without privilege gate; falsifiable target: gate recovers ≥ half the poisoned-entry penalty at ≤ 2× retrieval-event cost
-- [ ] T2 `PrivilegeGatedFuse` extension behind feature flag `engram_privilege` (opt-in) — kernel change is multiplicative, existing gate math untouched
-- [ ] T3 GOAT gate: G1 relevance-ranking preserved on clean tables (gate ≈ no-op when Δ high), G2 overhead budget (amortized ≤ +20% at retrieval events), G3 existing engram tests pass both feature states, G4 zero-alloc hot path (counterfactual scoring is amortized, not per-fuse)
-- [ ] T4 Cross-ref: EvidenceTier (riir-clippy Issues 018/021) as the discrete predecessor; note the query-conditional upgrade path for LatentFixMemory retrieval weighting as a NON-goal here (separate repo, no demonstrated binding)
+- [x] T1 PoC (riir-poc or katgpt-core bench): planted-drift test — table with x% poisoned entries; measure consumer error with/without privilege gate; falsifiable target: gate recovers ≥ half the poisoned-entry penalty at ≤ 2× retrieval-event cost
+- [x] T2 `PrivilegeGatedFuse` extension behind feature flag `engram_privilege` (opt-in) — kernel change is multiplicative, existing gate math untouched
+- [x] T3 GOAT gate: G1 relevance-ranking preserved on clean tables (gate ≈ no-op when Δ high), G2 overhead budget (amortized ≤ +20% at retrieval events), G3 existing engram tests pass both feature states, G4 zero-alloc hot path (counterfactual scoring is amortized, not per-fuse)
+- [x] T4 Cross-ref: EvidenceTier (riir-clippy Issues 018/021) as the discrete predecessor; note the query-conditional upgrade path for LatentFixMemory retrieval weighting as a NON-goal here (separate repo, no demonstrated binding)
 
 ## Verdict rule
 
 T1 falsifies or defends. If planted-drift shows no recoverable penalty (the similarity gate already suffices at realistic poisoning rates), close as negative result — the similarity gate is enough, privilege gating is training-world machinery only.
+
+## Verdict (2026-08-16) — **DEFENDED, opt-in, scope-limited**
+
+Full results: [`.benchmarks/656_engram_privilege_goat.md`](../.benchmarks/656_engram_privilege_goat.md).
+Shipped: `crates/katgpt-core/src/engram/privilege.rs` + `sigmoid_fuse_scaled_into` (cfg-gated
+sibling in `kernel.rs`), feature `engram_privilege` (opt-in).
+
+**T1 defends the mechanism.** On sign-opposed drift — poison with *identical* cosine to the
+query as the good patterns but the opposite utility projection, where the similarity gate is
+provably blind — recovery is **100.0%** (rel_err 0.3332 → 0.0001, purity 0.500 → 1.000) at
+**1.149×** retrieval-event cost. Bar was ≥50% at ≤2×.
+
+**GOAT: G1–G4 all PASS.** G1 clean-table rel_err 0.0 (exact) plus two bit-level anchors;
+G2 amortized **1.180×** ≤ 1.20× at update period 64 while holding 100% recovery; G3 142 (off)
+/ 167 (on) engram tests pass, build matrix clean; G4 0 allocs on fuse / update / read / trace.
+
+**Four measured scope limits — read these before consuming:**
+
+1. **Control B falsifies the general case.** Where poison is similarity-*separable*, the
+   shipped gate already handles it: `err_naive` 0.0036 vs. regime A's 0.3332 — **93× smaller**.
+   Privilege gating polishes a negligible penalty for ~18% cost. This primitive earns its keep
+   *only* where relevance and utility genuinely diverge.
+2. **The design is NOT query-conditional in its state.** δ is measured query-conditionally, but
+   `Δ_slot` is one scalar averaged over every query that touched the slot — structurally the
+   same as `EvidenceTier`, just continuous. On the real LOPD F2 shape (regime D: an entry that
+   helps query class 0 and hurts class 1) the EMA **oscillates rather than converges**:
+   `recency_latch = 0.6622` — one extra training round swings `p_poison` by 0.66. The 83%
+   headline recovery there is an artifact of where training stopped. True query-conditional
+   gating needs the query in the ledger key — a different primitive.
+3. **The cheap aggregate-δ path fails exactly where the gate is needed.** `CreditAssignment`
+   splits one scalar δ by *unsigned* weights, so on sign-opposed slots (aggregate δ ≈ 0)
+   recovery is **−0.0% vs. 100% exact**. Shipped and documented as same-sign-only, not removed
+   — it is the first thing a cost-sensitive host reaches for.
+4. **"7 updates suffice" is noise-free.** The cadence sweep is flat to 7 updates only because
+   the fixture's δ is exact; at 8× outcome noise the same cadence reads 51.6% and sparser/denser
+   cadences go negative. Budget updates against real outcome-label quality.
+
+**Not promoted to default** despite passing, and the gain being modelless (two evaluations and
+a comparison; ledger is runtime latent state, no gradients): the win is regime-specific (1),
+`margin`/`scale` are in host score units with no sensible default, and (2) is a real
+instability to inflict on hosts who never opted in. **Promote when** a consumer demonstrates
+the regime-A shape on real data *and* can supply outcome labels at ≥1× noise quality.
+
+**Design deviation from §1 above:** `Δ_slot` ships as a **side-car `PrivilegeLedger`**, not a
+table field. `InMemoryEngramTable` is frozen + BLAKE3-committed; mutable per-slot state would
+either poison the commitment or be excluded from it. The side-car needs no trait change, no
+freeze/thaw version bump, and composes with every `EngramTable` impl. The §1 "table layout
+change, versioned" scoping is superseded.
 
 ## References
 

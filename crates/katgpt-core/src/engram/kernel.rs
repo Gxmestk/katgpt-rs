@@ -288,6 +288,94 @@ pub fn sigmoid_fuse_into(
     }
 }
 
+/// [`sigmoid_fuse_into`] with an extra scalar on the gate — returns the
+/// **unscaled** gate.
+///
+/// Issue 656 (counterfactual privilege gating). Computes:
+/// ```text
+/// gate   = sigmoid(dot(q_norm, k_norm) / tau)     // identical to sigmoid_fuse_into
+/// out[j] = (gate * gate_scale) * v[j]
+/// return gate
+/// ```
+///
+/// # Why a sibling instead of a parameter on [`sigmoid_fuse_into`]
+///
+/// The shipped default path must stay byte-for-byte untouched (Issue 656 T2:
+/// "existing gate math untouched"). `gate_scale = 1.0` here is bit-identical
+/// to [`sigmoid_fuse_into`] — pinned by the
+/// `scaled_fuse_with_unit_scale_is_bit_identical` test in
+/// [`privilege`](super::privilege).
+///
+/// # Why the scale is applied to the scalar, not the vector
+///
+/// Folding it into the gate costs **one f32 multiply per call**. Applying it
+/// as a second pass over `out` would cost `D` multiplies plus a second store.
+/// That difference is the whole reason the privilege gate can meet a tight
+/// hot-path overhead budget.
+///
+/// # Returning the gate
+///
+/// The caller needs the *unscaled* similarity gate to implement the
+/// gate-on-gate floor (deciding whether a head is worth counterfactual
+/// scoring). Recovering it from `out` would require dividing by
+/// `gate_scale · ‖v‖`, which is undefined when either is zero.
+///
+/// # CRITICAL — sigmoid, not softmax, per AGENTS.md
+///
+/// Same single scalar gate as [`sigmoid_fuse_into`]. No `softmax` symbol.
+///
+/// # Zero-allocation
+///
+/// Same fused-RMSNorm + dot trick as [`sigmoid_fuse_into`] — no scratch.
+#[cfg(feature = "engram_privilege")]
+#[inline]
+pub fn sigmoid_fuse_scaled_into(
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
+    out: &mut [f32],
+    config: &SigmoidFusionConfig,
+    gate_scale: f32,
+) -> f32 {
+    let d = q.len();
+    debug_assert_eq!(
+        k.len(),
+        d,
+        "sigmoid_fuse_scaled_into: k.len() must equal q.len()"
+    );
+    debug_assert_eq!(
+        v.len(),
+        d,
+        "sigmoid_fuse_scaled_into: v.len() must equal q.len()"
+    );
+    debug_assert!(
+        out.len() >= d,
+        "sigmoid_fuse_scaled_into: out.len() must be ≥ q.len()"
+    );
+    if d == 0 {
+        return 0.0;
+    }
+
+    // Fused RMSNorm + dot — see `sigmoid_fuse_into` for the algebra.
+    let sum_sq_q = simd_sum_sq(q, d);
+    let sum_sq_k = simd_sum_sq(k, d);
+    let inv_rms_q = 1.0 / ((sum_sq_q / d as f32) + config.rmsnorm_eps).sqrt();
+    let inv_rms_k = 1.0 / ((sum_sq_k / d as f32) + config.rmsnorm_eps).sqrt();
+
+    let raw_dot = simd_dot_f32(q, k, d);
+    let normalized_dot = raw_dot * inv_rms_q * inv_rms_k;
+
+    // CRITICAL: sigmoid, not softmax, per AGENTS.md.
+    let gate = fast_sigmoid(normalized_dot / config.tau);
+    // The scale rides on the scalar — one multiply, not D.
+    let scaled = gate * gate_scale;
+
+    for (o, &vj) in out[..d].iter_mut().zip(v[..d].iter()) {
+        *o = scaled * vj;
+    }
+    gate
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

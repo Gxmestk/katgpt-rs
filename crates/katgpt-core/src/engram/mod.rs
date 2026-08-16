@@ -73,6 +73,14 @@ mod staging;
 mod table;
 mod tokenizer;
 
+// Issue 656 — counterfactual privilege gating (modelless δ from LOPD,
+// riir-train Research 419 §5.2). Multiplicative extension of the similarity
+// gate: `out = (base_gate · σ((Δ_slot − m)/s)) · v`. The `PrivilegeLedger` is
+// a side-car indexed by slot, NOT a table field — the table stays frozen and
+// BLAKE3-committed. Opt-in (`engram_privilege`).
+#[cfg(feature = "engram_privilege")]
+mod privilege;
+
 // Issue 039 — whole-architecture commitment root. Sibling to `commitment.rs`,
 // gated one layer deeper than its siblings: it depends on `EngramTableId`
 // from `commitment.rs` AND needs `engram` itself compiled (so the feature
@@ -117,6 +125,13 @@ pub use hash::{HashHead, multi_head_hash};
 pub use hotswap::EngramHotSwap;
 pub use kernel::{
     SigmoidFusionConfig, rmsnorm_into, sigmoid_fuse_into, sigmoid_fuse_multi_branch_into,
+};
+#[cfg(feature = "engram_privilege")]
+pub use kernel::sigmoid_fuse_scaled_into;
+#[cfg(feature = "engram_privilege")]
+pub use privilege::{
+    CreditAssignment, PrivilegeConfig, PrivilegeLedger, PrivilegeTrace,
+    fuse_into_hidden_state_privileged,
 };
 pub use staging::{StagingEngramTable, StagingError};
 pub use table::{EngramTableBuilder, InMemoryEngramTable};

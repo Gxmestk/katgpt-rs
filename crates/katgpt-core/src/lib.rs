@@ -1591,6 +1591,18 @@ pub use engram::{
     sigmoid_fuse_multi_branch_into, try_compress_token,
 };
 
+// Issue 656 — counterfactual privilege gating for engram fusion (modelless δ
+// from LOPD, riir-train Research 419 §5.2). Adds the missing *utility* axis to
+// the similarity-only gate: `out = (base_gate · σ((Δ_slot − m)/s)) · v`, where
+// Δ is an outcome-weighted EMA of the counterfactual advantage
+// `score(state + fuse) − score(state)`. Modelless — two evaluations and a
+// comparison, no gradients. Opt-in.
+#[cfg(feature = "engram_privilege")]
+pub use engram::{
+    CreditAssignment, PrivilegeConfig, PrivilegeLedger, PrivilegeTrace,
+    fuse_into_hidden_state_privileged, sigmoid_fuse_scaled_into,
+};
+
 // ── Product Key Memory — O(√N) Factored Retrieval (Plan 408, Research 387) ─
 //
 // Open MIT-licensed primitive: the fourth complexity class in the retrieval
