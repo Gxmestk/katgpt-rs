@@ -217,6 +217,48 @@ syncs should speed up ordinary width-1 decoding too, independent of MTP.
   (`caddtree_budget` GOAT 7/7, `corr_budget` GOAT 10/10, `entropy_truncate_horizon`).
   The ddtree half of `mtp+ddtree` is what makes the Metal case viable at all;
   it is not the part to pivot away from.
+### Cross-repo correction (2026-08-16): batched forward EXISTS in riir-ai
+
+An earlier revision of this file said "there is no batched forward anywhere".
+That is true of **katgpt-rs** but wrong as a global claim:
+`riir-ai/crates/riir-gpu/src/forward/batched_dispatch.rs` ships full-sequence
+batched GPU dispatch behind `gpu_batched_forward` (Plan 363 / Issue 017). Any
+batched-forward work must consume or extend that, not re-derive it.
+
+Also relevant, and the concrete reason "nobody uses dflash": **riir-ai Issue 708
+(open, filed 2026-08-16) reports `forward_dflash.rs` (1,345 LOC) as
+NON-FUNCTIONAL and wrong-math** — H1 CRITICAL is a stale `uniform_qkv` making
+every Phase-A dispatch read `pos = seq_len-1`. It is opt-in
+(`dflash_training`/`dflare_training`, not default) and "presents as working the
+moment it is enabled — the backward tests pass on garbage output". An
+honesty-gate doc/warning landed today; H1–H4 completion remains open.
+
+### Thermal-bias caveat — this benchmark has NOT used the house protocol
+
+riir-ai has an established interleaved protocol for Metal measurement, adopted
+after two sign-flipping corrections:
+
+| claim | corrected | source |
+|---|---|---|
+| 1.19× win | **0.87× loss** | riir-ai Bench 666 |
+| 1.24× win | **0.95× loss** | riir-ai Issue 658 |
+
+The protocol: 2 warmup pairs (discarded) + 5 measure pairs, **alternating**
+A→B / B→A ordering within each pair, with **per-pair** ratio as the primary
+metric so monotonic thermal drift cancels.
+
+This benchmark measured configurations **sequentially** (N=1,2,3,4,7,8,16 within
+each shape), which is the vulnerable pattern. Mitigations used here were a
+pre/post baseline re-measure with `min()` and drift reporting (0.4–4.0% on the
+bandwidth-saturated shapes, 13–17% on `attn_qkv`).
+
+**Direction of the residual bias is conservative**, which is why the verdict is
+not withdrawn: later configurations run hotter, so `cost(N)` is inflated and
+`cost(N)/cost(1)` is *overstated* — correcting would make batching look cheaper
+and strengthen ARTIFACT. But `attn_qkv`'s 13–17% drift is the shape that sets
+the `N ≤ 4` boundary, so **that boundary specifically should be re-measured
+under the interleaved protocol before being quoted as settled.**
+
 - **The real blocker is not Metal.** Prerequisites, in dependency order:
   1. **Single-submit forward** — collapse `gpu.rs`'s 9 command buffers / 9 CPU
      syncs per pass into one graph. Without this, MTP reproduces llama.cpp's

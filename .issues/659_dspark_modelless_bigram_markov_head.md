@@ -8,6 +8,38 @@
 **Related Benchmarks:** 656 (MTP Metal batch-width floor)
 **Consumer:** Ternary-Bonsai-27B (`riir-train/data/Ternary-Bonsai-27B-dspark-Q4_1.gguf`)
 
+## CORRECTION (2026-08-16, after riir-ai substrate check)
+
+This issue was originally framed as "the missing piece of hybrid DSpark". That
+framing is **wrong**. riir-ai Plan 528 §81 (the Bonsai owner, Active, Phase 0)
+states it plainly:
+
+> Bonsai **SHIPS with DSpark** — a 6-layer block-denoising speculative drafter
+> (1.34× CUDA decode speedup). DSpark IS the DFlash pattern. **Prism-ML trained
+> it; we consume it.** The DFlash training gap from Plan 332 is closed for the
+> Bonsai path by DSpark — **we don't need to train a drafter.** On Apple Silicon
+> the DSpark drafter is not enabled by default (batch-1 verification doesn't
+> amortize), but on 4090 it gives the 1.34× speedup.
+
+So the drafter gap is **already closed** for Bonsai on CUDA. The real, narrower
+gap is: **Bonsai has no working drafter on Apple Silicon**, because DSpark's
+6-layer forward does not amortise at batch-1 (Bench 656 failure mode 2).
+
+**Revised scope:** a bigram Markov head is not "the missing DSpark piece" — it is
+a *Metal-viable alternative drafter* for the case where DSpark is switched off.
+It is a table lookup rather than a forward pass, so it does not incur mode 2.
+
+**Ownership:** Bonsai is riir-ai's (Plan 528, 7 open tasks). The *primitive*
+belongs in katgpt-rs (which owns `dd_tree`, `dflash`, `prefix_scheduler`); the
+*Bonsai consumer + gate* belongs in riir-ai. Coordinate before implementing.
+
+**Also relevant — riir-ai Issue 708 (open, filed 2026-08-16):**
+`forward_dflash.rs` (1,345 LOC) is **NON-FUNCTIONAL and wrong-math** (H1: stale
+`uniform_qkv` makes every Phase-A dispatch read `pos = seq_len-1`), and
+"presents as working the moment it is enabled — the backward tests pass on
+garbage output". This is the concrete reason the dflash investment appears
+unused. Fixing H1–H4 may be higher value than adding a new drafter.
+
 ## What is already shipped
 
 Research 316 states the modelless hybrid DSpark is feasible today from parts
