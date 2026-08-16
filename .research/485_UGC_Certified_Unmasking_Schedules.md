@@ -2,9 +2,9 @@
 
 > **Source:** "The data geometry of masking diffusion: Certified-optimal schedules via unmasking growth complexity" — Martin J. Wainwright (MIT LIDS / EECS / Math), [arXiv:2608.13520](https://arxiv.org/abs/2608.13520), 2026-08-13. Companion (Gaussian diffusion): "Denoising growth complexity" [arXiv:2607.26285](https://arxiv.org/abs/2607.26285).
 > **Date:** 2026-08-16
-> **Status:** Active — PoC gated on [Issue 664](../.issues/664_ugc_certified_schedule_poc.md)
+> **Status:** CLOSED 2026-08-17 — Issue 664 executed: G1/G1-cert/G4 PASS (paper numbers reproduced to 3 digits; coverage 32/32; zero-alloc), **G1b FAIL (honest negative result — the confidence-threshold d2f loop offers the certified schedule nothing to reclaim; early-exit already adapts passes; certificate N undefined at measured ε≈0)**. Substrate landed always-on as `katgpt-core::ugc_schedule` (diagnostic-only, no feature flag). Record: [Bench 659](../.benchmarks/659_ugc_certified_schedule_poc.md). Re-open trigger: a d2f random-order-reveal variant.
 > **Related Research:** 034 (D2F — shipped decode), 430 (DiffusionBlocks — `EquiProbability` clock absorbed), 383 (Latent Forcing scheduling — riir-train), 271 (diffusion vocabulary crosswalk), 072 (DMax SPD), 316 (DSpark), 428 (PFlash budget), 119 (KPop KL masking — no-gain precedent)
-> **Related Plans:** none yet — promotion to plan requires Issue 664 G1b gate PASS
+> **Related Plans:** none — the Issue 664 G1b gate FAILED (Bench 659, 2026-08-17); no feature-flag plan opens. The `ugc_schedule` substrate landed always-on as diagnostic-only.
 > **Classification:** Public
 
 ---
@@ -110,11 +110,10 @@ Setup: sample Z ∈ A^d via the **reveal process** X_t (each coordinate independ
 5. **Prior-art lineage to cite:** CCL25 (oracle info-profile schedules, TC/DTC bounds), LZ25 (arXiv:2510.25544 — continuum √-profile rule; √-form attribution from UGC's text, not independently verified from LZ25's body), DHW26 (arXiv:2602.15008, COLT 2026 — aggregate effective total correlation), Entropic Time Schedulers (arXiv:2504.13612 — equal-conditional-entropy clock, optimality only *conjectured*; UGC proves the sharper √q form in this setting), EDS (arXiv:2602.06849), JYS (arXiv:2410.07761 — upper-bound search, no certificates), KLASS (arXiv:2511.05664), RADD (arXiv:2406.03736 — scalar time reparam). Game/PCG application of unmasking-schedule theory: **confirmed absent** (searched).
 6. **Fetch caveat** (§1): rendered fractions unreliable — re-derive scalars from theorem forms when implementing.
 
-## 4. Validation protocol (executed by Issue 664)
+## 4. Validation protocol (EXECUTED by Issue 664 — see [Bench 659](../.benchmarks/659_ugc_certified_schedule_poc.md))
 
-- **G1 exact checks:** closed-form q_rep(λ) = d(d−1)log2·r²(1−r)^d, q_par(λ) = d(d−1)log2·(1−r)²r^d; H(0,1) = ((d−1)/(d+1))log2 via the TSE identity; reproduce published Ratios (noisy-bit η∈{0.01,0.30,0.45} → {4.51, 2.16, 1.65}; mixtures d∈{32,48,64} → {2.19, 3.13, 3.85}).
-- **G1 certificate coverage:** empirical frequency that KL ≤ 4Ĉ/N matches the 1−η claim across seeds.
-- **G1b (the falsifiable promotion gate):** on real decode shapes (block_size 8–16), UGC-adaptive step counts reach equal *measured* KL quality with ≥20% fewer forward passes than the fixed 8/12/4 presets — else record the negative result and keep the estimator as diagnostic only.
-- **G2:** estimator amortized once per model; schedule stored as a committed artifact (BLAKE3) and reused across decode calls.
-- **G4:** zero-alloc estimator (fixed dyadic grid arrays, scratch buffers).
-- **Feature flag:** `ugc_schedule` (opt-in) created only if G1b passes; demote/keep-out otherwise.
+- **G1 exact checks: PASS** — closed-form q_rep(λ)/q_par(λ) (Eq 24a/24b) rel < 1e-9; H(0,1) = ((d−1)/(d+1))·ln2 via both direct integration and the TSE identity; noisy-bit Ratios **4.511/2.165/1.653** vs paper {4.51, 2.16, 1.65}; mixture Ratios **2.230/3.373/4.039** vs {2.19, 3.13, 3.85} (1.8%/7.8%/4.9%).
+- **G1 certificate coverage: PASS** — measured KL (exact 3^d enumeration of the sampler output law) ≤ 4Ĉ/N in **32/32 seeds** across both cells.
+- **G1b (the falsifiable promotion gate): FAIL — honest negative result.** At block sizes 8–15 on the real decode path: reductions −8.6%…+1.4% (bar ≥20%); the loop's confidence early-exit already adapts passes; ε(N) flat at the noise floor for N ≥ 3 (the certificate's N = 8Ĉ/ε is undefined at measured ε ≈ 0); the one +75% cell is degenerate (N-invariant outputs, N* from the scan not the certificate). Caveat 1 (random-order vs confidence-threshold reveal) is the confirmed structural cause.
+- **G4: PASS** — 0 allocations steady state (CountingAllocator).
+- **Feature flag:** `ugc_schedule` NOT created (G1b failed). Substrate = always-on diagnostic.

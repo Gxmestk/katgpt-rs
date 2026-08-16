@@ -247,6 +247,18 @@ pub use set_diffusion_schedule::{
     PositionOffsetSchedule, ar_order, block_causal_gen_steps, mdlm_gen_steps, order_to_gen_steps,
     uniform_order, uniform_order_with,
 };
+// UGC — Unmasking Growth Complexity certified schedules for masked diffusion
+// (arXiv:2608.13520, Research 485 / Issue 664). Always-on: pure math + a
+// denoiser trait, zero deps beyond crate::types::Rng — the same no-gate
+// rationale as set_diffusion_schedule. Feature-flag plan (`ugc_schedule`)
+// opens ONLY if the Issue 664 G1b promotion gate passes.
+pub mod ugc_schedule;
+pub use ugc_schedule::{
+    UgcBlockPlan, UgcDenoiser, UgcIntervalEstimate, UgcProfile, UgcScratch, UGC_MASK,
+    bernoulli_unmask_with_grid, certified_block_plan, certified_iteration_count,
+    dp_partition, equal_sqrt_mass_grid, estimate_interval, estimate_profile,
+    inv_log_reveal_odds, log_reveal_odds, reveal_grid_from_plan, reveal_odds,
+};
 // SIMD-accelerated linear algebra kernels (NEON / AVX2 / WASM-SIMD128 /
 // scalar fallback). Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::simd` for backwards
