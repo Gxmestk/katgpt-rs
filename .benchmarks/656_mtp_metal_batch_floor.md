@@ -3,10 +3,17 @@
 **Date:** 2026-08-16
 **Device:** Apple M3 Max (~400 GB/s peak bandwidth)
 **Harness:** `crates/katgpt-backend/examples/bench_mtp_metal_batch_floor.rs`
+(runs the sequential and interleaved protocols side by side)
 **Feature:** `gpu_inference`
 **Verdict:** **ARTIFACT** — batched speculative verify is affordable on Metal at
 shallow depth. llama.cpp's Apple-Silicon MTP loss is an implementation issue,
 not a hardware limit. `mtp+ddtree` is viable on M3, in the **N ≤ 4** band only.
+
+**Re-measured 2026-08-16 under riir-ai's interleaved protocol (3 runs): verdict
+holds and the `N ≤ 4` boundary is now SETTLED.** One of the three runs shows the
+*sequential* protocol crossing breakeven (1.73× vs 1.70×) and flipping the
+verdict, while the interleaved protocol held at 1.30×. See §Interleaved-protocol
+re-measurement.
 
 ---
 
@@ -233,7 +240,7 @@ every Phase-A dispatch read `pos = seq_len-1`. It is opt-in
 moment it is enabled — the backward tests pass on garbage output". An
 honesty-gate doc/warning landed today; H1–H4 completion remains open.
 
-### Thermal-bias caveat — this benchmark has NOT used the house protocol
+### Interleaved-protocol re-measurement (2026-08-16) — boundary SETTLED
 
 riir-ai has an established interleaved protocol for Metal measurement, adopted
 after two sign-flipping corrections:
@@ -243,21 +250,60 @@ after two sign-flipping corrections:
 | 1.19× win | **0.87× loss** | riir-ai Bench 666 |
 | 1.24× win | **0.95× loss** | riir-ai Issue 658 |
 
-The protocol: 2 warmup pairs (discarded) + 5 measure pairs, **alternating**
+The protocol: warmup pairs (discarded) + measure pairs, **alternating**
 A→B / B→A ordering within each pair, with **per-pair** ratio as the primary
 metric so monotonic thermal drift cancels.
 
-This benchmark measured configurations **sequentially** (N=1,2,3,4,7,8,16 within
-each shape), which is the vulnerable pattern. Mitigations used here were a
-pre/post baseline re-measure with `min()` and drift reporting (0.4–4.0% on the
-bandwidth-saturated shapes, 13–17% on `attn_qkv`).
+The original run above measured configurations **sequentially** (N=1,2,3,4,7,8,16
+within each shape) with a pre/post baseline re-measure — the vulnerable pattern.
+`attn_qkv` carried 13–17% baseline drift there and is the shape that sets the
+`N ≤ 4` boundary, so that boundary was recorded as **un-settled**.
 
-**Direction of the residual bias is conservative**, which is why the verdict is
-not withdrawn: later configurations run hotter, so `cost(N)` is inflated and
-`cost(N)/cost(1)` is *overstated* — correcting would make batching look cheaper
-and strengthen ARTIFACT. But `attn_qkv`'s 13–17% drift is the shape that sets
-the `N ≤ 4` boundary, so **that boundary specifically should be re-measured
-under the interleaved protocol before being quoted as settled.**
+The harness now runs **both protocols side by side**
+(`PAIR_WARMUP=2`, `PAIR_MEASURE=7`, `PAIR_ITERS=10`, alternating order, median
+of per-pair ratios), so the protocol change is attributable rather than
+asserted. Three runs, M3 Max, load average 5–7 (a sibling agent's `cargo test`
+running concurrently — deliberately not waited out, since robustness to exactly
+that is the protocol's purpose):
+
+#### Worst-case `cost(3)/cost(1)` across shapes (breakeven 1.70×)
+
+| run | sequential | interleaved | `attn_qkv` seq. baseline drift |
+|---|---|---|---|
+| 1 | 1.32× | **1.32×** | 0.3% |
+| 2 | 1.27× | **1.30×** | 6.9% |
+| 3 | **1.73× — verdict would FLIP** | **1.30×** | **74.1%** |
+
+**Run 3 is the result.** A 74% baseline drift on `attn_qkv` pushed the
+sequential N=3 ratio to **1.73×, above the 1.70× breakeven** — which would have
+inverted the verdict from ARTIFACT to FUNDAMENTAL and killed the MTP pivot on
+this box. The interleaved protocol returned **1.30×** on the same run, matching
+runs 1 and 2 to within 0.02×. This is the riir-ai Bench 666 / Issue 658 failure
+mode reproduced in-house, and it is now caught rather than shipped.
+
+Per-pair spreads widen under disturbance (run 3 `attn_qkv` N=3 spanned
+0.68–1.45) but the median holds — which is the point of taking the median of
+per-pair ratios rather than a ratio of medians.
+
+#### Viable band per shape (interleaved, identical in all 3 runs)
+
+| shape | band | why |
+|---|---|---|
+| `attn_qkv` | **N ≤ 4** | 4 096 threads — occupancy-limited, 103–127 GB/s |
+| `ffn_up` | **N ≤ 4** | 11 008 threads, 244–256 GB/s |
+| `lm_head` | N ≤ 16 | 32 000 threads — bandwidth-saturated at 294–315 GB/s |
+| **OVERALL** | **N ≤ 4** | `attn_qkv`/`ffn_up` bind |
+
+**The `N ≤ 4` band is confirmed, and by a stricter method than the one that
+first produced it.** The narrow shapes bind at exactly 4 in every run under both
+protocols; `lm_head` — the dominant matrix, and the one a width-N verify scales
+worst on — batches free out to N=16.
+
+The earlier note that residual sequential bias was "conservative" (later configs
+run hotter ⇒ ratios overstated ⇒ correcting strengthens ARTIFACT) was directionally
+right but **understated the risk**: run 3 shows the bias can be large enough to
+cross breakeven outright, and a single sequential run offers no way to tell which
+kind of run you got.
 
 - **The real blocker is not Metal.** Prerequisites, in dependency order:
   1. **Single-submit forward** — collapse `gpu.rs`'s 9 command buffers / 9 CPU
