@@ -1,12 +1,16 @@
 # Plan 574 — Modelless Clustered LM Head (activate the `mtp_cluster_*` substrate)
 
-**Status:** Phase 1 COMPLETE — builders ship, **GOAT FAILED on G2b, NOT promoted**.
-Follow-ups: Issue 657 (max bound — the likely fix), Issue 658 (multi-layer predictor)
+**Status:** Phase 2 COMPLETE — **G2b now PASSES (0.675 → 1.0000)**, still NOT
+promoted to default-on. Blocked on Issue 661 (serial stage 2 → 0.08× on flat
+data) and Issue 662 (no real checkpoint measured).
+Follow-ups: Issue 661, Issue 662. Issue 657 RESOLVED (its diagnosis was refuted
+by its own fix); Issue 658 (multi-layer predictor) is now moot — see T7.
 **Date:** 2026-08-16
 **Owner:** katgpt-rs
 **Related Research:** 026 (Gemma 4 MTP), 078 (MTP Cluster Top-K Efficient Embedder),
 407 (Trees from Marginals — DFlash-TfM)
-**Related Benchmarks:** 656 (MTP Metal batch-width floor)
+**Related Benchmarks:** 656 (MTP Metal batch-width floor), 657 (Phase 1 GOAT —
+the recorded FAIL), 658 (Phase 2 re-gate — supersedes 657)
 **Feature flag:** `cluster_lm_head` (opt-in until GOAT passes)
 
 ---
@@ -114,9 +118,41 @@ speedup on a wrong argmax is not a modelless gain.
       **G2b FAIL**: best argmax recall **0.675** vs the 0.99 target, and 0.16 at
       a usable 5% budget. Per AGENTS.md a speedup on a wrong argmax is not a
       modelless gain, so `mtp_cluster_*` stays unloaded by default.
-      Root cause is the *scoring objective* (mean logit vs max logit), not the
-      input — see Issue 657 (admissible Cauchy–Schwarz radius bound) and
-      Issue 658 (multi-layer/FUNCATTN predictor, ordered second).
+      Root cause diagnosed as the *scoring objective* (mean logit vs max logit)
+      — **that diagnosis was wrong, see T7**.
+
+## Phase 2 — Issue 657 (2026-08-16)
+
+- [x] **T7** Radius bound + admissible stop shipped
+      (`cluster_radii_from_map`, `cluster_head::clustered_lm_head_bounded`,
+      `ClusterStop::{TopK, Admissible}`). **G2b PASSES: 0.675 → 1.0000 at a 2%
+      active budget** — but Benchmark 658's 2×2 attribution shows the bound did
+      not cause it. The defect was a degenerate k-means seeding (strided init at
+      `stride = vocab/k` drew every centre from two planted groups); D² seeding
+      alone yields 1.0000, while the bound *alone* makes recall worse (0.410 at
+      25%). `ClusterInit::Dsquared` is now the default; `::Strided` survives only
+      so the bench can keep attributing.
+
+      The bound's value is the **admissible** stop: exact argmax after touching
+      **7.30%** of the vocabulary on a clustered head, recall 1.0 by
+      construction. On the unstructured control it needs **99.99%**.
+
+      This also **moots T8/Issue 658** (multi-layer FUNCATTN predictor). It was
+      ordered after 657 on the reasoning that "more layers cannot repair a wrong
+      objective" — but the objective was never wrong, and a single-layer
+      centroid score now achieves recall 1.0. There is no residual quality gap
+      for a deeper predictor to close.
+
+- [ ] **T8** **NOT PROMOTED (still).** Blocked on two measurements, not on
+      quality:
+      1. **Issue 661** — stage 2 is single-threaded against a rayon-parallel
+         `standard_lm_head`, so a 13.70× FLOP win measures as 2.1–2.9× and
+         *inverts to 0.08×* when pruning is weak. Need the active-fraction
+         crossover; that threshold is the load-time enable condition.
+      2. **Issue 662** — both fixtures are synthetic extremes (planted-Gaussian
+         vs uniform-random) with opposite verdicts. A real checkpoint decides
+         it. Owned by riir-ai: katgpt-rs has no GGUF reader and must not
+         path-depend on a private sibling.
 
 ## Non-goals
 

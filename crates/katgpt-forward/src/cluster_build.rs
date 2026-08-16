@@ -53,6 +53,11 @@ const KMEANS_ITERS: usize = 10;
 /// run would make the argmax-recall gate unfalsifiable.
 const PROJ_SEED: u64 = 0x5EED_C105_7E12_0001;
 
+/// Separate pinned stream for the k-means++ seeding draw. Distinct from
+/// [`PROJ_SEED`] so the projection and the initial-centre choice do not
+/// correlate.
+const INIT_SEED: u64 = 0x5EED_C105_7E12_0002;
+
 /// splitmix64 finalizer — deterministic, well-distributed bit mixing.
 #[inline]
 fn splitmix64(seed: u64) -> u64 {
@@ -101,6 +106,98 @@ fn sq_dist(a: &[f32], b: &[f32]) -> f32 {
         .sum::<f32>()
 }
 
+/// Deterministic k-means++ (D²) seeding in projected space.
+///
+/// # Why not strided init (the defect this replaces)
+///
+/// The original init took rows `0, stride, 2·stride, …` with
+/// `stride = count / k`. That is only "spread out" in *token-ID* order, which
+/// is not the geometry being clustered. When the vocabulary's geometric groups
+/// are periodic in token ID with a period that shares a factor with `stride`,
+/// every initial centre lands in the same handful of groups and Lloyd cannot
+/// recover from it. Benchmark 657's structured fixture assigns group
+/// `t % n_groups` with `n_groups == k`, so `stride = count / k` made all `k`
+/// centres come from exactly **two** distinct groups — a pathological start
+/// that Plan 574's G2b failure was originally (and wrongly) attributed to the
+/// scoring objective.
+///
+/// D² seeding picks centres by actual distance, so it cannot be defeated by an
+/// adversarial ID ordering. It is deterministic given [`INIT_SEED`]; cost is
+/// `O(k · count · dim)`, i.e. one extra Lloyd iteration.
+fn kmeanspp_init(data: &[f32], count: usize, k: usize, dim: usize) -> Vec<f32> {
+    let mut centers = vec![0.0f32; k * dim];
+    let mut closest = vec![f32::MAX; count];
+    let mut stream = INIT_SEED;
+
+    let next_u64 = |stream: &mut u64| {
+        *stream = stream.wrapping_add(1);
+        splitmix64(*stream)
+    };
+
+    let first = (next_u64(&mut stream) % count as u64) as usize;
+    centers[..dim].copy_from_slice(&data[first * dim..(first + 1) * dim]);
+
+    for c in 1..k {
+        // Fold the centre just chosen into the running nearest-centre distance.
+        let prev = &centers[(c - 1) * dim..c * dim];
+        let mut total = 0.0f64;
+        for (t, slot) in closest.iter_mut().enumerate() {
+            *slot = slot.min(sq_dist(&data[t * dim..(t + 1) * dim], prev));
+            total += *slot as f64;
+        }
+
+        // All remaining points coincide with a chosen centre — nothing left to
+        // separate, so fall back to a deterministic index rather than sampling
+        // from an all-zero distribution.
+        let chosen = match total > 0.0 {
+            false => c % count,
+            true => {
+                let target = total * (next_u64(&mut stream) >> 11) as f64 / (1u64 << 53) as f64;
+                let mut acc = 0.0f64;
+                let mut pick = count - 1;
+                for (t, &d) in closest.iter().enumerate() {
+                    acc += d as f64;
+                    if acc >= target {
+                        pick = t;
+                        break;
+                    }
+                }
+                pick
+            }
+        };
+        centers[c * dim..(c + 1) * dim].copy_from_slice(&data[chosen * dim..(chosen + 1) * dim]);
+    }
+    centers
+}
+
+/// How k-means picks its initial centres.
+///
+/// Exposed because the choice is not a tuning detail — it moved Benchmark 657's
+/// verdict on its own. Production always wants [`ClusterInit::Dsquared`];
+/// [`ClusterInit::Strided`] is retained solely so the benchmark can attribute
+/// the recall change to the init rather than to the scoring bound.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ClusterInit {
+    /// Deterministic k-means++ D² seeding. See [`kmeanspp_init`].
+    #[default]
+    Dsquared,
+    /// Rows `0, stride, 2·stride, …`. Spread in **token-ID** order, not in the
+    /// geometry being clustered — degenerate whenever the vocabulary's groups
+    /// are ID-periodic. Kept only as the measured-worse baseline.
+    Strided,
+}
+
+/// Strided (token-ID-spaced) initial centres — the defective baseline.
+fn strided_init(data: &[f32], count: usize, k: usize, dim: usize) -> Vec<f32> {
+    let stride = count / k;
+    let mut centers = vec![0.0f32; k * dim];
+    for c in 0..k {
+        let src = (c * stride).min(count - 1);
+        centers[c * dim..(c + 1) * dim].copy_from_slice(&data[src * dim..(src + 1) * dim]);
+    }
+    centers
+}
+
 /// Create a round-robin cluster assignment for tokens.
 ///
 /// Token `i` is assigned to cluster `i / cluster_size`. Deterministic, no
@@ -141,6 +238,25 @@ pub fn cluster_map_from_embeddings(
     n_embd: usize,
     cluster_size: usize,
 ) -> Vec<Vec<usize>> {
+    cluster_map_from_embeddings_with_init(
+        lm_head,
+        vocab_size,
+        n_embd,
+        cluster_size,
+        ClusterInit::default(),
+    )
+}
+
+/// [`cluster_map_from_embeddings`] with an explicit seeding strategy.
+///
+/// Only the benchmark should pass anything other than [`ClusterInit::Dsquared`].
+pub fn cluster_map_from_embeddings_with_init(
+    lm_head: &[f32],
+    vocab_size: usize,
+    n_embd: usize,
+    cluster_size: usize,
+    init: ClusterInit,
+) -> Vec<Vec<usize>> {
     // Degenerate shapes fall back to the baseline rather than erroring: the
     // caller gets a usable map, and round-robin is exactly what k-means would
     // reduce to when there is no geometry to exploit.
@@ -161,16 +277,12 @@ pub fn cluster_map_from_embeddings(
     let proj_dim = PROJ_DIM.min(n_embd);
     let data = project_rows(lm_head, vocab_size, n_embd, proj_dim);
 
-    // Strided init: evenly spaced rows spread the initial centers across the
-    // vocabulary. Taking the *first* k rows (as a naive init does) clusters
-    // them all in one corner of a sorted vocabulary and converges poorly.
-    let stride = vocab_size / k;
-    let mut centers = vec![0.0f32; k * proj_dim];
-    for c in 0..k {
-        let src = (c * stride).min(vocab_size - 1);
-        centers[c * proj_dim..(c + 1) * proj_dim]
-            .copy_from_slice(&data[src * proj_dim..(src + 1) * proj_dim]);
-    }
+    // See `kmeanspp_init` for why the strided variant is pathological on
+    // ID-periodic geometry.
+    let mut centers = match init {
+        ClusterInit::Dsquared => kmeanspp_init(&data, vocab_size, k, proj_dim),
+        ClusterInit::Strided => strided_init(&data, vocab_size, k, proj_dim),
+    };
 
     let mut labels = vec![0usize; vocab_size];
     let mut counts = vec![0usize; k];
@@ -263,6 +375,52 @@ pub fn cluster_classifier_from_map(
         }
     }
     classifier
+}
+
+/// Per-cluster residual radius — `radius_c = max‖lm_head[t] − centroid_c‖`.
+///
+/// This is the third clustered-LM-head artifact (Issue 657), and the one that
+/// turns stage 1 from a heuristic into an **admissible** bound. Writing
+/// `w_t = centroid_c + r_t`, Cauchy–Schwarz gives, for every `t` in cluster `c`:
+///
+/// ```text
+/// logit[t] = ⟨h, centroid_c⟩ + ⟨h, r_t⟩ ≤ ⟨h, centroid_c⟩ + ‖h‖ · radius_c
+/// ```
+///
+/// The bare centroid score is the cluster's *mean* logit, but the question
+/// stage 1 must answer is which cluster holds the *max*. A cluster with one
+/// spike among many low values has a poor mean and is pruned despite owning the
+/// argmax; the radius term is exactly the slack that covers that case.
+///
+/// Costs one `f32` per cluster and one FMA per cluster in stage 1. Computed
+/// from shipped weights — deterministic, **modelless**.
+///
+/// `classifier` must be the output of [`cluster_classifier_from_map`] for the
+/// same `cluster_map`, or the bound is not admissible.
+pub fn cluster_radii_from_map(
+    lm_head: &[f32],
+    cluster_map: &[Vec<usize>],
+    classifier: &[f32],
+    n_embd: usize,
+) -> Vec<f32> {
+    let mut radii = vec![0.0f32; cluster_map.len()];
+    for (c, tokens) in cluster_map.iter().enumerate() {
+        let centroid_off = c * n_embd;
+        if centroid_off + n_embd > classifier.len() {
+            continue;
+        }
+        let centroid = &classifier[centroid_off..centroid_off + n_embd];
+        let mut max_sq = 0.0f32;
+        for &t in tokens {
+            let off = t * n_embd;
+            if off + n_embd > lm_head.len() {
+                continue;
+            }
+            max_sq = max_sq.max(sq_dist(&lm_head[off..off + n_embd], centroid));
+        }
+        radii[c] = max_sq.sqrt();
+    }
+    radii
 }
 
 #[cfg(test)]

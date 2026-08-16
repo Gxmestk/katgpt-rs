@@ -325,21 +325,18 @@ pub fn clustered_lm_head(
     // NOTE(078): Cluster tokens are non-contiguous (round-robin assignment), so
     // batched simd_matmul_rows cannot be used directly. Individual simd_dot_f32 calls
     // are optimal here — the function is inlined and dispatch overhead is negligible.
+    //
+    // The per-cluster loop lives in `cluster_head` so this path and the
+    // bound-ranked one (Issue 657) cannot drift apart.
     for &cluster_idx in selected_clusters {
-        let cluster_tokens = &cluster_map[cluster_idx];
-        for &token_idx in cluster_tokens {
-            if token_idx < vocab_size {
-                let row_off = token_idx * n_embd;
-                let dot = katgpt_core::simd::simd_dot_f32(
-                    &lm_head[row_off..row_off + n_embd],
-                    &hidden[..n_embd],
-                    n_embd,
-                );
-                unsafe {
-                    *logits.get_unchecked_mut(token_idx) = dot;
-                }
-            }
-        }
+        crate::cluster_head::fill_cluster_exact(
+            logits,
+            hidden,
+            lm_head,
+            &cluster_map[cluster_idx],
+            vocab_size,
+            n_embd,
+        );
     }
 }
 
@@ -350,7 +347,8 @@ pub fn clustered_lm_head(
 // returned round-robin) is now a real k-means; `cluster_map_round_robin`
 // survives there unchanged as the baseline it must beat.
 pub use crate::cluster_build::{
-    cluster_classifier_from_map, cluster_map_from_embeddings, cluster_map_round_robin,
+    ClusterInit, cluster_classifier_from_map, cluster_map_from_embeddings,
+    cluster_map_from_embeddings_with_init, cluster_map_round_robin, cluster_radii_from_map,
 };
 #[allow(clippy::too_many_arguments)] // forward pass: 7 fixed + 1 cfg-gated (domain_latent)
 pub fn forward_base<'a>(

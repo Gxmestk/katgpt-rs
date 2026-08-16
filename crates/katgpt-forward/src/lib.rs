@@ -486,13 +486,19 @@ pub mod forward;
 // Plan 574: load-time construction of the clustered-LM-head artifacts.
 // Separate from `forward` because it is build-time, not hot-path.
 pub mod cluster_build;
+// Issue 657: bound-ranked / admissible stage-1 selection. Hot-path sibling of
+// `forward::clustered_lm_head`, kept separate so `forward.rs` stays in budget.
+pub mod cluster_head;
 #[cfg(feature = "coda_fusion")]
 pub use forward::forward_coda;
+pub use cluster_head::{
+    ClusterCost, ClusterHeadView, ClusterScratch, ClusterStop, clustered_lm_head_bounded,
+};
 pub use forward::{
-    CPU_FORWARD_USES_DEVICE_BASE_PATH, attention_head, cluster_classifier_from_map,
-    cluster_map_from_embeddings, cluster_map_round_robin, clustered_lm_head, forward, forward_base,
-    forward_base_f16, forward_f16, select_topk_indices, select_topk_indices_into_buf,
-    standard_lm_head,
+    CPU_FORWARD_USES_DEVICE_BASE_PATH, ClusterInit, attention_head, cluster_classifier_from_map,
+    cluster_map_from_embeddings, cluster_map_from_embeddings_with_init, cluster_map_round_robin,
+    cluster_radii_from_map, clustered_lm_head, forward, forward_base, forward_base_f16,
+    forward_f16, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
 };
 
 // DenseMesh `node_transformer` — Plan 385 (2026-07-05).
