@@ -212,10 +212,37 @@ surfaced only 3.5/3.6.
 
 ## Related
 
-- `crates/katgpt-transformer/src/mtp.rs` — **name collision, not this.** Plan
-  016/055 MTP projects target hidden state into a *separate small drafter's*
-  embedding space (MTP-as-conditioning). It is not a native MTP head. Grepping
-  `mtp` returns this as a false positive.
+- `crates/katgpt-transformer/src/mtp.rs` — **this is real MTP substrate**, not a
+  name collision (an earlier revision of this file wrongly called it one). It is
+  **Gemma 4-flavour MTP** per Research 026, whose three mechanisms all ship:
+  1. **Target activations** — `project_target_activation()` (Plan 016/055).
+  2. **Shared KV cache** — `mtp_shared_kv_prompt_threshold`.
+  3. **Clustered LM head** — `mtp_cluster_classifier` / `mtp_cluster_map` /
+     `mtp_cluster_topk`, live at `forward.rs:752` and `forward.rs:1323`.
+
+  The distinction from Qwen-native MTP is real but narrower than stated: Gemma 4
+  MTP conditions a *separate small drafter*; Qwen ships the draft head *inside*
+  the model. The **clustered LM head is orthogonal to both and helps either** —
+  it cuts the final matmul from `[vocab, hidden]` to `[cluster, hidden]` (~100×
+  at BPE scale per Research 026). That matters directly here: `lm_head` is the
+  dominant matrix in this benchmark (500 MB, 1.7–2.5 ms), and a width-N verify
+  computes `N × vocab` logits, so clustering compounds with MTP rather than
+  competing with it.
+
+  **Status: implemented and wired, never fed weights** (`mtp_cluster_*` are
+  always `None`). Round-robin cluster assignment is the shipped baseline;
+  K-means over existing embeddings is planned (Plan 056). Both are deterministic
+  → activating this is a **modelless** task, no riir-train dependency.
+- `.research/407_Trees_from_Marginals_GDN_Tree_Verify.md` — DFlash-TfM measures
+  **4.37× over AR decoding** (24.7% over tuned DFlash) on **Qwen3.6-27B**, the
+  exact dflash+ddtree combination this repo already invested in. Flags the GDN
+  rollback-free tree-verify as modelless "gold" (masked triangular solve, no
+  training) and the acceptance-ceiling result as "a one-line DDTree tuning
+  change" (argmax-of-marginal beats full-marginal sampling at depth). Plan 424 +
+  `bench_424_dd_tree_deep_argmax.rs` already exist.
+- `.research/078_MTP_Cluster_Top_K_Efficient_Embedder.md`,
+  `.research/243_Bebop_Entropy_Bounded_MTP_Acceptance_Adaptive_Gamma.md` —
+  further MTP clustering / acceptance-adaptive work already distilled.
 - `crates/katgpt-speculative/src/dd_tree/` — `build_dd_tree(marginals: &[&[f32]], config)`
   takes distributions and is origin-agnostic; zero `dflash` references in
   production code. MTP marginals drop in at this existing seam.
