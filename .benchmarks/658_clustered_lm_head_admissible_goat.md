@@ -137,11 +137,55 @@ the wall-clock win is always far below the FLOP ratio, and on the control regime
 (where the bound cannot prune) the same FLOPs run serially against a parallel
 baseline and the ratio inverts to 0.08× — a **12× regression**.
 
-That gap is a fixable implementation limit, not a property of the method: a
-rayon-parallel or gather-then-`matmul_parallel` stage 2 should recover most of
-the 13.7×. Filed as Issue 661. The structured spread (0.95–3.57 over 20 pairs)
+That gap was assumed to be a threading limit and filed as Issue 661. **It is
+not** — see the addendum below. The structured spread (0.95–3.57 over 20 pairs)
 is also wide enough that only the *direction* is established here, not the
 magnitude.
+
+## Addendum (2026-08-17) — Issue 661 resolved: it is locality, not threading
+
+`ClusterStop::Admissible { wave }` shipped, evaluating `wave` clusters per round
+with rayon inside a wave. Exactness is wave-independent (unit-tested). The
+sweep is a **wash**: `wave: 8` gives 3.01× against `wave: 1`'s 2.96×, inside the
+run-to-run spread, and past `wave: 16` it degrades because a coarser stop check
+over-computes faster than rayon absorbs it (`wave: 64` touches 3.62× the tokens
+for no gain).
+
+The gap is fully explained by memory access, and the arithmetic closes:
+
+| path | bytes | time | effective bandwidth |
+|---|---|---|---|
+| full head (contiguous stream) | 67.1 MB | 0.6213 ms | **108.0 GB/s** |
+| admissible (scattered rows) | 5.8 MB | 0.2805 ms | **20.6 GB/s** |
+
+```text
+11.64x (FLOP ratio)  /  5.26x (locality penalty)  =  2.21x  ==  measured 2.21x
+```
+
+Cluster members are non-contiguous token IDs, so stage 2 gathers ~2 800 separate
+2 KB rows instead of streaming one 67 MB block. **Issue 666** permutes `lm_head`
+rows into cluster order at load time so each cluster is one contiguous span.
+
+### The crossover — Issue 661's actual deliverable
+
+Walking the fixture's separability dial produces the curve this benchmark could
+previously only bracket by its two endpoints (`wave: 8`, exactness asserted
+throughout):
+
+| group spread | active% | speedup | |
+|---|---|---|---|
+| 0.05 | 8.59% | **2.88×** | win |
+| 0.07 | 13.74% | **1.71×** | win |
+| 0.09 | 21.41% | **1.14×** | win |
+| 0.11 | 34.30% | 0.16× | LOSS |
+| 0.13 | 46.43% | 0.35× | LOSS |
+| 0.15 | 60.21% | 0.26× | LOSS |
+| 0.30 | 100.00% | 0.11× | LOSS |
+
+**Crossover: between 21.4% and 34.3% active.** Enable below ~15% (≥1.7×, clear
+of noise); use the full head above ~25%. The loss below the crossover is severe,
+so the default must stay off and the condition must be *measured* per checkpoint
+— which is Issue 662.
 
 ## Promotion
 

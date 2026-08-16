@@ -40,15 +40,30 @@
 //!
 //! Its cost is data-dependent, and the spread is the whole story: **7.30%** of
 //! the vocabulary touched on a clustered head, **99.99%** on a geometrically
-//! flat one. Stage 2 is currently serial against a rayon-parallel full head, so
-//! the flat case measures as a 12× *regression* (Issue 661). Do not enable this
-//! unconditionally — see `.benchmarks/658_clustered_lm_head_admissible_goat.md`.
+//! flat one.
+//!
+//! # Do not enable this unconditionally
+//!
+//! Issue 661 measured the crossover: the clustered path beats the full head
+//! only below roughly **21–34% active**, and the loss above it is severe
+//! (0.11–0.35×). Enable below ~15% active; use the full head above ~25%.
+//!
+//! The wall-clock win is also well below the FLOP reduction — 2.21× measured
+//! against 11.64× of arithmetic saved — and the shortfall is **locality**, not
+//! threading. Cluster members are non-contiguous token IDs, so stage 2 gathers
+//! scattered rows at 20.6 GB/s where the full head streams at 108.0 GB/s; the
+//! 5.26× ratio accounts for the gap exactly. Wave-parallelism was tried and is
+//! a wash (Issue 661 §661a). Issue 666 permutes the rows into cluster order,
+//! which is the fix that addresses the actual cost.
+//!
+//! See `.benchmarks/658_clustered_lm_head_admissible_goat.md`.
 //!
 //! Both stop rules are deterministic functions of shipped weights —
 //! **modelless**, no training. The hot path allocates nothing; all scratch is
 //! caller-owned.
 
 use katgpt_core::simd::simd_dot_f32;
+use rayon::prelude::*;
 
 /// Borrowed view of the three load-time clustered-LM-head artifacts.
 ///
@@ -74,16 +89,41 @@ pub struct ClusterScratch<'a> {
     pub indexed: &'a mut Vec<(usize, f32)>,
     /// Receives the clusters actually evaluated, in visit order.
     pub selected: &'a mut Vec<usize>,
+    /// Token IDs of the wave currently being evaluated.
+    pub gathered: &'a mut Vec<usize>,
+    /// Per-token dot products for the current wave, index-aligned with
+    /// [`gathered`](Self::gathered). Separate from `logits` so the parallel
+    /// write target is contiguous and provably disjoint.
+    pub dots: &'a mut Vec<f32>,
 }
+
+/// Tokens a wave must reach before rayon is worth its ~5 µs of overhead.
+///
+/// Mirrors `simd_matmul_rows_parallel`'s own 512-row cutoff, so a wave that
+/// would have been serial inside the full head stays serial here too.
+const PARALLEL_MIN_TOKENS: usize = 512;
 
 /// When to stop admitting clusters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClusterStop {
-    /// Fixed budget: take the `k` highest-scoring clusters.
+    /// Fixed budget: take the `k` highest-scoring clusters. Evaluated as one
+    /// wave, so it parallelizes unconditionally.
     TopK(usize),
     /// Exact: stop when the bound can no longer beat the best exact logit
     /// found. Recall is 1.0 by construction.
-    Admissible,
+    ///
+    /// `wave` clusters are evaluated per round before the stop condition is
+    /// re-checked. The check is on the *leading* bound of each wave, so a wave
+    /// may compute clusters it did not strictly need — extra work, never a
+    /// missed argmax. Exactness is independent of `wave`.
+    ///
+    /// - `wave: 1` is the sequential reference: minimum work, no parallelism.
+    /// - Larger waves trade a few redundant clusters for rayon width. The
+    ///   highest-bound cluster almost always holds the argmax, so `best_exact`
+    ///   is near-final after the first wave and the second check prunes hard.
+    ///
+    /// `wave: 0` is treated as 1.
+    Admissible { wave: usize },
 }
 
 /// What the selection actually cost, so callers can report the operating point
@@ -179,29 +219,71 @@ pub fn clustered_lm_head_bounded(
     logits.fill(f32::NEG_INFINITY);
     scratch.selected.clear();
 
-    let limit = match stop {
-        ClusterStop::TopK(k) => k.min(num_clusters),
-        ClusterStop::Admissible => num_clusters,
+    // `TopK` is one wave over its whole budget with no stop check; `Admissible`
+    // walks the full list in `wave`-sized rounds, re-checking between them. One
+    // loop serves both.
+    let (limit, wave, checked) = match stop {
+        ClusterStop::TopK(k) => {
+            let k = k.min(num_clusters);
+            (k, k.max(1), false)
+        }
+        ClusterStop::Admissible { wave } => (num_clusters, wave.max(1), true),
     };
 
     let mut cost = ClusterCost::default();
     let mut best_exact = f32::NEG_INFINITY;
+    let mut visited = 0usize;
 
-    for &(cluster_idx, bound) in &scratch.indexed[..limit] {
-        // The bound is monotonically non-increasing over this loop, so once it
-        // cannot beat an exact logit we already hold, no later cluster can
-        // either. Terminating here is what makes the mode exact rather than
+    while visited < limit {
+        // Bounds are non-increasing over `indexed`, so if the leading bound of
+        // this wave cannot beat an exact logit we already hold, nothing from
+        // here on can either. This is what makes the mode exact rather than
         // merely cheap.
-        if stop == ClusterStop::Admissible && bound <= best_exact {
+        if checked && scratch.indexed[visited].1 <= best_exact {
             break;
         }
-        let tokens = &head.map[cluster_idx];
-        let cluster_best =
-            fill_cluster_exact(logits, hidden, lm_head, tokens, vocab_size, n_embd);
-        best_exact = best_exact.max(cluster_best);
-        scratch.selected.push(cluster_idx);
-        cost.clusters += 1;
-        cost.tokens += tokens.iter().filter(|&&t| t < vocab_size).count();
+        let end = (visited + wave).min(limit);
+
+        scratch.gathered.clear();
+        for &(cluster_idx, _) in &scratch.indexed[visited..end] {
+            let tokens = &head.map[cluster_idx];
+            scratch.gathered.extend(tokens.iter().copied().filter(|&t| t < vocab_size));
+            scratch.selected.push(cluster_idx);
+        }
+        cost.clusters += end - visited;
+        cost.tokens += scratch.gathered.len();
+
+        scratch.dots.resize(scratch.gathered.len(), 0.0);
+        let row = |t: usize| {
+            let off = t * n_embd;
+            simd_dot_f32(&lm_head[off..off + n_embd], &hidden[..n_embd], n_embd)
+        };
+        match scratch.gathered.len() >= PARALLEL_MIN_TOKENS {
+            true => scratch
+                .gathered
+                .par_iter()
+                .zip(scratch.dots.par_iter_mut())
+                .for_each(|(&t, d)| *d = row(t)),
+            false => {
+                for (&t, d) in scratch.gathered.iter().zip(scratch.dots.iter_mut()) {
+                    *d = row(t);
+                }
+            }
+        }
+
+        // Scatter is serial and memory-bound only — the dots are already
+        // computed. Token IDs are unique across clusters, so no write races
+        // even though the writes are scattered.
+        for (&t, &d) in scratch.gathered.iter().zip(scratch.dots.iter()) {
+            // SAFETY: `t < vocab_size` (filtered above) and `logits` is
+            // `vocab_size` wide.
+            unsafe {
+                *logits.get_unchecked_mut(t) = d;
+            }
+            best_exact = best_exact.max(d);
+        }
+
+        visited = end;
     }
 
     cost
@@ -273,6 +355,7 @@ mod tests {
         let mut truth = vec![0.0f32; vocab];
         let mut scores = vec![0.0f32; map.len()];
         let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
 
         for _ in 0..64 {
             let hidden: Vec<f32> = (0..n_embd).map(|_| rng.next_f32()).collect();
@@ -285,11 +368,13 @@ mod tests {
                 ClusterHeadView { classifier: &cls, radii: Some(&radii), map: &map },
                 vocab,
                 n_embd,
-                ClusterStop::Admissible,
+                ClusterStop::Admissible { wave: 1 },
                 ClusterScratch {
                     scores: &mut scores,
                     indexed: &mut indexed,
                     selected: &mut selected,
+                    gathered: &mut gathered,
+                    dots: &mut dots,
                 },
             );
             assert_eq!(
@@ -298,6 +383,110 @@ mod tests {
                 "admissible selection must be exact"
             );
         }
+    }
+
+    /// Wave size is a work/parallelism knob, never a correctness knob: every
+    /// wave must return the same argmax as `wave: 1`, and larger waves may only
+    /// touch *more* tokens, never fewer.
+    #[test]
+    fn wave_size_changes_cost_but_never_the_answer() {
+        let (vocab, n_embd) = (2048, 64);
+        let w = planted(vocab, n_embd, 64, 0x5EED);
+        let (map, cls, radii) = artifacts(&w, vocab, n_embd, 32);
+
+        let mut rng = Lcg(0x1234);
+        let mut truth = vec![0.0f32; vocab];
+        let mut logits = vec![0.0f32; vocab];
+        let mut scores = vec![0.0f32; map.len()];
+        let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
+
+        for _ in 0..24 {
+            let hidden: Vec<f32> = (0..n_embd).map(|_| rng.next_f32()).collect();
+            standard_lm_head(&mut truth, &hidden, &w, vocab, n_embd);
+            let want = argmax(&truth);
+
+            let mut baseline_tokens = 0usize;
+            for (i, wave) in [1usize, 2, 8, 64, 4096].into_iter().enumerate() {
+                let cost = clustered_lm_head_bounded(
+                    &mut logits,
+                    &hidden,
+                    &w,
+                    ClusterHeadView { classifier: &cls, radii: Some(&radii), map: &map },
+                    vocab,
+                    n_embd,
+                    ClusterStop::Admissible { wave },
+                    ClusterScratch {
+                        scores: &mut scores,
+                        indexed: &mut indexed,
+                        selected: &mut selected,
+                        gathered: &mut gathered,
+                        dots: &mut dots,
+                    },
+                );
+                assert_eq!(argmax(&logits), want, "wave {wave} changed the argmax");
+                match i {
+                    0 => baseline_tokens = cost.tokens,
+                    _ => assert!(
+                        cost.tokens >= baseline_tokens,
+                        "wave {wave} touched {} tokens, fewer than wave 1's {baseline_tokens} — \
+                         a larger wave can only over-compute, never skip work",
+                        cost.tokens
+                    ),
+                }
+            }
+        }
+    }
+
+    /// The parallel path must be bit-identical to the serial one. It only
+    /// engages above [`PARALLEL_MIN_TOKENS`], so this fixture is sized to
+    /// straddle that cutoff.
+    #[test]
+    fn parallel_wave_matches_serial_wave_bit_for_bit() {
+        let (vocab, n_embd) = (4096, 64);
+        let w = planted(vocab, n_embd, 32, 0xBEEF);
+        // 256-token clusters: wave 1 stays under the 512-token cutoff (serial),
+        // wave 8 clears it (parallel).
+        let (map, cls, radii) = artifacts(&w, vocab, n_embd, 256);
+
+        let hidden: Vec<f32> = (0..n_embd).map(|j| 0.03 * (j as f32) - 0.9).collect();
+        let mut scores = vec![0.0f32; map.len()];
+        let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
+
+        let mut run = |wave: usize,
+                       scores: &mut Vec<f32>,
+                       indexed: &mut Vec<(usize, f32)>,
+                       selected: &mut Vec<usize>,
+                       gathered: &mut Vec<usize>,
+                       dots: &mut Vec<f32>| {
+            let mut logits = vec![0.0f32; vocab];
+            clustered_lm_head_bounded(
+                &mut logits,
+                &hidden,
+                &w,
+                ClusterHeadView { classifier: &cls, radii: Some(&radii), map: &map },
+                vocab,
+                n_embd,
+                ClusterStop::TopK(wave),
+                ClusterScratch { scores, indexed, selected, gathered, dots },
+            );
+            logits
+        };
+
+        let serial = run(1, &mut scores, &mut indexed, &mut selected, &mut gathered, &mut dots);
+        let parallel = run(8, &mut scores, &mut indexed, &mut selected, &mut gathered, &mut dots);
+
+        // The parallel run is a superset: every finite logit the serial run
+        // produced must be present and identical.
+        let mut shared = 0usize;
+        for (t, &s) in serial.iter().enumerate() {
+            if s.is_finite() {
+                assert_eq!(parallel[t], s, "logit[{t}] differs serial vs parallel");
+                shared += 1;
+            }
+        }
+        assert!(shared >= PARALLEL_MIN_TOKENS, "fixture must cross the parallel cutoff");
     }
 
     /// A logit that *is* computed must equal the full head's, bit for bit —
@@ -315,6 +504,7 @@ mod tests {
         let mut logits = vec![0.0f32; vocab];
         let mut scores = vec![0.0f32; map.len()];
         let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
         clustered_lm_head_bounded(
             &mut logits,
             &hidden,
@@ -327,6 +517,8 @@ mod tests {
                 scores: &mut scores,
                 indexed: &mut indexed,
                 selected: &mut selected,
+                gathered: &mut gathered,
+                dots: &mut dots,
             },
         );
 
@@ -359,6 +551,7 @@ mod tests {
 
         let mut got = vec![0.0f32; vocab];
         let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
         clustered_lm_head_bounded(
             &mut got,
             &hidden,
@@ -371,6 +564,8 @@ mod tests {
                 scores: &mut scores,
                 indexed: &mut indexed,
                 selected: &mut selected,
+                gathered: &mut gathered,
+                dots: &mut dots,
             },
         );
         assert_eq!(got, want, "radii=None must be the mean-logit path exactly");

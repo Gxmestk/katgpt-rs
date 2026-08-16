@@ -144,11 +144,15 @@ speedup on a wrong argmax is not a modelless gain.
       for a deeper predictor to close.
 
 - [ ] **T8** **NOT PROMOTED (still).** Blocked on two measurements, not on
-      quality:
-      1. **Issue 661** — stage 2 is single-threaded against a rayon-parallel
-         `standard_lm_head`, so a 13.70× FLOP win measures as 2.1–2.9× and
-         *inverts to 0.08×* when pruning is weak. Need the active-fraction
-         crossover; that threshold is the load-time enable condition.
+      quality. Both are cost questions; G1/G2 are settled:
+      1. **Issue 661 — RESOLVED 2026-08-17, and the fix it proposed does not
+         work.** Wave-parallelism is a wash (`wave: 8` 3.01× vs `wave: 1`
+         2.96×, inside the noise). The shortfall is **locality**: the scattered
+         gather runs at 20.6 GB/s where the full head streams at 108.0 GB/s, and
+         `11.64× FLOP / 5.26× locality = 2.21× measured` closes exactly.
+         Successor is **Issue 666** (permute `lm_head` rows into cluster order
+         at load time). The crossover asked for *was* delivered: the clustered
+         path wins only below **21.4–34.3% active**; enable below ~15%.
       2. **Issue 662** — both fixtures are synthetic extremes (planted-Gaussian
          vs uniform-random) with opposite verdicts. A real checkpoint decides
          it. Owned by riir-ai: katgpt-rs has no GGUF reader and must not

@@ -52,6 +52,11 @@ const CLUSTER_SIZE: usize = 128;
 const PROBES: usize = 200;
 /// Plan 574's absolute quality bar.
 const RECALL_TARGET: f64 = 0.99;
+/// Baseline group jitter — the tight, favourable geometry.
+const DEFAULT_SPREAD: f32 = 0.05;
+/// Wave size used wherever a single admissible configuration is needed.
+/// Chosen from the Issue 661 sweep printed by this bench.
+const WAVE: usize = 8;
 
 /// Deterministic LCG — reproducible across runs and platforms.
 struct Lcg(u64);
@@ -65,7 +70,12 @@ impl Lcg {
 
 /// LM head with planted cluster structure; token `t` belongs to group
 /// `t % n_groups` so round-robin (which partitions by ID) cannot recover it.
-fn structured_lm_head(n_groups: usize, seed: u64) -> Vec<f32> {
+///
+/// `spread` is the per-coordinate jitter around a group's centre. It is the
+/// **separability dial**: at 0.05 the groups are tight and the bound prunes
+/// hard; as it grows the geometry washes out toward the random control. Issue
+/// 661's crossover sweep walks it.
+fn structured_lm_head(n_groups: usize, spread: f32, seed: u64) -> Vec<f32> {
     let mut rng = Lcg(seed);
     let mut centres = vec![0.0f32; n_groups * N_EMBD];
     for slot in centres.iter_mut() {
@@ -75,7 +85,7 @@ fn structured_lm_head(n_groups: usize, seed: u64) -> Vec<f32> {
     for t in 0..VOCAB {
         let g = t % n_groups;
         for j in 0..N_EMBD {
-            w[t * N_EMBD + j] = centres[g * N_EMBD + j] + 0.05 * rng.next_f32();
+            w[t * N_EMBD + j] = centres[g * N_EMBD + j] + spread * rng.next_f32();
         }
     }
     w
@@ -158,6 +168,7 @@ fn measure(
     let mut logits = vec![0.0f32; VOCAB];
     let mut scores = vec![0.0f32; arm.map.len()];
     let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+    let (mut gathered, mut dots) = (Vec::new(), Vec::new());
 
     let mut hits = 0usize;
     let mut active = 0usize;
@@ -174,6 +185,8 @@ fn measure(
                 scores: &mut scores,
                 indexed: &mut indexed,
                 selected: &mut selected,
+                gathered: &mut gathered,
+                dots: &mut dots,
             },
         );
         if argmax(&logits) == truth[i] {
@@ -277,7 +290,8 @@ fn run_regime(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
 
     println!("  -- ADMISSIBLE stop (recall is 1.0 by construction; cost is the result) --");
     for arm in arms.iter().filter(|a| a.use_bound) {
-        let (r, active) = measure(arm, lm_head, probes, &truth, ClusterStop::Admissible);
+        let (r, active) =
+            measure(arm, lm_head, probes, &truth, ClusterStop::Admissible { wave: WAVE });
         println!(
             "  {:<20} recall {r:.4}   active {:.2}%   speedup-vs-full {:.2}x",
             arm.label,
@@ -325,7 +339,7 @@ const MEASURE_PAIRS: usize = 20;
 /// This matters here specifically: an earlier revision of this bench used
 /// median(A)/median(B) and reported 2.44× on one run and 1.42× on the next from
 /// identical inputs. Neither number was trustworthy.
-fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
+fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>], wave: usize, quiet: bool) -> f64 {
     let map = cluster_map_from_embeddings_with_init(
         lm_head,
         VOCAB,
@@ -334,12 +348,25 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
         ClusterInit::Dsquared,
     );
     let arm = Arm::build("D² + BOUND", lm_head, map, true);
+    latency_for(label, lm_head, &arm, probes, wave, quiet)
+}
+
+/// [`latency`] against a pre-built arm, so a sweep does not rebuild the map.
+fn latency_for(
+    label: &str,
+    lm_head: &[f32],
+    arm: &Arm,
+    probes: &[Vec<f32>],
+    wave: usize,
+    quiet: bool,
+) -> f64 {
     let hidden = &probes[0];
     let mut logits = vec![0.0f32; VOCAB];
     let mut scores = vec![0.0f32; arm.map.len()];
     let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+    let (mut gathered, mut dots) = (Vec::new(), Vec::new());
 
-    let mut time_standard = |logits: &mut [f32]| {
+    let time_standard = |logits: &mut [f32]| {
         let t = Instant::now();
         standard_lm_head(logits, hidden, lm_head, VOCAB, N_EMBD);
         t.elapsed().as_secs_f64() * 1e3
@@ -353,10 +380,12 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
         // each side equally often instead of always the second-placed one.
         let standard_first = pair % 2 == 0;
 
-        let mut run_admissible = |logits: &mut [f32],
+        let run_admissible = |logits: &mut [f32],
                                   scores: &mut Vec<f32>,
                                   indexed: &mut Vec<(usize, f32)>,
-                                  selected: &mut Vec<usize>| {
+                                  selected: &mut Vec<usize>,
+                                  gathered: &mut Vec<usize>,
+                                  dots: &mut Vec<f32>| {
             let t = Instant::now();
             clustered_lm_head_bounded(
                 logits,
@@ -365,8 +394,8 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
                 arm.view(),
                 VOCAB,
                 N_EMBD,
-                ClusterStop::Admissible,
-                ClusterScratch { scores, indexed, selected },
+                ClusterStop::Admissible { wave },
+                ClusterScratch { scores, indexed, selected, gathered, dots },
             );
             t.elapsed().as_secs_f64() * 1e3
         };
@@ -374,11 +403,25 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
         let (s_ms, a_ms) = match standard_first {
             true => {
                 let s = time_standard(&mut logits);
-                let a = run_admissible(&mut logits, &mut scores, &mut indexed, &mut selected);
+                let a = run_admissible(
+                    &mut logits,
+                    &mut scores,
+                    &mut indexed,
+                    &mut selected,
+                    &mut gathered,
+                    &mut dots,
+                );
                 (s, a)
             }
             false => {
-                let a = run_admissible(&mut logits, &mut scores, &mut indexed, &mut selected);
+                let a = run_admissible(
+                    &mut logits,
+                    &mut scores,
+                    &mut indexed,
+                    &mut selected,
+                    &mut gathered,
+                    &mut dots,
+                );
                 let s = time_standard(&mut logits);
                 (s, a)
             }
@@ -392,14 +435,16 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
     }
 
     let ratio = median_ms(&mut ratios);
-    println!(
-        "  {label:<12} standard {:.4} ms   admissible {:.4} ms   per-pair ratio {ratio:.2}x  \
-         (spread {:.2}–{:.2})",
-        median_ms(&mut std_s),
-        median_ms(&mut adm_s),
-        ratios.iter().cloned().fold(f64::INFINITY, f64::min),
-        ratios.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-    );
+    if !quiet {
+        println!(
+            "  {label:<12} standard {:.4} ms   admissible {:.4} ms   per-pair ratio {ratio:.2}x  \
+             (spread {:.2}–{:.2})",
+            median_ms(&mut std_s),
+            median_ms(&mut adm_s),
+            ratios.iter().cloned().fold(f64::INFINITY, f64::min),
+            ratios.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
+    }
     ratio
 }
 
@@ -411,19 +456,103 @@ fn goat_657_clustered_lm_head_bound() {
     let probes = probe_vectors(PROBES, 0xC0FFEE);
     let n_clusters = VOCAB / CLUSTER_SIZE;
 
-    let structured = structured_lm_head(n_clusters, 0xA11CE);
+    let structured = structured_lm_head(n_clusters, DEFAULT_SPREAD, 0xA11CE);
     let best = run_regime("STRUCTURED (groups == clusters — the verdict regime)", &structured, &probes);
 
-    let split = structured_lm_head(64, 0xA11CE);
+    let split = structured_lm_head(64, DEFAULT_SPREAD, 0xA11CE);
     let _ = run_regime("STRUCTURED (64 groups vs 256 clusters — split penalty)", &split, &probes);
 
     let random = random_lm_head(0xB0B);
     let _ = run_regime("RANDOM (no structure — control)", &random, &probes);
 
+    // ── Issue 661a: wave sweep — how much parallelism can the exact stop take? ──
+    //
+    // `wave: 1` is the sequential reference measured in Benchmark 658. Larger
+    // waves evaluate more clusters per round before re-checking the bound, so
+    // they may compute clusters they did not strictly need — bounded extra work
+    // bought for rayon width. Exactness is independent of `wave` (asserted in
+    // `cluster_head`'s unit tests), so this is purely a cost trade.
+    println!("\n══ Issue 661a — wave sweep (structured; exactness is wave-independent) ══");
+    let map = cluster_map_from_embeddings_with_init(
+        &structured,
+        VOCAB,
+        N_EMBD,
+        CLUSTER_SIZE,
+        ClusterInit::Dsquared,
+    );
+    let arm = Arm::build("D² + BOUND", &structured, map, true);
+    let truth = true_argmaxes(&structured, &probes);
+    println!("  {:>5}  {:>9}  {:>10}  {:>8}", "wave", "active%", "vs wave 1", "speedup");
+    let mut base_active = 0.0f64;
+    for (i, wave) in [1usize, 2, 4, 8, 16, 32, 64].into_iter().enumerate() {
+        let (recall, active) =
+            measure(&arm, &structured, &probes, &truth, ClusterStop::Admissible { wave });
+        assert!((recall - 1.0).abs() < 1e-9, "wave {wave} broke exactness: recall {recall}");
+        if i == 0 {
+            base_active = active;
+        }
+        let ratio = latency_for("", &structured, &arm, &probes, wave, true);
+        println!(
+            "  {wave:>5}  {:>8.2}%  {:>9.2}x  {ratio:>7.2}x",
+            active * 100.0,
+            active / base_active
+        );
+    }
+
+    // ── Issue 661b: the crossover — at what active fraction does this stop paying? ──
+    //
+    // Benchmark 658 measured the two extremes (7.30% active → win, 99.99% →
+    // 12x loss) and could not say where the sign flips. Walking the fixture's
+    // separability dial produces the curve between them. The crossover active%
+    // is the load-time enable condition: above it, use the full head.
+    println!("\n══ Issue 661b — crossover (separability sweep, wave={WAVE}) ══");
+    println!("  {:>7}  {:>9}  {:>8}  {:>9}", "spread", "active%", "speedup", "verdict");
+    let mut crossover: Option<(f64, f64)> = None;
+    let mut prev: Option<(f64, f64)> = None;
+    for spread in [0.05f32, 0.07, 0.09, 0.11, 0.13, 0.15, 0.3, 1.0] {
+        let w = structured_lm_head(n_clusters, spread, 0xA11CE);
+        let m = cluster_map_from_embeddings_with_init(
+            &w,
+            VOCAB,
+            N_EMBD,
+            CLUSTER_SIZE,
+            ClusterInit::Dsquared,
+        );
+        let a = Arm::build("D² + BOUND", &w, m, true);
+        let t = true_argmaxes(&w, &probes);
+        let (recall, active) =
+            measure(&a, &w, &probes, &t, ClusterStop::Admissible { wave: WAVE });
+        assert!((recall - 1.0).abs() < 1e-9, "spread {spread} broke exactness");
+        let ratio = latency_for("", &w, &a, &probes, WAVE, true);
+        println!(
+            "  {spread:>7.2}  {:>8.2}%  {ratio:>7.2}x  {:>9}",
+            active * 100.0,
+            match ratio > 1.0 {
+                true => "win",
+                false => "LOSS",
+            }
+        );
+        // Bracket the sign change on the previous winning point.
+        if let Some((p_active, p_ratio)) = prev {
+            if p_ratio > 1.0 && ratio <= 1.0 && crossover.is_none() {
+                crossover = Some((p_active, active));
+            }
+        }
+        prev = Some((active, ratio));
+    }
+    match crossover {
+        Some((lo, hi)) => println!(
+            "  => crossover bracketed between {:.1}% and {:.1}% active",
+            lo * 100.0,
+            hi * 100.0
+        ),
+        None => println!("  => no sign change observed across the swept range"),
+    }
+
     // ── G3 perf: the admissible operating point vs the full head ──
     println!("\n══ G3 latency (admissible stop, both regimes) ══");
-    let g3_structured = latency("structured", &structured, &probes);
-    let g3_random = latency("random", &random, &probes);
+    let g3_structured = latency("structured", &structured, &probes, WAVE, false);
+    let g3_random = latency("random", &random, &probes, WAVE, false);
 
     println!("\n══ VERDICT ══");
     println!(
