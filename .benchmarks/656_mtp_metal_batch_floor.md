@@ -129,6 +129,55 @@ The first two attempts produced a **wrong verdict** and are worth recording:
 Estimator is **min-of-40**, not median: every perturbation is strictly additive,
 so the minimum is the least-contaminated estimate of true kernel cost.
 
+## Independent confirmation (2026-08-16, follow-up search)
+
+The ARTIFACT verdict was subsequently confirmed from outside, with an explicit
+mechanism — and the mechanism is **not** the one this benchmark measured.
+
+**Root cause is per-step kernel dispatch, not matmul width.** llama.cpp
+launches a separate Metal GPU kernel for each draft-verify step; on Apple
+Silicon that dispatch cost exceeds the speculative gain. MLX instead **fuses
+verification into the same compute graph as the main forward pass**, removing
+the per-token dispatch penalty — and running the identical speculative idea
+through MLX "flips it from a loss to a large win."
+
+**Working Apple-Silicon implementations exist.** [MTPLX](https://github.com/youssofal/MTPLX)
+is an MLX-native MTP runtime using the model's own heads with no external
+drafter, via "NAX verify kernels + compiled verify":
+
+| hardware | speedup |
+|---|---|
+| M4 Mac mini (16 GB) | 1.6× |
+| M5 Max | 2.24× |
+| M4 Mac mini, 9B, depth 1 | 14.4 → 23.0 tok/s |
+
+It supports Qwen 3.8 27B, 3.6 (27B / 35B MoE), and 3.5 (4B / 9B), and
+auto-tunes over draft depths **D1/D2/D3** — independently reproducing this
+benchmark's `N ≤ 4` viable band.
+
+**llama.cpp's MTP is broken on every backend, not just Metal**, which settles
+the artifact question:
+
+- [#23011](https://github.com/ggml-org/llama.cpp/issues/23011) — Qwen3.6-35B-A3B
+  self-MTP much slower on Metal **at 95.6% acceptance**. Definitively not an
+  acceptance-rate problem.
+- [#23698](https://github.com/ggml-org/llama.cpp/issues/23698) — MTP regression
+  on the **CPU** backend (44.5 → 21.2 tok/s).
+- [RTX 3090 sweep](https://hackmd.io/ODXuOQNzSiyUITz7g9mtBw) — no llama.cpp
+  speculative mode beats baseline on consumer Ampere either.
+
+### This repo's Metal backend has the same defect
+
+`crates/katgpt-backend/src/gpu.rs` allocates **9 command buffers and issues 9
+`wait_until_completed()` CPU syncs per forward pass**, 8 of them *inside* the
+per-layer loop (lines 538–737) — roughly `8 × n_layer` CPU↔GPU round trips per
+token. That is precisely the anti-pattern behind llama.cpp's loss.
+
+Building MTP on the backend as it stands would reproduce the failure exactly.
+The prerequisite is therefore not merely a batched forward but a **single-submit
+(graph-fused) forward**. That work stands on its own: collapsing the per-layer
+syncs should speed up ordinary width-1 decoding too, independent of MTP.
+
 ## Consequence for the pivot
 
 - **MTP can be gated on Metal**, not CUDA-only. It is not disqualified on the
@@ -138,11 +187,28 @@ so the minimum is the least-contaminated estimate of true kernel cost.
   (`caddtree_budget` GOAT 7/7, `corr_budget` GOAT 10/10, `entropy_truncate_horizon`).
   The ddtree half of `mtp+ddtree` is what makes the Metal case viable at all;
   it is not the part to pivot away from.
-- **The real blocker is not Metal.** `InferenceBackend::forward` takes
-  `token: usize, pos: usize` — single-token only. There is no batched forward
-  anywhere in katgpt-rs, and MTP verify requires one. No `nextn`/`mtp.*` tensor
-  loading exists either (`grep` over `crates/` → zero hits). Those are the
-  actual prerequisites.
+- **The real blocker is not Metal.** Prerequisites, in dependency order:
+  1. **Single-submit forward** — collapse `gpu.rs`'s 9 command buffers / 9 CPU
+     syncs per pass into one graph. Without this, MTP reproduces llama.cpp's
+     loss. Independently valuable for width-1 decode.
+  2. **Batched forward** — `InferenceBackend::forward` takes
+     `token: usize, pos: usize`; MTP verify needs width-N.
+  3. **`nextn`/`mtp.*` tensor loading** — `grep` over `crates/` → zero hits.
+  4. Wire MTP marginals into `build_dd_tree` at the existing seam.
+
+## Target model (corrected 2026-08-16)
+
+**Qwen3.8 shipped 2026-08-14**, and is the correct target — an earlier note in
+this file's review cycle wrongly concluded it did not exist, from a search that
+surfaced only 3.5/3.6.
+
+- **Qwen3.8-27B** (dense) — linear attention on 48 of 64 layers, vision tower,
+  **built-in BF16 MTP draft head**, 262K native context (extensible to 1M).
+- **Qwen3.8-2.4T-A95B** (MoE) — 512 experts, 92 layers, hybrid linear/full
+  attention, MTP trained across multiple steps.
+- MTP-bearing quantizations already published (e.g.
+  [`lued/Qwen3.8-27B-INT8-W8A16-MTP`](https://huggingface.co/lued/Qwen3.8-27B-INT8-W8A16-MTP)),
+  and MTPLX already supports Qwen 3.8 27B on Apple Silicon.
 
 ## Related
 
