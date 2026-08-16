@@ -1,6 +1,7 @@
 # Bench 659 — UGC certified-unmasking-schedule PoC (Issue 664 / Research 485 / arXiv:2608.13520)
 
 **Date:** 2026-08-17
+**Commit:** `3bb115da` (issue file removed per noise-reduction rule; this bench + Research 485 carry the record)
 **Verdict:** **G1 / G1-cert / G1(exact) / G4 ALL PASS — T5 G1b FAIL (honest negative result). Estimator + schedule construction land as always-on diagnostic substrate; NO `ugc_schedule` feature flag; GOAT-track CLOSED.**
 
 ## What ran
