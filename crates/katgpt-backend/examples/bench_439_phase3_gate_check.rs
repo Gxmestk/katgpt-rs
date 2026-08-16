@@ -35,12 +35,16 @@ use coreml_proto::proto::{
 };
 
 /// Conv spatial height (module-level so builder helpers can access it).
+#[cfg(target_os = "macos")]
 const H: i64 = 32;
 /// Conv spatial width.
+#[cfg(target_os = "macos")]
 const W: i64 = 32;
 /// Kernel height.
+#[cfg(target_os = "macos")]
 const KH: u64 = 3;
 /// Kernel width.
+#[cfg(target_os = "macos")]
 const KW: u64 = 3;
 
 #[cfg(target_os = "macos")]

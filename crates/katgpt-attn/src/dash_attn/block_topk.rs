@@ -447,7 +447,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
         let init = k.min(n);
         for i in 0..init {
-            heap_vals[i] = *scores.get_unchecked(i);
+            heap_vals[i] = *unsafe { scores.get_unchecked(i) };
             heap_idxs[i] = i;
         }
         // Sort initial k elements descending (insertion sort, k≤16)
@@ -470,7 +470,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
         let mut pos = init;
 
         for _ in 0..chunks8 {
-            let v = _mm256_loadu_ps(scores.as_ptr().add(pos));
+            let v = unsafe { _mm256_loadu_ps(scores.as_ptr().add(pos)) };
             let thresh = _mm256_set1_ps(heap_vals[k - 1]);
             // Compare: v > thresh (ordered, signaling)
             let cmp = _mm256_cmp_ps(v, thresh, _CMP_GT_OS);
@@ -478,16 +478,18 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
             if mask_bits != 0 {
                 // Extract qualifying lanes
-                let vals_arr: [f32; 8] = core::mem::transmute(v);
+                let vals_arr: [f32; 8] = unsafe { core::mem::transmute(v) };
                 for lane in 0..8 {
                     if mask_bits & (1 << lane) != 0 {
-                        insert_sorted_simd_avx2(
-                            &mut heap_vals,
-                            &mut heap_idxs,
-                            k,
-                            vals_arr[lane],
-                            pos + lane,
-                        );
+                        unsafe {
+                            insert_sorted_simd_avx2(
+                                &mut heap_vals,
+                                &mut heap_idxs,
+                                k,
+                                vals_arr[lane],
+                                pos + lane,
+                            )
+                        };
                     }
                 }
             }
@@ -498,22 +500,24 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
         let remaining4 = (n - pos) / 4;
         for _ in 0..remaining4 {
             // Process 4 at a time using SSE-like approach via AVX2
-            let v = _mm256_loadu_ps(scores.as_ptr().add(pos));
+            let v = unsafe { _mm256_loadu_ps(scores.as_ptr().add(pos)) };
             let thresh = _mm256_set1_ps(heap_vals[k - 1]);
             let cmp = _mm256_cmp_ps(v, thresh, _CMP_GT_OS);
             let mask_bits = (_mm256_movemask_ps(cmp) as u32) & 0x0F; // Only first 4 lanes
 
             if mask_bits != 0 {
-                let vals_arr: [f32; 8] = core::mem::transmute(v);
+                let vals_arr: [f32; 8] = unsafe { core::mem::transmute(v) };
                 for lane in 0..4 {
                     if mask_bits & (1 << lane) != 0 {
-                        insert_sorted_simd_avx2(
-                            &mut heap_vals,
-                            &mut heap_idxs,
-                            k,
-                            vals_arr[lane],
-                            pos + lane,
-                        );
+                        unsafe {
+                            insert_sorted_simd_avx2(
+                                &mut heap_vals,
+                                &mut heap_idxs,
+                                k,
+                                vals_arr[lane],
+                                pos + lane,
+                            )
+                        };
                     }
                 }
             }
@@ -522,9 +526,9 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
         // Scalar tail
         while pos < n {
-            let val = *scores.get_unchecked(pos);
+            let val = *unsafe { scores.get_unchecked(pos) };
             if val > heap_vals[k - 1] {
-                insert_sorted_simd_avx2(&mut heap_vals, &mut heap_idxs, k, val, pos);
+                unsafe { insert_sorted_simd_avx2(&mut heap_vals, &mut heap_idxs, k, val, pos) };
             }
             pos += 1;
         }
@@ -567,7 +571,7 @@ unsafe fn insert_sorted_simd_avx2(
     let chunks8 = k / 8;
     for c in 0..chunks8 {
         let base = c * 8;
-        let heap_chunk = _mm256_loadu_ps(heap_vals.as_ptr().add(base));
+        let heap_chunk = unsafe { _mm256_loadu_ps(heap_vals.as_ptr().add(base)) };
         let cmp = _mm256_cmp_ps(val_vec, heap_chunk, _CMP_GT_OS);
         let mask_bits = _mm256_movemask_ps(cmp) as u32;
 
