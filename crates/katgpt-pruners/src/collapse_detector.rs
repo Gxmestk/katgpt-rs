@@ -674,9 +674,10 @@ pub fn check_collapse_action(
     if !thinking_mode {
         return CollapseAction::Continue;
     }
-    match detector.check_collapse(token_id, position) {
-        true => CollapseAction::ForceExit,
-        false => CollapseAction::Continue,
+    if detector.check_collapse(token_id, position) {
+        CollapseAction::ForceExit
+    } else {
+        CollapseAction::Continue
     }
 }
 
@@ -918,9 +919,10 @@ mod tests {
         }
 
         fn decide_route(collapsed: bool) -> ComputeRoute {
-            match collapsed {
-                true => ComputeRoute::Cpu,
-                false => ComputeRoute::Gpu,
+            if collapsed {
+                ComputeRoute::Cpu
+            } else {
+                ComputeRoute::Gpu
             }
         }
 
@@ -1339,7 +1341,7 @@ mod tests {
 
             let mut false_neg_without = 0u32;
             let mut false_neg_with = 0u32;
-            let mut detected_step_with = Vec::new();
+            let mut detected_step_with = Vec::with_capacity(N_TRACES);
 
             for i in 0..N_TRACES {
                 // Spread e_star across [0.30, 0.70].

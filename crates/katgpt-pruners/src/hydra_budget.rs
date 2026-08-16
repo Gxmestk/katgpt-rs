@@ -142,7 +142,7 @@ pub fn hydra_layer_skip(
 /// Compute which layers to skip based on plan, and determine early exit point.
 pub fn hydra_adaptive_budget(skip_plan: &HydraSkipPlan, num_layers: usize) -> HydraBudgetResult {
     let n = skip_plan.n_layers.min(num_layers);
-    let mut skipped = Vec::new();
+    let mut skipped = Vec::with_capacity(n);
 
     for l in 0..n {
         if skip_plan.skip_layers.get(l) {

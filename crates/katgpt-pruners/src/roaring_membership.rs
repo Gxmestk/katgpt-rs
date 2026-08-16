@@ -240,8 +240,7 @@ impl CompactBitmap {
 
         self.containers
             .binary_search_by_key(&hi, |(k, _)| *k)
-            .map(|pos| self.containers[pos].1.contains(lo))
-            .unwrap_or(false)
+            .is_ok_and(|pos| self.containers[pos].1.contains(lo))
     }
 
     /// Total number of set bits. O(containers).

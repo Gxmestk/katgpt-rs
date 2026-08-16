@@ -1043,7 +1043,7 @@ impl HLPlayer {
     pub fn compress_cycle(&mut self) -> Vec<usize> {
         let min_visits = 20u32;
         let threshold = 0.1f32;
-        let mut newly_compressed = Vec::new();
+        let mut newly_compressed = Vec::with_capacity(Strategy::COUNT);
 
         for i in 0..Strategy::COUNT {
             if self.compressed[i] {
