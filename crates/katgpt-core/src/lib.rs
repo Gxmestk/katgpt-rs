@@ -2316,6 +2316,22 @@ pub use rrq_quant::{
     LEVELS_PER_STAGE, PMR_THRESHOLD_2_2, QuantStrategy, RrqStage, RrqWeights,
 };
 
+// Selection-Set Fixpoint Propagation — KEEP M3 in house operator vocabulary
+// (Issue 655 / Research 483, KEEP arXiv:2602.23592; HippoRAG PPR class). The
+// one genuinely-unshipped composition from the Research 483 audit: a
+// query-seeded importance propagation iterated until the top-r selected set
+// stabilizes (membership fixpoint). Sigmoid-gated membership, CLR-reliability
+// edge weighting, zero-alloc caller scratch, deterministic CSR order.
+// Opt-in — promotion depends on the Issue 655 G1 head-to-head vs the shipped
+// BFS-decay traversal (riir-rag fuse_graph_candidates) + downstream consumers.
+#[cfg(feature = "selection_propagation")]
+pub mod selection_propagation;
+#[cfg(feature = "selection_propagation")]
+pub use selection_propagation::{
+    PropagationBlend, PropagationConfig, PropagationOutcome, SelectionPropagationScratch,
+    propagate_selection_to_fixpoint_into,
+};
+
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
 // riir-engine, etc.) install their OWN `#[global_allocator]`; this static is

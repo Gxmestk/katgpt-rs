@@ -154,3 +154,59 @@ Port M1 to `katgpt-kv/segment_checkpoint`: segments stable for `t` accesses fuse
 3. **Our hot path is modelless** — game NPC cognition does not re-prefill LLM memory per tick, by design. KEEP's value here concentrates in the serving paths (riir-router priming, katgpt-kv segment reuse, FlashMemory-class long-context) and in the *selection* primitive (F1/F2), not in per-tick game loops.
 4. **Dense-memory failure mode** (inherited from 436): tasks needing global attention collapse under any sparse selection — KEEP's own Full-Reuse rows show the floor; any propagation selector needs a dense fallback.
 5. **BFS is O(degree^k)** (`k_hop_neighbors` is explicitly "not a per-tick query") — propagation with early stop may actually be *cheaper* than BFS at equal recall; that's part of what Issue 655 measures (G2).
+
+---
+
+## PoC Addendum (Issue 655, 2026-08-16) — CLAIM CONFIRMED
+
+[Bench 655](../.benchmarks/655_selection_propagation_poc.md) ran the
+three-way head-to-head (defend-wrong §3.6). The operator shipped as
+`katgpt-core/src/selection_propagation.rs` behind the opt-in
+`selection_propagation` feature.
+
+**Verdict: PASS — the claim holds decisively.**
+
+| arm (h≥2 means, chain/tail recall@k) | chain | tail |
+|---|---|---|
+| single-hop | 0.293 | 0.046 |
+| BFS-decay (shipped `fuse_graph_candidates` defaults) | 0.267 | 0.058 |
+| **propagation (Mass blend)** | **0.789** | **0.730** |
+| propagation (Mean blend — literal KEEP edge_avg) | 0.297 | 0.051 |
+
+36/36 cells won at h≥2, zero losses. G1/G3/G4 PASS; G2 µs-scale PASS
+(73 µs @ N=1024/k=32) with the "cheaper than BFS" sub-hypothesis honestly
+NEGATED in the sparse regime (BFS visited 78-816 nodes at degree ≈ 6 — the
+O(degree^k) blowup needs dense graphs; at equal recall the comparison is
+vacuous since no k_hop reaches 0.73 tail recall under calibrated
+ distractors).
+
+**Findings beyond the claim (all in Bench 655):**
+
+1. **The literal KEEP `edge_avg` is degenerate** — for a node supported by
+   one selected node, `w·rel/w = rel`: the edge weight cancels. Measured
+   catastrophic (tail 0.051 vs Mass 0.730). The PPR-style **Mass** blend
+   (`next = (1-α)·seed + α·Σ w·rel`) is the correct operatorization; the
+   shipped `PropagationBlend::Mean` stays as the falsified arm + a
+   bit-exact unit test pinning the cancellation.
+2. **The shipped BFS-decay fusion is actively harmful under calibrated
+   distractors** — worse than single-hop in the h=2/d=24 cells (0.100 vs
+   0.328 chain recall). Mechanism: proximity ≠ relevance; the +0.18
+   distance-1 bonus rewards distractor neighbors of the head. The shipped
+   G5 use case (transitive callers, zero lexical overlap, no distractor
+   pressure) is unaffected — but any consumer adding distractor-dense
+   corpora should not ship the default fusion.
+3. **1-hop does not tie — propagation wins there too** (distractor pressure
+   exists even at h=1; at d=0 the gap narrows to 0.431 vs 0.347 but never
+   inverts).
+4. **The membership fixpoint rarely fires in distractor-dense worlds**
+   (0/32 queries stable within 16 iters at N=1024/k=32 — boundary churn
+   among near-tied distractors). `max_iters` is the operative stop; results
+   stay bit-deterministic. The early-stop is valuable on clean graphs;
+   a damped/hysteresis stop is optional follow-up, not needed for the
+   verdict.
+
+**F1/F2 consumers routed** (the claim passed, so the consumer issues filed):
+riir-ai Issue 703 (riir-rag graph fusion upgrade) + Issue 704 (engram chain
+recall). The feature stays opt-in until the first consumer lands
+(`grapem_rodrigues`/`mop_path_entropy` precedent — gain proven on synthetic
+POC; default-on lands WITH the consumer, not before).
