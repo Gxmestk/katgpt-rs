@@ -423,6 +423,139 @@ pub fn cluster_radii_from_map(
     radii
 }
 
+/// Cluster-contiguous LM-head layout (Issue 666).
+///
+/// Stage 2 of the clustered head reads whole clusters. With the natural layout
+/// a cluster's members are scattered token IDs, so it gathers `len` separate
+/// `n_embd`-float rows from across a 500 MB matrix. Issue 661 measured what that
+/// costs: **20.6 GB/s against the full head's 108.0 GB/s**, a 5.26× locality
+/// penalty that accounted for the entire gap between an 11.64× FLOP reduction
+/// and a 2.21× wall-clock win.
+///
+/// Permuting the rows into cluster order once, at load time, turns each cluster
+/// into a single contiguous span — the same access pattern the full head
+/// already achieves 108 GB/s with.
+pub struct ClusterLayout {
+    /// `[vocab_size, n_embd]` — the LM-head rows, reordered so that every
+    /// cluster occupies one contiguous span.
+    pub permuted: Vec<f32>,
+    /// Row → original token ID. Stage 2 computes into row order and scatters
+    /// back through this.
+    pub token_of_row: Vec<usize>,
+    /// Per-cluster `(start_row, len)` into [`permuted`](Self::permuted) and
+    /// [`token_of_row`](Self::token_of_row).
+    ///
+    /// Replaces the `Vec<Vec<usize>>` cluster map on the hot path: one
+    /// allocation instead of `num_clusters`, and no pointer chase per cluster.
+    pub offsets: Vec<(usize, usize)>,
+}
+
+/// Shape only — a derived `Debug` would dump the whole permuted matrix
+/// (hundreds of MB at production scale) into a panic message.
+impl std::fmt::Debug for ClusterLayout {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClusterLayout")
+            .field("rows", &self.token_of_row.len())
+            .field("clusters", &self.offsets.len())
+            .field("extra_bytes", &self.extra_bytes())
+            .finish()
+    }
+}
+
+impl ClusterLayout {
+    /// Bytes the permuted copy occupies. The caller pays this on top of the
+    /// original `lm_head`.
+    #[must_use]
+    pub fn extra_bytes(&self) -> usize {
+        self.permuted.len() * size_of::<f32>()
+    }
+}
+
+/// Why [`cluster_layout_from_map`] declined to build a layout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayoutRefusal {
+    /// `lm_head` shares storage with `wte` (tied embeddings).
+    ///
+    /// The permuted copy **cannot alias** the embedding table — the whole point
+    /// is that its rows are in a different order — so it is a genuine second
+    /// allocation of the model's largest tensor. On a tied 2 B model that is a
+    /// ~1 GB increase to save ~0.3 ms per token, which is a trade the caller
+    /// must make deliberately rather than inherit from a default.
+    TiedEmbeddings { extra_bytes: usize },
+    /// Shape is degenerate (empty vocabulary/embedding, or a short buffer).
+    DegenerateShape,
+}
+
+/// What to do when `lm_head` may be tied to `wte`.
+///
+/// The check is on **storage identity**, not content: it catches the case where
+/// the two are the same buffer, which is what "tied" means at runtime. Two
+/// separate allocations holding equal values are already paying for two copies,
+/// so permuting one adds nothing new and is correctly allowed through.
+#[derive(Clone, Copy)]
+pub enum TiedPolicy<'a> {
+    /// Compare against the model's `wte` and refuse if they share storage.
+    /// This is the default a loader should use.
+    Refuse { wte: &'a [f32] },
+    /// The caller has measured the memory cost and accepts the second copy.
+    Accept,
+}
+
+/// Build the cluster-contiguous layout for `cluster_map`.
+///
+/// Rows are emitted in cluster order, and within a cluster in the order the map
+/// lists them, so the layout is a deterministic function of the map — rebuilds
+/// are identical. Tokens outside `0..vocab_size` are dropped.
+///
+/// # Errors
+///
+/// Returns [`LayoutRefusal::TiedEmbeddings`] when `tied` is
+/// [`TiedPolicy::Refuse`] and `lm_head` shares storage with the supplied `wte`,
+/// and [`LayoutRefusal::DegenerateShape`] for empty or short inputs.
+pub fn cluster_layout_from_map(
+    lm_head: &[f32],
+    cluster_map: &[Vec<usize>],
+    vocab_size: usize,
+    n_embd: usize,
+    tied: TiedPolicy<'_>,
+) -> Result<ClusterLayout, LayoutRefusal> {
+    if vocab_size == 0 || n_embd == 0 || lm_head.len() < vocab_size * n_embd {
+        return Err(LayoutRefusal::DegenerateShape);
+    }
+
+    let total_rows: usize =
+        cluster_map.iter().map(|c| c.iter().filter(|&&t| t < vocab_size).count()).sum();
+
+    if let TiedPolicy::Refuse { wte } = tied {
+        // Storage identity, not content equality: same base pointer and same
+        // length is the runtime signature of a tied table.
+        if std::ptr::eq(lm_head.as_ptr(), wte.as_ptr()) && lm_head.len() == wte.len() {
+            return Err(LayoutRefusal::TiedEmbeddings {
+                extra_bytes: total_rows * n_embd * size_of::<f32>(),
+            });
+        }
+    }
+
+    let mut permuted = vec![0.0f32; total_rows * n_embd];
+    let mut token_of_row = vec![0usize; total_rows];
+    let mut offsets = Vec::with_capacity(cluster_map.len());
+
+    let mut row = 0usize;
+    for tokens in cluster_map {
+        let start = row;
+        for &t in tokens.iter().filter(|&&t| t < vocab_size) {
+            let src = t * n_embd;
+            permuted[row * n_embd..(row + 1) * n_embd]
+                .copy_from_slice(&lm_head[src..src + n_embd]);
+            token_of_row[row] = t;
+            row += 1;
+        }
+        offsets.push((start, row - start));
+    }
+
+    Ok(ClusterLayout { permuted, token_of_row, offsets })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

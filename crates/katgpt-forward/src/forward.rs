@@ -347,8 +347,9 @@ pub fn clustered_lm_head(
 // returned round-robin) is now a real k-means; `cluster_map_round_robin`
 // survives there unchanged as the baseline it must beat.
 pub use crate::cluster_build::{
-    ClusterInit, cluster_classifier_from_map, cluster_map_from_embeddings,
-    cluster_map_from_embeddings_with_init, cluster_map_round_robin, cluster_radii_from_map,
+    ClusterInit, ClusterLayout, LayoutRefusal, TiedPolicy, cluster_classifier_from_map,
+    cluster_layout_from_map, cluster_map_from_embeddings, cluster_map_from_embeddings_with_init,
+    cluster_map_round_robin, cluster_radii_from_map,
 };
 #[allow(clippy::too_many_arguments)] // forward pass: 7 fixed + 1 cfg-gated (domain_latent)
 pub fn forward_base<'a>(

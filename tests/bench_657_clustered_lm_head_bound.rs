@@ -38,9 +38,10 @@
 //! the gain here is an upper bound on what it buys in production.
 
 use katgpt_rs::transformer::{
-    ClusterHeadView, ClusterInit, ClusterScratch, ClusterStop, cluster_classifier_from_map,
+    ClusterHeadView, ClusterInit, ClusterLayout, ClusterScratch, ClusterStop, PackedHeadView,
+    TiedPolicy, cluster_classifier_from_map, cluster_layout_from_map,
     cluster_map_from_embeddings_with_init, cluster_map_round_robin, cluster_radii_from_map,
-    clustered_lm_head_bounded, standard_lm_head,
+    clustered_lm_head_bounded, clustered_lm_head_packed, standard_lm_head,
 };
 use std::time::Instant;
 
@@ -57,6 +58,9 @@ const DEFAULT_SPREAD: f32 = 0.05;
 /// Wave size used wherever a single admissible configuration is needed.
 /// Chosen from the Issue 661 sweep printed by this bench.
 const WAVE: usize = 8;
+/// Whether the crossover sweep and G3 use Issue 666's cluster-contiguous layout.
+/// `true` once the packed path is measured as the better default.
+const PACKED: bool = true;
 
 /// Deterministic LCG — reproducible across runs and platforms.
 struct Lcg(u64);
@@ -143,6 +147,25 @@ impl Arm {
         let classifier = cluster_classifier_from_map(lm_head, &map, N_EMBD);
         let radii = cluster_radii_from_map(lm_head, &map, &classifier, N_EMBD);
         Self { label, map, classifier, radii, use_bound }
+    }
+
+    /// Issue 666's cluster-contiguous layout for this arm.
+    fn layout(&self, lm_head: &[f32]) -> ClusterLayout {
+        // `Accept`: the bench owns its fixture, so there is no `wte` to alias.
+        // Production must pass `Refuse { wte }` — see `TiedPolicy`.
+        cluster_layout_from_map(lm_head, &self.map, VOCAB, N_EMBD, TiedPolicy::Accept)
+            .expect("bench fixture is well-shaped and untied")
+    }
+
+    fn packed_view<'a>(&'a self, layout: &'a ClusterLayout) -> PackedHeadView<'a> {
+        PackedHeadView {
+            classifier: &self.classifier,
+            radii: match self.use_bound {
+                true => Some(&self.radii),
+                false => None,
+            },
+            layout,
+        }
     }
 
     fn view(&self) -> ClusterHeadView<'_> {
@@ -339,7 +362,15 @@ const MEASURE_PAIRS: usize = 20;
 /// This matters here specifically: an earlier revision of this bench used
 /// median(A)/median(B) and reported 2.44× on one run and 1.42× on the next from
 /// identical inputs. Neither number was trustworthy.
-fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>], wave: usize, quiet: bool) -> f64 {
+/// [`latency`] with an explicit scattered/packed choice (Issue 666).
+fn latency_layout(
+    label: &str,
+    lm_head: &[f32],
+    probes: &[Vec<f32>],
+    wave: usize,
+    quiet: bool,
+    packed: bool,
+) -> f64 {
     let map = cluster_map_from_embeddings_with_init(
         lm_head,
         VOCAB,
@@ -348,10 +379,11 @@ fn latency(label: &str, lm_head: &[f32], probes: &[Vec<f32>], wave: usize, quiet
         ClusterInit::Dsquared,
     );
     let arm = Arm::build("D² + BOUND", lm_head, map, true);
-    latency_for(label, lm_head, &arm, probes, wave, quiet)
+    latency_for(label, lm_head, &arm, probes, wave, quiet, packed)
 }
 
 /// [`latency`] against a pre-built arm, so a sweep does not rebuild the map.
+#[allow(clippy::too_many_arguments)]
 fn latency_for(
     label: &str,
     lm_head: &[f32],
@@ -359,7 +391,9 @@ fn latency_for(
     probes: &[Vec<f32>],
     wave: usize,
     quiet: bool,
+    packed: bool,
 ) -> f64 {
+    let layout = arm.layout(lm_head);
     let hidden = &probes[0];
     let mut logits = vec![0.0f32; VOCAB];
     let mut scores = vec![0.0f32; arm.map.len()];
@@ -387,16 +421,31 @@ fn latency_for(
                                   gathered: &mut Vec<usize>,
                                   dots: &mut Vec<f32>| {
             let t = Instant::now();
-            clustered_lm_head_bounded(
-                logits,
-                hidden,
-                lm_head,
-                arm.view(),
-                VOCAB,
-                N_EMBD,
-                ClusterStop::Admissible { wave },
-                ClusterScratch { scores, indexed, selected, gathered, dots },
-            );
+            match packed {
+                true => {
+                    clustered_lm_head_packed(
+                        logits,
+                        hidden,
+                        arm.packed_view(&layout),
+                        VOCAB,
+                        N_EMBD,
+                        ClusterStop::Admissible { wave },
+                        ClusterScratch { scores, indexed, selected, gathered, dots },
+                    );
+                }
+                false => {
+                    clustered_lm_head_bounded(
+                        logits,
+                        hidden,
+                        lm_head,
+                        arm.view(),
+                        VOCAB,
+                        N_EMBD,
+                        ClusterStop::Admissible { wave },
+                        ClusterScratch { scores, indexed, selected, gathered, dots },
+                    );
+                }
+            }
             t.elapsed().as_secs_f64() * 1e3
         };
 
@@ -472,7 +521,9 @@ fn goat_657_clustered_lm_head_bound() {
     // they may compute clusters they did not strictly need — bounded extra work
     // bought for rayon width. Exactness is independent of `wave` (asserted in
     // `cluster_head`'s unit tests), so this is purely a cost trade.
-    println!("\n══ Issue 661a — wave sweep (structured; exactness is wave-independent) ══");
+    println!(
+        "\n══ Issue 661a — wave sweep (structured, packed={PACKED}; exactness is wave-independent) ══"
+    );
     let map = cluster_map_from_embeddings_with_init(
         &structured,
         VOCAB,
@@ -491,7 +542,7 @@ fn goat_657_clustered_lm_head_bound() {
         if i == 0 {
             base_active = active;
         }
-        let ratio = latency_for("", &structured, &arm, &probes, wave, true);
+        let ratio = latency_for("", &structured, &arm, &probes, wave, true, PACKED);
         println!(
             "  {wave:>5}  {:>8.2}%  {:>9.2}x  {ratio:>7.2}x",
             active * 100.0,
@@ -499,13 +550,63 @@ fn goat_657_clustered_lm_head_bound() {
         );
     }
 
+    // ── Issue 666: does a cluster-contiguous layout recover the locality loss? ──
+    //
+    // Issue 661 showed the wall-clock shortfall is entirely memory access:
+    // scattered gathers ran at 20.6 GB/s where the full head streams at
+    // 108.0 GB/s, and `FLOP_ratio / locality_penalty` reproduced the measured
+    // speedup exactly. Permuting rows into cluster order at load time makes each
+    // cluster one contiguous span. Same clusters, same logits — only the
+    // addresses change (asserted bit-identical in `cluster_head`'s unit tests).
+    println!("\n══ Issue 666 — scattered vs packed layout (structured, wave={WAVE}) ══");
+    let layout = arm.layout(&structured);
+    let (_, active_666) =
+        measure(&arm, &structured, &probes, &truth, ClusterStop::Admissible { wave: WAVE });
+    let scattered_ratio =
+        latency_for("", &structured, &arm, &probes, WAVE, true, false);
+    let packed_ratio = latency_for("", &structured, &arm, &probes, WAVE, true, true);
+    let bytes = (VOCAB * N_EMBD * 4) as f64;
+    let gbs = |ratio: f64, std_ms: f64| bytes * active_666 / ((std_ms / ratio) * 1e-3) / 1e9;
+    // One shared `standard` reference so both bandwidths are on the same base.
+    let std_ms = {
+        let mut logits = vec![0.0f32; VOCAB];
+        let mut samples: Vec<f64> = (0..20)
+            .map(|_| {
+                let t = Instant::now();
+                standard_lm_head(&mut logits, &probes[0], &structured, VOCAB, N_EMBD);
+                t.elapsed().as_secs_f64() * 1e3
+            })
+            .collect();
+        median_ms(&mut samples)
+    };
+    println!("  active {:.2}%   FLOP ratio {:.2}x", active_666 * 100.0, 1.0 / active_666);
+    println!("  full head        {std_ms:.4} ms   {:.1} GB/s", bytes / (std_ms * 1e-3) / 1e9);
+    println!(
+        "  scattered        {:.4} ms   {:.1} GB/s   {scattered_ratio:.2}x",
+        std_ms / scattered_ratio,
+        gbs(scattered_ratio, std_ms)
+    );
+    println!(
+        "  packed (666)     {:.4} ms   {:.1} GB/s   {packed_ratio:.2}x",
+        std_ms / packed_ratio,
+        gbs(packed_ratio, std_ms)
+    );
+    println!(
+        "  => packed is {:.2}x the scattered path;  extra memory {:.1} MB ({:.0}% of lm_head)",
+        packed_ratio / scattered_ratio,
+        layout.extra_bytes() as f64 / 1e6,
+        layout.extra_bytes() as f64 / bytes * 100.0
+    );
+
     // ── Issue 661b: the crossover — at what active fraction does this stop paying? ──
     //
     // Benchmark 658 measured the two extremes (7.30% active → win, 99.99% →
     // 12x loss) and could not say where the sign flips. Walking the fixture's
     // separability dial produces the curve between them. The crossover active%
     // is the load-time enable condition: above it, use the full head.
-    println!("\n══ Issue 661b — crossover (separability sweep, wave={WAVE}) ══");
+    println!(
+        "\n══ Issue 661b — crossover (separability sweep, wave={WAVE}, packed={PACKED}) ══"
+    );
     println!("  {:>7}  {:>9}  {:>8}  {:>9}", "spread", "active%", "speedup", "verdict");
     let mut crossover: Option<(f64, f64)> = None;
     let mut prev: Option<(f64, f64)> = None;
@@ -523,7 +624,7 @@ fn goat_657_clustered_lm_head_bound() {
         let (recall, active) =
             measure(&a, &w, &probes, &t, ClusterStop::Admissible { wave: WAVE });
         assert!((recall - 1.0).abs() < 1e-9, "spread {spread} broke exactness");
-        let ratio = latency_for("", &w, &a, &probes, WAVE, true);
+        let ratio = latency_for("", &w, &a, &probes, WAVE, true, PACKED);
         println!(
             "  {spread:>7.2}  {:>8.2}%  {ratio:>7.2}x  {:>9}",
             active * 100.0,
@@ -533,10 +634,12 @@ fn goat_657_clustered_lm_head_bound() {
             }
         );
         // Bracket the sign change on the previous winning point.
-        if let Some((p_active, p_ratio)) = prev {
-            if p_ratio > 1.0 && ratio <= 1.0 && crossover.is_none() {
-                crossover = Some((p_active, active));
-            }
+        if let Some((p_active, p_ratio)) = prev
+            && p_ratio > 1.0
+            && ratio <= 1.0
+            && crossover.is_none()
+        {
+            crossover = Some((p_active, active));
         }
         prev = Some((active, ratio));
     }
@@ -551,8 +654,9 @@ fn goat_657_clustered_lm_head_bound() {
 
     // ── G3 perf: the admissible operating point vs the full head ──
     println!("\n══ G3 latency (admissible stop, both regimes) ══");
-    let g3_structured = latency("structured", &structured, &probes, WAVE, false);
-    let g3_random = latency("random", &random, &probes, WAVE, false);
+    let g3_structured =
+        latency_layout("structured", &structured, &probes, WAVE, false, PACKED);
+    let g3_random = latency_layout("random", &random, &probes, WAVE, false, PACKED);
 
     println!("\n══ VERDICT ══");
     println!(

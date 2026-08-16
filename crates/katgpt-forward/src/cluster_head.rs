@@ -62,6 +62,7 @@
 //! **modelless**, no training. The hot path allocates nothing; all scratch is
 //! caller-owned.
 
+use crate::cluster_build::ClusterLayout;
 use katgpt_core::simd::simd_dot_f32;
 use rayon::prelude::*;
 
@@ -165,7 +166,69 @@ pub(crate) fn fill_cluster_exact(
     best
 }
 
+/// Stage 1: score every cluster and sort `scratch.indexed` by score descending.
+///
+/// Shared by the scattered and packed stage-2 implementations so the ranking —
+/// the part that decides *which* clusters are visited, and therefore whether
+/// the result is exact — cannot drift between them.
+///
+/// A full sort (rather than a partial select) is required for `Admissible`, and
+/// at cluster counts of 256–2048 against a stage-2 cost of
+/// `active_tokens × n_embd` FMAs it is not the bottleneck.
+fn rank_clusters(
+    hidden: &[f32],
+    classifier: &[f32],
+    radii: Option<&[f32]>,
+    num_clusters: usize,
+    n_embd: usize,
+    scratch: &mut ClusterScratch<'_>,
+) {
+    let scores = &mut scratch.scores[..num_clusters];
+
+    // ‖h‖ is shared by every cluster's bound — one sqrt per call, not per
+    // cluster.
+    let h_norm = match radii {
+        None => 0.0,
+        Some(_) => simd_dot_f32(&hidden[..n_embd], &hidden[..n_embd], n_embd).max(0.0).sqrt(),
+    };
+
+    for (c, score) in scores.iter_mut().enumerate() {
+        let row_off = c * n_embd;
+        let mean = simd_dot_f32(&classifier[row_off..row_off + n_embd], &hidden[..n_embd], n_embd);
+        *score = match radii {
+            None => mean,
+            Some(radii) => mean + h_norm * radii[c],
+        };
+    }
+
+    scratch.indexed.resize(num_clusters, (0, 0.0));
+    for (i, &s) in scores.iter().enumerate() {
+        scratch.indexed[i] = (i, s);
+    }
+    scratch.indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+}
+
+/// `(limit, wave, stop_checked)` for a stop rule.
+///
+/// `TopK` is one wave over its whole budget with no stop check; `Admissible`
+/// walks the full list in `wave`-sized rounds, re-checking between them. One
+/// loop shape serves both.
+fn wave_plan(stop: ClusterStop, num_clusters: usize) -> (usize, usize, bool) {
+    match stop {
+        ClusterStop::TopK(k) => {
+            let k = k.min(num_clusters);
+            (k, k.max(1), false)
+        }
+        ClusterStop::Admissible { wave } => (num_clusters, wave.max(1), true),
+    }
+}
+
 /// Two-stage clustered LM head with bound-ranked stage-1 selection.
+///
+/// **Scattered layout** — cluster members are token IDs into the original
+/// `lm_head`, so stage 2 gathers non-contiguous rows. See
+/// [`clustered_lm_head_packed`] for the cluster-contiguous variant, which is
+/// the one to use when the memory cost is acceptable.
 ///
 /// See the module docs for the bound and the two stop rules. Unvisited tokens
 /// are left at `-inf`, matching
@@ -182,53 +245,15 @@ pub fn clustered_lm_head_bounded(
     vocab_size: usize,
     n_embd: usize,
     stop: ClusterStop,
-    scratch: ClusterScratch<'_>,
+    mut scratch: ClusterScratch<'_>,
 ) -> ClusterCost {
     let num_clusters = head.map.len();
-    let scores = &mut scratch.scores[..num_clusters];
-
-    // ‖h‖ is shared by every cluster's bound — one sqrt per call, not per
-    // cluster.
-    let h_norm = match head.radii {
-        None => 0.0,
-        Some(_) => simd_dot_f32(&hidden[..n_embd], &hidden[..n_embd], n_embd).max(0.0).sqrt(),
-    };
-
-    for (c, score) in scores.iter_mut().enumerate() {
-        let row_off = c * n_embd;
-        let mean = simd_dot_f32(
-            &head.classifier[row_off..row_off + n_embd],
-            &hidden[..n_embd],
-            n_embd,
-        );
-        *score = match head.radii {
-            None => mean,
-            Some(radii) => mean + h_norm * radii[c],
-        };
-    }
-
-    // Descending order by score. A full sort (rather than a partial select) is
-    // required for `Admissible`, and at cluster counts of 256–2048 against a
-    // stage-2 cost of `active_tokens × n_embd` FMAs it is not the bottleneck.
-    scratch.indexed.resize(num_clusters, (0, 0.0));
-    for (i, &s) in scores.iter().enumerate() {
-        scratch.indexed[i] = (i, s);
-    }
-    scratch.indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
+    rank_clusters(hidden, head.classifier, head.radii, num_clusters, n_embd, &mut scratch);
 
     logits.fill(f32::NEG_INFINITY);
     scratch.selected.clear();
 
-    // `TopK` is one wave over its whole budget with no stop check; `Admissible`
-    // walks the full list in `wave`-sized rounds, re-checking between them. One
-    // loop serves both.
-    let (limit, wave, checked) = match stop {
-        ClusterStop::TopK(k) => {
-            let k = k.min(num_clusters);
-            (k, k.max(1), false)
-        }
-        ClusterStop::Admissible { wave } => (num_clusters, wave.max(1), true),
-    };
+    let (limit, wave, checked) = wave_plan(stop, num_clusters);
 
     let mut cost = ClusterCost::default();
     let mut best_exact = f32::NEG_INFINITY;
@@ -289,11 +314,127 @@ pub fn clustered_lm_head_bounded(
     cost
 }
 
+/// Borrowed view of the **packed** clustered-LM-head artifacts (Issue 666).
+///
+/// The classifier and radii are unchanged — only the token→row indirection is
+/// replaced by [`ClusterLayout`]'s contiguous spans.
+#[derive(Clone, Copy)]
+pub struct PackedHeadView<'a> {
+    /// `[num_clusters, n_embd]` per-cluster centroids.
+    pub classifier: &'a [f32],
+    /// `[num_clusters]` residual radii. Must be built from the **same** map the
+    /// layout was, or the bound stops being admissible.
+    pub radii: Option<&'a [f32]>,
+    /// Cluster-contiguous rows.
+    pub layout: &'a ClusterLayout,
+}
+
+/// Clustered LM head over a cluster-contiguous layout (Issue 666).
+///
+/// Identical selection to [`clustered_lm_head_bounded`] — the two share
+/// [`rank_clusters`] and [`wave_plan`] — but stage 2 reads each cluster as one
+/// contiguous span of [`ClusterLayout::permuted`] and scatters the results back
+/// through [`ClusterLayout::token_of_row`], instead of gathering scattered rows.
+///
+/// Every logit this computes is **bit-identical** to the scattered path's: the
+/// same `simd_dot_f32` over the same row against the same hidden state, only
+/// read from a different address. That is asserted, not assumed.
+///
+/// Stage 1 costs nothing extra; the whole change is the memory access pattern.
+#[allow(clippy::too_many_arguments)]
+pub fn clustered_lm_head_packed(
+    logits: &mut [f32],
+    hidden: &[f32],
+    head: PackedHeadView<'_>,
+    vocab_size: usize,
+    n_embd: usize,
+    stop: ClusterStop,
+    mut scratch: ClusterScratch<'_>,
+) -> ClusterCost {
+    let layout = head.layout;
+    let num_clusters = layout.offsets.len();
+    rank_clusters(hidden, head.classifier, head.radii, num_clusters, n_embd, &mut scratch);
+
+    logits.fill(f32::NEG_INFINITY);
+    scratch.selected.clear();
+
+    let (limit, wave, checked) = wave_plan(stop, num_clusters);
+
+    let mut cost = ClusterCost::default();
+    let mut best_exact = f32::NEG_INFINITY;
+    let mut visited = 0usize;
+
+    while visited < limit {
+        // Same admissibility argument as the scattered path: bounds are
+        // non-increasing over `indexed`, so once the leading bound of a wave
+        // cannot beat an exact logit already held, nothing later can either.
+        if checked && scratch.indexed[visited].1 <= best_exact {
+            break;
+        }
+        let end = (visited + wave).min(limit);
+
+        // Total width first, so `dots` is sized once per wave rather than
+        // grown per cluster.
+        let total: usize =
+            scratch.indexed[visited..end].iter().map(|&(c, _)| layout.offsets[c].1).sum();
+        scratch.dots.resize(total, 0.0);
+        cost.clusters += end - visited;
+        cost.tokens += total;
+
+        let mut written = 0usize;
+        for &(cluster_idx, _) in &scratch.indexed[visited..end] {
+            let (start, len) = layout.offsets[cluster_idx];
+            scratch.selected.push(cluster_idx);
+            if len == 0 {
+                continue;
+            }
+            // The payoff: one contiguous `[len, n_embd]` block, which is the
+            // access pattern `standard_lm_head` already sustains 108 GB/s on.
+            // `simd_matmul_rows_parallel` self-selects rayon above 512 rows, so
+            // a cluster large enough to be worth threading gets it for free and
+            // a small one is not charged the scheduling overhead.
+            katgpt_core::simd::simd_matmul_rows_parallel(
+                &mut scratch.dots[written..written + len],
+                &layout.permuted[start * n_embd..(start + len) * n_embd],
+                &hidden[..n_embd],
+                len,
+                n_embd,
+            );
+            written += len;
+        }
+
+        // Scatter back to token order. Memory-bound only — the dots are already
+        // computed — and token IDs are unique across clusters, so the scattered
+        // writes cannot collide.
+        let mut at = 0usize;
+        for &(cluster_idx, _) in &scratch.indexed[visited..end] {
+            let (start, len) = layout.offsets[cluster_idx];
+            for i in 0..len {
+                let t = layout.token_of_row[start + i];
+                let d = scratch.dots[at + i];
+                // `cluster_layout_from_map` already filters out-of-range tokens,
+                // so this holds for every row the layout contains.
+                if t < vocab_size {
+                    // SAFETY: `t < vocab_size` and `logits` is `vocab_size` wide.
+                    unsafe { *logits.get_unchecked_mut(t) = d };
+                }
+                best_exact = best_exact.max(d);
+            }
+            at += len;
+        }
+
+        visited = end;
+    }
+
+    cost
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::cluster_build::{
-        cluster_classifier_from_map, cluster_map_from_embeddings, cluster_radii_from_map,
+        LayoutRefusal, TiedPolicy, cluster_classifier_from_map, cluster_layout_from_map,
+        cluster_map_from_embeddings, cluster_radii_from_map,
     };
     use crate::forward::standard_lm_head;
 
@@ -454,7 +595,7 @@ mod tests {
         let (mut indexed, mut selected) = (Vec::new(), Vec::new());
         let (mut gathered, mut dots) = (Vec::new(), Vec::new());
 
-        let mut run = |wave: usize,
+        let run = |wave: usize,
                        scores: &mut Vec<f32>,
                        indexed: &mut Vec<(usize, f32)>,
                        selected: &mut Vec<usize>,
@@ -487,6 +628,136 @@ mod tests {
             }
         }
         assert!(shared >= PARALLEL_MIN_TOKENS, "fixture must cross the parallel cutoff");
+    }
+
+    /// **The Issue 666 obligation.** The packed layout may only change *where*
+    /// rows are read from, never what is computed. Every logit must match the
+    /// scattered path bit-for-bit, and the same clusters must be visited.
+    ///
+    /// Issue 657's fix passed every plausibility check and was still attacking
+    /// the wrong defect; the only thing that caught it was running the
+    /// alternative side by side. Same discipline here.
+    #[test]
+    fn packed_layout_is_bit_identical_to_scattered() {
+        let (vocab, n_embd) = (2048, 64);
+        let w = planted(vocab, n_embd, 64, 0x0FFE);
+        let (map, cls, radii) = artifacts(&w, vocab, n_embd, 32);
+        let layout =
+            cluster_layout_from_map(&w, &map, vocab, n_embd, TiedPolicy::Accept).expect("layout");
+
+        let mut rng = Lcg(0xABCD);
+        let mut scores = vec![0.0f32; map.len()];
+        let (mut indexed, mut selected) = (Vec::new(), Vec::new());
+        let (mut gathered, mut dots) = (Vec::new(), Vec::new());
+
+        for _ in 0..24 {
+            let hidden: Vec<f32> = (0..n_embd).map(|_| rng.next_f32()).collect();
+
+            for stop in [ClusterStop::TopK(5), ClusterStop::Admissible { wave: 4 }] {
+                let mut scattered = vec![0.0f32; vocab];
+                let cost_s = clustered_lm_head_bounded(
+                    &mut scattered,
+                    &hidden,
+                    &w,
+                    ClusterHeadView { classifier: &cls, radii: Some(&radii), map: &map },
+                    vocab,
+                    n_embd,
+                    stop,
+                    ClusterScratch {
+                        scores: &mut scores,
+                        indexed: &mut indexed,
+                        selected: &mut selected,
+                        gathered: &mut gathered,
+                        dots: &mut dots,
+                    },
+                );
+                let visited_s = selected.clone();
+
+                let mut packed = vec![0.0f32; vocab];
+                let cost_p = clustered_lm_head_packed(
+                    &mut packed,
+                    &hidden,
+                    PackedHeadView { classifier: &cls, radii: Some(&radii), layout: &layout },
+                    vocab,
+                    n_embd,
+                    stop,
+                    ClusterScratch {
+                        scores: &mut scores,
+                        indexed: &mut indexed,
+                        selected: &mut selected,
+                        gathered: &mut gathered,
+                        dots: &mut dots,
+                    },
+                );
+
+                assert_eq!(packed, scattered, "packed logits differ for {stop:?}");
+                assert_eq!(cost_p, cost_s, "packed cost differs for {stop:?}");
+                assert_eq!(*selected, visited_s, "packed visited different clusters");
+            }
+        }
+    }
+
+    /// The permutation must not silently drop or duplicate a token.
+    #[test]
+    fn layout_covers_every_token_exactly_once() {
+        let (vocab, n_embd) = (512, 32);
+        let w = planted(vocab, n_embd, 16, 0x1111);
+        let map = cluster_map_from_embeddings(&w, vocab, n_embd, 32);
+        let layout =
+            cluster_layout_from_map(&w, &map, vocab, n_embd, TiedPolicy::Accept).expect("layout");
+
+        let mut seen = vec![0usize; vocab];
+        for &t in &layout.token_of_row {
+            seen[t] += 1;
+        }
+        assert!(seen.iter().all(|&c| c == 1), "every token must occupy exactly one row");
+
+        // Spans must tile the row space with no gap or overlap.
+        let mut next = 0usize;
+        for &(start, len) in &layout.offsets {
+            assert_eq!(start, next, "cluster spans must be contiguous and in order");
+            next += len;
+        }
+        assert_eq!(next, vocab, "spans must cover every row");
+
+        // Each permuted row must be its token's original row.
+        for (r, &t) in layout.token_of_row.iter().enumerate() {
+            assert_eq!(
+                &layout.permuted[r * n_embd..(r + 1) * n_embd],
+                &w[t * n_embd..(t + 1) * n_embd],
+                "row {r} is not token {t}'s LM-head row"
+            );
+        }
+    }
+
+    /// Tied embeddings must be refused by default: the permuted copy cannot
+    /// alias `wte`, so it is a second allocation of the largest tensor.
+    #[test]
+    fn tied_embeddings_are_refused_unless_explicitly_accepted() {
+        let (vocab, n_embd) = (256, 16);
+        let w = planted(vocab, n_embd, 8, 0x2222);
+        let map = cluster_map_from_embeddings(&w, vocab, n_embd, 32);
+
+        // Tied: `lm_head` and `wte` are the same storage.
+        let refused = cluster_layout_from_map(&w, &map, vocab, n_embd, TiedPolicy::Refuse { wte: &w });
+        match refused {
+            Err(LayoutRefusal::TiedEmbeddings { extra_bytes }) => assert_eq!(
+                extra_bytes,
+                vocab * n_embd * size_of::<f32>(),
+                "refusal must report the real cost so the caller can decide"
+            ),
+            other => panic!("tied weights must be refused, got {other:?}"),
+        }
+
+        // Explicit opt-in still builds.
+        let accepted = cluster_layout_from_map(&w, &map, vocab, n_embd, TiedPolicy::Accept);
+        assert!(accepted.is_ok(), "Accept must override the tie check");
+
+        // Untied: a genuinely separate buffer is allowed through.
+        let wte = planted(vocab, n_embd, 8, 0x3333);
+        let untied =
+            cluster_layout_from_map(&w, &map, vocab, n_embd, TiedPolicy::Refuse { wte: &wte });
+        assert!(untied.is_ok(), "untied weights must not be refused");
     }
 
     /// A logit that *is* computed must equal the full head's, bit for bit —

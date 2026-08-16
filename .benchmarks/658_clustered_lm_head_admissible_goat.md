@@ -182,10 +182,83 @@ throughout):
 | 0.15 | 60.21% | 0.26× | LOSS |
 | 0.30 | 100.00% | 0.11× | LOSS |
 
-**Crossover: between 21.4% and 34.3% active.** Enable below ~15% (≥1.7×, clear
-of noise); use the full head above ~25%. The loss below the crossover is severe,
-so the default must stay off and the condition must be *measured* per checkpoint
-— which is Issue 662.
+**Crossover: between 21.4% and 34.3% active** *(scattered layout — superseded by
+the Issue 666 addendum below, which moves it to 60.2–100%)*. The loss beyond the
+crossover is severe, so the default must stay off and the condition must be
+*measured* per checkpoint — which is Issue 662.
+
+## Addendum (2026-08-17) — Issue 666: the packed layout, and it works
+
+Issue 661 predicted the fix and Issue 666 implemented it: permute the LM-head
+rows into cluster order **once, at load time**, so each cluster is a single
+contiguous span (`ClusterLayout { permuted, token_of_row, offsets }`;
+`clustered_lm_head_packed`). Same clusters, same selection, same logits — only
+the addresses change, and that is asserted bit-identical against the scattered
+path rather than assumed.
+
+### The locality loss is recovered
+
+Structured fixture, `wave: 8`, 8.59% active (FLOP ratio 11.64×), 3 runs:
+
+| | run 1 | run 2 | run 3 | mean |
+|---|---|---|---|---|
+| full head — bandwidth | 104.6 | 95.1 | 115.4 | **105.0 GB/s** |
+| scattered — bandwidth | 17.1 | 13.7 | 30.7 | 20.5 GB/s |
+| **packed — bandwidth** | 72.8 | 67.9 | 83.3 | **74.7 GB/s** |
+| scattered — speedup | 1.90× | 1.68× | 3.09× | 2.22× |
+| **packed — speedup** | **8.10×** | **8.30×** | **8.40×** | **8.27×** |
+
+The packed path reaches **71% of the full head's streaming bandwidth**, against
+the scattered path's 20%. Speedup goes from 2.2× to **8.3×** — 71% of the 11.64×
+theoretical, where before it was 19%. The diagnosis in Issue 661 was correct and
+the predicted fix delivered what it predicted.
+
+Wave size remains a wash under the packed layout too (`wave` 1–8 all land at
+8.8–11.0×, degrading past 16), which independently confirms Issue 661's
+conclusion: threading was never the lever.
+
+### The crossover moves, a lot
+
+| group spread | active% | scattered | **packed** |
+|---|---|---|---|
+| 0.05 | 8.59% | 2.88× | **7.06–12.69×** |
+| 0.07 | 13.74% | 1.71× | **5.49–5.92×** |
+| 0.09 | 21.41% | 1.14× | **3.60–4.13×** |
+| 0.11 | 34.30% | 0.16× | **2.02–2.58×** |
+| 0.13 | 46.43% | 0.35× | **1.36–1.88×** |
+| 0.15 | 60.21% | 0.26× | **1.14–1.73×** |
+| 0.30 | 100.00% | 0.11× | 0.47–0.62× |
+
+**Crossover: 60.2%–100% active** (identical bracket in all 3 runs), up from
+21.4%–34.3%. The primitive now wins at *every* structured spread tested. The
+unstructured control also improves from 0.11× to **0.52×** — still a loss, but
+4× less severe, because even a doomed scan now streams.
+
+Revised enable condition: **enable below ~50% active**, use the full head above
+~60%. That is a far weaker requirement than the scattered path's ~15%, and it is
+the number Issue 662 must check a real checkpoint against.
+
+### G3, interleaved protocol, 3 runs (packed)
+
+| regime | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| structured | 9.94× | 9.40× | 8.17× |
+| random control | 0.52× | 0.50× | 0.53× |
+
+### The cost, stated plainly
+
+The permuted copy is **67.1 MB — 100% of `lm_head`**. It cannot alias the
+original (its rows are in a different order), so this is a genuine doubling of
+the model's largest tensor. `cluster_layout_from_map` therefore takes a
+`TiedPolicy` and **refuses by default** when `lm_head` shares storage with
+`wte`: on a tied 2 B model the permutation costs ~1 GB to save ~0.5 ms/token,
+which is a trade the caller must make deliberately rather than inherit.
+`TiedPolicy::Accept` overrides it; the refusal reports the exact byte cost so
+the decision is informed.
+
+`ClusterLayout` also replaces `Vec<Vec<usize>>` with flat `(start, len)`
+offsets — one allocation instead of `num_clusters`, and no pointer chase per
+cluster on the hot path.
 
 ## Promotion
 

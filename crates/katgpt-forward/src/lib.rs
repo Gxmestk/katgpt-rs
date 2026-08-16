@@ -492,10 +492,12 @@ pub mod cluster_head;
 #[cfg(feature = "coda_fusion")]
 pub use forward::forward_coda;
 pub use cluster_head::{
-    ClusterCost, ClusterHeadView, ClusterScratch, ClusterStop, clustered_lm_head_bounded,
+    ClusterCost, ClusterHeadView, ClusterScratch, ClusterStop, PackedHeadView,
+    clustered_lm_head_bounded, clustered_lm_head_packed,
 };
 pub use forward::{
-    CPU_FORWARD_USES_DEVICE_BASE_PATH, ClusterInit, attention_head, cluster_classifier_from_map,
+    CPU_FORWARD_USES_DEVICE_BASE_PATH, ClusterInit, ClusterLayout, LayoutRefusal, TiedPolicy,
+    attention_head, cluster_classifier_from_map, cluster_layout_from_map,
     cluster_map_from_embeddings, cluster_map_from_embeddings_with_init, cluster_map_round_robin,
     cluster_radii_from_map, clustered_lm_head, forward, forward_base, forward_base_f16,
     forward_f16, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,

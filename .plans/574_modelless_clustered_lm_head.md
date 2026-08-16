@@ -1,16 +1,17 @@
 # Plan 574 — Modelless Clustered LM Head (activate the `mtp_cluster_*` substrate)
 
-**Status:** Phase 2 COMPLETE — **G2b now PASSES (0.675 → 1.0000)**, still NOT
-promoted to default-on. Blocked on Issue 661 (serial stage 2 → 0.08× on flat
-data) and Issue 662 (no real checkpoint measured).
-Follow-ups: Issue 661, Issue 662. Issue 657 RESOLVED (its diagnosis was refuted
-by its own fix); Issue 658 (multi-layer predictor) is now moot — see T7.
+**Status:** Phase 3 COMPLETE — **G2b PASSES (recall 1.0000)** and **G3 PASSES at
+8.3–9.2× on structured data**. Still NOT promoted to default-on, on two
+non-quality grounds: Issue 662 (no real checkpoint) and the packed layout's
+100%-of-`lm_head` memory cost.
+Issues 657, 661, 666 RESOLVED; Issue 658 MOOT. Only Issue 662 remains open.
 **Date:** 2026-08-16
 **Owner:** katgpt-rs
 **Related Research:** 026 (Gemma 4 MTP), 078 (MTP Cluster Top-K Efficient Embedder),
 407 (Trees from Marginals — DFlash-TfM)
 **Related Benchmarks:** 656 (MTP Metal batch-width floor), 657 (Phase 1 GOAT —
-the recorded FAIL), 658 (Phase 2 re-gate — supersedes 657)
+the recorded FAIL), 658 (Phase 2 re-gate + Phase 3 packed-layout addendum —
+supersedes 657)
 **Feature flag:** `cluster_lm_head` (opt-in until GOAT passes)
 
 ---
@@ -143,20 +144,52 @@ speedup on a wrong argmax is not a modelless gain.
       centroid score now achieves recall 1.0. There is no residual quality gap
       for a deeper predictor to close.
 
-- [ ] **T8** **NOT PROMOTED (still).** Blocked on two measurements, not on
-      quality. Both are cost questions; G1/G2 are settled:
-      1. **Issue 661 — RESOLVED 2026-08-17, and the fix it proposed does not
-         work.** Wave-parallelism is a wash (`wave: 8` 3.01× vs `wave: 1`
-         2.96×, inside the noise). The shortfall is **locality**: the scattered
-         gather runs at 20.6 GB/s where the full head streams at 108.0 GB/s, and
-         `11.64× FLOP / 5.26× locality = 2.21× measured` closes exactly.
-         Successor is **Issue 666** (permute `lm_head` rows into cluster order
-         at load time). The crossover asked for *was* delivered: the clustered
-         path wins only below **21.4–34.3% active**; enable below ~15%.
-      2. **Issue 662** — both fixtures are synthetic extremes (planted-Gaussian
-         vs uniform-random) with opposite verdicts. A real checkpoint decides
-         it. Owned by riir-ai: katgpt-rs has no GGUF reader and must not
-         path-depend on a private sibling.
+- [x] **T8** **Issue 661 — RESOLVED 2026-08-17; the fix it proposed does not
+      work.** Wave-parallelism is a wash (`wave: 8` 3.01× vs `wave: 1` 2.96×,
+      inside the noise). The shortfall is **locality**: the scattered gather ran
+      at 20.6 GB/s where the full head streams at 108.0 GB/s, and
+      `11.64× FLOP / 5.26× locality = 2.21× measured` closes exactly. The
+      crossover asked for *was* delivered (**21.4–34.3% active**, scattered).
+
+## Phase 3 — Issue 666 (2026-08-17)
+
+- [x] **T9** **Cluster-contiguous layout shipped, and it works.**
+      `cluster_layout_from_map` permutes the LM-head rows into cluster order at
+      load time (`ClusterLayout { permuted, token_of_row, offsets }`);
+      `clustered_lm_head_packed` reads each cluster as one contiguous span and
+      scatters back through `token_of_row`. Stage 1 (`rank_clusters`) and the
+      wave loop (`wave_plan`) are shared with the scattered path, so the part
+      that decides exactness cannot drift.
+
+      | | scattered | **packed** | full head |
+      |---|---|---|---|
+      | effective bandwidth | 20.5 GB/s | **74.7 GB/s** | 105.0 GB/s |
+      | speedup @ 8.59% active | 2.22× | **8.27×** | — |
+      | share of 11.64× theoretical | 19% | **71%** | — |
+      | crossover | 21.4–34.3% | **60.2–100%** | — |
+      | random control | 0.11× | **0.52×** | — |
+
+      3 runs, interleaved protocol. Wave size stays a wash under the packed
+      layout, independently re-confirming T8.
+
+- [x] **T10** **Tied-embeddings guard.** The permuted copy cannot alias `wte`,
+      so it is a genuine doubling of the largest tensor (67.1 MB here, ~1 GB on
+      a tied 2 B model). `cluster_layout_from_map` takes a `TiedPolicy` and
+      **refuses by default** when `lm_head` shares storage with `wte`, reporting
+      the exact byte cost; `TiedPolicy::Accept` is the deliberate override. The
+      check is storage identity, not content equality.
+
+- [ ] **T11** **STILL NOT PROMOTED — one blocker left, and it is not quality.**
+      G1 holds, G2b passes at recall 1.0000, G3 passes at 8.3–9.2×.
+      1. **Issue 662** — both fixtures are synthetic extremes with opposite
+         verdicts. A real checkpoint decides it. The bar is now much weaker
+         (~50% active, was ~15%), so this is likelier to pass than before — but
+         it is still unmeasured, and "likelier" is not a measurement. Owned by
+         riir-ai: katgpt-rs has no GGUF reader and must not path-depend on a
+         private sibling.
+      2. **Memory policy.** 100% of `lm_head` is not a cost to default on. Even
+         if Issue 662 passes, promotion should enable the primitive *behind the
+         `TiedPolicy` refusal*, not around it.
 
 ## Non-goals
 

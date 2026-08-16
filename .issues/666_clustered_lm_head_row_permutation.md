@@ -1,7 +1,10 @@
 # Issue 666 — Clustered LM head: permute `lm_head` rows into cluster order
 
-**Status:** Open
+**Status:** **RESOLVED — shipped and measured. It worked, and by the predicted
+mechanism.** Speedup 2.2× → **8.3×**; effective bandwidth 20.5 → **74.7 GB/s**
+(71% of the full head's 105.0). Crossover moved 21–34% → **60–100% active**.
 **Opened:** 2026-08-17
+**Resolved:** 2026-08-17
 **Owner:** katgpt-rs
 **Blocks:** Plan 574 promotion (with Issue 662)
 **Supersedes:** Issue 661 (wave-parallelism — measured as a wash)
@@ -72,18 +75,55 @@ one allocation instead of ~2 000.
 - The permutation must be applied consistently to `lm_head`, the classifier, and
   the radii, or the bound stops being admissible. Assert it.
 
+## Outcome (2026-08-17)
+
+Everything this issue predicted, measured over 3 runs — see
+`.benchmarks/658` §Addendum.
+
+| | scattered | **packed** | full head |
+|---|---|---|---|
+| effective bandwidth | 20.5 GB/s | **74.7 GB/s** | 105.0 GB/s |
+| speedup @ 8.59% active | 2.22× | **8.27×** | — |
+| share of the 11.64× theoretical | 19% | **71%** | — |
+| crossover | 21.4–34.3% active | **60.2–100%** | — |
+| random control | 0.11× | **0.52×** | — |
+
+Wave size stays a wash under the packed layout (`wave` 1–8 all 8.8–11.0×),
+independently re-confirming Issue 661: threading was never the lever.
+
+**Enable condition, revised: below ~50% active** (was ~15%). The primitive now
+wins at every structured spread tested, including 60% active.
+
 ## Tasks
 
-- [ ] `cluster_layout_from_map()` → `(permuted_lm_head, token_of_row, offsets)`.
-- [ ] `ClusterHeadView` variant taking the flat layout.
-- [ ] Contiguous stage 2: `matmul_parallel` per cluster span, scatter via
-      `token_of_row`.
-- [ ] Unit test: permuted path is **bit-identical** to the scattered path on
-      every computed logit, and admissibility still holds.
-- [ ] Re-run `tests/bench_657_clustered_lm_head_bound.rs` §661a/§661b. Report
-      the new effective bandwidth and the new crossover.
-- [ ] If the crossover moves past ~50% active, re-gate Plan 574 G3 and
-      reconsider promotion (still gated on Issue 662's real checkpoint).
+- [x] `cluster_layout_from_map()` → `ClusterLayout { permuted, token_of_row,
+      offsets }`, with `TiedPolicy` / `LayoutRefusal`.
+- [x] `PackedHeadView` taking the flat layout.
+- [x] Contiguous stage 2 — `simd_matmul_rows_parallel` per cluster span,
+      scatter via `token_of_row`. Stage 1 (`rank_clusters`) and the wave loop
+      (`wave_plan`) are **shared** with the scattered path, so the part that
+      decides exactness cannot drift between them.
+- [x] Unit tests: `packed_layout_is_bit_identical_to_scattered` (logits, cost,
+      and visited-cluster list, over `TopK` and `Admissible`),
+      `layout_covers_every_token_exactly_once` (spans tile the row space; each
+      permuted row is its token's original row),
+      `tied_embeddings_are_refused_unless_explicitly_accepted`.
+- [x] Re-ran the bench §661a/§661b with the new layout. New bandwidth and
+      crossover recorded above.
+- [x] Crossover moved past 50% active — but **promotion is still declined**.
+      Two reasons, neither of them quality:
+      1. **Issue 662** — no real checkpoint measured. The enable condition is
+         weaker now but it is still a condition, and it is still unchecked.
+      2. **Memory.** 100% of `lm_head` is not a default-on cost. `TiedPolicy`
+         refuses tied weights precisely so this cannot be inherited silently.
+
+## Note on the tie guard
+
+The check is on **storage identity** (`as_ptr()` + `len()`), not content
+equality — that is what "tied" means at runtime, and a content compare over
+`vocab × n_embd` would cost more than the layout it guards. Two separate
+allocations holding equal values are already paying for two copies, so
+permuting one adds nothing new and is correctly allowed through.
 
 ## Note
 
