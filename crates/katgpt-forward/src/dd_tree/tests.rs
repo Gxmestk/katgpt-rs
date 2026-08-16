@@ -1350,6 +1350,7 @@ fn test_build_slices_view_matches_iter_collect() {
 ///
 /// This is NOT how a real screener works — it's intentionally slow to
 /// measure the overhead FrozenBaseGuard avoids at intermediate hops.
+#[cfg(feature = "thinking_prune")]
 struct ExpensiveScreener {
     /// Simulated work per relevance() call: number of hash rounds.
     work_factor: usize,
@@ -1358,6 +1359,7 @@ struct ExpensiveScreener {
     sink: std::sync::atomic::AtomicU32,
 }
 
+#[cfg(feature = "thinking_prune")]
 impl ExpensiveScreener {
     fn new(work_factor: usize) -> Self {
         Self {
@@ -1367,6 +1369,7 @@ impl ExpensiveScreener {
     }
 }
 
+#[cfg(feature = "thinking_prune")]
 impl ScreeningPruner for ExpensiveScreener {
     fn relevance(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
         // Simulate expensive work: hash-based computation that can't be optimized away
@@ -1389,6 +1392,7 @@ impl ScreeningPruner for ExpensiveScreener {
 
 /// Generate synthetic marginals for benchmarking.
 /// vocab_size tokens per depth, draft_lookahead depths.
+#[cfg(feature = "thinking_prune")]
 fn bench_marginals(vocab_size: usize, draft_lookahead: usize) -> Vec<Vec<f32>> {
     let mut rng = Rng::new(42);
     (0..draft_lookahead)

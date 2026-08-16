@@ -646,11 +646,10 @@ mod tests {
         // One cluster holding tokens 0..4 — centroid is mean(0,1,2,3) = 1.5.
         let map = vec![vec![0usize, 1, 2, 3]];
         let classifier = cluster_classifier_from_map(&w, &map, n_embd);
-        for j in 0..n_embd {
+        for (j, centroid) in classifier.iter().enumerate() {
             assert!(
-                (classifier[j] - 1.5).abs() < 1e-6,
-                "centroid[{j}] = {}, want 1.5",
-                classifier[j]
+                (centroid - 1.5).abs() < 1e-6,
+                "centroid[{j}] = {centroid}, want 1.5"
             );
         }
     }
