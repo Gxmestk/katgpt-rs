@@ -2,6 +2,7 @@
 
 **Feature:** `switch_cost` (opt-in — NOT promoted; promotion requires a
 riir-ai consumer A/B, see verdict)
+**Commit:** `17909bb8` (feat, 2026-08-17)
 **Source:** Research 484 — Skill Entropy (arXiv:2608.05139, He et al. 2026-08-06)
 **Date:** 2026-08-17
 **Machine:** M3 Max (Apple Silicon), release-mode timing best-of-3 × 1M;
