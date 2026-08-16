@@ -166,6 +166,36 @@ the artifact question:
 - [RTX 3090 sweep](https://hackmd.io/ODXuOQNzSiyUITz7g9mtBw) — no llama.cpp
   speculative mode beats baseline on consumer Ampere either.
 
+### Prior in-house observation: DSpark (2026-08-13)
+
+Three days before this benchmark, `riir-train` recorded the same Metal-vs-CUDA
+asymmetry using a **different drafter entirely** — `Ternary-Bonsai-27B-dspark-Q4_1.gguf`
+(riir-train/README.md:248, Plan 528 in riir-ai):
+
+> DSpark drafter (6-layer block-denoising speculative decoder, PrismML-trained).
+> **DSpark = DFlash pattern.** "On Apple Silicon batch-1 verification doesn't
+> amortize the drafter; on 4090 it gives the 1.34× speedup."
+
+This separates the Metal problem into **two distinct failure modes** that had
+been conflated:
+
+| # | failure mode | who suffers | status |
+|---|---|---|---|
+| 1 | Per-step kernel dispatch / no graph fusion | llama.cpp MTP (all backends) | **ARTIFACT** — MLX fuses and wins |
+| 2 | Drafter forward cost doesn't amortize at batch-1 | **separate-drafter** family: DFlash, DSpark | **STRUCTURAL** for separate drafters |
+
+Mode 2 is not a bug. A separate 6-layer drafter must run its own forward pass
+every step; at batch-1 on Apple Silicon there is no batching to amortize it
+against, so the drafter's cost is charged in full. On a 4090 the same drafter
+wins (1.34×) because the verify batch is comparatively free there.
+
+**This is an argument *for* the MTP pivot on Metal specifically.** A native MTP
+head is ~1 layer sharing the model trunk, not a separate multi-layer model, so
+it is far cheaper to run and does not incur mode 2 — which is consistent with
+MTPLX measuring 1.6–2.24× on Apple Silicon with in-model heads while DSpark
+loses there. Neither this benchmark nor Bench 656's matmul measurement probes
+mode 2 directly; it is inferred from the two independent field results.
+
 ### This repo's Metal backend has the same defect
 
 `crates/katgpt-backend/src/gpu.rs` allocates **9 command buffers and issues 9
