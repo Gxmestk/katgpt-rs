@@ -52,10 +52,29 @@ off even if the MTP pivot is abandoned.
 
 ## Tasks
 
-- [ ] Encode the whole forward into **one** command buffer; one
-      `wait_until_completed()` at the end.
-- [ ] Remove per-layer CPU syncs; keep GPU-side ordering via encoder order.
-- [ ] Verify bit-identical logits vs the current path (G1).
-- [ ] Measure width-1 decode tok/s before and after — this is the standalone win.
+- [x] Encode the whole forward into **one** command buffer; one
+      `wait_until_completed()` at the end. (2026-08-17)
+- [x] Remove per-layer CPU syncs; keep GPU-side ordering via encoder order.
+      (2026-08-17 — 9 syncs → 1; the mid-forward `x→xr2` CPU copy became a
+      blit-encoder copy, the one real CPU dependency that forced the syncs)
+- [x] Verify bit-identical logits vs the current path (G1). (2026-08-17 —
+      exact f32 bit patterns over the sequence [0,1,3,7,5], identical)
+- [x] Measure width-1 decode tok/s before and after — this is the standalone
+      win. (2026-08-17 — interleaved protocol, 5 pairs: median ratio 0.1272
+      → **7.86× faster** on micro, 2019-2063 → 255-282 µs/token; Bench 661)
 - [ ] Only then: batched width-N forward (`InferenceBackend::forward` is
       single-token: `token: usize, pos: usize`).
+
+## Resolution (2026-08-17)
+
+**Tasks 1-4 DONE, GOAT PASS (Bench 661).** The whole forward is now ONE
+command buffer with one commit + wait. Encoder order within a command
+buffer provides the GPU-side ordering (dispatches within a compute encoder
+serialize with memory visibility — the same guarantee the old per-block
+waits provided; the code already relied on it for matmul→relu→matmul).
+The `n_head` attention heads share one encoder (shared `scores_buf`
+ordering preserved by encoder serialization). G1 bit-identical; G2 median
+interleaved ratio 0.1272 (7.86×) on the overhead-dominated micro config;
+G3 23/23 lib tests + clippy clean. Task 5 (batched width-N) stays open per
+the "only then" ordering — the single-submit prerequisite it depended on
+is now in place.

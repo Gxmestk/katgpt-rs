@@ -509,6 +509,15 @@ impl InferenceBackend for GpuBackend {
         // mlp_hidden_in_dim_buf). Only seq_len_buf is per-call (context grows).
         // n_embd_buf doubles as n_embd_in_dim_buf, mlp_in_dim_buf, kv_in_dim_buf.
 
+        // ── Single-submit (Issue 660): the whole forward is encoded into ONE
+        // command buffer with a single commit + wait at the end. Encoder order
+        // within a command buffer IS the GPU-side ordering — dispatches within
+        // a compute encoder serialize with memory visibility between them
+        // (the same guarantee the old per-block waits provided). The one
+        // mid-forward CPU dependency (the x→xr2 save in 2g) became a blit
+        // encoder copy so no CPU read happens before the final wait. ──
+        let cmd_buffer = command_queue.new_command_buffer();
+
         // ── Step 1: Embedding lookup x = wte[token] + wpe[pos] ──
         {
             // Copy wte[token*n_embd..(token+1)*n_embd] into emb_wte_slice (reused buffer)
@@ -522,21 +531,17 @@ impl InferenceBackend for GpuBackend {
             let wpe_upload = self.emb_wpe_slice.as_ref().expect("emb_wpe_slice missing");
             write_f32_slice(wpe_upload, wpe_slice);
             // x_buf = wte + wpe
-            let cmd_buffer = command_queue.new_command_buffer();
             let encoder = cmd_buffer.new_compute_command_encoder();
             encoder.set_buffer(0, Some(x_upload), 0);
             encoder.set_buffer(1, Some(wpe_upload), 0);
             encoder.set_buffer(2, Some(x_buf), 0);
             dispatch_1d(encoder, &pipelines.elem_add, n_embd as u64);
             encoder.end_encoding();
-            cmd_buffer.commit();
-            cmd_buffer.wait_until_completed();
         }
 
         // ── Step 2: Per-layer transformer block ──
         #[allow(clippy::needless_range_loop)]
         for layer_idx in 0..config.n_layer {
-            let cmd_buffer = command_queue.new_command_buffer();
             let encoder = cmd_buffer.new_compute_command_encoder();
 
             // 2a. RMSNorm: xr = rmsnorm(x, attn_norm_gamma)
@@ -580,12 +585,13 @@ impl InferenceBackend for GpuBackend {
             dispatch_1d(encoder, &pipelines.kv_store, kv_dim as u64);
 
             // 2d. Multi-head attention
-            // For each head, compute attention scores, softmax, and weighted value sum
-            // We process heads sequentially in separate command buffers because
-            // each head needs its own softmax before the value sum.
-            encoder.end_encoding();
-            cmd_buffer.commit();
-            cmd_buffer.wait_until_completed();
+            // For each head, compute attention scores, softmax, and weighted value sum.
+            // All heads share this ONE encoder: dispatches within an encoder
+            // serialize, so head h's softmax is visible to its value sum, and
+            // head h's value sum completes before head h+1 overwrites the
+            // shared scores_buf — the identical guarantee the old per-head
+            // command-buffer waits provided, without the CPU round trips.
+            // (key_cache_buf / value_cache_buf bound above at 2c.)
 
             for h in 0..n_head {
                 // Per-head offsets — pre-computed buffers cached at compile().
@@ -593,149 +599,127 @@ impl InferenceBackend for GpuBackend {
                 let kv_off_buf = &kv_off_bufs[h];
                 let out_off_buf = &out_off_bufs[h];
 
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-
                 // Attention scores: scores[t] = q[h*head_dim..] . key_cache[t*kv_dim + kv_group*head_dim..] * scale
-                enc.set_buffer(0, Some(q_buf), 0);
-                enc.set_buffer(1, Some(key_cache_buf), 0);
-                enc.set_buffer(2, Some(q_off_buf), 0);
-                enc.set_buffer(3, Some(kv_off_buf), 0);
-                enc.set_buffer(4, Some(kv_dim_buf), 0);
-                enc.set_buffer(5, Some(head_dim_buf), 0);
-                enc.set_buffer(6, Some(scale_buf), 0);
-                enc.set_buffer(7, Some(scores_buf), 0);
-                dispatch_1d(enc, &pipelines.attention_score, seq_len as u64);
+                encoder.set_buffer(0, Some(q_buf), 0);
+                encoder.set_buffer(1, Some(key_cache_buf), 0);
+                encoder.set_buffer(2, Some(q_off_buf), 0);
+                encoder.set_buffer(3, Some(kv_off_buf), 0);
+                encoder.set_buffer(4, Some(kv_dim_buf), 0);
+                encoder.set_buffer(5, Some(head_dim_buf), 0);
+                encoder.set_buffer(6, Some(scale_buf), 0);
+                encoder.set_buffer(7, Some(scores_buf), 0);
+                dispatch_1d(encoder, &pipelines.attention_score, seq_len as u64);
 
                 // Softmax over scores[0..seq_len]
-                enc.set_buffer(0, Some(scores_buf), 0);
-                enc.set_buffer(1, Some(seq_len_buf), 0);
-                dispatch_single(enc, &pipelines.softmax);
+                encoder.set_buffer(0, Some(scores_buf), 0);
+                encoder.set_buffer(1, Some(seq_len_buf), 0);
+                dispatch_single(encoder, &pipelines.softmax);
 
                 // Weighted value sum: attn_out[h*head_dim..] = sum_t scores[t] * value_cache[t*kv_dim + kv_offset..]
-                enc.set_buffer(0, Some(scores_buf), 0);
-                enc.set_buffer(1, Some(value_cache_buf), 0);
-                enc.set_buffer(2, Some(attn_out_buf), 0);
-                enc.set_buffer(3, Some(out_off_buf), 0);
-                enc.set_buffer(4, Some(kv_off_buf), 0);
-                enc.set_buffer(5, Some(kv_dim_buf), 0);
-                enc.set_buffer(6, Some(head_dim_buf), 0);
-                enc.set_buffer(7, Some(seq_len_buf), 0);
-                dispatch_single(enc, &pipelines.attention_value);
-
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
+                encoder.set_buffer(0, Some(scores_buf), 0);
+                encoder.set_buffer(1, Some(value_cache_buf), 0);
+                encoder.set_buffer(2, Some(attn_out_buf), 0);
+                encoder.set_buffer(3, Some(out_off_buf), 0);
+                encoder.set_buffer(4, Some(kv_off_buf), 0);
+                encoder.set_buffer(5, Some(kv_dim_buf), 0);
+                encoder.set_buffer(6, Some(head_dim_buf), 0);
+                encoder.set_buffer(7, Some(seq_len_buf), 0);
+                dispatch_single(encoder, &pipelines.attention_value);
             }
 
             // 2e. Output projection: x = wo @ attn_out  [n_embd output, n_embd input]
             {
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-                enc.set_buffer(0, Some(&wb.attn_wo[layer_idx]), 0);
-                enc.set_buffer(1, Some(attn_out_buf), 0);
-                enc.set_buffer(2, Some(x_buf), 0);
-                enc.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
-                dispatch_1d(enc, &pipelines.matmul, n_embd as u64);
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
+                encoder.set_buffer(0, Some(&wb.attn_wo[layer_idx]), 0);
+                encoder.set_buffer(1, Some(attn_out_buf), 0);
+                encoder.set_buffer(2, Some(x_buf), 0);
+                encoder.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
+                dispatch_1d(encoder, &pipelines.matmul, n_embd as u64);
             }
 
             // 2f. Residual: x += xr
             {
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-                enc.set_buffer(0, Some(x_buf), 0);
-                enc.set_buffer(1, Some(xr_buf), 0);
-                enc.set_buffer(2, Some(x_buf), 0);
-                dispatch_1d(enc, &pipelines.elem_add, n_embd as u64);
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
+                encoder.set_buffer(0, Some(x_buf), 0);
+                encoder.set_buffer(1, Some(xr_buf), 0);
+                encoder.set_buffer(2, Some(x_buf), 0);
+                dispatch_1d(encoder, &pipelines.elem_add, n_embd as u64);
             }
+
+            encoder.end_encoding();
 
             // 2g. Save pre-norm x to xr2, then RMSNorm x in-place
             // xr2 = x (save pre-norm value for residual)
             // x = rmsnorm(x, mlp_norm_gamma)
+            //
+            // The save is a GPU-side blit copy INSIDE the command buffer
+            // (Issue 660): the old CPU ptr::copy via contents() was the one
+            // mid-forward CPU↔GPU dependency that forced the per-block syncs.
+            // Byte-for-byte identical to the CPU copy.
             {
-                // Copy x_buf → xr2_buf via shared memory (zero-copy on Apple Silicon)
-                let src_ptr = x_buf.contents() as *const f32;
-                let dst_ptr = xr2_buf.contents() as *mut f32;
-                unsafe {
-                    std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, n_embd);
-                }
+                let blit = cmd_buffer.new_blit_command_encoder();
+                blit.copy_from_buffer(
+                    x_buf,
+                    0,
+                    xr2_buf,
+                    0,
+                    (n_embd * std::mem::size_of::<f32>()) as u64,
+                );
+                blit.end_encoding();
             }
-            // RMSNorm x_buf in-place
+            // RMSNorm x_buf in-place (new encoder — must not overlap the blit)
             {
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-                enc.set_buffer(0, Some(x_buf), 0);
-                enc.set_buffer(1, Some(x_buf), 0); // in-place: output = input
-                enc.set_buffer(2, Some(&wb.mlp_norm_gamma[layer_idx]), 0);
-                enc.set_buffer(3, Some(n_embd_buf), 0);
-                enc.set_buffer(4, Some(eps_buf), 0);
-                dispatch_single(enc, &pipelines.rmsnorm);
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
-            }
+                let encoder = cmd_buffer.new_compute_command_encoder();
+                encoder.set_buffer(0, Some(x_buf), 0);
+                encoder.set_buffer(1, Some(x_buf), 0); // in-place: output = input
+                encoder.set_buffer(2, Some(&wb.mlp_norm_gamma[layer_idx]), 0);
+                encoder.set_buffer(3, Some(n_embd_buf), 0);
+                encoder.set_buffer(4, Some(eps_buf), 0);
+                dispatch_single(encoder, &pipelines.rmsnorm);
 
-            // 2h. MLP: hidden = relu(w1 @ x), then x = w2 @ hidden
-            // hidden = w1 @ x  [mlp_hidden output, n_embd input]
-            {
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-                enc.set_buffer(0, Some(&wb.mlp_w1[layer_idx]), 0);
-                enc.set_buffer(1, Some(x_buf), 0);
-                enc.set_buffer(2, Some(hidden_buf), 0);
-                enc.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
-                dispatch_1d(enc, &pipelines.matmul, mlp_hidden as u64);
+                // 2h. MLP: hidden = relu(w1 @ x), then x = w2 @ hidden
+                // hidden = w1 @ x  [mlp_hidden output, n_embd input]
+                encoder.set_buffer(0, Some(&wb.mlp_w1[layer_idx]), 0);
+                encoder.set_buffer(1, Some(x_buf), 0);
+                encoder.set_buffer(2, Some(hidden_buf), 0);
+                encoder.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
+                dispatch_1d(encoder, &pipelines.matmul, mlp_hidden as u64);
 
                 // ReLU on hidden
-                enc.set_buffer(0, Some(hidden_buf), 0);
-                enc.set_buffer(1, Some(hidden_buf), 0);
-                dispatch_1d(enc, &pipelines.relu, mlp_hidden as u64);
+                encoder.set_buffer(0, Some(hidden_buf), 0);
+                encoder.set_buffer(1, Some(hidden_buf), 0);
+                dispatch_1d(encoder, &pipelines.relu, mlp_hidden as u64);
 
                 // x = w2 @ hidden  [n_embd output, mlp_hidden input]
-                enc.set_buffer(0, Some(&wb.mlp_w2[layer_idx]), 0);
-                enc.set_buffer(1, Some(hidden_buf), 0);
-                enc.set_buffer(2, Some(x_buf), 0);
-                enc.set_buffer(3, Some(mlp_hidden_in_dim_buf), 0);
-                dispatch_1d(enc, &pipelines.matmul, n_embd as u64);
+                encoder.set_buffer(0, Some(&wb.mlp_w2[layer_idx]), 0);
+                encoder.set_buffer(1, Some(hidden_buf), 0);
+                encoder.set_buffer(2, Some(x_buf), 0);
+                encoder.set_buffer(3, Some(mlp_hidden_in_dim_buf), 0);
+                dispatch_1d(encoder, &pipelines.matmul, n_embd as u64);
 
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
-            }
+                // 2i. Residual: x += xr2 (pre-norm value)
+                encoder.set_buffer(0, Some(x_buf), 0);
+                encoder.set_buffer(1, Some(xr2_buf), 0);
+                encoder.set_buffer(2, Some(x_buf), 0);
+                dispatch_1d(encoder, &pipelines.elem_add, n_embd as u64);
 
-            // 2i. Residual: x += xr2 (pre-norm value)
-            {
-                let cmd_buf = command_queue.new_command_buffer();
-                let enc = cmd_buf.new_compute_command_encoder();
-                enc.set_buffer(0, Some(x_buf), 0);
-                enc.set_buffer(1, Some(xr2_buf), 0);
-                enc.set_buffer(2, Some(x_buf), 0);
-                dispatch_1d(enc, &pipelines.elem_add, n_embd as u64);
-                enc.end_encoding();
-                cmd_buf.commit();
-                cmd_buf.wait_until_completed();
+                encoder.end_encoding();
             }
         }
 
         // ── Step 3: LM head: logits = lm_head @ x ──
         {
-            let cmd_buf = command_queue.new_command_buffer();
-            let enc = cmd_buf.new_compute_command_encoder();
-            enc.set_buffer(0, Some(&wb.lm_head), 0);
-            enc.set_buffer(1, Some(x_buf), 0);
-            enc.set_buffer(2, Some(logits_buf), 0);
-            enc.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
-            dispatch_1d(enc, &pipelines.matmul, vocab_size as u64);
-            enc.end_encoding();
-            cmd_buf.commit();
-            cmd_buf.wait_until_completed();
+            let encoder = cmd_buffer.new_compute_command_encoder();
+            encoder.set_buffer(0, Some(&wb.lm_head), 0);
+            encoder.set_buffer(1, Some(x_buf), 0);
+            encoder.set_buffer(2, Some(logits_buf), 0);
+            encoder.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
+            dispatch_1d(encoder, &pipelines.matmul, vocab_size as u64);
+            encoder.end_encoding();
         }
+
+        // ── Single commit + single wait (Issue 660): one CPU↔GPU sync for the
+        // whole forward. Step 4's CPU read of logits_buf is safe after this. ──
+        cmd_buffer.commit();
+        cmd_buffer.wait_until_completed();
 
         // ── Step 4: Copy logits from GPU back to CPU ──
         {
