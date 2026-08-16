@@ -1,6 +1,7 @@
 # Plan 574 — Modelless Clustered LM Head (activate the `mtp_cluster_*` substrate)
 
-**Status:** Active — Phase 1
+**Status:** Phase 1 COMPLETE — builders ship, **GOAT FAILED on G2b, NOT promoted**.
+Follow-ups: Issue 657 (max bound — the likely fix), Issue 658 (multi-layer predictor)
 **Date:** 2026-08-16
 **Owner:** katgpt-rs
 **Related Research:** 026 (Gemma 4 MTP), 078 (MTP Cluster Top-K Efficient Embedder),
@@ -104,12 +105,18 @@ speedup on a wrong argmax is not a modelless gain.
 - [x] **T3** Unit tests: determinism (same input ⇒ same map), full-coverage
       (every token in exactly one cluster), G1 bit-identity at
       `topk >= num_clusters`.
-- [ ] **T4** GOAT bench: argmax recall + latency, k-means vs round-robin, swept
-      over `(num_clusters, topk)`.
+- [x] **T4** GOAT bench — `.benchmarks/657_clustered_lm_head_goat.md`,
+      `tests/bench_574_clustered_lm_head_goat.rs`.
 - [x] **T5** Correct the stale riir-burner/Plan-056 claim in
       `.docs/02_inference/mtp_threshold.md`.
-- [ ] **T6** If G1–G5 pass and k-means beats round-robin → promote; else record
-      the negative result and keep round-robin.
+- [x] **T6** **NOT PROMOTED — negative result recorded.** G2a PASS (k-means beats
+      round-robin 1.4×–4.7× at every matched budget), G3 PASS (4.68×), but
+      **G2b FAIL**: best argmax recall **0.675** vs the 0.99 target, and 0.16 at
+      a usable 5% budget. Per AGENTS.md a speedup on a wrong argmax is not a
+      modelless gain, so `mtp_cluster_*` stays unloaded by default.
+      Root cause is the *scoring objective* (mean logit vs max logit), not the
+      input — see Issue 657 (admissible Cauchy–Schwarz radius bound) and
+      Issue 658 (multi-layer/FUNCATTN predictor, ordered second).
 
 ## Non-goals
 

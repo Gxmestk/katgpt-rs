@@ -118,8 +118,9 @@ pub use katgpt_forward::{DepthRouteIndicesArgs, depth_route_with_indices};
 #[cfg(feature = "coda_fusion")]
 pub use katgpt_forward::forward_coda;
 pub use katgpt_forward::{
-    cluster_map_from_embeddings, cluster_map_round_robin, clustered_lm_head, forward, forward_base,
-    select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
+    cluster_classifier_from_map, cluster_map_from_embeddings, cluster_map_round_robin,
+    clustered_lm_head, forward, forward_base, select_topk_indices, select_topk_indices_into_buf,
+    standard_lm_head,
 };
 // `attention_head` is `unsafe fn` — re-export publicly for root's other
 // forward variants and tests that call it inside `unsafe { ... }` blocks.
