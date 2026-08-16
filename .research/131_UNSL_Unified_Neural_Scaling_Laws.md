@@ -93,3 +93,4 @@ The "broken scaling law" pattern (piecewise power laws with smooth transitions) 
 - katgpt-rs Plan 061 (Entropy Anomaly Detection) — validates oppositional force concept
 - katgpt-rs Research 052 (SimpleTES) — related evaluation-driven scaling work
 - riir-ai Plan 026 (Domain Inference Budget) — TOML-configured β budgets
+- riir-train Research 418 (Small-Scale Experiments / noisy quadratic, arXiv:2608.11859) — supplies the experiment methodology this note's "Why No Implementation Plan" #2 blocked on: tuned-frontier multi-scale data collection (≥64 configs/scale + NQL diagnostic + WSD decay branching) is now a documented recipe. Revisit UNSL after a first real sweep lands.
