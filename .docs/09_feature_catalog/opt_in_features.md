@@ -2552,10 +2552,11 @@ Two tiny trained MLPs (Q-Indexer + K-Indexer, 2114 params at Kimi-K3 d_h=64) tha
 
 ## 78. Clustered LM Head — two-stage admissible-set vocab head (Plan 574; Issues 657/658/661/666)
 
-**Feature flag:** `cluster_lm_head` (opt-in until GOAT passes — and the load-bearing gate
-is a REAL-checkpoint measurement, [Issue 662](../../.issues/662_clustered_lm_head_real_checkpoint.md)).
+**Feature flag:** `cluster_lm_head` (opt-in **PERMANENTLY** — the load-bearing
+real-checkpoint gate was measured 2026-08-17 and fired the pre-committed
+negative rule: [riir-ai Bench 688](../../../riir-ai/.benchmarks/688_clustered_lm_head_real_checkpoint_harness.md)).
 
-Stage 1 scores k≈V/128 clusters via ❈h, centroid_c❉; stage 2 runs the exact head
+Stage 1 scores k≈V/128 clusters via ⟨h, centroid_c⟩; stage 2 runs the exact head
 over the admissible set only. `ClusterStop::Admissible` (Cauchy–Schwarz radius bound)
 + `ClusterStop::TopK` budget stops. D² seeding (Bench 658's degenerate-strided-init
 fix) is the construction default; the strided variant survives as `ClusterInit::Strided`
@@ -2569,7 +2570,7 @@ for bench attribution only.
 | G2 structured | **8.3–9.2×** — after the cluster-contiguous row permutation (Issue 666): 2.2× → 8.3× by making each cluster's vocab rows memory-contiguous (the stage-2 GEMV reads whole clusters, not strided rows). | Bench 658 §addendum |
 | G2 wave-parallel stage 2 | **WASH (negative)** — parallelizing stage 2's per-cluster work gained nothing: the bottleneck is **locality, not work**. This finding directly motivated the row-permutation fix above. | Issue 661 |
 | G3 unstructured control | **HONEST FAIL — 0.08× loss** on uniform-random rows (99.99% admissible → all the overhead, none of the savings). | Bench 658 §Promotion |
-| Promotion | **BLOCKED** — both regimes are synthetic; where a real LM head sits between planted-Gaussian (7.30% admissible, 2.1–2.9× win) and uniform (99.99%, 0.08× loss) is precisely the promotion decision. | [Issue 662](../../.issues/662_clustered_lm_head_real_checkpoint.md) |
+| Promotion | **PERMANENT NEGATIVE (measured 2026-08-17, Issue 662 resolved + removed)** — on Gemma 2 2B's tied wte at the shipping ratio (k≈2000), 123 real `after_final_norm` probes: **Admissible active 99.95%** — the uniform-random regime, not between the extremes. Packed head **0.44×** (2.3× slower, interleaved). Exactness holds (recall 1.0000 asserted — sound bound, all-inclusive on real geometry: real h is anisotropic, exactly as predicted). The D² clusters carry real structure (TopK 68% argmax recall at 1.58% active) but TopK is inexact and the value proposition required the exact bound. Per the issue's pre-committed rule: fixture NOT tuned further. | [riir-ai Bench 688](../../../riir-ai/.benchmarks/688_clustered_lm_head_real_checkpoint_harness.md) (run record) |
 
 **Unconditional landing:** D² seeding replaces strided seeding as the default in
 `cluster_map_from_embeddings` (regime-independent strict improvement).
