@@ -16,13 +16,7 @@ use katgpt_rs::kimi_k3::model::{KimiK3ModelConfig, KimiK3Runtime};
 /// Check that all values in a slice are finite (no NaN/Inf).
 fn assert_all_finite(name: &str, v: &[f32]) {
     for (i, &val) in v.iter().enumerate() {
-        assert!(
-            val.is_finite(),
-            "{}[{}] is not finite: {}",
-            name,
-            i,
-            val
-        );
+        assert!(val.is_finite(), "{name}[{i}] is not finite: {val}");
     }
 }
 
@@ -50,38 +44,56 @@ fn train_init_all_finite_0_40b() {
 
     // Per-layer.
     for (li, layer) in weights.layers.iter().enumerate() {
-        assert_all_finite(&format!("layer{}.input_ln", li), &layer.input_layernorm_weight);
-        assert_all_finite(&format!("layer{}.post_attn_ln", li), &layer.post_attention_layernorm_weight);
-        assert_all_finite(&format!("layer{}.self_attn_res.norm", li), &layer.self_attn_res.norm_weight);
-        assert_all_finite(&format!("layer{}.self_attn_res.proj", li), &layer.self_attn_res.proj_weight);
-        assert_all_finite(&format!("layer{}.mlp_attn_res.norm", li), &layer.mlp_attn_res.norm_weight);
-        assert_all_finite(&format!("layer{}.mlp_attn_res.proj", li), &layer.mlp_attn_res.proj_weight);
+        assert_all_finite(
+            &format!("layer{li}.input_ln"),
+            &layer.input_layernorm_weight,
+        );
+        assert_all_finite(
+            &format!("layer{li}.post_attn_ln"),
+            &layer.post_attention_layernorm_weight,
+        );
+        assert_all_finite(
+            &format!("layer{li}.self_attn_res.norm"),
+            &layer.self_attn_res.norm_weight,
+        );
+        assert_all_finite(
+            &format!("layer{li}.self_attn_res.proj"),
+            &layer.self_attn_res.proj_weight,
+        );
+        assert_all_finite(
+            &format!("layer{li}.mlp_attn_res.norm"),
+            &layer.mlp_attn_res.norm_weight,
+        );
+        assert_all_finite(
+            &format!("layer{li}.mlp_attn_res.proj"),
+            &layer.mlp_attn_res.proj_weight,
+        );
 
         match &layer.attention {
             katgpt_rs::kimi_k3::decoder_layer::KimiAttentionWeights::Mla(m) => {
-                assert_all_finite(&format!("layer{}.mla.w_dkv", li), &m.w_dkv);
-                assert_all_finite(&format!("layer{}.mla.w_o", li), &m.w_o);
-                assert_all_finite(&format!("layer{}.mla.q_a_norm", li), &m.q_a_norm_weight);
+                assert_all_finite(&format!("layer{li}.mla.w_dkv"), &m.w_dkv);
+                assert_all_finite(&format!("layer{li}.mla.w_o"), &m.w_o);
+                assert_all_finite(&format!("layer{li}.mla.q_a_norm"), &m.q_a_norm_weight);
                 if let Some(ref wg) = m.w_g {
-                    assert_all_finite(&format!("layer{}.mla.w_g", li), wg);
+                    assert_all_finite(&format!("layer{li}.mla.w_g"), wg);
                 }
             }
             katgpt_rs::kimi_k3::decoder_layer::KimiAttentionWeights::Kda(k) => {
-                assert_all_finite(&format!("layer{}.kda.q_proj", li), &k.q_proj);
-                assert_all_finite(&format!("layer{}.kda.a_log", li), &k.a_log);
-                assert_all_finite(&format!("layer{}.kda.dt_bias", li), &k.dt_bias);
+                assert_all_finite(&format!("layer{li}.kda.q_proj"), &k.q_proj);
+                assert_all_finite(&format!("layer{li}.kda.a_log"), &k.a_log);
+                assert_all_finite(&format!("layer{li}.kda.dt_bias"), &k.dt_bias);
             }
         }
 
         match &layer.ffn {
             katgpt_rs::kimi_k3::decoder_layer::KimiFfnWeights::Dense(e) => {
-                assert_all_finite(&format!("layer{}.dense.gate", li), &e.gate_proj);
+                assert_all_finite(&format!("layer{li}.dense.gate"), &e.gate_proj);
             }
             katgpt_rs::kimi_k3::decoder_layer::KimiFfnWeights::Moe(m) => {
-                assert_all_finite(&format!("layer{}.moe.router", li), &m.router_weight);
-                assert_all_finite(&format!("layer{}.moe.bias", li), &m.e_score_correction_bias);
+                assert_all_finite(&format!("layer{li}.moe.router"), &m.router_weight);
+                assert_all_finite(&format!("layer{li}.moe.bias"), &m.e_score_correction_bias);
                 for (ei, e) in m.experts.iter().enumerate() {
-                    assert_all_finite(&format!("layer{}.moe.expert{}.gate", li, ei), &e.gate_proj);
+                    assert_all_finite(&format!("layer{li}.moe.expert{ei}.gate"), &e.gate_proj);
                 }
             }
         }
@@ -95,17 +107,15 @@ fn train_init_embedding_small_std() {
     let weights = KimiK3ModelWeights::random_train_init(&config, 42);
     let embed_std = std_dev(&weights.embed_weight);
     let lm_head_std = std_dev(&weights.lm_head_weight);
-    eprintln!("embed std = {:.4}, lm_head std = {:.4}", embed_std, lm_head_std);
+    eprintln!("embed std = {embed_std:.4}, lm_head std = {lm_head_std:.4}");
     // Allow some tolerance for finite-sample variance.
     assert!(
         embed_std > 0.01 && embed_std < 0.04,
-        "embed std out of range: {:.4} (expected ~0.02)",
-        embed_std
+        "embed std out of range: {embed_std:.4} (expected ~0.02)"
     );
     assert!(
         lm_head_std > 0.01 && lm_head_std < 0.04,
-        "lm_head std out of range: {:.4} (expected ~0.02)",
-        lm_head_std
+        "lm_head std out of range: {lm_head_std:.4} (expected ~0.02)"
     );
 }
 
@@ -115,10 +125,10 @@ fn train_init_norm_gammas_are_one() {
     let weights = KimiK3ModelWeights::random_train_init(&config, 42);
     // All RMSNorm gammas should be exactly 1.0.
     for &g in &weights.final_norm_weight {
-        assert_eq!(g, 1.0, "final_norm gamma != 1.0: {}", g);
+        assert_eq!(g, 1.0, "final_norm gamma != 1.0: {g}");
     }
     for &g in &weights.output_attn_res.norm_weight {
-        assert_eq!(g, 1.0, "output_attn_res norm gamma != 1.0: {}", g);
+        assert_eq!(g, 1.0, "output_attn_res norm gamma != 1.0: {g}");
     }
     for layer in &weights.layers {
         for &g in &layer.input_layernorm_weight {
@@ -146,15 +156,14 @@ fn train_init_moe_router_small() {
     for layer in &weights.layers {
         if let katgpt_rs::kimi_k3::decoder_layer::KimiFfnWeights::Moe(m) = &layer.ffn {
             let router_std = std_dev(&m.router_weight);
-            eprintln!("MoE router std = {:.4}", router_std);
+            eprintln!("MoE router std = {router_std:.4}");
             assert!(
                 router_std < 0.05,
-                "MoE router std too large: {:.4} (expected ~0.02)",
-                router_std
+                "MoE router std too large: {router_std:.4} (expected ~0.02)"
             );
             // e_score_correction_bias should be zero.
             for &b in &m.e_score_correction_bias {
-                assert_eq!(b, 0.0, "e_score_correction_bias != 0: {}", b);
+                assert_eq!(b, 0.0, "e_score_correction_bias != 0: {b}");
             }
             break;
         }
@@ -172,18 +181,14 @@ fn train_init_forward_pass_finite_logits() {
     let tokens = vec![1u32, 5, 10, 15];
     let _ = tokens; // just for documentation
     runtime.reset();
-    let logits = katgpt_rs::kimi_k3::model::kimi_k3_forward_token(
-        &config,
-        &weights,
-        &mut runtime,
-        1u32,
-    );
+    let logits =
+        katgpt_rs::kimi_k3::model::kimi_k3_forward_token(&config, &weights, &mut runtime, 1u32);
 
     // Check all logits are finite.
     let v = config.vocab_size;
     assert_eq!(logits.len(), v, "logits length mismatch");
     for (i, &l) in logits.iter().enumerate() {
-        assert!(l.is_finite(), "logit[{}] is not finite: {}", i, l);
+        assert!(l.is_finite(), "logit[{i}] is not finite: {l}");
     }
 
     eprintln!(

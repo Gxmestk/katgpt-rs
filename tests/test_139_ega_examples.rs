@@ -118,13 +118,10 @@ fn proof_t5_gating_improves_signal_to_noise() {
 
     assert!(
         dist_gated < dist_ungated,
-        "Gated output (dist={:.4}) should be closer to signal mean than ungated (dist={:.4})",
-        dist_gated,
-        dist_ungated,
+        "Gated output (dist={dist_gated:.4}) should be closer to signal mean than ungated (dist={dist_ungated:.4})",
     );
     println!(
-        "T5 PASS: gating improves signal-to-noise (gated dist={:.4} < ungated dist={:.4})",
-        dist_gated, dist_ungated
+        "T5 PASS: gating improves signal-to-noise (gated dist={dist_gated:.4} < ungated dist={dist_ungated:.4})"
     );
 }
 
@@ -185,13 +182,10 @@ fn proof_t5_reversed_energy_worsens_output() {
 
     assert!(
         dist_reversed > dist_ungated,
-        "Reversed-energy output (dist={:.4}) should be WORSE than ungated (dist={:.4})",
-        dist_reversed,
-        dist_ungated,
+        "Reversed-energy output (dist={dist_reversed:.4}) should be WORSE than ungated (dist={dist_ungated:.4})",
     );
     println!(
-        "T5 PASS: reversed energy worsens output (reversed dist={:.4} > ungated dist={:.4})",
-        dist_reversed, dist_ungated
+        "T5 PASS: reversed energy worsens output (reversed dist={dist_reversed:.4} > ungated dist={dist_ungated:.4})"
     );
 }
 
@@ -217,7 +211,7 @@ fn proof_t6_gate_monotonic_with_energy() {
     }
     println!("T6 PASS: gate is monotonic with energy");
     for (i, (&e, &g)) in energy.iter().zip(&gate).enumerate() {
-        println!("  energy[{}] = {:>6.1}  →  gate = {:.6}", i, e, g);
+        println!("  energy[{i}] = {e:>6.1}  →  gate = {g:.6}");
     }
 }
 
@@ -232,8 +226,7 @@ fn proof_t6_high_alpha_sharper_gate() {
     // With high alpha, most values should be near-binary (at least 5 of 8)
     assert!(
         sharp_count >= 5,
-        "Expected >= 5 sharp values with alpha=10.0, got {}",
-        sharp_count
+        "Expected >= 5 sharp values with alpha=10.0, got {sharp_count}"
     );
     println!(
         "T6 PASS: high alpha produces {} sharp (near-binary) values out of {}",
@@ -243,7 +236,7 @@ fn proof_t6_high_alpha_sharper_gate() {
     for (i, (&e, &g)) in energy.iter().zip(&gate).enumerate() {
         let bar_len = (g * 40.0) as usize;
         let bar: String = "█".repeat(bar_len);
-        println!("  energy[{}] = {:>6.1}  →  gate = {:.4} {}", i, e, g, bar);
+        println!("  energy[{i}] = {e:>6.1}  →  gate = {g:.4} {bar}");
     }
 }
 
@@ -253,7 +246,7 @@ fn proof_t6_tau_shifts_threshold() {
     let energy = [0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0f32];
     let tau_values = [0.0, 0.5, 1.0, 2.0f32];
 
-    let mut counts_below = Vec::new();
+    let mut counts_below = Vec::with_capacity(tau_values.len());
     for &tau in &tau_values {
         let gate = compute_energy_gate(&energy, 2.2, tau);
         let count = gate.iter().filter(|&&g| g < 0.5).count();
@@ -264,16 +257,12 @@ fn proof_t6_tau_shifts_threshold() {
     for w in counts_below.windows(2) {
         assert!(
             w[1] >= w[0],
-            "count below 0.5 should not decrease with higher tau: {:?}",
-            counts_below
+            "count below 0.5 should not decrease with higher tau: {counts_below:?}"
         );
     }
-    println!(
-        "T6 PASS: tau shifts threshold (counts below 0.5: {:?})",
-        counts_below
-    );
+    println!("T6 PASS: tau shifts threshold (counts below 0.5: {counts_below:?})");
     for (&tau, &count) in tau_values.iter().zip(&counts_below) {
-        println!("  tau={:.1} → {} positions below 0.5", tau, count);
+        println!("  tau={tau:.1} → {count} positions below 0.5");
     }
 }
 
@@ -314,10 +303,7 @@ fn proof_t7_eviction_removes_low_energy_first() {
         } else {
             "padding"
         };
-        println!(
-            "  rank {:>2}: pos {:>2} energy={:.4} [{}]",
-            rank, pos, e, kind
-        );
+        println!("  rank {rank:>2}: pos {pos:>2} energy={e:.4} [{kind}]");
     }
 
     for k in [8, 16, 24] {
@@ -329,11 +315,9 @@ fn proof_t7_eviction_removes_low_energy_first() {
             .collect();
         assert!(
             content_evicted.is_empty(),
-            "K={}: no content positions should be evicted, but got {:?}",
-            k,
-            content_evicted
+            "K={k}: no content positions should be evicted, but got {content_evicted:?}"
         );
-        println!("  K={:>2}: evicted {} padding positions, 0 content ✓", k, k);
+        println!("  K={k:>2}: evicted {k} padding positions, 0 content ✓");
     }
     println!("T7 PASS: eviction always removes padding first");
 }
@@ -411,15 +395,12 @@ fn proof_t7_eviction_preserves_attention_quality() {
 
     assert!(
         dist_evicted < dist_full,
-        "Evicted output (dist={:.4}) should be closer to signal than full (dist={:.4})",
-        dist_evicted,
-        dist_full
+        "Evicted output (dist={dist_evicted:.4}) should be closer to signal than full (dist={dist_full:.4})"
     );
     println!(
-        "T7 PASS: eviction improves quality (evicted dist={:.4} < full dist={:.4})",
-        dist_evicted, dist_full
+        "T7 PASS: eviction improves quality (evicted dist={dist_evicted:.4} < full dist={dist_full:.4})"
     );
-    println!("  evicted positions (bottom 25%): {:?}", evicted);
+    println!("  evicted positions (bottom 25%): {evicted:?}");
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -462,13 +443,10 @@ fn proof_t8_combined_pipeline() {
 
     assert!(
         min_signal_energy > max_noise_energy,
-        "Min signal energy ({:.4}) should exceed max noise energy ({:.4})",
-        min_signal_energy,
-        max_noise_energy
+        "Min signal energy ({min_signal_energy:.4}) should exceed max noise energy ({max_noise_energy:.4})"
     );
     println!(
-        "T8 Step 2: energy separation OK (min_signal={:.4} > max_noise={:.4})",
-        min_signal_energy, max_noise_energy
+        "T8 Step 2: energy separation OK (min_signal={min_signal_energy:.4} > max_noise={max_noise_energy:.4})"
     );
 
     // Step 3: Apply EGA gate to attention → verify rows sum to 1
@@ -480,9 +458,7 @@ fn proof_t8_combined_pipeline() {
         let row_sum: f32 = attn[i * seq_len..(i + 1) * seq_len].iter().sum();
         assert!(
             (row_sum - 1.0).abs() < 1e-4,
-            "After gating, row {} sums to {:.6}, expected 1.0",
-            i,
-            row_sum
+            "After gating, row {i} sums to {row_sum:.6}, expected 1.0"
         );
     }
     println!("T8 Step 3: gated attention rows sum to 1.0 ✓");
@@ -500,13 +476,9 @@ fn proof_t8_combined_pipeline() {
         .collect();
     assert!(
         evicted_signal.is_empty(),
-        "No signal positions should be evicted, but got {:?}",
-        evicted_signal
+        "No signal positions should be evicted, but got {evicted_signal:?}"
     );
-    println!(
-        "T8 Step 4: bottom-25% eviction removes only noise ({} positions) ✓",
-        k
-    );
+    println!("T8 Step 4: bottom-25% eviction removes only noise ({k} positions) ✓");
 
     // Step 5: Re-normalize → verify rows still sum to 1
     for &pos in &evicted {
@@ -529,9 +501,7 @@ fn proof_t8_combined_pipeline() {
         let row_sum: f32 = attn[i * seq_len..(i + 1) * seq_len].iter().sum();
         assert!(
             (row_sum - 1.0).abs() < 1e-4,
-            "After eviction+renorm, row {} sums to {:.6}, expected 1.0",
-            i,
-            row_sum
+            "After eviction+renorm, row {i} sums to {row_sum:.6}, expected 1.0"
         );
     }
     println!("T8 Step 5: post-eviction renormalization rows sum to 1.0 ✓");
@@ -559,10 +529,10 @@ fn proof_t9_energy_profile_table() {
     println!("|-------:|-------:|------:|------:|------:|-------:|");
 
     for (&e, &zv) in energy.iter().zip(&z) {
-        print!("| {:>6.1} | {:>6.3} |", e, zv);
+        print!("| {e:>6.1} | {zv:>6.3} |");
         for &alpha in &alpha_values {
             let g = sigmoid(alpha * (zv - tau));
-            print!(" {:>.4} |", g);
+            print!(" {g:>.4} |");
         }
         println!();
     }
@@ -574,7 +544,7 @@ fn proof_t9_energy_profile_table() {
     for (&e, &g) in energy.iter().zip(&gate_default) {
         let bar_len = (g * 40.0).round() as usize;
         let bar: String = "█".repeat(bar_len);
-        println!("  E={:>5.1} │{} {:.3}", e, bar, g);
+        println!("  E={e:>5.1} │{bar} {g:.3}");
     }
     println!("           └────────────────────────────────────────");
     println!("           0.0                                1.0");
@@ -608,10 +578,7 @@ fn proof_t9_eviction_simulation() {
     let mut indexed: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
     indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-    println!(
-        "\n### T9 — Eviction Simulation (seq_len={}, head_dim={})\n",
-        seq_len, head_dim
-    );
+    println!("\n### T9 — Eviction Simulation (seq_len={seq_len}, head_dim={head_dim})\n");
     println!("**Ranked positions (low → high energy):**\n");
     println!("| Rank | Pos | Energy   | Type     |");
     println!("|-----:|----:|---------:|:---------|");
@@ -621,7 +588,7 @@ fn proof_t9_eviction_simulation() {
         } else {
             "noise"
         };
-        println!("| {:>4} | {:>3} | {:>8.4} | {:8} |", rank, pos, e, kind);
+        println!("| {rank:>4} | {pos:>3} | {e:>8.4} | {kind:8} |");
     }
 
     // Simulate eviction at K=4, K=8, K=12
@@ -634,16 +601,13 @@ fn proof_t9_eviction_simulation() {
             .collect();
         let kept: Vec<usize> = indexed[k..].iter().map(|(p, _)| *p).collect();
 
-        println!(
-            "\n**Eviction K={}** (evict {} lowest-energy positions):",
-            k, k
-        );
-        println!("- Evicted: {:?}", evicted);
-        println!("- Kept: {:?}", kept);
+        println!("\n**Eviction K={k}** (evict {k} lowest-energy positions):");
+        println!("- Evicted: {evicted:?}");
+        println!("- Kept: {kept:?}");
         if evicted_signal.is_empty() {
             println!("- ✓ No signal positions evicted");
         } else {
-            println!("- ✗ Signal positions evicted: {:?}", evicted_signal);
+            println!("- ✗ Signal positions evicted: {evicted_signal:?}");
         }
     }
     println!("\nT9 PASS: eviction simulation printed");

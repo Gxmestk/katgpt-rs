@@ -67,8 +67,7 @@ fn g1_precision_monotonicity() {
         for d in 0..8 {
             assert!(
                 lambda[d] >= old[d],
-                "G1 FAIL: precision regressed at dim {}",
-                d
+                "G1 FAIL: precision regressed at dim {d}"
             );
         }
     }
@@ -87,8 +86,7 @@ fn g2_uninformative_prior_absorbs() {
         let error = (mu - 1.0).abs();
         assert!(
             error < 0.1,
-            "G2 FAIL: uninformative prior should absorb eagerly, error={}",
-            error
+            "G2 FAIL: uninformative prior should absorb eagerly, error={error}"
         );
     }
     println!("G2 PASS: uninformative prior absorbs observation eagerly");
@@ -105,8 +103,7 @@ fn g3_high_precision_anchors() {
     for mu in &mu_new {
         assert!(
             mu.abs() < 0.002,
-            "G3 FAIL: high precision anchor should resist, moved to {}",
-            mu
+            "G3 FAIL: high precision anchor should resist, moved to {mu}"
         );
     }
     println!("G3 PASS: high precision anchors resist change");
@@ -131,14 +128,10 @@ fn g4_regularization_penalty() {
     let penalty_deviant = bake_regularize(&mu_old, &lambda, &mu_current, 1.0);
     assert!(
         penalty_deviant > 5.0,
-        "G4 FAIL: penalty should be high when deviating, got {}",
-        penalty_deviant
+        "G4 FAIL: penalty should be high when deviating, got {penalty_deviant}"
     );
 
-    println!(
-        "G4 PASS: regularization penalty zero={} deviant={:.4}",
-        penalty_aligned, penalty_deviant
-    );
+    println!("G4 PASS: regularization penalty zero={penalty_aligned} deviant={penalty_deviant:.4}");
 }
 
 // ── G5: Confidence monotonic with precision ──────────────────────────────────
@@ -156,10 +149,7 @@ fn g5_confidence_monotonic() {
             "G5 FAIL: confidence should be non-decreasing with precision"
         );
     }
-    println!(
-        "G5 PASS: confidence monotonically increases: {:?}",
-        confidences
-    );
+    println!("G5 PASS: confidence monotonically increases: {confidences:?}");
 }
 
 // ── G6: Exploration priority inversely proportional ─────────────────────────
@@ -176,10 +166,7 @@ fn g6_exploration_priority_inversely_proportional() {
             "G6 FAIL: priorities should decrease as precision increases"
         );
     }
-    println!(
-        "G6 PASS: exploration priorities inversely proportional: {:?}",
-        priorities
-    );
+    println!("G6 PASS: exploration priorities inversely proportional: {priorities:?}");
 }
 
 // ── G7: SIMD throughput benchmark ────────────────────────────────────────────
@@ -200,16 +187,12 @@ fn g7_simd_throughput() {
     let elapsed = start.elapsed();
     let ns_per_update = elapsed.as_nanos() as f64 / n_updates as f64;
 
-    println!(
-        "G7 PASS: {} updates in {:?} ({:.1} ns/update)",
-        n_updates, elapsed, ns_per_update
-    );
+    println!("G7 PASS: {n_updates} updates in {elapsed:?} ({ns_per_update:.1} ns/update)");
 
     // Target: <50ns/update on modern hardware (SIMD-friendly)
     assert!(
         ns_per_update < 500.0,
-        "G7 FAIL: too slow at {:.1} ns/update (target <500ns)",
-        ns_per_update
+        "G7 FAIL: too slow at {ns_per_update:.1} ns/update (target <500ns)"
     );
 }
 
@@ -250,17 +233,14 @@ fn g8_embedding_drift_precision_anchoring() {
     let reduction_pct = (drift_naive - drift_bake) / drift_naive.max(1e-8) * 100.0;
 
     println!(
-        "G8 PASS: drift naive={:.4} bake={:.4} reduction={:.1}%",
-        drift_naive, drift_bake, reduction_pct
+        "G8 PASS: drift naive={drift_naive:.4} bake={drift_bake:.4} reduction={reduction_pct:.1}%"
     );
 
     // Precision anchoring should reduce drift (or at least not make it worse)
     // The GOAT target is ≥30% reduction — we verify it's directionally correct
     assert!(
         drift_bake < drift_naive,
-        "G8 FAIL: BAKE drift ({:.4}) should be less than naive ({:.4})",
-        drift_bake,
-        drift_naive
+        "G8 FAIL: BAKE drift ({drift_bake:.4}) should be less than naive ({drift_naive:.4})"
     );
 }
 
@@ -372,14 +352,12 @@ fn g10_bfcf_region_oscillation_precision_anchoring() {
     };
 
     println!(
-        "G10 PASS: region flips without={} with={} reduction={:.1}%",
-        flips_without, flips_with, reduction_pct
+        "G10 PASS: region flips without={flips_without} with={flips_with} reduction={reduction_pct:.1}%"
     );
 
     // GOAT gate: precision anchoring should reduce oscillation by ≥50%
     assert!(
         reduction_pct >= 50.0,
-        "G10 FAIL: precision anchoring reduction {:.1}% < 50% GOAT threshold",
-        reduction_pct
+        "G10 FAIL: precision anchoring reduction {reduction_pct:.1}% < 50% GOAT threshold"
     );
 }

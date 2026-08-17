@@ -143,16 +143,10 @@ fn t1_speculative_acceptance_rate() {
     let trd_rate = count_accepted(&trd_scores) as f64 / n_branches as f64 * 100.0;
     let delta = trd_rate - baseline_rate;
 
-    println!("  Branches:                {}", n_branches);
-    println!(
-        "  Baseline accepted:       {} ({:.1}%)",
-        raw_branches_accepted, baseline_rate
-    );
-    println!(
-        "  TRDraft accepted:        {} ({:.1}%)",
-        refined_accepted, trd_rate
-    );
-    println!("  Delta:                   {:+.1}%", delta);
+    println!("  Branches:                {n_branches}");
+    println!("  Baseline accepted:       {raw_branches_accepted} ({baseline_rate:.1}%)");
+    println!("  TRDraft accepted:        {refined_accepted} ({trd_rate:.1}%)");
+    println!("  Delta:                   {delta:+.1}%");
     println!(
         "  Success rate:            {:.1}%",
         trd.success_rate() * 100.0
@@ -234,16 +228,10 @@ fn t2_latency_p50() {
     // In practice, skip path does: bandit select + vec clone + bandit update
     let overhead_vs_refine = skip_per_call_us / onestep_per_call_us;
 
-    println!(
-        "  detect_prefix_failure:   {:.0} ns/call",
-        detect_per_call_ns
-    );
-    println!("  Bandit skip (tight):     {:.3} μs/call", skip_per_call_us);
-    println!(
-        "  1-step refinement:       {:.3} μs/call",
-        onestep_per_call_us
-    );
-    println!("  Skip / 1-step ratio:    {:.2}x", overhead_vs_refine);
+    println!("  detect_prefix_failure:   {detect_per_call_ns:.0} ns/call");
+    println!("  Bandit skip (tight):     {skip_per_call_us:.3} μs/call");
+    println!("  1-step refinement:       {onestep_per_call_us:.3} μs/call");
+    println!("  Skip / 1-step ratio:    {overhead_vs_refine:.2}x");
 
     // GOAT gate: skip path should be significantly faster than 1-step refinement
     // This ensures bandit skip adds negligible overhead vs doing actual work
@@ -317,8 +305,8 @@ fn t3_latency_p99() {
         0.0
     };
 
-    println!("  Baseline P99 (1-step):   {:.1} μs", p99_baseline);
-    println!("  Worst-case P99 (2-step): {:.1} μs", p99_worst);
+    println!("  Baseline P99 (1-step):   {p99_baseline:.1} μs");
+    println!("  Worst-case P99 (2-step): {p99_worst:.1} μs");
     println!("  Increase:                {increase_pct:+.1}%");
 
     assert!(
@@ -381,9 +369,9 @@ fn t4_pass_to_fail_leakage() {
 
     let leakage_rate = leaked as f64 / n_branches as f64 * 100.0;
 
-    println!("  Branches tested:         {}", n_branches);
-    println!("  Downgraded (leaked):     {}", leaked);
-    println!("  Leakage rate:            {:.2}%", leakage_rate);
+    println!("  Branches tested:         {n_branches}");
+    println!("  Downgraded (leaked):     {leaked}");
+    println!("  Leakage rate:            {leakage_rate:.2}%");
 
     assert!(
         leakage_rate < 2.0,
@@ -469,14 +457,11 @@ fn t5_trajectory_length() {
     let avg_no_prefold = total_refined_no_prefold as f64 / n_branches as f64;
     let compression_ratio = avg_refined / avg_raw;
 
-    println!("  Avg raw length:          {:.1} tokens", avg_raw);
-    println!("  Avg refined (prefold):   {:.1} tokens", avg_refined);
-    println!("  Avg refined (no prefold):{:.1} tokens", avg_no_prefold);
-    println!("  Compression ratio:       {:.3}", compression_ratio);
-    println!(
-        "  Prefold compactions:     {}/{}",
-        prefold_compact_count, n_branches
-    );
+    println!("  Avg raw length:          {avg_raw:.1} tokens");
+    println!("  Avg refined (prefold):   {avg_refined:.1} tokens");
+    println!("  Avg refined (no prefold):{avg_no_prefold:.1} tokens");
+    println!("  Compression ratio:       {compression_ratio:.3}");
+    println!("  Prefold compactions:     {prefold_compact_count}/{n_branches}");
 
     assert!(
         avg_refined <= avg_raw,
@@ -563,29 +548,14 @@ fn t6_bandit_learning_curve() {
     let (one_step_reward, one_step_pulls) = stats[1];
     let (two_step_reward, two_step_pulls) = stats[2];
 
-    println!("  Rounds:                  {}", n_rounds);
-    println!(
-        "  First half mean reward:  {:.3} (var: {:.3})",
-        first_half, var_first
-    );
-    println!(
-        "  Second half mean reward: {:.3} (var: {:.3})",
-        second_half, var_second
-    );
+    println!("  Rounds:                  {n_rounds}");
+    println!("  First half mean reward:  {first_half:.3} (var: {var_first:.3})");
+    println!("  Second half mean reward: {second_half:.3} (var: {var_second:.3})");
     println!();
     println!("  Bandit arm stats:");
-    println!(
-        "    Skip (0-step):  reward={:.3} pulls={}",
-        skip_reward, skip_pulls
-    );
-    println!(
-        "    1-step:         reward={:.3} pulls={}",
-        one_step_reward, one_step_pulls
-    );
-    println!(
-        "    2-step:         reward={:.3} pulls={}",
-        two_step_reward, two_step_pulls
-    );
+    println!("    Skip (0-step):  reward={skip_reward:.3} pulls={skip_pulls}");
+    println!("    1-step:         reward={one_step_reward:.3} pulls={one_step_pulls}");
+    println!("    2-step:         reward={two_step_reward:.3} pulls={two_step_pulls}");
     println!();
     println!(
         "  Overall success rate:    {:.1}%",
@@ -607,8 +577,8 @@ fn t6_bandit_learning_curve() {
     );
 
     let depth_with_budget = trd.select_refinement_depth_with_context(true);
-    println!("  Context select (budget): {} steps", depth_with_budget);
-    println!("  Context select (tight):   {} steps", depth_tight);
+    println!("  Context select (budget): {depth_with_budget} steps");
+    println!("  Context select (tight):   {depth_tight} steps");
 
     assert!(
         converged,

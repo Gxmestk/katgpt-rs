@@ -803,10 +803,7 @@ fn experiment_adamw_learnable_gate() {
         );
         eprintln!("  → CONFIRMED: AdamW collapses softmax gate but sigmoid resists");
     } else {
-        eprintln!(
-            "  → Both gates converge to similar values ({:.4} vs {:.4})",
-            gate_sm, gate_sig
-        );
+        eprintln!("  → Both gates converge to similar values ({gate_sm:.4} vs {gate_sig:.4})");
         eprintln!("  → Gate dynamics are similar on random data");
     }
 }
@@ -1226,8 +1223,7 @@ fn experiment_sink_injection() {
             "SIMILAR"
         };
         eprintln!(
-            "║ {:>6.1}   ║ {:>5}   ║ {:>11.4} ║ {:>11.4} ║ {:>8.4} ║ {:<13} ║",
-            strength, decay, sm_cor, sig_cor, ratio, verdict,
+            "║ {strength:>6.1}   ║ {decay:>5}   ║ {sm_cor:>11.4} ║ {sig_cor:>11.4} ║ {ratio:>8.4} ║ {verdict:<13} ║",
         );
     }
 
@@ -1325,8 +1321,7 @@ fn experiment_sink_injection() {
                 f32::NAN
             };
             eprintln!(
-                "║ {:>6.1}   ║ {:>5}   ║ {:>11.4} ║ {:>11.4} ║ {:>24.4} ║",
-                strength, decay, gate_sm, gate_sig, gate_ratio,
+                "║ {strength:>6.1}   ║ {decay:>5}   ║ {gate_sm:>11.4} ║ {gate_sig:>11.4} ║ {gate_ratio:>24.4} ║",
             );
         }
     }
@@ -1492,8 +1487,7 @@ fn experiment_structured_cor_boosting() {
 
     for &(label, sink_count, sink_alignment, q_alignment) in configs {
         eprintln!(
-            "\n══ {} (sink_count={}, sink_align={:.2}, q_align={:.2}) ══",
-            label, sink_count, sink_alignment, q_alignment
+            "\n══ {label} (sink_count={sink_count}, sink_align={sink_alignment:.2}, q_align={q_alignment:.2}) ══"
         );
 
         let mut rng = fastrand::Rng::with_seed(SEED + 300);
@@ -1666,8 +1660,7 @@ fn experiment_structured_cor_boosting() {
         };
 
         eprintln!(
-            "  \u{2192} COR: SM={:.4} Sig={:.4} ratio={:.4}  |  Loss: SM={:.4} Sig={:.4} ratio={:.4}",
-            final_sm_cor, final_sig_cor, cor_ratio, final_sm_loss, final_sig_loss, loss_ratio,
+            "  \u{2192} COR: SM={final_sm_cor:.4} Sig={final_sig_cor:.4} ratio={cor_ratio:.4}  |  Loss: SM={final_sm_loss:.4} Sig={final_sig_loss:.4} ratio={loss_ratio:.4}",
         );
 
         all_results.push((
@@ -1700,8 +1693,7 @@ fn experiment_structured_cor_boosting() {
 
     for (label, sm_cor, sig_cor, cor_ratio, sm_loss, sig_loss, _) in &all_results {
         eprintln!(
-            "\u{2551} {:<14} \u{2551} {:>11.4} \u{2551} {:>11.4} \u{2551} {:>8.4} \u{2551} {:>11.4} \u{2551} {:>11.4} \u{2551}",
-            label, sm_cor, sig_cor, cor_ratio, sm_loss, sig_loss,
+            "\u{2551} {label:<14} \u{2551} {sm_cor:>11.4} \u{2551} {sig_cor:>11.4} \u{2551} {cor_ratio:>8.4} \u{2551} {sm_loss:>11.4} \u{2551} {sig_loss:>11.4} \u{2551}",
         );
     }
 
@@ -1715,7 +1707,7 @@ fn experiment_structured_cor_boosting() {
         .iter()
         .map(|(_, sm, sig, _, _, _, _)| sm.max(*sig))
         .fold(0.0f32, f32::max);
-    eprintln!("  Max COR achieved: {:.4}", max_cor);
+    eprintln!("  Max COR achieved: {max_cor:.4}");
     eprintln!("  Real model COR range: 4\u{2013}12 (Research 135)");
     if max_cor < 1.0 {
         eprintln!(
@@ -1751,8 +1743,7 @@ fn experiment_structured_cor_boosting() {
         for (label, sm_cor, sig_cor, ratio, _, _, _) in &diverged {
             let winner = if *ratio > 1.0 { "SIGMOID" } else { "SOFTMAX" };
             eprintln!(
-                "    {}: COR sig={:.4} vs sm={:.4} (ratio={:.4}) \u{2192} {} wins",
-                label, sig_cor, sm_cor, ratio, winner
+                "    {label}: COR sig={sig_cor:.4} vs sm={sm_cor:.4} (ratio={ratio:.4}) \u{2192} {winner} wins"
             );
         }
     }
@@ -1838,10 +1829,9 @@ fn experiment_reverse_cor() {
 
     for &gate_scale in gate_scales {
         for &(sink_label, sink_count, sink_alignment, q_alignment) in sink_configs {
-            let label = format!("gs={:.0}_{}", gate_scale, sink_label);
+            let label = format!("gs={gate_scale:.0}_{sink_label}");
             eprintln!(
-                "\n\u{2550}\u{2550} gate_scale={}, {} (sink_count={}, align={:.2}) \u{2550}\u{2550}",
-                gate_scale, sink_label, sink_count, sink_alignment
+                "\n\u{2550}\u{2550} gate_scale={gate_scale}, {sink_label} (sink_count={sink_count}, align={sink_alignment:.2}) \u{2550}\u{2550}"
             );
 
             let mut rng = fastrand::Rng::with_seed(SEED + 400);
@@ -1970,8 +1960,7 @@ fn experiment_reverse_cor() {
 
                 if step % 50 == 0 || step == steps {
                     eprintln!(
-                        "  step={:>3} SM: loss={:>10.4} COR={:.4}  |  Sig: loss={:>10.4} COR={:.4}",
-                        step, loss_sm, cor_sm, loss_sig, cor_sig,
+                        "  step={step:>3} SM: loss={loss_sm:>10.4} COR={cor_sm:.4}  |  Sig: loss={loss_sig:>10.4} COR={cor_sig:.4}",
                     );
                     cor_trajectory_sm.push((step, cor_sm));
                     cor_trajectory_sig.push((step, cor_sig));
@@ -2006,14 +1995,13 @@ fn experiment_reverse_cor() {
             };
 
             // Detect COR trend: is COR growing or shrinking during training?
-            let initial_sm_cor = cor_trajectory_sm.first().map(|(_, c)| *c).unwrap_or(0.0);
-            let initial_sig_cor = cor_trajectory_sig.first().map(|(_, c)| *c).unwrap_or(0.0);
+            let initial_sm_cor = cor_trajectory_sm.first().map_or(0.0, |(_, c)| *c);
+            let initial_sig_cor = cor_trajectory_sig.first().map_or(0.0, |(_, c)| *c);
             let sm_cor_change = final_sm_cor - initial_sm_cor;
             let sig_cor_change = final_sig_cor - initial_sig_cor;
 
             eprintln!(
-                "  \u{2192} Final COR: SM={:.4} Sig={:.4} ratio={:.4}  |  COR \u{394}: SM={:+.4} Sig={:+.4}",
-                final_sm_cor, final_sig_cor, cor_ratio, sm_cor_change, sig_cor_change,
+                "  \u{2192} Final COR: SM={final_sm_cor:.4} Sig={final_sig_cor:.4} ratio={cor_ratio:.4}  |  COR \u{394}: SM={sm_cor_change:+.4} Sig={sig_cor_change:+.4}",
             );
 
             results.push((
@@ -2047,8 +2035,7 @@ fn experiment_reverse_cor() {
 
     for (label, sm_cor, sig_cor, cor_ratio, sm_delta, sig_delta, _) in &results {
         eprintln!(
-            "\u{2551} {:<20} \u{2551} {:>11.4} \u{2551} {:>11.4} \u{2551} {:>8.4} \u{2551} {:>+11.4} \u{2551} {:>+11.4} \u{2551}",
-            label, sm_cor, sig_cor, cor_ratio, sm_delta, sig_delta,
+            "\u{2551} {label:<20} \u{2551} {sm_cor:>11.4} \u{2551} {sig_cor:>11.4} \u{2551} {cor_ratio:>8.4} \u{2551} {sm_delta:>+11.4} \u{2551} {sig_delta:>+11.4} \u{2551}",
         );
     }
 
@@ -2062,7 +2049,7 @@ fn experiment_reverse_cor() {
         .map(|(_, sm, sig, _, _, _, _)| sm.max(*sig))
         .fold(0.0f32, f32::max);
     eprintln!("\n\u{2500}\u{2500} T2d COR Range Achieved \u{2500}\u{2500}");
-    eprintln!("  Max COR: {:.4} (target: 4\u{2013}12)", max_cor);
+    eprintln!("  Max COR: {max_cor:.4} (target: 4\u{2013}12)");
 
     // Check for differential COR collapse
     eprintln!("\n\u{2500}\u{2500} T2d Differential Collapse Analysis \u{2500}\u{2500}");
@@ -2087,8 +2074,7 @@ fn experiment_reverse_cor() {
         );
         for (label, sm_cor, sig_cor, ratio, sm_delta, sig_delta, _) in &collapse_cases {
             eprintln!(
-                "    {}: COR sig={:.4} vs sm={:.4} (ratio={:.4}), \u{394} sig={:+.4} vs sm={:+.4}",
-                label, sig_cor, sm_cor, ratio, sig_delta, sm_delta,
+                "    {label}: COR sig={sig_cor:.4} vs sm={sm_cor:.4} (ratio={ratio:.4}), \u{394} sig={sig_delta:+.4} vs sm={sm_delta:+.4}",
             );
         }
     }
@@ -2106,10 +2092,7 @@ fn experiment_reverse_cor() {
         );
         eprintln!("  \u{2192} Evidence against the hypothesis");
     } else {
-        eprintln!(
-            "  \u{2192} COR still below real-model range ({:.4} vs 4\u{2013}12)",
-            max_cor
-        );
+        eprintln!("  \u{2192} COR still below real-model range ({max_cor:.4} vs 4\u{2013}12)");
         eprintln!(
             "  \u{2192} Synthetic experiments cannot reproduce the COR magnitude of trained LMs"
         );

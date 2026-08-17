@@ -24,8 +24,7 @@ fn test_goat_off_mode_returns_exact_base() {
         assert_eq!(
             adaptive_tree_budget(base, r, BudgetAdaptation::Off),
             base,
-            "Off mode should always return base_budget, failed at r={}",
-            r
+            "Off mode should always return base_budget, failed at r={r}"
         );
     }
     println!("✅ G7.1: Off mode bit-identical across all compression ratios");
@@ -40,10 +39,7 @@ fn test_goat_midpoint_near_base() {
     // scale = 0.5 + 1.5 * 0.5 = 1.25 → budget = 2967
     let expected = (base as f32 * 1.25) as usize;
     assert_eq!(budget, expected, "midpoint budget should be 1.25× base");
-    println!(
-        "✅ G7.2: Midpoint (r=0.5) → budget = {} (1.25× base = {})",
-        budget, expected
-    );
+    println!("✅ G7.2: Midpoint (r=0.5) → budget = {budget} (1.25× base = {expected})");
 }
 
 // ── G7.3: Budget clamped within [base/2, base*2] for all r ────
@@ -60,11 +56,7 @@ fn test_goat_budget_always_clamped() {
         let budget = adaptive_tree_budget(base, r, BudgetAdaptation::Compression);
         assert!(
             budget >= lo && budget <= hi,
-            "budget {} out of [{}, {}] at r={}",
-            budget,
-            lo,
-            hi,
-            r
+            "budget {budget} out of [{lo}, {hi}] at r={r}"
         );
     }
 
@@ -73,17 +65,10 @@ fn test_goat_budget_always_clamped() {
         let budget = adaptive_tree_budget(base, r, BudgetAdaptation::Compression);
         assert!(
             budget >= lo && budget <= hi,
-            "budget {} out of [{}, {}] at extreme r={}",
-            budget,
-            lo,
-            hi,
-            r
+            "budget {budget} out of [{lo}, {hi}] at extreme r={r}"
         );
     }
-    println!(
-        "✅ G7.3: Budget clamped within [{}, {}] for all tested ratios",
-        lo, hi
-    );
+    println!("✅ G7.3: Budget clamped within [{lo}, {hi}] for all tested ratios");
 }
 
 // ── G8: Heterogeneous prompt complexity adapts correctly ───────
@@ -177,21 +162,14 @@ fn test_goat_heterogeneous_complexity() {
 
     assert!(
         simple_b <= medium_b,
-        "simple budget {} > medium budget {}",
-        simple_b,
-        medium_b
+        "simple budget {simple_b} > medium budget {medium_b}"
     );
     assert!(
         medium_b <= complex_b,
-        "medium budget {} > complex budget {}",
-        medium_b,
-        complex_b
+        "medium budget {medium_b} > complex budget {complex_b}"
     );
 
-    println!(
-        "✅ G8: Monotonic: simple({}) ≤ medium({}) ≤ complex({})",
-        simple_b, medium_b, complex_b
-    );
+    println!("✅ G8: Monotonic: simple({simple_b}) ≤ medium({medium_b}) ≤ complex({complex_b})");
 }
 
 // ── G8b: Effective budget + lookahead scaling integration ──────
@@ -231,10 +209,10 @@ fn test_goat_no_regression_off_mode() {
     // With Off mode, effective_tree_budget must return exact base
     for &r in &[0.0, 0.01, 0.1, 0.5, 0.99, 1.0] {
         let eff = effective_tree_budget(base, r, BudgetAdaptation::Off);
-        assert_eq!(eff, base, "Off mode regression at r={}", r);
+        assert_eq!(eff, base, "Off mode regression at r={r}");
 
         let la = scaled_draft_lookahead(5, eff, base);
-        assert_eq!(la, 5, "lookahead changed under Off mode at r={}", r);
+        assert_eq!(la, 5, "lookahead changed under Off mode at r={r}");
     }
 
     // With Off mode, compression_ratio still computes correctly (just unused)
@@ -267,8 +245,7 @@ fn test_goat_overhead_negligible() {
     let per_call_ns = elapsed_budget.as_nanos() as f64 / iterations as f64;
 
     println!(
-        "  adaptive_tree_budget: {} calls in {:?} = {:.1} ns/call",
-        iterations, elapsed_budget, per_call_ns
+        "  adaptive_tree_budget: {iterations} calls in {elapsed_budget:?} = {per_call_ns:.1} ns/call"
     );
 
     // Measure block_compression_ratio
@@ -281,25 +258,20 @@ fn test_goat_overhead_negligible() {
     let per_ratio_ns = elapsed_ratio.as_nanos() as f64 / iterations as f64;
 
     println!(
-        "  block_compression_ratio: {} calls in {:?} = {:.1} ns/call",
-        iterations, elapsed_ratio, per_ratio_ns
+        "  block_compression_ratio: {iterations} calls in {elapsed_ratio:?} = {per_ratio_ns:.1} ns/call"
     );
 
     // Total overhead per prompt: one compression_ratio call + one budget call
     let total_ns = per_call_ns + per_ratio_ns;
-    println!("  total overhead per prompt: {:.1} ns", total_ns);
+    println!("  total overhead per prompt: {total_ns:.1} ns");
 
     // Must be under 1μs (1000 ns) in debug mode — in release it will be <100ns
     assert!(
         total_ns < 5000.0,
-        "overhead {:.1} ns > 5000 ns budget",
-        total_ns
+        "overhead {total_ns:.1} ns > 5000 ns budget"
     );
 
-    println!(
-        "✅ Overhead: {:.1} ns per prompt (well under 1μs)",
-        total_ns
-    );
+    println!("✅ Overhead: {total_ns:.1} ns per prompt (well under 1μs)");
 }
 
 // ── Summary ─────────────────────────────────────────────────────

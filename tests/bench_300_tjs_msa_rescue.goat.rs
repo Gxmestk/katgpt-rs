@@ -264,32 +264,26 @@ fn t1_12_splat_msa_rescue_at_50pct_density() {
     println!("╔══════════════════════════════════════════════════════════════════════╗");
     println!("║ Plan 300 T1.12 — SPLAT MSA Rescue at 50% Density (GOAT gate)        ║");
     println!(
-        "║ HEAD_DIM={}, N_KEYS={}, N_QUERIES={}, TOP_K={}                          ║",
-        HEAD_DIM, N_KEYS, N_QUERIES, TOP_K
+        "║ HEAD_DIM={HEAD_DIM}, N_KEYS={N_KEYS}, N_QUERIES={N_QUERIES}, TOP_K={TOP_K}                          ║"
     );
     println!("╠══════════════════════════════════╦═════════════════╦═════════════════╣");
     println!("║ Metric                           ║ SPLAT (task)    ║ Uniform (heur)  ║");
     println!("╠══════════════════════════════════╬═════════════════╬═════════════════╣");
     println!(
-        "║ Recall@top-{} vs dense            ║ {:>13.4}   ║ {:>13.4}   ║",
-        TOP_K, splat_recall, uniform_recall
+        "║ Recall@top-{TOP_K} vs dense            ║ {splat_recall:>13.4}   ║ {uniform_recall:>13.4}   ║"
     );
     println!(
-        "║ Argmax preservation              ║ {:>13.4}   ║ {:>13.4}   ║",
-        splat_argmax_pres, uniform_argmax_pres
+        "║ Argmax preservation              ║ {splat_argmax_pres:>13.4}   ║ {uniform_argmax_pres:>13.4}   ║"
     );
     println!(
-        "║ Score relative L2                ║ {:>13.4}   ║ {:>13.4}   ║",
-        splat_rel_l2, uniform_rel_l2
+        "║ Score relative L2                ║ {splat_rel_l2:>13.4}   ║ {uniform_rel_l2:>13.4}   ║"
     );
     println!(
-        "║ Signal coverage                  ║ {:>13.4}   ║ {:>13.4}   ║",
-        splat_coverage, uniform_coverage
+        "║ Signal coverage                  ║ {splat_coverage:>13.4}   ║ {uniform_coverage:>13.4}   ║"
     );
     println!("╠══════════════════════════════════╩═════════════════╩═════════════════╣");
     println!(
-        "║ Coverage ratio (SPLAT/Uniform): {:.4}                               ║",
-        coverage_ratio
+        "║ Coverage ratio (SPLAT/Uniform): {coverage_ratio:.4}                               ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();
@@ -342,43 +336,36 @@ fn t1_12_splat_msa_rescue_at_50pct_density() {
     // Gate 1: SPLAT recall ≥ 0.90.
     assert!(
         splat_recall >= 0.90,
-        "SPLAT recall@{} {:.4} < 0.90 — task-aligned projection lost attention selection",
-        TOP_K,
-        splat_recall
+        "SPLAT recall@{TOP_K} {splat_recall:.4} < 0.90 — task-aligned projection lost attention selection"
     );
 
     // Gate 2: Coverage ratio ≥ 1.5×.
     assert!(
         coverage_ratio >= 1.5,
-        "Coverage ratio {:.4} < 1.5× — SPLAT does not dominate uniform on signal mass",
-        coverage_ratio
+        "Coverage ratio {coverage_ratio:.4} < 1.5× — SPLAT does not dominate uniform on signal mass"
     );
 
     // Gate 3: SPLAT argmax preservation ≥ 0.95.
     assert!(
         splat_argmax_pres >= 0.95,
-        "SPLAT argmax preservation {:.4} < 0.95 — top-1 key not preserved",
-        splat_argmax_pres
+        "SPLAT argmax preservation {splat_argmax_pres:.4} < 0.95 — top-1 key not preserved"
     );
 
     // Gate 4: Uniform must fail at least one gate (task-alignment matters).
     let uniform_passes_all = uniform_recall >= 0.90 && uniform_argmax_pres >= 0.95;
     assert!(
         !uniform_passes_all,
-        "Uniform mask passed all gates (recall {:.4}, argmax {:.4}) — \
-         task-alignment advantage NOT demonstrated. T1.12 rescue claim invalid.",
-        uniform_recall, uniform_argmax_pres
+        "Uniform mask passed all gates (recall {uniform_recall:.4}, argmax {uniform_argmax_pres:.4}) — \
+         task-alignment advantage NOT demonstrated. T1.12 rescue claim invalid."
     );
 
     println!(
         "✅ T1.12 PASSED — SPLAT task-aligned projection at 50% density rescues MSA failure mode."
     );
     println!(
-        "   SPLAT recall {:.4} ≥ 0.90, coverage ratio {:.4}× ≥ 1.5×, argmax {:.4} ≥ 0.95.",
-        splat_recall, coverage_ratio, splat_argmax_pres
+        "   SPLAT recall {splat_recall:.4} ≥ 0.90, coverage ratio {coverage_ratio:.4}× ≥ 1.5×, argmax {splat_argmax_pres:.4} ≥ 0.95."
     );
     println!(
-        "   Uniform mask: recall {:.4}, argmax {:.4} — fails ≥1 gate.",
-        uniform_recall, uniform_argmax_pres
+        "   Uniform mask: recall {uniform_recall:.4}, argmax {uniform_argmax_pres:.4} — fails ≥1 gate."
     );
 }
