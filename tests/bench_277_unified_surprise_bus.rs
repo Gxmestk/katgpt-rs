@@ -363,11 +363,11 @@ fn print_grid_f32(title: &str, unit: &str, metric_fn: impl Fn(f32, f32) -> f32) 
     println!("\n┌─ {title} ─┐  (higher = better)  unit: {unit}");
     print!("│ α_fast＼α_slow │");
     for &as_ in &ALPHA_SLOW {
-        print!("  {:>7.4} ", as_);
+        print!("  {as_:>7.4} ");
     }
     println!("│");
     for &af in &ALPHA_FAST {
-        print!("│ {:>11.3}   │", af);
+        print!("│ {af:>11.3}   │");
         for &as_ in &ALPHA_SLOW {
             if !valid_combo(af, as_) {
                 print!("    ---   ");
@@ -378,7 +378,7 @@ fn print_grid_f32(title: &str, unit: &str, metric_fn: impl Fn(f32, f32) -> f32) 
                 } else {
                     "  "
                 };
-                print!(" {:>7.4}{}", m, marker);
+                print!(" {m:>7.4}{marker}");
             }
         }
         println!("│");
@@ -390,11 +390,11 @@ fn print_grid_usize(title: &str, unit: &str, metric_fn: impl Fn(f32, f32) -> usi
     println!("\n┌─ {title} ─┐  (lower = better)  unit: {unit}");
     print!("│ α_fast＼α_slow │");
     for &as_ in &ALPHA_SLOW {
-        print!("  {:>7.4} ", as_);
+        print!("  {as_:>7.4} ");
     }
     println!("│");
     for &af in &ALPHA_FAST {
-        print!("│ {:>11.3}   │", af);
+        print!("│ {af:>11.3}   │");
         for &as_ in &ALPHA_SLOW {
             if !valid_combo(af, as_) {
                 print!("    ---   ");
@@ -405,7 +405,7 @@ fn print_grid_usize(title: &str, unit: &str, metric_fn: impl Fn(f32, f32) -> usi
                 } else {
                     "  "
                 };
-                print!(" {:>7}{}", m, marker);
+                print!(" {m:>7}{marker}");
             }
         }
         println!("│");
@@ -597,10 +597,7 @@ fn unified_surprise_bus_sweep() {
         if f4_within { "YES ✓" } else { "NO ✗" }
     );
     println!("  ─────────────────────────────────────────────────────────");
-    println!(
-        "  {}/4 consumers have the paper-default in their Pareto region.",
-        n_pass
-    );
+    println!("  {n_pass}/4 consumers have the paper-default in their Pareto region.");
     if super_goat {
         println!("  VERDICT: SUPER-GOAT ✓ — unified α-pair (0.3, 0.03) is universal.");
     } else {
