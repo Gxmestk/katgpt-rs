@@ -3,7 +3,7 @@
 **Paper:** Zhang, Li, Xiao, Chen, Chen (Tsinghua). *Quantifying and Optimizing Simplicity via Polynomial Representations*. [arXiv:2605.29823](https://arxiv.org/abs/2605.29823), ICML 2026.
 **Code:** https://github.com/xinzaixinzai/Effective-Degree
 **Date:** 2026-08-17
-**Status:** DISTILLED — open primitive **SHIPPED opt-in** 2026-08-17 ([Issue 668](../.issues/668_effective_degree_open_primitive.md) T1-T6 complete; GOAT record [Bench 665](../.benchmarks/665_effective_degree_goat.md), G1+G2+G3+G4 ALL PASS, feature `effective_degree`, default-OFF). Gain verdict stands; Super-GOAT still pending the freeze-gate PoC ([riir-neuron-db Issue 602](../../riir-neuron-db/.issues/602_effective_degree_freeze_gate_poc.md)), which is the gating consumer for promotion.
+**Status:** DISTILLED — **CLOSED.** Open primitive **SHIPPED opt-in** 2026-08-17 ([Issue 668](../.issues/668_effective_degree_open_primitive.md) T1-T6 complete; GOAT record [Bench 665](../.benchmarks/665_effective_degree_goat.md), G1+G2+G3+G4 ALL PASS, feature `effective_degree`, default-OFF). Freeze-gate PoC **ANSWERED 2026-08-17 — SCOPE-LIMITED (Simpson reversal), no gate change** ([Bench 484](../../riir-neuron-db/.benchmarks/484_ed_vs_flatness_freeze_gate_poc.md); riir-neuron-db Issue 602 closed and removed). ED out-correlates the incumbent `output_flatness` 12.6× pooled (0.598 vs 0.047) but its sign inverts between the across-regime and within-regime grains, so it is NOT wirable as the proposed one-sided gate. Verdict stays **Gain**; the Super-GOAT path via the freeze gate is **closed**. Primitive stays opt-in as a regime diagnostic (§10, §4 KARC regime-mismatch probe). See **§10 PoC Addendum** for what transferred, what did not, and the new grain-dependent-sign risk.
 **Classification:** Open (the metric is generic math, no game IP). The freeze-gate consumer story is private (riir-neuron-db).
 
 ---
@@ -104,3 +104,93 @@ Training-cost-weighted assessment: the ED regularizer is a real recipe (label-an
 - **Scale dependence**: raw ED scales with output magnitude (paper Table 12: ×2 outputs ≈ ×2 ED); use `ED_norm` or fit post-softmax/normalized outputs — the paper's regularizer fits post-softmax probabilities for exactly this reason.
 - **Data-manifold dependence**: random-pixel endpoints destroy the signal (paper C.1: ED with random pixels = baseline accuracy). Paths must come from real wake events / real states — `interpolation_geometry`'s RavenSlot events are the right anchors.
 - Cost: correlation-grade estimates used r=200/K=40/400 averages (expensive); regularizer-grade r=4/K=3 is cheap. The freeze gate needs the cheap end with enough pairs for stability — PoC must sweep this.
+
+---
+
+## 10. PoC Addendum — the freeze-gate question is ANSWERED (2026-08-17)
+
+**Verdict: SCOPE-LIMITED (Simpson reversal). No gate change. ED ships as a regime
+diagnostic, not a `can_freeze` arm.** Full measurement:
+[riir-neuron-db Bench 484](../../riir-neuron-db/.benchmarks/484_ed_vs_flatness_freeze_gate_poc.md).
+Issue 602 is closed and removed.
+
+§"The falsifiable stack question" (TL;DR) and §6's conditional novelty items 2/3
+resolve as follows — **both halves matter, and they point opposite ways**:
+
+**Half 1 — the paper's headline transfers, and Bench 010's closure WAS
+instrument-limited.** On 360 shard states (30 cycles × 4 scenarios × 3 seeds,
+held-out wake-event recall error as ground truth), pooled |Pearson| with the
+generalization gap: **`ed_norm` 0.598 vs `output_flatness` 0.047** — a 12.6×
+advantage, against a distribution-matched control at 0.032 and a permutation
+floor at 0.042. `ed_norm` beat flatness in **4/4** scenarios, raw and
+cycle-controlled, and the advantage reproduced on 3 disjoint seed sets. Flatness
+is statistically indistinguishable from noise as a gap predictor on this
+substrate. Bench 010's "reduces to a convergence check `output_flatness` already
+captures" was measured with a flatness-family instrument, and §"falsifiable stack
+question" was right to flag that as suspect.
+
+**Half 2 — but ED is not wirable as the proposed gate, for a reason §9 did not
+anticipate.** ED's sign **inverts between grains** (Simpson's paradox, reproduced
+on all 3 seed sets):
+
+| grain | r(ed_norm, gap) | reading |
+|---|---|---|
+| pooled across regimes | **+0.598** | higher ED ⇒ higher gap (the paper's direction) |
+| within a regime, cycle-controlled | **−0.18, −0.68, −0.35, −0.25** (all negative) | higher ED ⇒ *lower* gap |
+
+A gate is one threshold on one shard state, so it must commit to a direction;
+`ed_norm < τ_e` correctly rejects the memorizing regime wholesale while, inside
+every regime, preferring exactly the shards with the **largest** held-out gap.
+No τ_e fixes this — it is a property of the signal, not of calibration. So the
+§"selling point candidate" sentence ("shards that prove their own simplicity in
+function space before freezing") **does not complete**, and must not be used.
+
+**Half 3 — the mechanism does NOT transfer, which qualifies Half 1 sharply.**
+`ed_norm` is a magnitude-weighted mean of the degree index over *all*
+coefficients, `k=0` included. Removing the DC term (`ed_ac`) collapses the
+correlation to **+0.122 pooled** — below flatness-plus-noise and 5× below
+`ed_norm`. Nearly all of ED's power here lives in `coeff_norms[0]`, which for the
+cosine decode is the along-path *mean level* — i.e. **how well `style_weights` is
+aligned to the event cluster**. That is alignment information wearing a
+complexity costume. When the complexity-only component is isolated, it does not
+beat the incumbent. **The paper's actual thesis (function-space complexity
+predicts generalization) is NOT confirmed at shard scale**; what was confirmed is
+that a data-anchored function-space *probe* out-predicts a data-blind
+parameter-space one, for reasons partly incidental to ED's own theory.
+(DC-term mechanism reported by the Issue 668 owner from that primitive's
+Bench 665; it is why `ed_ac` was added as a 4th arm.)
+
+### What this changes in this note
+
+- §5 "Selling point candidate (pending PoC)" — **retired, do not use.** The
+  freeze-gate framing is refuted as a *gate*.
+- §4 "Freeze/thaw certification (the PoC question)" — **closed negative.**
+- §4 "Per-NPC KARC shard" (regime-mismatch diagnostic) — **strengthened, and it
+  is now the primary consumer story.** Cross-regime triage is precisely the grain
+  where ED's sign is correct, and it is 12.6× better than the incumbent there at
+  196 ns/path. A shard with high decode ED and low flatness is
+  polynomial-basis-strained: Bench 010's documented KARC scope-limit made
+  *measurable* rather than inferred from a CRPS loss.
+- §6 novelty gate — item 2 (new behavior class) and item 3 (product selling
+  point) **resolve NO** for the gate framing. Verdict stays **Gain**, not
+  Super-GOAT. The Super-GOAT path via the freeze gate is closed; a future
+  re-open would need a different consumer (adapter selection §4, crowd-volatility
+  monitor §4) with its own PoC.
+- §9 risks — **add a fourth**, now measured rather than hypothesized:
+  *grain-dependent sign*. ED's association with generalization can reverse
+  between the across-model and within-trajectory grains. Any future ED consumer
+  MUST state which grain it operates at and verify the sign there. This is the
+  generalizable lesson; it is not specific to the freeze gate, and it applies to
+  the paper's own pooled 27-config correlation study, which measures only the
+  across-model grain.
+- §7 revisit trigger ("the Issue 602 PoC confirming ED is the freeze signal") —
+  **did not fire.** The regularizer stays deferred with cause.
+
+### Cheap config is validated (T4), so cost is not the limiter
+
+`EdConfig::cheap()` (r=4/K=3, 8 paths) reaches 0.598 vs `precise()`
+(r=15/K=7, 32 paths) at 0.623 — ~4% of the correlation for ~5× less work. Zero
+ranking flips across `n_pairs ∈ {1..64}`, and per-path spread falls monotonically
+8.8× (seed_std 0.0335 → 0.0038) as paths accumulate, confirming Theorem 3.1's
+path-averaging prediction empirically. §9's cost caveat is discharged: the cheap
+end is sufficient. What limits ED here is the *grain-dependent sign*, not r/K/pairs.
