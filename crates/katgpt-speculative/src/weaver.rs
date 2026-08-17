@@ -2639,7 +2639,7 @@ mod tests {
         assert!(matches!(err, super::WeaverCorrectError::HiddenShape { .. }));
 
         // Depth exceeds max_depth.
-        let too_deep_owned: Vec<Vec<f32>> = (0..(depth + 1)).map(|_| vec![0.3; h]).collect();
+        let too_deep_owned: Vec<Vec<f32>> = (0..=depth).map(|_| vec![0.3; h]).collect();
         let too_deep: Vec<&[f32]> = too_deep_owned.iter().map(|v| v.as_slice()).collect();
         let mut deep_marginals = vec![0.0f32; (depth + 1) * vocab];
         let err = corrector
