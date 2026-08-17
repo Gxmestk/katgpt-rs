@@ -120,8 +120,7 @@ impl SonltPlayer {
             .ok()
             .filter(|v| v.len() == 6);
 
-        let (lq, lk, lv, lo, lm1, lm2) = match loaded {
-            Some(v) => {
+        let (lq, lk, lv, lo, lm1, lm2) = if let Some(v) = loaded {
                 // Validate each adapter's in/out dims match Config::game() projections.
                 let n = config.n_embd;
                 let kvd = kv_dim(&config);
@@ -152,12 +151,10 @@ impl SonltPlayer {
                     eprintln!("SonltPlayer: adapter dims mismatch — falling back to heuristic");
                     (None, None, None, None, None, None)
                 }
-            }
-            None => {
+            } else {
                 eprintln!("SonltPlayer: LoRA load failed or wrong adapter count — heuristic mode");
                 (None, None, None, None, None, None)
-            }
-        };
+            };
 
         let rank = lq.as_ref().map_or(0, |a| a.rank);
         let n = config.n_embd;

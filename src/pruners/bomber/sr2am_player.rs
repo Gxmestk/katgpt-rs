@@ -594,8 +594,7 @@ impl BomberPlayer for Sr2amPlayer {
             }
             PlanningDecision::PlanExtend => {
                 // Reuse last_template, recompute hint with current state
-                match self.last_template {
-                    Some(template) => {
+                if let Some(template) = self.last_template {
                         let tid = self.last_template_id.unwrap_or(0);
                         self.round_template_ids.push(tid);
                         let hinted = Self::apply_template_hints(
@@ -606,8 +605,7 @@ impl BomberPlayer for Sr2amPlayer {
                             &opponent_positions,
                         );
                         (hinted, Some(tid))
-                    }
-                    None => {
+                    } else {
                         // No previous template — fall back to PlanNew
                         let (template, tid) = self.template_proposer.select();
                         self.last_template = Some(template);
@@ -622,7 +620,6 @@ impl BomberPlayer for Sr2amPlayer {
                         );
                         (hinted, Some(tid))
                     }
-                }
             }
             PlanningDecision::PlanSkip => {
                 // Skip template entirely — use only heuristic query_scores + Q-values

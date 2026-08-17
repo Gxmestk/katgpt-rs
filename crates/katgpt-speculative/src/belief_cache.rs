@@ -88,17 +88,14 @@ impl LatentTransitionCache {
     /// when the caller already has the key (e.g. `get_or_insert`).
     fn get_with_key(&self, key: &CacheKey) -> Option<Vec<f32>> {
         let map = self.map.pin();
-        match map.get(key) {
-            Some(entry) => {
+        if let Some(entry) = map.get(key) {
                 self.counter.fetch_add(1, Ordering::Relaxed);
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 Some(entry.h_next.clone())
-            }
-            None => {
+            } else {
                 self.misses.fetch_add(1, Ordering::Relaxed);
                 None
             }
-        }
     }
 
     /// Insert a cached transition.
@@ -146,14 +143,11 @@ impl LatentTransitionCache {
     {
         // Compute the BLAKE3 cache key once — both get and insert need it.
         let key = CacheKey::from_slices(h_t, next_emb);
-        match self.get_with_key(&key) {
-            Some(h_next) => h_next,
-            None => {
+        if let Some(h_next) = self.get_with_key(&key) { h_next } else {
                 let h_next = compute();
                 self.insert_with_key(&key, h_next.clone());
                 h_next
             }
-        }
     }
 
     /// Clear the cache and reset hit/miss counters.

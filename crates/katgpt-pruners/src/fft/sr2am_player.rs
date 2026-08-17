@@ -520,15 +520,13 @@ impl FftPlayer for FftSr2amPlayer {
             }
             PlanningDecision::PlanExtend => {
                 // Reuse last_template, recompute hint with current state
-                match self.last_template {
-                    Some(template) => {
+                if let Some(template) = self.last_template {
                         let tid = self.last_template_id.unwrap_or(0);
                         self.round_template_ids.push(tid);
                         let hinted =
                             Self::compute_hinted_scores(template, &query_scores, state, unit_id);
                         (hinted, Some(tid))
-                    }
-                    None => {
+                    } else {
                         // No previous template — fall back to PlanNew
                         let (template, tid) = self.template_proposer.select();
                         self.last_template = Some(template);
@@ -538,7 +536,6 @@ impl FftPlayer for FftSr2amPlayer {
                             Self::compute_hinted_scores(template, &query_scores, state, unit_id);
                         (hinted, Some(tid))
                     }
-                }
             }
             PlanningDecision::PlanSkip => {
                 // Skip template entirely — use only heuristic query_scores + Q-values

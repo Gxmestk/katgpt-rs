@@ -731,9 +731,7 @@ impl BomberWasmPruner {
 
         // Lock-free read. The steady-state path is a single hash lookup;
         // only the first call on a thread falls through to insert + re-get.
-        let mutex = match guard.get(&id) {
-            Some(m) => m,
-            None => {
+        let mutex = if let Some(m) = guard.get(&id) { m } else {
                 // First call for this thread — create instance
                 let inner = match BomberInner::new(&self.engine, &self.module) {
                     Ok(i) => Mutex::new(i),
@@ -741,8 +739,7 @@ impl BomberWasmPruner {
                 };
                 guard.insert(id, inner);
                 guard.get(&id)?
-            }
-        };
+            };
         let mut inner = match mutex.lock() {
             Ok(g) => g,
             Err(_) => return None,

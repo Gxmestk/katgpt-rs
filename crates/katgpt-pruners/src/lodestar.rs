@@ -515,13 +515,10 @@ impl ConstraintPruner for LodestarPruner {
                 results[i] = false;
                 continue;
             }
-            let next = match self.automaton.transition(state, token) {
-                Some(ns) => ns,
-                None => {
+            let next = if let Some(ns) = self.automaton.transition(state, token) { ns } else {
                     results[i] = false;
                     continue;
-                }
-            };
+                };
             results[i] = match budget_remaining {
                 Some(br) => {
                     let d = self.automaton.distance(next);

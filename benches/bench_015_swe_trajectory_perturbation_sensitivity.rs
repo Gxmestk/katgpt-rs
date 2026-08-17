@@ -529,8 +529,7 @@ fn main() {
         .find(|r| r.sigma > 0.0 && r.accuracy >= 0.80)
         .map(|r| r.sigma);
 
-    match floor {
-        Some(sigma_floor) => {
+    if let Some(sigma_floor) = floor {
             println!("   Discrimination floor (σ* where accuracy first ≥ 80%): {sigma_floor}");
             println!();
             if sigma_floor <= 0.001 {
@@ -554,8 +553,7 @@ fn main() {
                 println!("   the iterative refinement trajectory (T5.4 path 2) becomes");
                 println!("   the necessary substrate.");
             }
-        }
-        None => {
+        } else {
             // Check if even σ=0.5 didn't reach 80%.
             let max_acc = results.iter().map(|r| r.accuracy).fold(0.0_f32, f32::max);
             if max_acc < 0.80 {
@@ -568,7 +566,6 @@ fn main() {
                 println!("   preserves structure; random weights destroy it.");
             }
         }
-    }
     println!();
 
     // ── Sanity check: σ=0.0 should be ~50% ─────────────────────────────────

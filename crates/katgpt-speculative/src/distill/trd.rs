@@ -376,14 +376,11 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
             } else {
                 // Pruner rejects — try top-k from marginal
                 let fallback = find_valid_token(depth, marginal, &refined_tokens, self.pruner);
-                match fallback {
-                    Some(tok) => refined_tokens.push(tok),
-                    None => {
+                if let Some(tok) = fallback { refined_tokens.push(tok) } else {
                         // No valid continuation — refinement failed
                         success = false;
                         break;
                     }
-                }
             }
         }
 

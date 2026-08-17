@@ -203,13 +203,10 @@ fn main() {
 
     // ── G4 verdict ──
     let g4_target_ns: f64 = 1000.0;
-    let g4_pass = match w64_agg {
-        Some(agg) => agg < g4_target_ns,
-        None => {
+    let g4_pass = if let Some(agg) = w64_agg { agg < g4_target_ns } else {
             println!("  ⚠ W=64 not in WINDOW_SIZES — G4 verdict indeterminate.");
             false
-        }
-    };
+        };
 
     println!("  ── G4 verdict (gate overhead at W=64) ──");
     if let Some(agg) = w64_agg {

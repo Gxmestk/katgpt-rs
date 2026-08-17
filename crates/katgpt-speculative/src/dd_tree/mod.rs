@@ -1402,14 +1402,11 @@ where
             marginals: marginal.to_vec(),
         };
 
-        let candidates = match generator.generate(&condition, rng) {
-            Ok(c) => c,
-            Err(_) => {
+        let candidates = if let Ok(c) = generator.generate(&condition, rng) { c } else {
                 // Generator failed — use original marginals as fallback
                 filtered_marginals.push(marginal.to_vec());
                 continue;
-            }
-        };
+            };
 
         // Keep marginals only for valid candidates
         let mut filtered = vec![0.0f32; marginal.len()];
@@ -1576,13 +1573,10 @@ where
             marginals: marginal.to_vec(),
         };
 
-        let candidates = match generator.generate(&condition, rng) {
-            Ok(c) => c,
-            Err(_) => {
+        let candidates = if let Ok(c) = generator.generate(&condition, rng) { c } else {
                 filtered_marginals.push(marginal.to_vec());
                 continue;
-            }
-        };
+            };
 
         // Keep marginals only for valid candidates
         let mut filtered = vec![0.0f32; marginal.len()];
@@ -1807,15 +1801,13 @@ where
     S: Clone,
 {
     match node {
-        AndOrNode::Or { children, best, .. } => match best {
-            Some(idx) => children
+        AndOrNode::Or { children, best, .. } => if let Some(idx) = best { children
                 .get(*idx)
                 .and_then(|c| {
                     let path = collect_solved_path(c);
                     if path.is_empty() { None } else { Some(path) }
                 })
-                .unwrap_or_default(),
-            None => {
+                .unwrap_or_default() } else {
                 for child in children {
                     let path = collect_solved_path(child);
                     if !path.is_empty() {
@@ -1823,8 +1815,7 @@ where
                     }
                 }
                 Vec::new()
-            }
-        },
+            },
         AndOrNode::And {
             children,
             solved_count,

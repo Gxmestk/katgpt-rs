@@ -797,9 +797,7 @@ fn main() {
             .find(|r| r.sigma > 0.0 && r.accuracy >= 0.80)
             .map(|r| r.sigma);
 
-        match floor {
-            Some(f) => println!("  {:>12}: σ* = {:.4} ✅", ek.name(), f),
-            None => {
+        if let Some(f) = floor { println!("  {:>12}: σ* = {:.4} ✅", ek.name(), f) } else {
                 let max_acc = all_results
                     .iter()
                     .filter(|r| r.encoder == ek)
@@ -807,7 +805,6 @@ fn main() {
                     .fold(0.0_f32, f32::max);
                 println!("  {:>12}: no floor (max acc = {:.1}%) ❌", ek.name(), max_acc * 100.0);
             }
-        }
     }
     println!();
 

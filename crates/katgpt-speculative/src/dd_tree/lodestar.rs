@@ -171,8 +171,7 @@ pub fn build_dd_tree_lodestar(
                                 horizon,
                                 seq_len - span_depth - 1,
                             );
-                            match forced {
-                                Some((token, prob)) => {
+                            if let Some((token, prob)) = forced {
                                     let d = horizon.min_completion_distance(
                                         span_depth,
                                         token,
@@ -186,12 +185,10 @@ pub fn build_dd_tree_lodestar(
                                     span_path = (span_path << 16) | (token as u128);
                                     span_parents_buf.push(token);
                                     span_depth += 1;
-                                }
-                                None => {
+                                } else {
                                     valid = false;
                                     break;
                                 }
-                            }
                         }
 
                         if valid && span_depth <= seq_len {
