@@ -207,8 +207,8 @@ mod tests {
         let plain_ep = convergence_episode(&plain_q_history, env.optimal);
         let sdpg_ep = convergence_episode(&sdpg_q_history, env.optimal);
 
-        eprintln!("Plain UCB1 converged at episode: {:?}", plain_ep);
-        eprintln!("SDPG Bandit converged at episode: {:?}", sdpg_ep);
+        eprintln!("Plain UCB1 converged at episode: {plain_ep:?}");
+        eprintln!("SDPG Bandit converged at episode: {sdpg_ep:?}");
         eprintln!("Plain final Q: {:?}", plain.q_values());
         eprintln!("SDPG final Q: {:?}", sdpg.q_values());
 
@@ -529,11 +529,7 @@ mod tests {
         }
 
         // Verify the strong arm dominates
-        assert!(
-            q[4] > q[0],
-            "Arm 4 should have higher Q than arm 0: {:?}",
-            q
-        );
+        assert!(q[4] > q[0], "Arm 4 should have higher Q than arm 0: {q:?}");
 
         // Verify weak arms have NOT all collapsed to the exact same value.
         // The URKL anchor with β=0.1 provides regularization that should maintain

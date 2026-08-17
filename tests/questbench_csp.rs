@@ -530,7 +530,6 @@ fn test_empty_sufficient_set_for_uniform() {
     let result = find_sufficient_set(&pruner, 0, &[], 16, 16);
     assert!(
         result.is_empty(),
-        "NoPruner should yield empty sufficient set, got {:?}",
-        result
+        "NoPruner should yield empty sufficient set, got {result:?}"
     );
 }
