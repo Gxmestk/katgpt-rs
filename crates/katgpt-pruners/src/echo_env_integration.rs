@@ -253,6 +253,12 @@ mod tests {
         );
     }
 
+    // Gated like the item it tests (`EchoPredictionScorer` requires
+    // `partial_scoring` for the `PartialScorer` impl) — under feature
+    // unification (e.g. `cargo test -p katgpt-speculative -p katgpt-pruners
+    // --lib`) `echo_env_predictor` is ON while `partial_scoring` stays OFF
+    // (Issue 667).
+    #[cfg(feature = "partial_scoring")]
     #[test]
     fn test_prediction_scorer_basic() {
         let mut scorer = EchoPredictionScorer::new(0.5);
