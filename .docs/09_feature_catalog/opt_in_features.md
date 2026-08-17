@@ -2620,3 +2620,34 @@ cross-domain switch-cost measurement — Bench 032 there).
 G1 formula PASS (fixture 3.0/0.667, tol 1e-6) · G1 directionality PASS (gap >1.0
 pinned constructible) · G1 determinism PASS (replay-order independence) · modelless
 throughout. Stays opt-in (diagnostic/curriculum tool; no default-on consumer yet).
+
+## 81. Freedom Selection — extension-count (freedom-of-function) best-of-K criterion (Issue 665)
+
+**Feature flag:** `freedom_selection = ["renoise_ce"]` in katgpt-core (opt-in).
+
+Extension-count selection (Bennett, arXiv:2608.05423; Research 486): among
+candidates within a loss gate of the winner, prefer the one that opens an
+unoccupied output region — freedom of function provably orders generalization.
+Ships `log_freedom` (Σ log(2^a − 1), a = occupied-cell counts per context over a
+declared finite partition), `freedom_gain`, `LossGate` (absolute/relative
+tolerance), `ExtensionOccupancy` (O(1) update state) in `src/extension_count.rs`,
+plus the renoise-CE selection sibling `best_of_n_freedom` (drift-gate +
+max Δ-log-extension-count over caller-owned occupancy). Modelless closed-form;
+8 unit tests incl. the brute-force enumeration pin. Documented conventions:
+empty contexts excluded from the product (2^0−1 zero-annihilates);
+first-activation pinned `FIRST_ACTIVATION_GAIN = 2.0 > ln 3` (raw increment +∞);
+3-arg `freedom_gain` (distinguishes fresh vs occupied cell).
+
+### PoC gate (Research 486 §PoC Addendum; harness `riir-poc examples/freedom_best_of_k.rs`, riir-ai `8bc3f65d2`)
+
+**PASS** — parent-hit **0.7075** vs min-loss 0.4453 vs random-near-best 0.5156
+(the confound control, SAME gate) on a controlled 4-context × 8-cell toy under a
+declared child→parent distribution shift: **64/64 per-seed wins vs BOTH**.
+Decomposition: relaxation buys +0.070; freedom guidance buys +0.192 more — **73%
+of the gain is the freedom signal**, the paper's missing control separated. Both
+substrate arms call the REAL substrates; all arms replay identical pools
+(matched budget K=8).
+
+T5 (Theorem-7 allocation formula as a second primitive) deferred on promotion.
+Stays opt-in until a production consumer A/B + GOAT gate (the `switch_cost` /
+Issue-663 precedent). Issue 665 RESOLVED+REMOVED 2026-08-17 (T1–T4 in `96d01e91`).

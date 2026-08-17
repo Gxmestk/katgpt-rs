@@ -6,7 +6,7 @@
 > Addendum) — primitive shipped opt-in `freedom_selection`; promotion pending
 > a production consumer A/B
 > **Related Research:** 369 (Renoise-CE best-of-N), 323 (TEMP diversity fingerprints), 320 (best_belief), 240 (CGSP curiosity), 479→riir-games coverage curiosity, 484 (percepta skill entropy)
-> **Related Issues:** [665](../.issues/665_freedom_guided_best_of_k_poc.md) — PoC: freedom-guided best-of-K selection mode
+> **Related Issues:** 665 — RESOLVED+REMOVED 2026-08-17 (T1–T4 landed in `96d01e91` + riir-ai `8bc3f65d2`; T5 deferred on promotion; PoC verdict in §PoC Addendum; catalog §81)
 > **Classification:** Public
 
 ---
