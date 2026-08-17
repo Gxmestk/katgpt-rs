@@ -299,6 +299,12 @@ other agents can review the violation independently.
 
 ---
 
+## Run log
+
+| Date | Scope | Verdict | Record |
+|---|---|---|---|
+| 2026-08-17 | Mode 2 drift audit — riir-mmorpg-examples (the Plan-022/539-era fresh code: party/social_signals/monster_predation/pet_pvp/pvp_karma/shared_quest_monsters/scenario_runner) + riir-game-sdk `src/` | **CLEAN overall** — 1 new minor D1 site; 2 model consumers found | The 5 audit grep families run over `src/`+`crates/` (both consumers). Findings: (1) **pet_teaching.rs:678** — `(dx*dx+dy*dy).sqrt()` where `Position.0` IS substrate `MapPos3D` → delegatable to `distance_2d_to`; appended to mmorpg Issue 069's D1 ledger (`61899d3`, detection-only). (2) **Model consumers** (the discipline is HOLDING in fresh code): `predation.rs` wraps substrate `tick_swarm_emotions_fov` (emotion.rs:353) with scratch wiring; `pet_alarm.rs` consumes `GenericSpatialBelief<PlayerTarget>` + fog-of-war gate + `distance_2d_to`. (3) False positives documented: ~12 squared-distance comparisons (`dx*dx+dy*dy <= r*r`) are the CORRECT no-sqrt idiom (the Batch 53 `distance-sq-no-sqrt` rule) — a naive D1 "fix" there would be a pessimization; `constants.rs:796` grid-space heightfield math; `authority/karma.rs:656` wire-DTO `[f32;N]` arrays (not MapPos3D); `EntityVisibility` (render-kind mask); `QuestRestockBelief` (temporal EMA, two-brain-compliant docs); game-sdk `ai/cognition.rs:42` (doc-comment example). Clean: inline sigmoid (0 hits), HashMap spatial grids (0 hits). NOTE: audit ran against origin/develop `339f4b7` (the sibling's local develop is diverged on a line without a48af77; findings greps used the local tree — issue-filed via the temp-worktree pattern). |
+
 ## References
 
 - AGENTS.md §"Spatial Cognition (Two-Brain Model)" — the canonical perception rules
