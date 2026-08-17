@@ -212,10 +212,7 @@ fn g1_3sr_vs_rcd_iteration_reduction_at_equal_quality() {
     let rcd_3sr = aggregate(&weights, &config, &targets, run_rcd_3sr);
 
     println!("┌───────────────────────────────────────────────────────────┐");
-    println!(
-        "│ Plan 291 G1 micro-benchmark (N_TARGETS={}, N_STEPS={})",
-        N_TARGETS, N_STEPS
-    );
+    println!("│ Plan 291 G1 micro-benchmark (N_TARGETS={N_TARGETS}, N_STEPS={N_STEPS})");
     println!("├──────────────────────┬──────────┬───────────┬─────────────────┤");
     println!("│ Config               │ mean its │ mean agr  │ converged       │");
     println!("├──────────────────────┼──────────┼───────────┼─────────────────┤");
@@ -310,13 +307,9 @@ fn control_b_uniform_gamma_does_not_explode() {
     let agreement = denoising_accuracy(&tokens, &target);
     assert!(
         agreement.is_finite() && agreement >= 0.0,
-        "uniform-γ produced non-finite or negative agreement: {}",
-        agreement,
+        "uniform-γ produced non-finite or negative agreement: {agreement}",
     );
-    println!(
-        "✅ Control (b): uniform-γ does not explode (agreement = {:.4})",
-        agreement
-    );
+    println!("✅ Control (b): uniform-γ does not explode (agreement = {agreement:.4})");
 }
 
 // ─── Sanity: 3SR disabled falls through to RCD ───────────────────────────

@@ -98,25 +98,22 @@ fn run_bench(
     }
     let elapsed_us = start.elapsed().as_micros();
 
-    let auc = match sampler {
-        Some(s) => {
-            let trajs = collect_trajectories(weights, config, decode_config, targets, 0);
-            if trajs.is_empty() {
-                0.5
-            } else {
-                s.evaluate_auc(&trajs)
-            }
+    let auc = if let Some(s) = sampler {
+        let trajs = collect_trajectories(weights, config, decode_config, targets, 0);
+        if trajs.is_empty() {
+            0.5
+        } else {
+            s.evaluate_auc(&trajs)
         }
-        None => {
-            // Baseline: compute AUC with untrained logistic as reference
-            let mut rng = Rng::new(42);
-            let untrained = DiffusionSampler::logistic(&mut rng);
-            let trajs = collect_trajectories(weights, config, decode_config, targets, 0);
-            if trajs.is_empty() {
-                0.5
-            } else {
-                untrained.evaluate_auc(&trajs)
-            }
+    } else {
+        // Baseline: compute AUC with untrained logistic as reference
+        let mut rng = Rng::new(42);
+        let untrained = DiffusionSampler::logistic(&mut rng);
+        let trajs = collect_trajectories(weights, config, decode_config, targets, 0);
+        if trajs.is_empty() {
+            0.5
+        } else {
+            untrained.evaluate_auc(&trajs)
         }
     };
 
