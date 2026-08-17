@@ -2651,3 +2651,68 @@ substrate arms call the REAL substrates; all arms replay identical pools
 T5 (Theorem-7 allocation formula as a second primitive) deferred on promotion.
 Stays opt-in until a production consumer A/B + GOAT gate (the `switch_cost` /
 Issue-663 precedent). Issue 665 RESOLVED+REMOVED 2026-08-17 (T1–T4 in `96d01e91`).
+
+## 82. Effective Degree — modelless function-space simplicity metric (Issue 668)
+
+**Feature flag:** `effective_degree = ["karc_forecaster"]` in katgpt-core
+(opt-in; implies an already-default-on feature, so zero added build cost).
+
+ED = Σ|c_k|·k over Chebyshev coefficients fitted along data-pair interpolation
+paths (arXiv:2605.29823, ICML 2026; Research 488) — a distribution-aware,
+reparameterization-invariant simplicity probe computable on any frozen
+function. Ships `EdConfig` (+ `cheap()` r=4/K=3 and `precise()` r=15/K=7
+presets mirroring the paper's efficiency/performance points),
+`randomized_cosine_nodes` (stratified splitmix64 sampler, deterministic from
+seed), `effective_degree_along_path` (the whole (K+1)² solve on fixed-size
+stack arrays — no scratch, never allocates), the `_multi` vector-output twin
+(one Cholesky with `out_dim` RHS), the basis-agnostic `ed_from_coeff_norms`
+reducer, and the generic `ed_over_pairs` driver whose decode closure is
+consumer-supplied (a shard readout, an adapter, a policy — katgpt-core stays
+domain-agnostic). Gram/RHS accumulate in f64 (f32 Cholesky is fragile at
+ε = 1e-6 relative to matrix scale — the KARC `fit_direct` precedent).
+**Substrate consumed, not rebuilt:** `karc::ChebyshevBasis<8>` +
+`linalg::{cholesky_f64, chol_solve_f64}`; only the ED reduction and the node
+sampler are new (~560 LOC incl. docs + 12 tests).
+
+### GOAT (Bench 665)
+
+G1a–G1g + G2 + G3 + G4 ALL PASS — order preservation strictly monotone over
+the full degree 1..5 chain (stronger than the paper's 3-point protocol),
+stable across 8 node seeds and a Legendre basis swap (ordering is
+basis-invariant, magnitude is not); `ed` scales ×2.0000 with outputs while
+`ed_norm` is invariant to 1e-4; **195.9 ns/path** at the cheap config (sub-µs
+is marginal at precise: ≈0.9 µs quiet / ≈1.1 µs busy); **0 allocs** steady
+state; lib tests 1893 → 1905 (+12, 0 regressions); clippy clean in all three
+feature states.
+
+**Honest finding (the DC term):** `ed_norm` is a degree-weighted mean over
+ALL coefficients including k = 0, so a DC offset drags it below the algebraic
+degree (deg-5 fixture reads 1.15; with `c₀` zeroed, 1.63). Ordering is
+unaffected — `ed_norm` is comparative-only, never an absolute degree read.
+An offset-free arm is one line via `ed_from_coeff_norms`.
+
+### Consumer verdict — SCOPE-LIMITED, no gate change (riir-neuron-db Issue 602 / Bench 484)
+
+Over 360 shard states, `ed_norm` out-correlates the incumbent
+`output_flatness` **12.6×** pooled (0.598 vs 0.047, control 0.032, permutation
+floor 0.042) and beat it 4/4 scenarios — but the **sign inverts between
+grains** (pooled +0.598, within-regime all four negative), a Simpson reversal
+on 3 disjoint seed sets, so no threshold wires it as the proposed one-sided
+freeze gate. The Bench 665 DC finding drove that conclusion: zeroing
+`coeff_norms[0]` collapses the correlation 0.598 → +0.122 — ED's power on that
+substrate lives in the DC term (event *alignment*, not shape complexity). The
+paper's thesis is therefore NOT confirmed at shard scale; the weaker claim
+(data-anchored function-space beats data-blind parameter-space) is.
+`EdConfig::cheap()` is sufficient on real substrate (0.598 vs precise's 0.623
+for ~5× less work); Theorem 3.1's path-averaging shows 0 ranking flips across
+`n_pairs ∈ {1..64}`. Surviving promotion axis: **cross-regime triage** (the
+KARC regime-mismatch probe, Research 488 §4) — not freeze timing.
+Documented risk: grain-dependent sign (module-doc caveat 4 — consumers must
+state their grain and verify the sign there; the paper measures only the
+across-model grain).
+
+Stays opt-in + diagnostic-only (the no-default-consumer rule). ED is not
+UQ-bearing (a complexity scalar, not a distribution/interval/coverage claim),
+so the Issue 010 "Report the Floor" rule does not apply. Issue 668
+RESOLVED+REMOVED 2026-08-18 (T1–T6 in `2d5a9efc`; consumer verdict folded in
+`89e3910d`).
