@@ -129,7 +129,7 @@ fn g1_beta_recovery() {
             max_err = err;
         }
     }
-    println!("  max ‖β − β_ref‖_∞ = {:.6}  (threshold: 0.2)", max_err);
+    println!("  max ‖β − β_ref‖_∞ = {max_err:.6}  (threshold: 0.2)");
     assert!(max_err < 0.2, "G1 FAIL: β recovery error {max_err} > 0.2");
     println!("  G1: PASS");
 }
@@ -246,8 +246,7 @@ fn g3_omp_residual() {
     let residual_frac = 1.0 - coverage;
 
     println!(
-        "  OMP coverage = {:.4}, residual fraction = {:.4}  (threshold: 0.10)",
-        coverage, residual_frac
+        "  OMP coverage = {coverage:.4}, residual fraction = {residual_frac:.4}  (threshold: 0.10)"
     );
     assert!(
         residual_frac < 0.10,
@@ -329,10 +328,7 @@ fn g5_reconstruction_quality() {
     let report = result.report.as_ref().expect("report");
 
     let rel_err = report.relative_attn_output_error;
-    println!(
-        "  relative attn-output error = {:.6}  (threshold: 0.05)",
-        rel_err
-    );
+    println!("  relative attn-output error = {rel_err:.6}  (threshold: 0.05)");
     assert!(
         rel_err < 0.05,
         "G5 FAIL: reconstruction error {rel_err} > 0.05"
@@ -367,7 +363,7 @@ fn g6_router_determinism() {
                 "G6 FAIL: non-deterministic for t={t} gpu={gpu}: {first:?} vs {b:?}"
             );
         }
-        println!("  t={:>5} gpu={:>5} → {:?}  (100× stable)", t, gpu, first);
+        println!("  t={t:>5} gpu={gpu:>5} → {first:?}  (100× stable)");
     }
     println!("  G6: PASS");
 }
@@ -399,8 +395,7 @@ fn g7_no_allocation_in_hot_loops() {
         let (_count, bytes) = get_alloc_stats();
         let per_call = bytes as f64 / n_calls as f64;
         println!(
-            "  {} calls allocated {} bytes total ({:.3} bytes/call, threshold: < 1024.0)",
-            n_calls, bytes, per_call
+            "  {n_calls} calls allocated {bytes} bytes total ({per_call:.3} bytes/call, threshold: < 1024.0)"
         );
         // Tolerate up to 1KB/call to absorb runtime bookkeeping on this
         // thread. The real per-call allocation is 0.
@@ -424,8 +419,7 @@ fn g7_no_allocation_in_hot_loops() {
         let elapsed = start.elapsed();
         let per_call_ns = elapsed.as_nanos() as f64 / n_calls as f64;
         println!(
-            "  release build (no TrackingAllocator): {} calls in {:?} ({:.1} ns/call)",
-            n_calls, elapsed, per_call_ns
+            "  release build (no TrackingAllocator): {n_calls} calls in {elapsed:?} ({per_call_ns:.1} ns/call)"
         );
         assert!(
             per_call_ns < 1000.0,
@@ -482,10 +476,7 @@ fn g8_simd_vs_scalar() {
     } else {
         0.0
     };
-    println!(
-        "  correctness: max |scalar − simd| = {:.6} (rel {:.4e})",
-        max_diff, rel_err
-    );
+    println!("  correctness: max |scalar − simd| = {max_diff:.6} (rel {rel_err:.4e})");
     assert!(
         rel_err < 1e-3,
         "G8 FAIL: SIMD/scalar rel disagreement {rel_err} > 1e-3"
@@ -506,10 +497,7 @@ fn g8_simd_vs_scalar() {
     let elapsed_simd = start_simd.elapsed();
 
     let speedup = elapsed_scalar.as_secs_f64() / elapsed_simd.as_secs_f64();
-    println!(
-        "  scalar: {:?}, simd: {:?}, speedup: {:.3}×",
-        elapsed_scalar, elapsed_simd, speedup
-    );
+    println!("  scalar: {elapsed_scalar:?}, simd: {elapsed_simd:?}, speedup: {speedup:.3}×");
 
     // On Apple Silicon (NEON) the scalar loop also auto-vectorizes, so the
     // explicit SIMD path may only be ~1.5–2× faster. Document the actual.
@@ -517,8 +505,7 @@ fn g8_simd_vs_scalar() {
     // is still correct and the scalar is just unusually well-optimized).
     if speedup < 1.5 {
         println!(
-            "  G8: SKIP (speedup {:.3}× < 1.5× threshold — scalar auto-vectorizes well on this platform)",
-            speedup
+            "  G8: SKIP (speedup {speedup:.3}× < 1.5× threshold — scalar auto-vectorizes well on this platform)"
         );
         return;
     }
@@ -549,7 +536,7 @@ fn z_full_pipeline_smoke_all_selectors() {
         assert_eq!(result.compact_len, 16);
         assert_eq!(result.original_len, 64);
         for &b in &result.beta {
-            assert!(b.is_finite(), "β non-finite for {:?}", selector);
+            assert!(b.is_finite(), "β non-finite for {selector:?}");
         }
         println!(
             "  {:?}: compact_len={}, ratio={:.1}×",

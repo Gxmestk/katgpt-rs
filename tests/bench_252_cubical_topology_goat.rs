@@ -124,8 +124,7 @@ mod tests {
 
             assert_eq!(
                 baseline_result, operad_result,
-                "Mismatch at token {}: baseline={}, operad={}",
-                token_idx, baseline_result, operad_result
+                "Mismatch at token {token_idx}: baseline={baseline_result}, operad={operad_result}"
             );
 
             if baseline_result {
@@ -137,10 +136,7 @@ mod tests {
         }
 
         let acceptance_rate = baseline_accepted as f64 / vocab_size as f64;
-        println!(
-            "T25 PASS: Semantic equivalence verified for {} tokens",
-            vocab_size
-        );
+        println!("T25 PASS: Semantic equivalence verified for {vocab_size} tokens");
         println!(
             "  Baseline accepted: {} ({:.1}%)",
             baseline_accepted,
@@ -200,15 +196,11 @@ mod tests {
 
             assert_eq!(
                 baseline, operad,
-                "OR composition mismatch at token {}",
-                token_idx
+                "OR composition mismatch at token {token_idx}"
             );
         }
 
-        println!(
-            "T25b PASS: OR composition equivalence verified for {} tokens",
-            vocab_size
-        );
+        println!("T25b PASS: OR composition equivalence verified for {vocab_size} tokens");
     }
 
     // ── T26: CubicalNerve blocked on Plan 251 placeholder ───────────────
@@ -291,25 +283,22 @@ mod tests {
         let time_8 = start.elapsed().as_nanos() as f64 / iterations as f64;
 
         println!("T27 Pruner composition overhead:");
-        println!("  2 pruners: {:.1} ns/eval", time_2);
-        println!("  4 pruners: {:.1} ns/eval", time_4);
-        println!("  8 pruners: {:.1} ns/eval", time_8);
+        println!("  2 pruners: {time_2:.1} ns/eval");
+        println!("  4 pruners: {time_4:.1} ns/eval");
+        println!("  8 pruners: {time_8:.1} ns/eval");
 
         // Overhead thresholds
         assert!(
             time_2 < 200.0,
-            "2-pruner eval should be <200ns, got {:.1}ns",
-            time_2
+            "2-pruner eval should be <200ns, got {time_2:.1}ns"
         );
         assert!(
             time_4 < 400.0,
-            "4-pruner eval should be <400ns, got {:.1}ns",
-            time_4
+            "4-pruner eval should be <400ns, got {time_4:.1}ns"
         );
         assert!(
             time_8 < 1000.0,
-            "8-pruner eval should be <1000ns, got {:.1}ns",
-            time_8
+            "8-pruner eval should be <1000ns, got {time_8:.1}ns"
         );
     }
 
@@ -375,9 +364,9 @@ mod tests {
         };
 
         println!("T27b Operadic vs ad-hoc AND (5 pruners, token=4):");
-        println!("  Ad-hoc AND:  {:.1} ns/call", adhoc_time);
-        println!("  Operadic:    {:.1} ns/call", operad_time);
-        println!("  Overhead:    {:.1}%", overhead_pct);
+        println!("  Ad-hoc AND:  {adhoc_time:.1} ns/call");
+        println!("  Operadic:    {operad_time:.1} ns/call");
+        println!("  Overhead:    {overhead_pct:.1}%");
 
         // The operadic path includes the per-pruner evaluation + expr eval,
         // so some overhead is expected. The GOAT gate says demote if overhead > 20%

@@ -90,10 +90,7 @@ fn bench_tokens_saved_by_collapse_detection() {
         } else {
             0.0
         };
-        println!(
-            "{:<20} {:>12} {:>12} {:>9.1}%",
-            name, generated, max_tokens, saved_pct
-        );
+        println!("{name:<20} {generated:>12} {max_tokens:>12} {saved_pct:>9.1}%");
 
         // High hesitation should collapse early
         if *interval == 2 {
@@ -208,10 +205,7 @@ fn bench_collapse_detector_per_token_overhead() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "\nbench_collapse_detector: {} tokens in {:?} ({:.1} ns/token)",
-        n, elapsed, ns_per
-    );
+    println!("\nbench_collapse_detector: {n} tokens in {elapsed:?} ({ns_per:.1} ns/token)");
     // Target: <10ns in release, allow up to 10µs in debug (unoptimized)
     assert!(
         ns_per < 10_000.0,
@@ -296,10 +290,7 @@ fn bench_efficiency_reward_shaping() {
     }
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
-    println!(
-        "\nbench_efficiency_reward: {} calls in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
-    );
+    println!("\nbench_efficiency_reward: {n} calls in {elapsed:?} ({ns_per:.1} ns/op)");
 }
 
 // ── Bench 5: check_collapse_action Decode-Loop Integration ────
@@ -321,10 +312,7 @@ fn bench_check_collapse_action_overhead() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "\nbench_check_collapse_action: {} tokens in {:?} ({:.1} ns/token)",
-        n, elapsed, ns_per
-    );
+    println!("\nbench_check_collapse_action: {n} tokens in {elapsed:?} ({ns_per:.1} ns/token)");
     // Allow up to 10µs in debug builds (unoptimized)
     assert!(
         ns_per < 10_000.0,

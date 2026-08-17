@@ -25,7 +25,7 @@ fn fmt_f32(v: f32) -> String {
     if v.is_nan() {
         "NaN".into()
     } else {
-        format!("{:.4}", v)
+        format!("{v:.4}")
     }
 }
 
@@ -33,7 +33,7 @@ fn fmt_f64(v: f64) -> String {
     if v.is_nan() {
         "NaN".into()
     } else {
-        format!("{:.4}", v)
+        format!("{v:.4}")
     }
 }
 
@@ -101,10 +101,7 @@ fn goat_bandit_converges_on_cyclic() {
     let improvement = late_avg - baseline_avg;
     assert!(
         improvement > 0.10,
-        "Bandit convergence: improvement {:.4} should be > 0.10 (baseline={:.4}, late={:.4})",
-        improvement,
-        baseline_avg,
-        late_avg
+        "Bandit convergence: improvement {improvement:.4} should be > 0.10 (baseline={baseline_avg:.4}, late={late_avg:.4})"
     );
 }
 
@@ -135,8 +132,7 @@ fn goat_no_regression_on_non_cyclic() {
     // Should be within 5% of 0.5 baseline (i.e., 0.45..0.55)
     assert!(
         (avg_reward - 0.5).abs() < 0.05,
-        "No regression: avg reward {:.4} should be within 5% of 0.5",
-        avg_reward
+        "No regression: avg reward {avg_reward:.4} should be within 5% of 0.5"
     );
 }
 
@@ -231,9 +227,7 @@ fn goat_sigmoid_not_softmax() {
         let s = sigmoid(x);
         assert!(
             (0.0..=1.0).contains(&s),
-            "sigmoid({}) = {} should be in [0,1]",
-            x,
-            s
+            "sigmoid({x}) = {s} should be in [0,1]"
         );
     }
     // For reasonable inputs, output is strictly in (0, 1)
@@ -241,9 +235,7 @@ fn goat_sigmoid_not_softmax() {
         let s = sigmoid(x);
         assert!(
             s > 0.0 && s < 1.0,
-            "sigmoid({}) = {} should be in (0,1) for reasonable inputs",
-            x,
-            s
+            "sigmoid({x}) = {s} should be in (0,1) for reasonable inputs"
         );
     }
 
@@ -254,8 +246,7 @@ fn goat_sigmoid_not_softmax() {
 
     assert!(
         (sum - 1.0).abs() > 0.01,
-        "sigmoid weights sum={:.4} should NOT be 1.0 (that's softmax)",
-        sum
+        "sigmoid weights sum={sum:.4} should NOT be 1.0 (that's softmax)"
     );
 
     // Monotonic: higher input → higher output
@@ -497,13 +488,9 @@ fn freq_bandit_goat_verdict() {
     eprintln!("  Details:");
     eprintln!("    G1: cyclic=High, flat=Low, period8=Mid, period32=Low");
     eprintln!(
-        "    G2: baseline Q={:.4} → final Q={:.4}, Δ={:.4} (converge matches: {}/200)",
-        baseline_q, final_q, g2_improvement, converge_matches
+        "    G2: baseline Q={baseline_q:.4} → final Q={final_q:.4}, Δ={g2_improvement:.4} (converge matches: {converge_matches}/200)"
     );
-    eprintln!(
-        "    G3: random avg reward = {:.4} (target: 0.45..0.55)",
-        g3_avg
-    );
+    eprintln!("    G3: random avg reward = {g3_avg:.4} (target: 0.45..0.55)");
     eprintln!(
         "    G4: Low({},{},{}) Mid({},{},{}) High({},{},{})",
         low_cfg.draft_tree_width,
@@ -516,10 +503,7 @@ fn freq_bandit_goat_verdict() {
         high_cfg.draft_tree_depth,
         high_cfg.verify_iterations
     );
-    eprintln!(
-        "    G5: Low freq → {:?}, High freq → {:?}",
-        tier_low, tier_high
-    );
+    eprintln!("    G5: Low freq → {tier_low:?}, High freq → {tier_high:?}");
     eprintln!(
         "    G6: sigmoid weights [σ(1)={:.4}, σ(2)={:.4}, σ(3)={:.4}], sum={:.4}",
         weights[0], weights[1], weights[2], sum

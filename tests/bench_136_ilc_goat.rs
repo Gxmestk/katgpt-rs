@@ -92,13 +92,9 @@ fn bench_136_ilc_goat_proof() {
     };
     assert!(
         unique_clusters >= 3,
-        "T2 FAILED: Only {} unique clusters found (need >= 3)",
-        unique_clusters
+        "T2 FAILED: Only {unique_clusters} unique clusters found (need >= 3)"
     );
-    println!(
-        "  ✅ Lookup identified {} distinct clusters from 4 known centers",
-        unique_clusters
-    );
+    println!("  ✅ Lookup identified {unique_clusters} distinct clusters from 4 known centers");
 
     // Synonym check
     assert!(
@@ -127,8 +123,7 @@ fn bench_136_ilc_goat_proof() {
     let rel_first = syn_pruner.relevance(0, 0, &[]);
     assert!(
         (rel_first - 1.2).abs() < 0.01,
-        "T3 FAILED: Unexplored query should get diversity bonus (1.0 + 0.2 = 1.2), got {}",
-        rel_first
+        "T3 FAILED: Unexplored query should get diversity bonus (1.0 + 0.2 = 1.2), got {rel_first}"
     );
 
     // Empty map: no bonus
@@ -141,8 +136,7 @@ fn bench_136_ilc_goat_proof() {
     let rel_empty = empty_pruner.relevance(0, 0, &[]);
     assert_eq!(
         rel_empty, 1.0,
-        "T3 FAILED: Empty map should delegate to inner pruner (1.0), got {}",
-        rel_empty
+        "T3 FAILED: Empty map should delegate to inner pruner (1.0), got {rel_empty}"
     );
 
     // Reset is a no-op on fresh state
@@ -156,8 +150,7 @@ fn bench_136_ilc_goat_proof() {
     let rel_after_reset = syn_pruner_reset.relevance(0, 0, &[]);
     assert_eq!(
         rel_after_reset, 1.2,
-        "T3 FAILED: After reset, should still be bonus, got {}",
-        rel_after_reset
+        "T3 FAILED: After reset, should still be bonus, got {rel_after_reset}"
     );
     println!("  ✅ SynonymAwarePruner correctly applies diversity bonus");
 
@@ -208,16 +201,14 @@ fn bench_136_ilc_goat_proof() {
         0.0
     };
 
-    println!("  Baseline tree: {} nodes", nodes_baseline);
-    println!("  Synonym tree:  {} nodes", nodes_synonyms);
-    println!("  Reduction:     {:.1}%", reduction_pct);
+    println!("  Baseline tree: {nodes_baseline} nodes");
+    println!("  Synonym tree:  {nodes_synonyms} nodes");
+    println!("  Reduction:     {reduction_pct:.1}%");
 
     // The synonym tree should explore ≤ baseline nodes
     assert!(
         nodes_synonyms <= nodes_baseline,
-        "T4 FAILED: Synonym tree ({}) should have ≤ baseline ({}) nodes",
-        nodes_synonyms,
-        nodes_baseline
+        "T4 FAILED: Synonym tree ({nodes_synonyms}) should have ≤ baseline ({nodes_baseline}) nodes"
     );
     println!("  ✅ Synonym pruning never increases node count");
 
@@ -232,17 +223,11 @@ fn bench_136_ilc_goat_proof() {
     extract_best_path_into(&tree_synonyms, &mut path_synonyms);
 
     // Compare scores
-    let score_baseline = tree_baseline
-        .first()
-        .map(|n| n.score)
-        .unwrap_or(f32::NEG_INFINITY);
-    let score_synonyms = tree_synonyms
-        .first()
-        .map(|n| n.score)
-        .unwrap_or(f32::NEG_INFINITY);
+    let score_baseline = tree_baseline.first().map_or(f32::NEG_INFINITY, |n| n.score);
+    let score_synonyms = tree_synonyms.first().map_or(f32::NEG_INFINITY, |n| n.score);
 
-    println!("  Baseline best score:  {:.4}", score_baseline);
-    println!("  Synonym best score:   {:.4}", score_synonyms);
+    println!("  Baseline best score:  {score_baseline:.4}");
+    println!("  Synonym best score:   {score_synonyms:.4}");
     println!("  Baseline path len:    {}", path_baseline.len());
     println!("  Synonym path len:     {}", path_synonyms.len());
 
@@ -258,10 +243,7 @@ fn bench_136_ilc_goat_proof() {
         !path_synonyms.is_empty(),
         "T5 FAILED: Synonym tree should produce a non-empty best path"
     );
-    println!(
-        "  ✅ Quality ratio: {:.3} (need ≥ 0.80 for GOAT pass)",
-        quality_ratio
-    );
+    println!("  ✅ Quality ratio: {quality_ratio:.3} (need ≥ 0.80 for GOAT pass)");
 
     // ── T6: Feature gate verification ──────────────────────────────
     println!("\n── T6: Feature gate ──");
@@ -276,6 +258,6 @@ fn bench_136_ilc_goat_proof() {
     println!("  T4 DDTree pruning:       ✅ Nodes never increase");
     println!("  T5 Quality retention:    ✅ Best path found");
     println!("  T6 Feature gate:         ✅ ilc_distill opt-in");
-    println!("  Node reduction:          {:.1}%", reduction_pct);
+    println!("  Node reduction:          {reduction_pct:.1}%");
     println!("{}", "═".repeat(70));
 }

@@ -457,14 +457,8 @@ fn bench_378_cross_dim_procrustes() {
         h_drafts.push(h_d);
     }
 
-    println!(
-        "  Target: n_embd={}, Draft: n_embd={}, vocab={}",
-        target_n_embd, draft_n_embd, vocab
-    );
-    println!(
-        "  Samples: {} train + {} test = {}",
-        n_train, n_test, n_total
-    );
+    println!("  Target: n_embd={target_n_embd}, Draft: n_embd={draft_n_embd}, vocab={vocab}");
+    println!("  Samples: {n_train} train + {n_test} test = {n_total}");
     println!();
 
     // ── Step 2: Compute Procrustes from training samples ────────────────
@@ -657,10 +651,7 @@ fn bench_378_cross_dim_procrustes() {
         draft_own_kl += kl;
     }
     draft_own_kl /= n_test as f32;
-    println!(
-        "  Draft's own KL (no projection, draft's own hidden): {:.6}",
-        draft_own_kl
-    );
+    println!("  Draft's own KL (no projection, draft's own hidden): {draft_own_kl:.6}");
     println!();
 
     // ── Step 6: GOAT gate ───────────────────────────────────────────────
@@ -748,10 +739,7 @@ fn bench_378_cross_dim_procrustes() {
     println!("── Verdict ───────────────────────────────────────────────────");
     if g1_pass && g1_beats_truncate {
         println!("  A trained/Procrustes projection PASSES the GOAT gate.");
-        println!(
-            "  Cross-dim MTP projection is closed (KL ≤ {:.2}).",
-            g1_threshold
-        );
+        println!("  Cross-dim MTP projection is closed (KL ≤ {g1_threshold:.2}).");
         println!();
         println!(
             "  → Issue 378 acceptance criterion 3 (GOAT gate): MET by {}",
@@ -982,14 +970,8 @@ fn bench_378_synthetic_linear_fixture() {
         h_drafts.push(h_d);
     }
 
-    println!(
-        "  Target: n_embd={}, Draft: n_embd={}, vocab={}",
-        target_n_embd, draft_n_embd, vocab
-    );
-    println!(
-        "  Samples: {} train + {} test = {}",
-        n_train, n_test, n_total
-    );
+    println!("  Target: n_embd={target_n_embd}, Draft: n_embd={draft_n_embd}, vocab={vocab}");
+    println!("  Samples: {n_train} train + {n_test} test = {n_total}");
     println!(
         "  Ground-truth W: [{d}×{D}] (seed=77777)",
         d = draft_n_embd,
@@ -1005,10 +987,7 @@ fn bench_378_synthetic_linear_fixture() {
     let mut summary_rows: Vec<(&'static str, f32, f32, f32, f32, bool)> = Vec::new();
 
     for &noise_sigma in noise_levels {
-        println!(
-            "── Noise sigma = {:.4} ─────────────────────────────────────",
-            noise_sigma
-        );
+        println!("── Noise sigma = {noise_sigma:.4} ─────────────────────────────────────");
 
         // Build the synthetic target_lm_head for this noise level
         let synthetic_lm_head = build_synthetic_target_lm_head(
@@ -1080,8 +1059,7 @@ fn bench_378_synthetic_linear_fixture() {
             mtp_threshold: target_config.mtp_activation_threshold,
         });
         println!(
-            "    [diag] P=W_gt    KL = {:.6}  cos = {:.4}  (theoretical optimum at noise=0)",
-            gt_kl, gt_cos
+            "    [diag] P=W_gt    KL = {gt_kl:.6}  cos = {gt_cos:.4}  (theoretical optimum at noise=0)"
         );
 
         // Evaluate all variants on held-out test set
@@ -1137,10 +1115,7 @@ fn bench_378_synthetic_linear_fixture() {
             g1_pass && sgd_finite,
         ));
 
-        println!(
-            "    truncate/pad KL = {:.6}  cos = {:.4}",
-            trunc_kl, trunc_cos
-        );
+        println!("    truncate/pad KL = {trunc_kl:.6}  cos = {trunc_cos:.4}");
         println!(
             "    Procrustes  KL = {:.6}  cos = {:.4}  G1={}",
             proc_kl,

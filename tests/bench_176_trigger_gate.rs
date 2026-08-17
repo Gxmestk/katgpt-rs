@@ -61,10 +61,7 @@ fn bench_176_gate_evaluate_overhead() {
     let elapsed = start.elapsed();
     let us_per_call = elapsed.as_secs_f64() * 1e6 / n_iters as f64;
 
-    println!(
-        "Bench 176: TriggerGate evaluate() overhead: {:.3} µs/call",
-        us_per_call
-    );
+    println!("Bench 176: TriggerGate evaluate() overhead: {us_per_call:.3} µs/call");
     assert!(
         us_per_call < 1.0,
         "TriggerGate evaluate() too slow: {us_per_call:.3} µs/call (expected < 1 µs)"
@@ -89,10 +86,7 @@ fn bench_176_gate_record_inference_overhead() {
     let elapsed = start.elapsed();
     let us_per_call = elapsed.as_secs_f64() * 1e6 / n_iters as f64;
 
-    println!(
-        "Bench 176: TriggerGate record_inference() overhead: {:.3} µs/call",
-        us_per_call
-    );
+    println!("Bench 176: TriggerGate record_inference() overhead: {us_per_call:.3} µs/call");
     assert!(
         us_per_call < 0.5,
         "TriggerGate record_inference() too slow: {us_per_call:.3} µs/call (expected < 0.5 µs)"
@@ -141,8 +135,7 @@ fn bench_176_router_forward_cpu() {
     let overhead_pct = (overhead_us / baseline_us) * 100.0;
 
     println!(
-        "Bench 176: InferenceRouter forward() (CPU tier): {:.2} µs/call (baseline: {:.2} µs, overhead: {:.2} µs / {:.1}%)",
-        routed_us, baseline_us, overhead_us, overhead_pct
+        "Bench 176: InferenceRouter forward() (CPU tier): {routed_us:.2} µs/call (baseline: {baseline_us:.2} µs, overhead: {overhead_us:.2} µs / {overhead_pct:.1}%)"
     );
 
     // Overhead should be < 20% of baseline (router adds evaluate() + timing + routing logic).
@@ -182,8 +175,7 @@ fn bench_176_router_under_load() {
     let throughput = n_iters as f64 / elapsed.as_secs_f64();
 
     println!(
-        "Bench 176: Router under simulated load ({} iters): {:.2} µs/call, {:.0} calls/sec",
-        n_iters, us_per_call, throughput
+        "Bench 176: Router under simulated load ({n_iters} iters): {us_per_call:.2} µs/call, {throughput:.0} calls/sec"
     );
     println!(
         "           tier_transitions={}, total_inferences={}, estimated_qps={:.1}, tier={}",
@@ -193,8 +185,7 @@ fn bench_176_router_under_load() {
     // Verify the router tracked all inferences.
     assert_eq!(
         stats.total_inferences, n_iters as u64,
-        "router should have recorded all {} inferences",
-        n_iters
+        "router should have recorded all {n_iters} inferences"
     );
 
     // Throughput should be reasonable (> 1000 calls/sec for micro model).
@@ -254,8 +245,7 @@ fn bench_176_router_forward_batch() {
     let overhead_pct = ((batch_us - baseline_us) / baseline_us) * 100.0;
 
     println!(
-        "Bench 176: forward_batch (batch_size={batch_size}): {:.2} µs/token (baseline: {:.2} µs, overhead: {:.1}%)",
-        batch_us, baseline_us, overhead_pct
+        "Bench 176: forward_batch (batch_size={batch_size}): {batch_us:.2} µs/token (baseline: {baseline_us:.2} µs, overhead: {overhead_pct:.1}%)"
     );
 
     // Batch overhead should be < 15% (single evaluate() for entire batch).

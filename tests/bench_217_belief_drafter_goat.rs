@@ -348,8 +348,8 @@ fn bench_217_belief_drafter_goat_proof() {
 
     println!("═══════════════════════════════════════════════════════════");
     println!("  Plan 217 Phase 2 GOAT: ALL BENCHMARKS PASSED");
-    println!("  Belief drafter: {:.1} μs/call", belief_us);
-    println!("  MLP overhead: {:.1} μs/step", us_per_step);
+    println!("  Belief drafter: {belief_us:.1} μs/call");
+    println!("  MLP overhead: {us_per_step:.1} μs/step");
     println!("  Variable-length: adapts to entropy threshold");
     println!("═══════════════════════════════════════════════════════════");
 }
@@ -684,12 +684,11 @@ fn bench_217_cache_hit_rate() {
         for i in 0..lookups {
             let h = make_h(i);
             let emb = make_emb(i);
-            match cache.get(&h, &emb) {
-                Some(v) => drop(black_box(v)),
-                None => {
-                    let h_next = (0..n_embd).map(|j| j as f32 * 0.5).collect();
-                    cache.insert(&h, &emb, h_next);
-                }
+            if let Some(v) = cache.get(&h, &emb) {
+                drop(black_box(v))
+            } else {
+                let h_next = (0..n_embd).map(|j| j as f32 * 0.5).collect();
+                cache.insert(&h, &emb, h_next);
             }
         }
         let hits = cache.hits();
@@ -734,12 +733,11 @@ fn bench_217_cache_hit_rate() {
         for i in 0..lookups {
             let idx = i % 4;
             let (h, emb) = &walk_states[idx];
-            match cache.get(h, emb) {
-                Some(v) => drop(black_box(v)),
-                None => {
-                    let h_next = (0..n_embd).map(|j| j as f32 * 0.1).collect();
-                    cache.insert(h, emb, h_next);
-                }
+            if let Some(v) = cache.get(h, emb) {
+                drop(black_box(v))
+            } else {
+                let h_next = (0..n_embd).map(|j| j as f32 * 0.1).collect();
+                cache.insert(h, emb, h_next);
             }
         }
         let hits = cache.hits();
@@ -791,23 +789,21 @@ fn bench_217_cache_hit_rate() {
             };
 
             if i % 10 < 7 {
-                match cache.get(h, emb) {
-                    Some(v) => drop(black_box(v)),
-                    None => {
-                        let h_next = (0..n_embd).map(|j| j as f32 * 0.2).collect();
-                        cache.insert(h, emb, h_next);
-                    }
+                if let Some(v) = cache.get(h, emb) {
+                    drop(black_box(v))
+                } else {
+                    let h_next = (0..n_embd).map(|j| j as f32 * 0.2).collect();
+                    cache.insert(h, emb, h_next);
                 }
             } else {
                 // Novel state
                 let h = make_h(500 + i);
                 let emb = make_emb(500 + i);
-                match cache.get(&h, &emb) {
-                    Some(v) => drop(black_box(v)),
-                    None => {
-                        let h_next = (0..n_embd).map(|j| j as f32 * 0.3).collect();
-                        cache.insert(&h, &emb, h_next);
-                    }
+                if let Some(v) = cache.get(&h, &emb) {
+                    drop(black_box(v))
+                } else {
+                    let h_next = (0..n_embd).map(|j| j as f32 * 0.3).collect();
+                    cache.insert(&h, &emb, h_next);
                 }
             }
         }
@@ -1029,7 +1025,7 @@ fn bench_217_cached_vs_uncached_mlp() {
         ratio < 2.0,
         "Cached path too slow: {ratio:.1}x vs uncached {uncached_us:.1} μs"
     );
-    println!("\n  ✓ B6 PASS: Cache overhead acceptable ({:.1}x)", ratio);
+    println!("\n  ✓ B6 PASS: Cache overhead acceptable ({ratio:.1}x)");
 
     // Also verify cache hit rate after the benchmark
     let rate = cache.hit_rate();
@@ -1227,7 +1223,7 @@ fn goat_217_acceptance_rate() {
     // Belief tree should have reasonable size relative to MTP tree
     // (not drastically smaller — means the drafter is working)
     let belief_ratio = belief_tree.len() as f64 / mtp_tree.len().max(1) as f64;
-    println!("\n  Belief/MTP node ratio: {:.2}", belief_ratio);
+    println!("\n  Belief/MTP node ratio: {belief_ratio:.2}");
     assert!(
         !belief_tree.is_empty(),
         "Belief tree should have at least 1 node"
@@ -1417,10 +1413,7 @@ fn goat_217_variable_length_speedup() {
         "Variable", var_us, var_avg, var_total_tokens
     );
     let unique_len_count = unique_lengths.len();
-    println!(
-        "\n  Variable-length distribution: {} unique lengths",
-        unique_len_count
-    );
+    println!("\n  Variable-length distribution: {unique_len_count} unique lengths");
     println!("  Lengths: {:?}", {
         let mut l: Vec<usize> = unique_lengths.into_iter().collect();
         l.sort();
@@ -1430,8 +1423,7 @@ fn goat_217_variable_length_speedup() {
     // Variable-length should produce different-length drafts
     assert!(
         unique_len_count >= 1,
-        "Variable-length should produce at least 1 unique length, got {}",
-        unique_len_count
+        "Variable-length should produce at least 1 unique length, got {unique_len_count}"
     );
 
     // Fixed should always produce exactly 5
@@ -1444,9 +1436,7 @@ fn goat_217_variable_length_speedup() {
     // Variable should produce ≤ fixed (entropy gating can stop early)
     assert!(
         var_total_tokens <= fixed_total_tokens,
-        "Variable-length should produce ≤ fixed-length tokens: {} vs {}",
-        var_total_tokens,
-        fixed_total_tokens
+        "Variable-length should produce ≤ fixed-length tokens: {var_total_tokens} vs {fixed_total_tokens}"
     );
 
     println!("\n  ✓ G2 PASS: Variable-length adapts draft length");

@@ -97,7 +97,7 @@ fn bench_simpletes_scaling_crossstrategy_goat() {
             .map(|(_, s)| credit.node_weight(*s))
             .collect();
 
-        println!("  Trajectory scores: {:?}", traj_scores);
+        println!("  Trajectory scores: {traj_scores:?}");
         println!(
             "  Credit weights:    [{:.2}, {:.2}, {:.2}, {:.2}]",
             weights[0], weights[1], weights[2], weights[3]
@@ -320,8 +320,7 @@ fn bench_simpletes_scaling_crossstrategy_goat() {
         let (avg_best, avg_evals, perfect) =
             run_tes_trials(config.clone(), &scale_env, N_TRIALS, SEED);
         println!(
-            "  │ {:<19} │ {:>6} │ {:>8.4} │ {:>6} │ {:>7} │",
-            name, budget, avg_best, avg_evals, perfect
+            "  │ {name:<19} │ {budget:>6} │ {avg_best:>8.4} │ {avg_evals:>6} │ {perfect:>7} │"
         );
         t9_results.push((*name, avg_best, avg_evals, perfect));
     }
@@ -430,8 +429,7 @@ fn bench_simpletes_scaling_crossstrategy_goat() {
         let regret_ratio = avg_regret / avg_reward.max(0.001);
 
         println!(
-            "  │ {:<16} │ {:>10.1} │ {:>10.1} │ {:>8.3} │ {:>5}/{:<3} │",
-            name, avg_reward, avg_regret, regret_ratio, found_optimal, N_TRIALS
+            "  │ {name:<16} │ {avg_reward:>10.1} │ {avg_regret:>10.1} │ {regret_ratio:>8.3} │ {found_optimal:>5}/{N_TRIALS:<3} │"
         );
 
         bern_results.push((name, avg_reward, avg_regret, regret_ratio, found_optimal));
@@ -477,8 +475,7 @@ fn bench_simpletes_scaling_crossstrategy_goat() {
         let regret_ratio = avg_regret / avg_reward.max(0.001);
 
         println!(
-            "  │ {:<16} │ {:>10.1} │ {:>10.1} │ {:>8.3} │ {:>5}/{:<3} │",
-            name, avg_reward, avg_regret, regret_ratio, found_optimal, N_TRIALS
+            "  │ {name:<16} │ {avg_reward:>10.1} │ {avg_regret:>10.1} │ {regret_ratio:>8.3} │ {found_optimal:>5}/{N_TRIALS:<3} │"
         );
 
         gauss_results.push((name, avg_reward, avg_regret, regret_ratio, found_optimal));

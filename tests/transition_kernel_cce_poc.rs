@@ -92,7 +92,10 @@ fn solve_square_system(mat: &[Vec<f64>], rhs: &[f64], combo: &[usize]) -> Option
             let (left, right) = aug.split_at_mut(row);
             let aug_pivot_row = &left[pivot];
             let aug_row = &mut right[0];
-            for (arc, &apc) in aug_row[pivot..=n].iter_mut().zip(aug_pivot_row[pivot..=n].iter()) {
+            for (arc, &apc) in aug_row[pivot..=n]
+                .iter_mut()
+                .zip(aug_pivot_row[pivot..=n].iter())
+            {
                 *arc -= factor * apc;
             }
         }
@@ -466,16 +469,22 @@ fn t2_unconstrained_cce_artifact() {
     println!("  ρ(HIGH, INVEST)= {:.6}", rho[HIGH * 2 + INVEST]);
     println!("  ν(LOW)  = {:.6}", state_marginal(&rho, LOW));
     println!("  ν(HIGH) = {:.6}", state_marginal(&rho, HIGH));
-    println!("  γ₀(unconstrained) = {:.6}", gamma0);
+    println!("  γ₀(unconstrained) = {gamma0:.6}");
 
     // Cross-check with shipped CceLp::solve.
     let devs = mdp_constant_devs();
     let game = MdpGame;
-    let rho_shipped = CceLp::new().solve(&devs, &game).expect("shipped LP feasible");
-    let gamma0_shipped: f64 = rho_shipped.entries.iter().map(|&v| v as f64).zip(
-        (0..2).flat_map(|s| (0..2).map(move |a| COST[s][a]))
-    ).map(|(r, c)| r * c).sum();
-    println!("  γ₀(shipped CceLp) = {:.6}", gamma0_shipped);
+    let rho_shipped = CceLp::new()
+        .solve(&devs, &game)
+        .expect("shipped LP feasible");
+    let gamma0_shipped: f64 = rho_shipped
+        .entries
+        .iter()
+        .map(|&v| v as f64)
+        .zip((0..2).flat_map(|s| (0..2).map(move |a| COST[s][a])))
+        .map(|(r, c)| r * c)
+        .sum();
+    println!("  γ₀(shipped CceLp) = {gamma0_shipped:.6}");
 
     // The artifact: γ₀ ≈ 0 (all mass on (HIGH, WAIT) where cost = 0).
     assert!(
@@ -513,8 +522,16 @@ fn t3_true_mdp_optimum() {
         let nu = stationary_distribution(policy);
         let pstr = format!(
             "[{}, {}]",
-            if policy[LOW] == WAIT { "WAIT" } else { "INVEST" },
-            if policy[HIGH] == WAIT { "WAIT" } else { "INVEST" }
+            if policy[LOW] == WAIT {
+                "WAIT"
+            } else {
+                "INVEST"
+            },
+            if policy[HIGH] == WAIT {
+                "WAIT"
+            } else {
+                "INVEST"
+            }
         );
         println!(
             "    policy {:>14}: avg_cost = {:>10.4}  ν = {:?}",
@@ -523,14 +540,28 @@ fn t3_true_mdp_optimum() {
             nu.unwrap_or([f64::NAN, f64::NAN])
         );
     }
-    println!("  Optimal policy: [{}, {}]",
-        if best_policy[LOW] == WAIT { "WAIT" } else { "INVEST" },
-        if best_policy[HIGH] == WAIT { "WAIT" } else { "INVEST" });
+    println!(
+        "  Optimal policy: [{}, {}]",
+        if best_policy[LOW] == WAIT {
+            "WAIT"
+        } else {
+            "INVEST"
+        },
+        if best_policy[HIGH] == WAIT {
+            "WAIT"
+        } else {
+            "INVEST"
+        }
+    );
     println!("  ν(LOW) = {:.6}, ν(HIGH) = {:.6}", nu[LOW], nu[HIGH]);
-    println!("  γ₀(true optimum) = {:.6}", best_cost);
+    println!("  γ₀(true optimum) = {best_cost:.6}");
 
     // The honest optimum: always WAIT, γ₀ = 5/6 ≈ 0.833.
-    assert_eq!(best_policy, [WAIT, WAIT], "T3: optimal policy should be always-WAIT");
+    assert_eq!(
+        best_policy,
+        [WAIT, WAIT],
+        "T3: optimal policy should be always-WAIT"
+    );
     assert!(
         (best_cost - 5.0 / 6.0).abs() < 0.01,
         "T3: optimal average cost should be 5/6 ≈ 0.833, got {best_cost:.6}"
@@ -549,14 +580,16 @@ fn t4_constrained_cce_closes_artifact() {
     let (mat, rhs, obj, n_vars, na) = build_constrained_mdp_lp();
 
     println!("\n=== T4: Constrained CCE (balance equation added) ===");
-    println!("  Constraint rows: {} (1 norm + 2 CCE + 1 balance)", mat.len());
+    println!(
+        "  Constraint rows: {} (1 norm + 2 CCE + 1 balance)",
+        mat.len()
+    );
 
-    let rho = match enumerate_bfs(&mat, &rhs, &obj, n_vars, na) {
-        Some(r) => r,
-        None => {
-            println!("  ✗ LP INFEASIBLE — the balance equation makes the CCE LP infeasible!");
-            panic!("T4: constrained LP infeasible");
-        }
+    let rho = if let Some(r) = enumerate_bfs(&mat, &rhs, &obj, n_vars, na) {
+        r
+    } else {
+        println!("  ✗ LP INFEASIBLE — the balance equation makes the CCE LP infeasible!");
+        panic!("T4: constrained LP infeasible");
     };
 
     let gamma0 = mdp_gamma0(&rho);
@@ -566,7 +599,7 @@ fn t4_constrained_cce_closes_artifact() {
     println!("  ρ(HIGH, INVEST)= {:.6}", rho[HIGH * 2 + INVEST]);
     println!("  ν(LOW)  = {:.6}", state_marginal(&rho, LOW));
     println!("  ν(HIGH) = {:.6}", state_marginal(&rho, HIGH));
-    println!("  γ₀(constrained) = {:.6}", gamma0);
+    println!("  γ₀(constrained) = {gamma0:.6}");
 
     // The key assertion: γ₀ ≈ 5/6 (artifact closed — matches honest optimum).
     let (_, true_optimum) = optimal_deterministic_policy();
@@ -584,14 +617,15 @@ fn t4_constrained_cce_closes_artifact() {
     }
     let balance_rhs = state_marginal(&rho, HIGH);
     let balance_residual = (balance_lhs - balance_rhs).abs();
-    println!("  Balance check: Σ ρ·P(HIGH|·) = {:.6}, ν(HIGH) = {:.6}, residual = {:.2e}",
-        balance_lhs, balance_rhs, balance_residual);
+    println!(
+        "  Balance check: Σ ρ·P(HIGH|·) = {balance_lhs:.6}, ν(HIGH) = {balance_rhs:.6}, residual = {balance_residual:.2e}"
+    );
     assert!(
         balance_residual < 1e-6,
         "T4: balance equation not satisfied (residual = {balance_residual:.2e})"
     );
 
-    println!("  ✓ PASS: γ₀ ≈ {:.4} (matches true MDP optimum {:.4})", gamma0, true_optimum);
+    println!("  ✓ PASS: γ₀ ≈ {gamma0:.4} (matches true MDP optimum {true_optimum:.4})");
     println!("  ✓ Balance equation satisfied (residual < 1e-6)");
 }
 
@@ -602,8 +636,7 @@ fn t4_constrained_cce_closes_artifact() {
 #[test]
 fn t5_constrained_rho_is_valid_cce() {
     let (mat, rhs, obj, n_vars, na) = build_constrained_mdp_lp();
-    let rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na)
-        .expect("constrained LP feasible");
+    let rho_entries = enumerate_bfs(&mat, &rhs, &obj, n_vars, na).expect("constrained LP feasible");
     let rho = OccupationMeasure::<2, 2>::new(rho_entries.iter().map(|&v| v as f32).collect())
         .expect("valid occupation measure");
 
@@ -615,8 +648,12 @@ fn t5_constrained_rho_is_valid_cce() {
     for kappa in devs.deviations() {
         let reg = er.er(&rho, &devs, &game);
         let best = er.best_deviation(&rho, &devs, &game);
-        println!("  κ={:?}: ER = {:.6} (best dev: {:?})",
-            kappa.id, reg, best.map(|d| d.id));
+        println!(
+            "  κ={:?}: ER = {:.6} (best dev: {:?})",
+            kappa.id,
+            reg,
+            best.map(|d| d.id)
+        );
         assert!(
             reg <= 0.05,
             "T5: deviation {:?} has ER = {reg:.6} > 0.05 — CCE violated (over-restricted?)",
@@ -662,9 +699,15 @@ fn t6_rps_reduction_analytical_note() {
     // 573: each state gets 1/3 mass, concentrated on the best-response action).
     // N=3, A=3. Entries: ρ(R,P)=1/3, ρ(P,S)=1/3, ρ(S,R)=1/3, rest 0.
     let rho_artifact: [f64; 9] = [
-        0.0, 1.0 / 3.0, 0.0, // s=R: [R=0, P=1/3, S=0]
-        0.0, 0.0, 1.0 / 3.0,  // s=P: [R=0, P=0, S=1/3]
-        1.0 / 3.0, 0.0, 0.0,  // s=S: [R=1/3, P=0, S=0]
+        0.0,
+        1.0 / 3.0,
+        0.0, // s=R: [R=0, P=1/3, S=0]
+        0.0,
+        0.0,
+        1.0 / 3.0, // s=P: [R=0, P=0, S=1/3]
+        1.0 / 3.0,
+        0.0,
+        0.0, // s=S: [R=1/3, P=0, S=0]
     ];
     let n_states = 3usize;
     let n_actions = 3usize;
@@ -680,8 +723,8 @@ fn t6_rps_reduction_analytical_note() {
     }
 
     println!("  RPS with state-independent P(s'|s,a) = 1/3:");
-    println!("    ρ (artifact) = {:?}", rho_artifact);
-    println!("    ν (balance)  = {:?}", nu);
+    println!("    ρ (artifact) = {rho_artifact:?}");
+    println!("    ν (balance)  = {nu:?}");
     println!("    Expected: ν = [1/3, 1/3, 1/3] = uniform");
 
     for (s, &nu_s) in nu.iter().enumerate() {
@@ -693,7 +736,9 @@ fn t6_rps_reduction_analytical_note() {
 
     println!("  ✓ Balance equation reduces to ν = uniform for state-independent transitions");
     println!("  → This is identical to Issue 573 T4a (marginal constraint, γ₀ = -1.0 persists)");
-    println!("  → The RPS artifact needs the richer-deviation-class fix (option 1), NOT this constraint");
+    println!(
+        "  → The RPS artifact needs the richer-deviation-class fix (option 1), NOT this constraint"
+    );
 }
 
 /// T7: Verdict — record the PoC outcome.
@@ -717,13 +762,13 @@ fn t7_verdict() {
     let rho_con = enumerate_bfs(&mat, &rhs, &obj, n_vars, na).expect("constrained feasible");
     let gamma0_con = mdp_gamma0(&rho_con);
 
-    println!("  Unconstrained CCE γ₀ = {:.6} (artifact — below true optimum)", gamma0_unc);
-    println!("  True MDP optimum γ₀   = {:.6} (honest baseline)", true_optimum);
-    println!("  Constrained CCE γ₀    = {:.6} (should match true optimum)", gamma0_con);
+    println!("  Unconstrained CCE γ₀ = {gamma0_unc:.6} (artifact — below true optimum)");
+    println!("  True MDP optimum γ₀   = {true_optimum:.6} (honest baseline)");
+    println!("  Constrained CCE γ₀    = {gamma0_con:.6} (should match true optimum)");
 
     // The artifact gap: unconstrained is strictly below the true optimum.
     let artifact_gap = true_optimum - gamma0_unc;
-    println!("  Artifact gap (true − unconstrained) = {:.6}", artifact_gap);
+    println!("  Artifact gap (true − unconstrained) = {artifact_gap:.6}");
     assert!(
         artifact_gap > 0.1,
         "T7: expected a meaningful artifact gap (> 0.1), got {artifact_gap:.6}"
@@ -731,7 +776,7 @@ fn t7_verdict() {
 
     // The constraint closes the gap.
     let residual_gap = (gamma0_con - true_optimum).abs();
-    println!("  Residual gap (constrained − true)   = {:.6}", residual_gap);
+    println!("  Residual gap (constrained − true)   = {residual_gap:.6}");
     if residual_gap < 0.05 {
         println!();
         println!("  ╔══════════════════════════════════════════════════════════════╗");
@@ -744,7 +789,10 @@ fn t7_verdict() {
         println!("  ║  RPS (state-independent transitions) needs the richer-       ║");
         println!("  ║  deviation-class fix — a separate PoC.                       ║");
         println!("  ╚══════════════════════════════════════════════════════════════╝");
-        assert!(residual_gap < 0.05, "T7: constrained CCE should match true optimum");
+        assert!(
+            residual_gap < 0.05,
+            "T7: constrained CCE should match true optimum"
+        );
     } else {
         println!();
         println!("  ╔══════════════════════════════════════════════════════════════╗");
