@@ -306,9 +306,29 @@ fn write_f32_slice(buf: &Buffer, data: &[f32]) {
     }
 }
 
+/// Dispatch a 1D compute kernel with `n` total threads.
+fn dispatch_1d(encoder: &metal::ComputeCommandEncoderRef, pipeline: &ComputePipelineState, n: u64) {
+    encoder.set_compute_pipeline_state(pipeline);
+    let tg_size = pipeline.thread_execution_width();
+    let threadgroup_count = MTLSize::new(n.div_ceil(tg_size), 1, 1);
+    let threads_per_tg = MTLSize::new(tg_size, 1, 1);
+    encoder.dispatch_thread_groups(threadgroup_count, threads_per_tg);
+}
+
+/// Dispatch a single-thread kernel (for sequential ops like rmsnorm, softmax).
+fn dispatch_single(encoder: &metal::ComputeCommandEncoderRef, pipeline: &ComputePipelineState) {
+    encoder.set_compute_pipeline_state(pipeline);
+    encoder.dispatch_thread_groups(MTLSize::new(1, 1, 1), MTLSize::new(1, 1, 1));
+}
+
 // ---------------------------------------------------------------------------
 // GpuBackend
 // ---------------------------------------------------------------------------
+
+/// Maximum tokens accepted by [`GpuBackend::forward_batch`]. Per-slot upload
+/// buffers for this many tokens are pre-allocated at `compile()` time
+/// (Issue 660 task 5).
+pub const MAX_FORWARD_BATCH: usize = 16;
 
 /// GPU inference backend using Apple Metal compute shaders.
 ///
@@ -363,6 +383,17 @@ pub struct GpuBackend {
     pos_scalar: Option<Buffer>,     // u32 pos
     emb_wte_slice: Option<Buffer>,  // [n_embd] wte[token] slice
     emb_wpe_slice: Option<Buffer>,  // [n_embd] wpe[pos] slice
+    // Batched width-N forward (Issue 660 task 5): per-slot buffers so N
+    // tokens can be encoded into ONE command buffer. Per-slot, not shared,
+    // because pos/seq_len differ per token — CPU writes to a shared buffer
+    // all land before GPU execution, so every dispatch would otherwise see
+    // the last value. Each slot is written exactly once before commit and
+    // read only by that token's dispatches.
+    batch_wte_slices: Option<Vec<Buffer>>,      // MAX_FORWARD_BATCH x [n_embd]
+    batch_wpe_slices: Option<Vec<Buffer>>,      // MAX_FORWARD_BATCH x [n_embd]
+    batch_logits: Option<Vec<Buffer>>,          // MAX_FORWARD_BATCH x [vocab_size]
+    batch_pos_scalars: Option<Vec<Buffer>>,     // MAX_FORWARD_BATCH x u32
+    batch_seq_len_scalars: Option<Vec<Buffer>>, // MAX_FORWARD_BATCH x u32
 }
 
 impl GpuBackend {
@@ -406,134 +437,279 @@ impl GpuBackend {
             pos_scalar: None,
             emb_wte_slice: None,
             emb_wpe_slice: None,
+            batch_wte_slices: None,
+            batch_wpe_slices: None,
+            batch_logits: None,
+            batch_pos_scalars: None,
+            batch_seq_len_scalars: None,
         })
+    }
+
+    /// Build the borrowed resource view shared by `forward` and
+    /// `forward_batch`. All unwraps are guarded by the `compiled` flag at
+    /// the call sites.
+    fn frame(&self) -> GpuFrame<'_> {
+        GpuFrame {
+            pipelines: self
+                .pipelines
+                .as_ref()
+                .expect("pipelines missing after compile"),
+            wb: self
+                .weight_buffers
+                .as_ref()
+                .expect("weights missing after compile"),
+            kv_cache: self.kv_cache.as_ref().expect("kv_cache missing after compile"),
+            x_buf: self.x_buf.as_ref().expect("x_buf missing"),
+            xr_buf: self.xr_buf.as_ref().expect("xr_buf missing"),
+            xr2_buf: self.xr2_buf.as_ref().expect("xr2_buf missing"),
+            q_buf: self.q_buf.as_ref().expect("q_buf missing"),
+            k_buf: self.k_buf.as_ref().expect("k_buf missing"),
+            v_buf: self.v_buf.as_ref().expect("v_buf missing"),
+            attn_out_buf: self.attn_out_buf.as_ref().expect("attn_out_buf missing"),
+            hidden_buf: self.hidden_buf.as_ref().expect("hidden_buf missing"),
+            scores_buf: self.scores_buf.as_ref().expect("scores_buf missing"),
+            n_embd_buf: self
+                .n_embd_scalar
+                .as_ref()
+                .expect("n_embd_scalar missing"),
+            kv_dim_buf: self.kv_dim_scalar.as_ref().expect("kv_dim_scalar missing"),
+            head_dim_buf: self
+                .head_dim_scalar
+                .as_ref()
+                .expect("head_dim_scalar missing"),
+            eps_buf: self.eps_scalar.as_ref().expect("eps_scalar missing"),
+            scale_buf: self.scale_scalar.as_ref().expect("scale_scalar missing"),
+            mlp_hidden_in_dim_buf: self
+                .mlp_hidden_scalar
+                .as_ref()
+                .expect("mlp_hidden_scalar missing"),
+            q_off_bufs: self.q_off_bufs.as_ref().expect("q_off_bufs missing"),
+            kv_off_bufs: self.kv_off_bufs.as_ref().expect("kv_off_bufs missing"),
+            out_off_bufs: self.out_off_bufs.as_ref().expect("out_off_bufs missing"),
+        }
+    }
+
+    /// Batched width-N forward (Issue 660 task 5): process `tokens` starting
+    /// at absolute position `pos` in ONE command buffer with a single commit
+    /// and wait, returning logits for EVERY position (the MTP verification
+    /// shape). Returns a flat row-major slice: row `i` = logits for
+    /// `tokens[i]`, i.e. `out[i * vocab_size..(i + 1) * vocab_size]`.
+    ///
+    /// Semantics are identical to `tokens.len()` sequential `forward` calls:
+    /// token i attends over positions `0..=pos + i` (earlier batch tokens'
+    /// KV entries are written by earlier dispatches in the same command
+    /// buffer — encoder serialization provides the memory visibility, the
+    /// same guarantee the single-token path relies on).
+    ///
+    /// Per-slot upload buffers (allocated at `compile()`) carry each token's
+    /// embedding row + pos/seq_len scalars; all CPU writes land before the
+    /// single commit.
+    ///
+    /// Falls back to sequential CPU forwards when not compiled. Panics when
+    /// `tokens.len() > MAX_FORWARD_BATCH` or the batch would run past
+    /// `config.block_size`.
+    pub fn forward_batch(
+        &mut self,
+        ctx: &mut ForwardContext,
+        weights: &TransformerWeights,
+        cache: &mut MultiLayerKVCache,
+        tokens: &[usize],
+        pos: usize,
+        config: &Config,
+    ) -> Vec<f32> {
+        let n = tokens.len();
+        if n == 0 {
+            return Vec::new();
+        }
+        if !self.compiled {
+            // CPU fallback: sequential single-token forwards.
+            let mut out = Vec::with_capacity(n * config.vocab_size);
+            for (i, &tok) in tokens.iter().enumerate() {
+                let logits = katgpt_forward::forward(ctx, weights, cache, tok, pos + i, config);
+                out.extend_from_slice(logits);
+            }
+            return out;
+        }
+        assert!(
+            n <= MAX_FORWARD_BATCH,
+            "forward_batch: {n} tokens > MAX_FORWARD_BATCH ({MAX_FORWARD_BATCH})"
+        );
+        assert!(
+            pos + n <= config.block_size,
+            "forward_batch: pos {pos} + {n} tokens exceeds block_size {}",
+            config.block_size
+        );
+
+        let n_embd = config.n_embd;
+        let vocab_size = config.vocab_size;
+
+        // CPU-side uploads (all pre-encode): per-slot embedding rows + scalars.
+        let wte_slots = self
+            .batch_wte_slices
+            .as_ref()
+            .expect("batch_wte_slices missing");
+        let wpe_slots = self
+            .batch_wpe_slices
+            .as_ref()
+            .expect("batch_wpe_slices missing");
+        let logits_slots = self.batch_logits.as_ref().expect("batch_logits missing");
+        let pos_slots = self
+            .batch_pos_scalars
+            .as_ref()
+            .expect("batch_pos_scalars missing");
+        let seq_slots = self
+            .batch_seq_len_scalars
+            .as_ref()
+            .expect("batch_seq_len_scalars missing");
+        for i in 0..n {
+            let tok_pos = pos + i;
+            write_scalar(&pos_slots[i], &(tok_pos as u32));
+            write_scalar(&seq_slots[i], &((tok_pos + 1) as u32));
+            let tok = tokens[i];
+            write_f32_slice(
+                &wte_slots[i],
+                &weights.wte[tok * n_embd..(tok + 1) * n_embd],
+            );
+            write_f32_slice(
+                &wpe_slots[i],
+                &weights.wpe[tok_pos * n_embd..(tok_pos + 1) * n_embd],
+            );
+        }
+
+        // ONE command buffer for all N tokens (the Issue 660 single-submit
+        // guarantee extended across the batch).
+        let cmd_buffer = self.command_queue.new_command_buffer();
+        let frame = self.frame();
+        for i in 0..n {
+            frame.encode_token(
+                cmd_buffer,
+                &wte_slots[i],
+                &wpe_slots[i],
+                &logits_slots[i],
+                &pos_slots[i],
+                &seq_slots[i],
+                pos + i,
+                config,
+            );
+        }
+        cmd_buffer.commit();
+        cmd_buffer.wait_until_completed();
+
+        // Readback: all N rows, once.
+        let mut out = Vec::with_capacity(n * vocab_size);
+        for buf in &logits_slots[..n] {
+            let ptr = buf.contents() as *const f32;
+            let row = unsafe { std::slice::from_raw_parts(ptr, vocab_size) };
+            out.extend_from_slice(row);
+        }
+
+        // Keep ctx.logits coherent with the last token (consumer compat with
+        // forward) + update the CPU KV-cache fill tracker.
+        let last = &out[(n - 1) * vocab_size..];
+        ctx.logits[..vocab_size].copy_from_slice(last);
+        cache.advance_pos(pos + n - 1);
+        out
     }
 }
 
-impl InferenceBackend for GpuBackend {
-    fn forward<'a>(
-        &'a mut self,
-        ctx: &'a mut ForwardContext,
-        weights: &TransformerWeights,
-        cache: &mut MultiLayerKVCache,
-        token: usize,
+/// Borrowed view of the per-forward GPU resources (all allocated once in
+/// `compile()`). Bundled so the per-token dispatch body is written ONCE and
+/// shared verbatim by the single-token `forward` and the batched
+/// `forward_batch` (Issue 660 task 5).
+struct GpuFrame<'a> {
+    pipelines: &'a GpuPipelines,
+    wb: &'a GpuWeightBuffers,
+    kv_cache: &'a [(Buffer, Buffer)],
+    // Reused per-token scratch — dispatches serialize within a command
+    // buffer, so consecutive tokens reuse the same buffers exactly like
+    // sequential separate forwards.
+    x_buf: &'a Buffer,
+    xr_buf: &'a Buffer,
+    xr2_buf: &'a Buffer,
+    q_buf: &'a Buffer,
+    k_buf: &'a Buffer,
+    v_buf: &'a Buffer,
+    attn_out_buf: &'a Buffer,
+    hidden_buf: &'a Buffer,
+    scores_buf: &'a Buffer,
+    // Config-derived constant scalars (bound as buffers on every dispatch).
+    n_embd_buf: &'a Buffer,
+    kv_dim_buf: &'a Buffer,
+    head_dim_buf: &'a Buffer,
+    eps_buf: &'a Buffer,
+    scale_buf: &'a Buffer,
+    mlp_hidden_in_dim_buf: &'a Buffer,
+    // Per-head offsets (fixed at compile time).
+    q_off_bufs: &'a [Buffer],
+    kv_off_bufs: &'a [Buffer],
+    out_off_bufs: &'a [Buffer],
+}
+
+impl GpuFrame<'_> {
+    /// Encode ONE full token pipeline (embedding → per-layer blocks →
+    /// lm_head) into `cmd_buffer` as dispatches only — no commit, no CPU
+    /// readback.
+    ///
+    /// The caller has already uploaded the embedding row into `wte_src` /
+    /// `wpe_src` and written this token's absolute position into `pos_buf`
+    /// and `pos + 1` into `seq_len_buf` (CPU `contents()` writes all land
+    /// before the command buffer is committed). `pos` itself only drives
+    /// per-dispatch thread counts (encode-time constants).
+    ///
+    /// Batched callers encode N tokens into the SAME command buffer with
+    /// per-slot buffers: token i's KV-cache write lands at `pos + i` and its
+    /// attention dispatches read exactly `[0, pos + i]` — encoder
+    /// serialization makes earlier batch tokens' KV visible, the identical
+    /// guarantee the single-token path relies on.
+    #[allow(clippy::too_many_arguments)]
+    fn encode_token(
+        &self,
+        cmd_buffer: &metal::CommandBufferRef,
+        wte_src: &Buffer,
+        wpe_src: &Buffer,
+        logits_dst: &Buffer,
+        pos_buf: &Buffer,
+        seq_len_buf: &Buffer,
         pos: usize,
         config: &Config,
-    ) -> &'a mut [f32] {
-        // Fall back to CPU if not compiled
-        if !self.compiled {
-            return katgpt_forward::forward(ctx, weights, cache, token, pos, config);
-        }
-
-        let pipelines = self
-            .pipelines
-            .as_ref()
-            .expect("pipelines missing after compile");
-        let wb = self
-            .weight_buffers
-            .as_ref()
-            .expect("weights missing after compile");
-        let kv_cache = self
-            .kv_cache
-            .as_ref()
-            .expect("kv_cache missing after compile");
-
+    ) {
+        let seq_len = pos + 1; // number of cached positions incl. this token
         let n_embd = config.n_embd;
         let kv_dim = kv_dim(config);
         let n_head = config.n_head;
         let mlp_hidden = config.mlp_hidden;
         let vocab_size = config.vocab_size;
-        let seq_len = pos + 1; // number of cached positions
-        // head_dim, n_kv_head, eps, scale are consumed by compile() into cached
-        // scalar buffers — no longer needed in forward() per-call.
-
+        let pipelines = &self.pipelines;
+        let wb = &self.wb;
+        let kv_cache = &self.kv_cache;
         // Shortcut references to scratch buffers
-        let x_buf = self.x_buf.as_ref().unwrap();
-        let xr_buf = self.xr_buf.as_ref().unwrap();
-        let xr2_buf = self.xr2_buf.as_ref().unwrap();
-        let q_buf = self.q_buf.as_ref().unwrap();
-        let k_buf = self.k_buf.as_ref().unwrap();
-        let v_buf = self.v_buf.as_ref().unwrap();
-        let attn_out_buf = self.attn_out_buf.as_ref().unwrap();
-        let hidden_buf = self.hidden_buf.as_ref().unwrap();
-        let scores_buf = self.scores_buf.as_ref().unwrap();
-        let logits_buf = self.logits_buf.as_ref().unwrap();
-
-        // Cached scalar buffers (allocated once in compile()). These replace
-        // per-forward scalar_buffer() calls that triggered Metal IPC allocations.
-        let n_embd_buf = self.n_embd_scalar.as_ref().unwrap();
-        let kv_dim_buf = self.kv_dim_scalar.as_ref().unwrap();
-        let head_dim_buf = self.head_dim_scalar.as_ref().unwrap();
-        let eps_buf = self.eps_scalar.as_ref().unwrap();
-        let scale_buf = self.scale_scalar.as_ref().unwrap();
-        let mlp_hidden_in_dim_buf = self.mlp_hidden_scalar.as_ref().unwrap();
-        let q_off_bufs = self.q_off_bufs.as_ref().unwrap();
-        let kv_off_bufs = self.kv_off_bufs.as_ref().unwrap();
-        let out_off_bufs = self.out_off_bufs.as_ref().unwrap();
-        // n_embd_buf doubles as n_embd_in_dim_buf, mlp_in_dim_buf, and kv_in_dim_buf
-        // (all carry the same n_embd value for these matmul in_dim arguments).
-
-        let command_queue = &self.command_queue;
-
-        // Per-call scalar buffers (these change every forward, so cannot be cached):
-        // seq_len grows as context extends; pos advances by 1 each token.
-        // Reuse pre-allocated buffers from compile() — write via contents() instead
-        // of allocating new Metal buffers each call.
-        let seq_len_buf = self
-            .seq_len_scalar
-            .as_ref()
-            .expect("seq_len_scalar missing");
-        let pos_buf = self.pos_scalar.as_ref().expect("pos_scalar missing");
-        write_scalar(seq_len_buf, &(seq_len as u32));
-        write_scalar(pos_buf, &(pos as u32));
-
-        // Helper: dispatch a 1D compute kernel with `n` total threads
-        let dispatch_1d =
-            |encoder: &metal::ComputeCommandEncoderRef, pipeline: &ComputePipelineState, n: u64| {
-                encoder.set_compute_pipeline_state(pipeline);
-                let tg_size = pipeline.thread_execution_width();
-                let threadgroup_count = MTLSize::new(n.div_ceil(tg_size), 1, 1);
-                let threads_per_tg = MTLSize::new(tg_size, 1, 1);
-                encoder.dispatch_thread_groups(threadgroup_count, threads_per_tg);
-            };
-
-        // Helper: dispatch a single-thread kernel (for sequential ops like rmsnorm, softmax)
-        let dispatch_single = |encoder: &metal::ComputeCommandEncoderRef,
-                               pipeline: &ComputePipelineState| {
-            encoder.set_compute_pipeline_state(pipeline);
-            encoder.dispatch_thread_groups(MTLSize::new(1, 1, 1), MTLSize::new(1, 1, 1));
-        };
-
-        // Helper constants as buffers — cached scalar buffers allocated once
-        // in compile() (n_embd_buf, kv_dim_buf, head_dim_buf, eps_buf, scale_buf,
-        // mlp_hidden_in_dim_buf). Only seq_len_buf is per-call (context grows).
-        // n_embd_buf doubles as n_embd_in_dim_buf, mlp_in_dim_buf, kv_in_dim_buf.
-
-        // ── Single-submit (Issue 660): the whole forward is encoded into ONE
-        // command buffer with a single commit + wait at the end. Encoder order
-        // within a command buffer IS the GPU-side ordering — dispatches within
-        // a compute encoder serialize with memory visibility between them
-        // (the same guarantee the old per-block waits provided). The one
-        // mid-forward CPU dependency (the x→xr2 save in 2g) became a blit
-        // encoder copy so no CPU read happens before the final wait. ──
-        let cmd_buffer = command_queue.new_command_buffer();
+        let x_buf = self.x_buf;
+        let xr_buf = self.xr_buf;
+        let xr2_buf = self.xr2_buf;
+        let q_buf = self.q_buf;
+        let k_buf = self.k_buf;
+        let v_buf = self.v_buf;
+        let attn_out_buf = self.attn_out_buf;
+        let hidden_buf = self.hidden_buf;
+        let scores_buf = self.scores_buf;
+        // Cached scalar buffers (constants consumed at compile() time).
+        let n_embd_buf = self.n_embd_buf;
+        let kv_dim_buf = self.kv_dim_buf;
+        let head_dim_buf = self.head_dim_buf;
+        let eps_buf = self.eps_buf;
+        let scale_buf = self.scale_buf;
+        let mlp_hidden_in_dim_buf = self.mlp_hidden_in_dim_buf;
+        let q_off_bufs = self.q_off_bufs;
+        let kv_off_bufs = self.kv_off_bufs;
+        let out_off_bufs = self.out_off_bufs;
 
         // ── Step 1: Embedding lookup x = wte[token] + wpe[pos] ──
+        // (the caller uploaded the token's wte row + the wpe row for this
+        // token's absolute position into wte_src / wpe_src before encoding)
         {
-            // Copy wte[token*n_embd..(token+1)*n_embd] into emb_wte_slice (reused buffer)
-            let wte_offset = token * n_embd;
-            let wte_slice = &weights.wte[wte_offset..wte_offset + n_embd];
-            let x_upload = self.emb_wte_slice.as_ref().expect("emb_wte_slice missing");
-            write_f32_slice(x_upload, wte_slice);
-            // Copy wpe[pos*n_embd..(pos+1)*n_embd] into emb_wpe_slice (reused buffer)
-            let wpe_offset = pos * n_embd;
-            let wpe_slice = &weights.wpe[wpe_offset..wpe_offset + n_embd];
-            let wpe_upload = self.emb_wpe_slice.as_ref().expect("emb_wpe_slice missing");
-            write_f32_slice(wpe_upload, wpe_slice);
-            // x_buf = wte + wpe
             let encoder = cmd_buffer.new_compute_command_encoder();
-            encoder.set_buffer(0, Some(x_upload), 0);
-            encoder.set_buffer(1, Some(wpe_upload), 0);
+            encoder.set_buffer(0, Some(wte_src), 0);
+            encoder.set_buffer(1, Some(wpe_src), 0);
             encoder.set_buffer(2, Some(x_buf), 0);
             dispatch_1d(encoder, &pipelines.elem_add, n_embd as u64);
             encoder.end_encoding();
@@ -580,7 +756,7 @@ impl InferenceBackend for GpuBackend {
             encoder.set_buffer(1, Some(v_buf), 0);
             encoder.set_buffer(2, Some(key_cache_buf), 0);
             encoder.set_buffer(3, Some(value_cache_buf), 0);
-            encoder.set_buffer(4, Some(pos_buf), 0); // cached at forward entry
+            encoder.set_buffer(4, Some(pos_buf), 0); // this token's slot
             encoder.set_buffer(5, Some(kv_dim_buf), 0);
             dispatch_1d(encoder, &pipelines.kv_store, kv_dim as u64);
 
@@ -710,19 +886,75 @@ impl InferenceBackend for GpuBackend {
             let encoder = cmd_buffer.new_compute_command_encoder();
             encoder.set_buffer(0, Some(&wb.lm_head), 0);
             encoder.set_buffer(1, Some(x_buf), 0);
-            encoder.set_buffer(2, Some(logits_buf), 0);
+            encoder.set_buffer(2, Some(logits_dst), 0);
             encoder.set_buffer(3, Some(n_embd_buf), 0); // in_dim = n_embd (cached)
             dispatch_1d(encoder, &pipelines.matmul, vocab_size as u64);
             encoder.end_encoding();
         }
+    }
+}
 
-        // ── Single commit + single wait (Issue 660): one CPU↔GPU sync for the
-        // whole forward. Step 4's CPU read of logits_buf is safe after this. ──
+impl InferenceBackend for GpuBackend {
+    fn forward<'a>(
+        &'a mut self,
+        ctx: &'a mut ForwardContext,
+        weights: &TransformerWeights,
+        cache: &mut MultiLayerKVCache,
+        token: usize,
+        pos: usize,
+        config: &Config,
+    ) -> &'a mut [f32] {
+        // Fall back to CPU if not compiled
+        if !self.compiled {
+            return katgpt_forward::forward(ctx, weights, cache, token, pos, config);
+        }
+
+        let seq_len = pos + 1; // number of cached positions
+        let n_embd = config.n_embd;
+        let vocab_size = config.vocab_size;
+
+        // Per-call CPU-side uploads (all land before the command buffer is
+        // committed): the token's embedding row + the pos/seq_len scalars.
+        // Reused pre-allocated buffers — no per-call Metal allocations.
+        let seq_len_buf = self
+            .seq_len_scalar
+            .as_ref()
+            .expect("seq_len_scalar missing");
+        let pos_buf = self.pos_scalar.as_ref().expect("pos_scalar missing");
+        write_scalar(seq_len_buf, &(seq_len as u32));
+        write_scalar(pos_buf, &(pos as u32));
+        let wte_upload = self.emb_wte_slice.as_ref().expect("emb_wte_slice missing");
+        let wpe_upload = self.emb_wpe_slice.as_ref().expect("emb_wpe_slice missing");
+        write_f32_slice(
+            wte_upload,
+            &weights.wte[token * n_embd..(token + 1) * n_embd],
+        );
+        write_f32_slice(wpe_upload, &weights.wpe[pos * n_embd..(pos + 1) * n_embd]);
+
+        // ── Single-submit (Issue 660): the whole forward is encoded into ONE
+        // command buffer with a single commit + wait at the end. Encoder order
+        // within a command buffer IS the GPU-side ordering — dispatches within
+        // a compute encoder serialize with memory visibility between them
+        // (the same guarantee the old per-block waits provided). The one
+        // mid-forward CPU dependency (the x→xr2 save in 2g) is a blit-encoder
+        // copy inside the buffer, so no CPU read happens before the wait. ──
+        let cmd_buffer = self.command_queue.new_command_buffer();
+        self.frame().encode_token(
+            cmd_buffer,
+            wte_upload,
+            wpe_upload,
+            self.logits_buf.as_ref().expect("logits_buf missing"),
+            pos_buf,
+            seq_len_buf,
+            pos,
+            config,
+        );
         cmd_buffer.commit();
         cmd_buffer.wait_until_completed();
 
-        // ── Step 4: Copy logits from GPU back to CPU ──
+        // ── Copy logits from GPU back to CPU ──
         {
+            let logits_buf = self.logits_buf.as_ref().expect("logits_buf missing");
             let ptr = logits_buf.contents() as *const f32;
             let gpu_logits = unsafe { std::slice::from_raw_parts(ptr, vocab_size) };
             ctx.logits[..vocab_size].copy_from_slice(gpu_logits);
@@ -873,6 +1105,27 @@ impl InferenceBackend for GpuBackend {
         let emb_wte_slice = zero_buffer(device, n_embd);
         let emb_wpe_slice = zero_buffer(device, n_embd);
 
+        // Batched width-N per-slot buffers (Issue 660 task 5): each slot is
+        // written exactly once before commit and read only by that token's
+        // dispatches — per-slot, not shared, because CPU writes to a shared
+        // buffer all land before GPU execution (every dispatch would see the
+        // last value).
+        let batch_wte_slices = (0..MAX_FORWARD_BATCH)
+            .map(|_| zero_buffer(device, n_embd))
+            .collect();
+        let batch_wpe_slices = (0..MAX_FORWARD_BATCH)
+            .map(|_| zero_buffer(device, n_embd))
+            .collect();
+        let batch_logits = (0..MAX_FORWARD_BATCH)
+            .map(|_| zero_buffer(device, config.vocab_size))
+            .collect();
+        let batch_pos_scalars = (0..MAX_FORWARD_BATCH)
+            .map(|_| scalar_buffer(device, &0u32))
+            .collect();
+        let batch_seq_len_scalars = (0..MAX_FORWARD_BATCH)
+            .map(|_| scalar_buffer(device, &0u32))
+            .collect();
+
         // Store everything
         self.pipelines = Some(pipelines);
         self.weight_buffers = Some(wb);
@@ -900,6 +1153,11 @@ impl InferenceBackend for GpuBackend {
         self.pos_scalar = Some(pos_scalar);
         self.emb_wte_slice = Some(emb_wte_slice);
         self.emb_wpe_slice = Some(emb_wpe_slice);
+        self.batch_wte_slices = Some(batch_wte_slices);
+        self.batch_wpe_slices = Some(batch_wpe_slices);
+        self.batch_logits = Some(batch_logits);
+        self.batch_pos_scalars = Some(batch_pos_scalars);
+        self.batch_seq_len_scalars = Some(batch_seq_len_scalars);
         self.config_snapshot = Some(config.clone());
         self.compiled = true;
         self.needs_recompile = false;
@@ -1193,6 +1451,259 @@ mod tests {
                 token_seq[i]
             );
         }
+    }
+
+    // ── Issue 660 task 5: batched width-N forward ──────────────────
+
+    #[test]
+    fn test_gpu_forward_batch_matches_sequential() {
+        let (config, weights, _, _) = micro_fixtures();
+        let token_seq: [usize; 5] = [0, 1, 3, 7, 5];
+
+        let mut backend = match GpuBackend::new() {
+            Ok(b) => b,
+            Err(_) => return, // Skip on non-Metal environments
+        };
+        if backend.compile(&weights, &config).is_err() {
+            return; // Skip if compilation fails
+        }
+
+        // Reference: sequential single-token GPU forwards + a follow-up
+        // token that probes KV-cache state divergence.
+        let (seq_logits, followup_seq): (Vec<Vec<f32>>, Vec<f32>) = {
+            let mut ctx = ForwardContext::new(&config);
+            let mut cache = MultiLayerKVCache::new(&config);
+            let mut acc = Vec::new();
+            for (pos, &tok) in token_seq.iter().enumerate() {
+                acc.push(
+                    backend
+                        .forward(&mut ctx, &weights, &mut cache, tok, pos, &config)
+                        .to_vec(),
+                );
+            }
+            let followup = backend
+                .forward(&mut ctx, &weights, &mut cache, 2, token_seq.len(), &config)
+                .to_vec();
+            (acc, followup)
+        };
+
+        // Batched: all 5 tokens at pos 0 in ONE command buffer + same follow-up.
+        let (batch_logits, followup_batch): (Vec<f32>, Vec<f32>) = {
+            let mut ctx = ForwardContext::new(&config);
+            let mut cache = MultiLayerKVCache::new(&config);
+            let batched =
+                backend.forward_batch(&mut ctx, &weights, &mut cache, &token_seq, 0, &config);
+            let followup = backend
+                .forward(&mut ctx, &weights, &mut cache, 2, token_seq.len(), &config)
+                .to_vec();
+            (batched, followup)
+        };
+
+        let vocab = config.vocab_size;
+        assert_eq!(batch_logits.len(), token_seq.len() * vocab);
+
+        // Bit-identical logits at every position: same kernels, same values,
+        // same per-token dispatch order — only the submit grouping differs.
+        for (i, row) in seq_logits.iter().enumerate() {
+            let brow = &batch_logits[i * vocab..(i + 1) * vocab];
+            for (j, (a, b)) in row.iter().zip(brow.iter()).enumerate() {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "batched logits differ from sequential at pos {i} logit {j}"
+                );
+            }
+        }
+
+        // The follow-up token catches KV-cache divergence the logits rows
+        // alone cannot (e.g. a mis-placed cache slot written beyond seq_len).
+        for (j, (a, b)) in followup_seq.iter().zip(followup_batch.iter()).enumerate() {
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "follow-up token diverged at logit {j} — KV cache state differs"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gpu_forward_batch_matches_cpu() {
+        if !transformer::CPU_FORWARD_USES_DEVICE_BASE_PATH {
+            eprintln!("Skipping: CPU forward uses a feature-gated path the GPU doesn't implement");
+            return;
+        }
+        let (config, weights, _, _) = micro_fixtures();
+        let token_seq: [usize; 5] = [0, 1, 3, 7, 5];
+
+        let mut backend = match GpuBackend::new() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        if backend.compile(&weights, &config).is_err() {
+            return;
+        }
+
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerKVCache::new(&config);
+        let batched =
+            backend.forward_batch(&mut ctx, &weights, &mut cache, &token_seq, 0, &config);
+
+        // CPU reference: same continuous sequence with shared cache
+        let mut ctx2 = ForwardContext::new(&config);
+        let mut cache2 = MultiLayerKVCache::new(&config);
+        let vocab = config.vocab_size;
+        for (i, &tok) in token_seq.iter().enumerate() {
+            let cpu = transformer::forward(&mut ctx2, &weights, &mut cache2, tok, i, &config);
+            let brow = &batched[i * vocab..(i + 1) * vocab];
+            let sim = cosine_similarity(cpu, brow);
+            eprintln!("batch pos {i} (token={tok}): cosine_sim={sim:.6}");
+            assert!(
+                sim >= 0.999,
+                "batch vs CPU mismatch at pos {i}: {sim:.6} < 0.999"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gpu_forward_batch_cpu_fallback() {
+        // Uncompiled backend: forward_batch loops the CPU forward per token.
+        let (config, weights, _, _) = micro_fixtures();
+        let mut backend = match GpuBackend::new() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        let token_seq: [usize; 5] = [0, 1, 3, 7, 5];
+
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerKVCache::new(&config);
+        let batched =
+            backend.forward_batch(&mut ctx, &weights, &mut cache, &token_seq, 0, &config);
+
+        let mut ctx2 = ForwardContext::new(&config);
+        let mut cache2 = MultiLayerKVCache::new(&config);
+        let vocab = config.vocab_size;
+        assert_eq!(batched.len(), token_seq.len() * vocab);
+        for (i, &tok) in token_seq.iter().enumerate() {
+            let cpu = transformer::forward(&mut ctx2, &weights, &mut cache2, tok, i, &config);
+            let brow = &batched[i * vocab..(i + 1) * vocab];
+            for (a, b) in cpu.iter().zip(brow.iter()) {
+                assert_eq!(a.to_bits(), b.to_bits(), "CPU fallback diverged at pos {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_gpu_forward_batch_empty() {
+        let (config, weights, _, _) = micro_fixtures();
+        let mut backend = match GpuBackend::new() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        if backend.compile(&weights, &config).is_err() {
+            return;
+        }
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerKVCache::new(&config);
+        let out = backend.forward_batch(&mut ctx, &weights, &mut cache, &[], 0, &config);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn bench_gpu_forward_batch_vs_sequential() {
+        let (config, weights, _, _) = micro_fixtures();
+        let mut backend = match GpuBackend::new() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        if backend.compile(&weights, &config).is_err() {
+            return;
+        }
+
+        // Global warm-up (shader JIT / queue warm) so the FIRST measured width
+        // does not absorb cold-start cost on top of its own discarded pairs.
+        for _ in 0..10 {
+            let mut ctx = ForwardContext::new(&config);
+            let mut cache = MultiLayerKVCache::new(&config);
+            backend.forward(&mut ctx, &weights, &mut cache, 0, 0, &config);
+            backend.forward_batch(
+                &mut ctx,
+                &weights,
+                &mut cache,
+                &[1, 2, 3],
+                1,
+                &config,
+            );
+        }
+
+        // Interleaved protocol (Bench 661/666 discipline): 2 warmup pairs
+        // discarded, 5 measure pairs, alternating seq→batch / batch→seq
+        // order within each pair, per-pair µs/token ratio as primary metric.
+        // Gates are per-width: the amortization model 2(E+W)/(2E+W) caps the
+        // width-2 ratio near ~1.3× (one saved wait out of two round trips),
+        // while widths 5-8 amortize the single wait across many encodes (~2×).
+        for width in [2usize, 5, 8] {
+            let tokens: Vec<usize> = (0..width).map(|i| (i * 3 + 1) % 26).collect();
+            let mut ratios: Vec<f64> = Vec::new();
+            let mut last_seq = 0.0;
+            let mut last_batch = 0.0;
+            for pair in 0..7 {
+                let (t_seq, t_batch) = if pair % 2 == 0 {
+                    let a = time_width_step(&mut backend, &weights, &config, &tokens, true);
+                    let b = time_width_step(&mut backend, &weights, &config, &tokens, false);
+                    (a, b)
+                } else {
+                    let b = time_width_step(&mut backend, &weights, &config, &tokens, false);
+                    let a = time_width_step(&mut backend, &weights, &config, &tokens, true);
+                    (a, b)
+                };
+                if pair >= 2 {
+                    ratios.push(t_seq / t_batch);
+                    last_seq = t_seq;
+                    last_batch = t_batch;
+                }
+            }
+            ratios.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let median = ratios[ratios.len() / 2];
+            eprintln!(
+                "width {width}: seq {last_seq:.1} µs/token vs batch {last_batch:.1} µs/token — median speedup {median:.2}× (ratios: {ratios:?})"
+            );
+            #[cfg(not(debug_assertions))]
+            {
+                let floor = if width <= 2 { 1.1 } else { 1.5 };
+                assert!(
+                    median > floor,
+                    "batched forward should beat sequential at width {width} \
+                     (median {median:.2}×, floor {floor})"
+                );
+            }
+        }
+    }
+
+    /// Time one width-N step (sequential singles or one forward_batch),
+    /// returning µs/token. Fresh CPU context/cache each iteration; GPU cache
+    /// slots below seq_len are rewritten before being read (stale rows beyond
+    /// seq_len are never read), so buffer reuse across iterations is correct.
+    fn time_width_step(
+        backend: &mut GpuBackend,
+        weights: &TransformerWeights,
+        config: &Config,
+        tokens: &[usize],
+        sequential: bool,
+    ) -> f64 {
+        const ITERS: usize = 50;
+        let start = std::time::Instant::now();
+        for _ in 0..ITERS {
+            let mut ctx = ForwardContext::new(config);
+            let mut cache = MultiLayerKVCache::new(config);
+            if sequential {
+                for (i, &tok) in tokens.iter().enumerate() {
+                    backend.forward(&mut ctx, weights, &mut cache, tok, i, config);
+                }
+            } else {
+                backend.forward_batch(&mut ctx, weights, &mut cache, tokens, 0, config);
+            }
+        }
+        start.elapsed().as_micros() as f64 / (ITERS * tokens.len()) as f64
     }
 
     // ── Plan 176: Latency Benchmarks ────────────────────────────

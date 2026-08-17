@@ -1,6 +1,8 @@
 # Issue 660 — Single-submit (graph-fused) Metal forward
 
-**Status:** Open
+**Status:** Resolved (all 5 tasks) — removed per the noise-reduction rule;
+resolution record: Bench 661 (tasks 1–4) + Bench 662 (task 5) + this file's
+git history.
 **Opened:** 2026-08-16
 **Owner:** katgpt-rs
 **Related Benchmarks:** 656 (MTP Metal batch-width floor)
@@ -62,8 +64,12 @@ off even if the MTP pivot is abandoned.
 - [x] Measure width-1 decode tok/s before and after — this is the standalone
       win. (2026-08-17 — interleaved protocol, 5 pairs: median ratio 0.1272
       → **7.86× faster** on micro, 2019-2063 → 255-282 µs/token; Bench 661)
-- [ ] Only then: batched width-N forward (`InferenceBackend::forward` is
-      single-token: `token: usize, pos: usize`).
+- [x] Only then: batched width-N forward (`InferenceBackend::forward` is
+      single-token: `token: usize, pos: usize`). (2026-08-17 — `GpuBackend::
+      forward_batch(tokens, pos)`: N tokens in ONE command buffer, per-slot
+      buffers for pos/seq_len/embeddings/logits, shared per-token encode body;
+      G1 bit-identical vs sequential incl. KV-cache follow-up probe, G2
+      1.35×/2.19×/2.37× at widths 2/5/8 — Bench 662)
 
 ## Resolution (2026-08-17)
 
@@ -75,6 +81,22 @@ waits provided; the code already relied on it for matmul→relu→matmul).
 The `n_head` attention heads share one encoder (shared `scores_buf`
 ordering preserved by encoder serialization). G1 bit-identical; G2 median
 interleaved ratio 0.1272 (7.86×) on the overhead-dominated micro config;
-G3 23/23 lib tests + clippy clean. Task 5 (batched width-N) stays open per
-the "only then" ordering — the single-submit prerequisite it depended on
-is now in place.
+G3 23/23 lib tests + clippy clean.
+
+## Resolution addendum (2026-08-17, task 5)
+
+**Task 5 DONE, GOAT PASS (Bench 662) — the issue is now fully resolved.**
+`GpuBackend::forward_batch(tokens, pos)` processes N tokens in ONE command
+buffer with a single commit + wait, returning logits for EVERY position
+(the MTP verification shape). Per-slot buffers carry each token's
+pos/seq_len/embedding/logits (shared buffers cannot work — CPU writes all
+land before GPU execution, so every dispatch would see the last value);
+the per-token dispatch body is shared verbatim with `forward` via
+`GpuFrame::encode_token`. G1: bit-identical vs sequential forwards incl. a
+follow-up KV-cache probe. G2 (interleaved): 1.35× / 2.19× / 2.37× at widths
+2/5/8 — width-8 runs at 139.4 µs/token, 2.5× below the post-661 single-token
+path. The width-2 ceiling is structural (`N(E+W)/(N·E+W)` amortization of
+one wait); raising it further needs GEMM-shaped matmuls (M=N — new MSL
+kernels, out of scope). The `InferenceBackend` trait is untouched; promote
+`forward_batch` to a trait method when an MTP consumer needs
+backend-agnostic batching. MTP/speculative work on Metal is unblocked.
