@@ -91,11 +91,24 @@ wants this.
 
 ## Tasks
 
-- [ ] Bigram table builder from corpus counts (deterministic).
-- [ ] Top-`m` successor storage + marginal emission.
-- [ ] Wire into `build_dd_tree`.
-- [ ] Bench on Bonsai; Metal and 4090.
-- [ ] Note: Plan 339's scheduler GOAT is *vacuous* today ("katgpt-rs default is
-      single-request, so the gate is vacuous without a multi-request batch
-      caller"). This issue does not fix that; a real multi-request caller is
-      separate work.
+- [x] Bigram table builder from corpus counts (deterministic). — `BigramMarkovBuilder` (packed-u64 sort + two-pointer-pass; `(count desc, next asc)` top-m; bit-identical rebuilds, brute-force-reference-pinned).
+- [x] Top-`m` successor storage + marginal emission. — `BigramMarkovTable` (CSR) + `bigram_predict`/`BigramMarginalBuffer`: zero-alloc steady state, O(steps × top_m) touched-reset sparse writes, greedy-chain conditioning, zero-row fallback for unseen prevs (the seam skips `prob ≤ 0` — unseen proposes nothing).
+- [x] Wire into `build_dd_tree`. — `bigram_build_tree` (emits `config.draft_lookahead` marginals → `build_dd_tree` seam).
+- [-] Bench on Bonsai; Metal and 4090. — **Primitive gate landed (Bench 663, 2026-08-17)**: 181 ns/call (23 ns/step) at Bonsai scale on M3 release — ~5,600× under a 6-layer drafter forward per step (the mode-2 avoidance measured); 17 MB worst-case table vs 268 MB low-rank. **Deferred**: the consumer gate (acceptance rate at equal draft depth + wall-clock on Metal AND 4090 against the Bonsai target) — belongs to the riir-ai Bonsai consumer (Plan 528), and the 4090 is occupied by a sibling's p336 run. The `bigram_markov` feature stays opt-in until this gate passes.
+
+> Note: Plan 339's scheduler GOAT is *vacuous* today ("katgpt-rs default is
+> single-request, so the gate is vacuous without a multi-request batch
+> caller"). This issue does not fix that; a real multi-request caller is
+> separate work.
+
+## Progress log
+
+- **2026-08-17 (T1–T3 + primitive gate)**: substrate-first check run — no
+  existing bigram/n-gram/successor-table substrate in any of the 7 repos
+  (`bigram`/`markov`/`ngram`/`successor` variants grepped; `belief_drafter`
+  is the trained-MLP sibling, not a conflict). Module landed in
+  `katgpt-speculative` beside `dflash.rs`/`dd_tree/` per the ownership note;
+  feature `bigram_markov = []` (zero deps). The issue's Issue-708 caveat is
+  moot — 708 resolved (`42b564759`). The batched width-N Metal forward
+  (Bench 662) landed the verification side, so the remaining gap is exactly
+  the consumer gate above. Record: [Bench 663](../.benchmarks/663_bigram_markov_head_primitive.md).
