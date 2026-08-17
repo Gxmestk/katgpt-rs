@@ -477,7 +477,7 @@ fn t1_sigmoid_parallax_stays_stable_unclipped() {
 
     let init_mse = parallax_forward_mse(&x, &y, &w_q, &w_k, &w_v, &w_r, &mut buf);
     eprintln!("\n=== T1: sigmoid Parallax, NO mitigation (regression anchor — expect stable) ===");
-    eprintln!("init mse = {:.6}", init_mse);
+    eprintln!("init mse = {init_mse:.6}");
 
     let mut last_mse = init_mse;
     for step in 0..STEPS {
@@ -511,17 +511,11 @@ fn t1_sigmoid_parallax_stays_stable_unclipped() {
         }
     }
 
-    eprintln!(
-        "T1 verdict: final mse = {:.6} (init {:.6})",
-        last_mse, init_mse
-    );
+    eprintln!("T1 verdict: final mse = {last_mse:.6} (init {init_mse:.6})");
     assert!(
         last_mse < init_mse,
-        "T1 regression: sigmoid Parallax did not improve over {} steps \
-         (init={:.6}, final={:.6}). Expected monotonic descent on a learnable target.",
-        STEPS,
-        init_mse,
-        last_mse,
+        "T1 regression: sigmoid Parallax did not improve over {STEPS} steps \
+         (init={init_mse:.6}, final={last_mse:.6}). Expected monotonic descent on a learnable target.",
     );
 }
 
@@ -566,7 +560,7 @@ fn t2_softmax_parallax_diverges_unclipped() {
     eprintln!(
         "\n=== T2: softmax Parallax, NO mitigation (regression anchor — expect divergence ~step 325-350) ==="
     );
-    eprintln!("init mse = {:.6}", init_mse);
+    eprintln!("init mse = {init_mse:.6}");
 
     let mut diverged_at: Option<usize> = None;
     let mut last_mse = init_mse;
@@ -592,17 +586,12 @@ fn t2_softmax_parallax_diverges_unclipped() {
         }
     }
 
-    eprintln!(
-        "T2 verdict: final mse = {:.6}, diverged_at = {:?}",
-        last_mse, diverged_at
-    );
+    eprintln!("T2 verdict: final mse = {last_mse:.6}, diverged_at = {diverged_at:?}");
     assert!(
         !last_mse.is_finite(),
-        "T2 regression anchor broken: softmax Parallax stayed finite for {} steps \
-         (final mse = {:.6}). The 2026-06-19 inverted divergence pattern no longer \
+        "T2 regression anchor broken: softmax Parallax stayed finite for {STEPS} steps \
+         (final mse = {last_mse:.6}). The 2026-06-19 inverted divergence pattern no longer \
          reproduces — investigate whether the forward path changed.",
-        STEPS,
-        last_mse,
     );
     assert!(
         diverged_at.is_some(),
@@ -637,10 +626,9 @@ fn t3b_sigmoid_parallax_stabilized_by_wr_grad_clip() {
 
     let init_mse = parallax_forward_mse(&x, &y, &w_q, &w_k, &w_v, &w_r, &mut buf);
     eprintln!(
-        "\n=== T3b: sigmoid Parallax, W_R gradient clip ‖∇_W_R‖ ≤ {} (expect stable) ===",
-        W_R_MAX_GRAD_NORM,
+        "\n=== T3b: sigmoid Parallax, W_R gradient clip ‖∇_W_R‖ ≤ {W_R_MAX_GRAD_NORM} (expect stable) ===",
     );
-    eprintln!("init mse = {:.6}", init_mse);
+    eprintln!("init mse = {init_mse:.6}");
 
     let mut last_mse = init_mse;
     for step in 0..STEPS {
@@ -656,21 +644,15 @@ fn t3b_sigmoid_parallax_stabilized_by_wr_grad_clip() {
         }
     }
 
-    eprintln!(
-        "T3b verdict: final mse = {:.6} (init {:.6})",
-        last_mse, init_mse
-    );
+    eprintln!("T3b verdict: final mse = {last_mse:.6} (init {init_mse:.6})");
     assert!(
         last_mse.is_finite(),
         "T3b mitigation failed: sigmoid Parallax diverged even with W_R gradient \
-         clipping (final mse = {:.6}). Issue 002 T3b mitigation is insufficient.",
-        last_mse,
+         clipping (final mse = {last_mse:.6}). Issue 002 T3b mitigation is insufficient.",
     );
     assert!(
         last_mse < init_mse,
-        "T3b mitigation: training did not improve (init={:.6}, final={:.6}). \
+        "T3b mitigation: training did not improve (init={init_mse:.6}, final={last_mse:.6}). \
          Stability without progress is not a useful mitigation.",
-        init_mse,
-        last_mse,
     );
 }
