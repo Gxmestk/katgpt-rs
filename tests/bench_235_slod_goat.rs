@@ -125,7 +125,7 @@ fn t3_eigenvalue_sum_conservation() {
 #[test]
 fn t4_hsbm_hierarchy_produces_boundaries() {
     // Create two well-separated clusters with noise
-    let mut embeddings = Vec::new();
+    let mut embeddings = Vec::with_capacity(25);
     // Cluster 1: near origin
     for i in 0..25 {
         embeddings.push(0.05 * (i as f32 * 0.1).cos());
@@ -340,13 +340,12 @@ fn g5_boundary_scan_1k_nodes_under_50ms() {
     let boundaries = SlodOperator::boundary_scan(&eigenvalues, &eigenvectors, 0, n, &config);
     let elapsed = start.elapsed();
 
-    println!("G5: BoundaryScan 1K nodes: {:?}", elapsed);
+    println!("G5: BoundaryScan 1K nodes: {elapsed:?}");
     println!("  Boundaries found: {}", boundaries.len());
 
     assert!(
         elapsed.as_millis() <= 100,
-        "BoundaryScan should complete in ≤ 100ms (debug), took {:?}",
-        elapsed
+        "BoundaryScan should complete in ≤ 100ms (debug), took {elapsed:?}"
     );
 }
 
@@ -383,8 +382,8 @@ fn g6_frechet_convergence() {
         "Fréchet mean should be inside ball, ||μ||² = {norm_sq}"
     );
 
-    println!("G6: Fréchet mean convergence: {:?}", elapsed);
-    println!("  ||μ||² = {:.6}", norm_sq);
+    println!("G6: Fréchet mean convergence: {elapsed:?}");
+    println!("  ||μ||² = {norm_sq:.6}");
 }
 
 // ── GOAT G1: SlodPruner overhead ≤ 100ns per call (hot path) ────

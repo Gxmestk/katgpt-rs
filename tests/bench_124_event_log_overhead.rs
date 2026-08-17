@@ -345,8 +345,7 @@ fn test_fork_and_replay_counterfactual() {
     assert!(!diff.is_identical());
 
     eprintln!(
-        "  [Bench] Counterfactual (fork at 250, alt 250 moves): fork={:?}, diff={:?}, replay_parent={:?}, replay_fork={:?}",
-        elapsed_fork, elapsed_diff, elapsed_replay_parent, elapsed_replay_fork,
+        "  [Bench] Counterfactual (fork at 250, alt 250 moves): fork={elapsed_fork:?}, diff={elapsed_diff:?}, replay_parent={elapsed_replay_parent:?}, replay_fork={elapsed_replay_fork:?}",
     );
 }
 

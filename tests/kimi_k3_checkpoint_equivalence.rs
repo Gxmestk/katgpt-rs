@@ -188,7 +188,14 @@ fn run_equivalence(config: &KimiK3ModelConfig, tokens: &[u32]) -> f32 {
         (0..l).map(|_| TokenSavedActivations::new()).collect();
     rt_full.reset();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(config, &weights, &mut rt_full, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            config,
+            &weights,
+            &mut rt_full,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
     let d_logits = make_d_logits(&saved_tokens);
     let mut grads_full = KimiK3ModelGradients::zeros_like(config, &weights);
@@ -221,9 +228,18 @@ fn run_equivalence(config: &KimiK3ModelConfig, tokens: &[u32]) -> f32 {
         .collect();
     rt_ckpt.reset();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_ckpt(config, &weights, &mut rt_ckpt, tok, pos, &mut ckpt_tokens[pos]);
+        kimi_k3_forward_token_ckpt(
+            config,
+            &weights,
+            &mut rt_ckpt,
+            tok,
+            pos,
+            &mut ckpt_tokens[pos],
+        );
     }
-    let ckpt = SequenceCheckpoint { tokens: ckpt_tokens };
+    let ckpt = SequenceCheckpoint {
+        tokens: ckpt_tokens,
+    };
     let mut grads_ckpt = KimiK3ModelGradients::zeros_like(config, &weights);
     kimi_k3_backward_sequence_ckpt(
         config,
@@ -242,17 +258,13 @@ fn checkpoint_equivalence_all_kda_3_layers_2_tokens() {
     let config = small_config_all_kda();
     let tokens = vec![0u32, 1];
     let max_diff = run_equivalence(&config, &tokens);
-    eprintln!(
-        "all-KDA 3-layer 2-token: max abs diff = {:.2e}",
-        max_diff
-    );
+    eprintln!("all-KDA 3-layer 2-token: max abs diff = {max_diff:.2e}");
     // Both backwards use the same analytic formulas on the same forward values;
     // differences come only from f32 reordering in cloned snapshots. Should be
     // near zero (typically < 1e-5).
     assert!(
         max_diff < 1e-3,
-        "checkpoint vs non-checkpoint grad diff too large: {:.2e}",
-        max_diff
+        "checkpoint vs non-checkpoint grad diff too large: {max_diff:.2e}"
     );
 }
 
@@ -261,14 +273,10 @@ fn checkpoint_equivalence_with_mla_3_tokens() {
     let config = small_config();
     let tokens = vec![0u32, 1, 2];
     let max_diff = run_equivalence(&config, &tokens);
-    eprintln!(
-        "MLA+KDA 3-layer 3-token: max abs diff = {:.2e}",
-        max_diff
-    );
+    eprintln!("MLA+KDA 3-layer 3-token: max abs diff = {max_diff:.2e}");
     assert!(
         max_diff < 1e-3,
-        "checkpoint vs non-checkpoint grad diff too large: {:.2e}",
-        max_diff
+        "checkpoint vs non-checkpoint grad diff too large: {max_diff:.2e}"
     );
 }
 
@@ -280,13 +288,9 @@ fn checkpoint_equivalence_with_mla_block_boundary() {
     config.attn_res_config.block_size = 2;
     let tokens = vec![0u32, 1, 2];
     let max_diff = run_equivalence(&config, &tokens);
-    eprintln!(
-        "MLA+KDA block_size=2 3-token: max abs diff = {:.2e}",
-        max_diff
-    );
+    eprintln!("MLA+KDA block_size=2 3-token: max abs diff = {max_diff:.2e}");
     assert!(
         max_diff < 1e-3,
-        "checkpoint vs non-checkpoint grad diff too large: {:.2e}",
-        max_diff
+        "checkpoint vs non-checkpoint grad diff too large: {max_diff:.2e}"
     );
 }

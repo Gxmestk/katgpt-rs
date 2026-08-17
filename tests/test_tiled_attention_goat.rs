@@ -27,10 +27,7 @@ fn cos_sim(a: &[f32], b: &[f32]) -> f32 {
         norm_b += y * y;
     }
     let denom = norm_a.sqrt() * norm_b.sqrt();
-    match denom < 1e-12 {
-        true => 0.0,
-        false => dot / denom,
-    }
+    if denom < 1e-12 { 0.0 } else { dot / denom }
 }
 
 /// Reference attention: full score matrix materialization with row-wise softmax.

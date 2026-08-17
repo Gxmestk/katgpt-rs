@@ -165,10 +165,7 @@ fn prof_dense_mesh_forward_scaling() {
         }
         let ratio = mean_us / baseline_mean_us;
 
-        println!(
-            "│ {:>4} │ {:>12.2} │ {:>12.2} │ {:>16.0} │ {:>17.2}x │",
-            w, mean_us, p99_us, qps, ratio
-        );
+        println!("│ {w:>4} │ {mean_us:>12.2} │ {p99_us:>12.2} │ {qps:>16.0} │ {ratio:>17.2}x │");
     }
     println!("└──────────────────────────────────────────────────────────────────────────┘");
 
@@ -292,8 +289,7 @@ fn prof_dense_mesh_aggregation_overhead() {
             0.0
         };
         println!(
-            "│ {:>7} │ {:>12.1} │  per-edge ≈ {per_edge_ns:>6.1} ns                          │",
-            fan_in, mean_ns
+            "│ {fan_in:>7} │ {mean_ns:>12.1} │  per-edge ≈ {per_edge_ns:>6.1} ns                          │"
         );
     }
     println!("└──────────────────────────────────────────────────────────────────────────┘");
@@ -399,10 +395,7 @@ fn prof_dense_mesh_compute_router_o1() {
     println!();
     println!("┌──────────────────────────────────────────────────────────────────────────┐");
     println!("│ T4: compute_router::pick_compute() dispatch latency                      │");
-    println!(
-        "│   calls={}, total={elapsed:?}                                          │",
-        n_iters
-    );
+    println!("│   calls={n_iters}, total={elapsed:?}                                          │");
     println!("│   ns/call   : {ns_per_call:>10.2} ns                                       │");
     println!(
         "│   threshold : {budget_ns:>10.2} ns ({})                            │",

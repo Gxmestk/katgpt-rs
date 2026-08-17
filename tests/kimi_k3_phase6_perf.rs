@@ -29,9 +29,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use katgpt_rs::kimi_k3::loader::load_kimi_k3;
-use katgpt_rs::kimi_k3::model::{
-    KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token,
-};
+use katgpt_rs::kimi_k3::model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
 
 fn model_dir() -> String {
     std::env::var("KIMI_K3_MODEL_DIR").unwrap_or_else(|_| {
@@ -109,8 +107,10 @@ fn g2_decode_throughput_tok_per_sec() {
     eprintln!("║  Vocab     : 163,840                                             ║");
     eprintln!("║  Hidden    : 1,024                                              ║");
     eprintln!("║  Tokens    : {N_MEASURE:<5}                                            ║");
-    eprintln!("║  Time      : {:.3} s                                          ", secs);
-    eprintln!("║  Throughput: {tok_s:>7.1} tok/s  ({ms_per_tok:>6.2} ms/tok)                       ", );
+    eprintln!("║  Time      : {secs:.3} s                                          ");
+    eprintln!(
+        "║  Throughput: {tok_s:>7.1} tok/s  ({ms_per_tok:>6.2} ms/tok)                       ",
+    );
     eprintln!("╚══════════════════════════════════════════════════════════════════╝");
     eprintln!();
     eprintln!("   Note: G2 is informational for infrastructure additions (Proposal 032");

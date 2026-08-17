@@ -214,14 +214,8 @@ fn bench_kog_gemma2_scale_goat() {
     let speedup = opt_tok_s / base_tok_s;
     let g2_pass = speedup >= 0.95;
 
-    eprintln!(
-        "    Baseline:  {:.0} tok/s, {:.1} µs/tok, MBU {:.1}%",
-        base_tok_s, base_us_tok, base_mbu
-    );
-    eprintln!(
-        "    Optimized: {:.0} tok/s, {:.1} µs/tok, MBU {:.1}%",
-        opt_tok_s, opt_us_tok, opt_mbu
-    );
+    eprintln!("    Baseline:  {base_tok_s:.0} tok/s, {base_us_tok:.1} µs/tok, MBU {base_mbu:.1}%");
+    eprintln!("    Optimized: {opt_tok_s:.0} tok/s, {opt_us_tok:.1} µs/tok, MBU {opt_mbu:.1}%");
     eprintln!(
         "    Speedup:   {:.3}x ({:+.1}%){}",
         speedup,

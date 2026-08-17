@@ -16,7 +16,8 @@
 use katgpt_attn::gdn2::kda_forward::KdaConfig;
 use katgpt_attn::mla::MlaConfig;
 use katgpt_rs::kimi_k3::backward::{
-    KimiK3ModelGradients, kimi_k3_backward_sequence, kimi_k3_forward_token_saved, TokenSavedActivations,
+    KimiK3ModelGradients, TokenSavedActivations, kimi_k3_backward_sequence,
+    kimi_k3_forward_token_saved,
 };
 use katgpt_rs::kimi_k3::decoder_layer::KimiFfnConfig;
 use katgpt_rs::kimi_k3::loader::KimiK3ModelWeights;
@@ -55,7 +56,11 @@ fn small_config_layers(use_mla: bool, num_layers: usize) -> KimiK3ModelConfig {
         vocab_size: 32,
         num_layers,
         rms_eps: 1e-5,
-        mla_layer_indices: if use_mla { vec![num_layers - 1] } else { vec![] },
+        mla_layer_indices: if use_mla {
+            vec![num_layers - 1]
+        } else {
+            vec![]
+        },
         mla_config: MlaConfig {
             kv_lora_rank: 8,
             q_lora_rank: 8,
@@ -141,14 +146,32 @@ fn gradient_check_no_attn_res() {
     let tokens: Vec<u32> = vec![0, 1];
 
     let mut runtime = KimiK3Runtime::new(&config, l);
-    let mut saved_tokens: Vec<TokenSavedActivations> = (0..l).map(|_| TokenSavedActivations::new()).collect();
+    let mut saved_tokens: Vec<TokenSavedActivations> =
+        (0..l).map(|_| TokenSavedActivations::new()).collect();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            &config,
+            &weights,
+            &mut runtime,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
 
-    let d_logits: Vec<Vec<f32>> = saved_tokens.iter().map(|s| s.logits.iter().map(|&v| 2.0 * v).collect()).collect();
+    let d_logits: Vec<Vec<f32>> = saved_tokens
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
     let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
-    kimi_k3_backward_sequence(&config, &weights, &runtime, &saved_tokens, &d_logits, &mut grads);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved_tokens,
+        &d_logits,
+        &mut grads,
+    );
 
     let mut max_rel_err = 0.0f32;
     let mut max_rel_err_label = String::new();
@@ -173,11 +196,19 @@ fn gradient_check_no_attn_res() {
 
     // Check embed_weight
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.embed_weight[j], grads.embed_weight[j], format!("embed[{}]", j));
+        fd_check!(
+            &mut weights_mut.embed_weight[j],
+            grads.embed_weight[j],
+            format!("embed[{}]", j)
+        );
     }
     // Check final_norm
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.final_norm_weight[j], grads.final_norm_weight[j], format!("final_norm[{}]", j));
+        fd_check!(
+            &mut weights_mut.final_norm_weight[j],
+            grads.final_norm_weight[j],
+            format!("final_norm[{}]", j)
+        );
     }
     // Check per-layer input_ln
     for li in 0..config.num_layers {
@@ -190,8 +221,17 @@ fn gradient_check_no_attn_res() {
         }
     }
 
-    eprintln!("No-attn-res gradient check: max rel_err = {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
-    assert!(max_rel_err < tol, "no-attn-res gradient check FAILED: {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
+    eprintln!(
+        "No-attn-res gradient check: max rel_err = {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
+    assert!(
+        max_rel_err < tol,
+        "no-attn-res gradient check FAILED: {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
 }
 
 /// Single-layer gradient check — minimal test isolating the basic backward.
@@ -207,14 +247,32 @@ fn gradient_check_single_layer() {
     let tokens: Vec<u32> = vec![0];
 
     let mut runtime = KimiK3Runtime::new(&config, l);
-    let mut saved_tokens: Vec<TokenSavedActivations> = (0..l).map(|_| TokenSavedActivations::new()).collect();
+    let mut saved_tokens: Vec<TokenSavedActivations> =
+        (0..l).map(|_| TokenSavedActivations::new()).collect();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            &config,
+            &weights,
+            &mut runtime,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
 
-    let d_logits: Vec<Vec<f32>> = saved_tokens.iter().map(|s| s.logits.iter().map(|&v| 2.0 * v).collect()).collect();
+    let d_logits: Vec<Vec<f32>> = saved_tokens
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
     let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
-    kimi_k3_backward_sequence(&config, &weights, &runtime, &saved_tokens, &d_logits, &mut grads);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved_tokens,
+        &d_logits,
+        &mut grads,
+    );
 
     let mut max_rel_err = 0.0f32;
     let mut max_rel_err_label = String::new();
@@ -238,17 +296,38 @@ fn gradient_check_single_layer() {
     }
 
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.embed_weight[j], grads.embed_weight[j], format!("embed[{}]", j));
+        fd_check!(
+            &mut weights_mut.embed_weight[j],
+            grads.embed_weight[j],
+            format!("embed[{}]", j)
+        );
     }
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.final_norm_weight[j], grads.final_norm_weight[j], format!("final_norm[{}]", j));
+        fd_check!(
+            &mut weights_mut.final_norm_weight[j],
+            grads.final_norm_weight[j],
+            format!("final_norm[{}]", j)
+        );
     }
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.layers[0].input_layernorm_weight[j], grads.layers[0].input_layernorm_weight[j], format!("L0_input_ln[{}]", j));
+        fd_check!(
+            &mut weights_mut.layers[0].input_layernorm_weight[j],
+            grads.layers[0].input_layernorm_weight[j],
+            format!("L0_input_ln[{}]", j)
+        );
     }
 
-    eprintln!("Single-layer gradient check: max rel_err = {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
-    assert!(max_rel_err < tol, "single-layer gradient check FAILED: {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
+    eprintln!(
+        "Single-layer gradient check: max rel_err = {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
+    assert!(
+        max_rel_err < tol,
+        "single-layer gradient check FAILED: {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
 }
 
 /// Gradient check with ALL KDA layers (no MLA) — isolates KDA backward.
@@ -264,14 +343,32 @@ fn gradient_check_all_kda() {
     let tokens: Vec<u32> = vec![0, 1];
 
     let mut runtime = KimiK3Runtime::new(&config, l);
-    let mut saved_tokens: Vec<TokenSavedActivations> = (0..l).map(|_| TokenSavedActivations::new()).collect();
+    let mut saved_tokens: Vec<TokenSavedActivations> =
+        (0..l).map(|_| TokenSavedActivations::new()).collect();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            &config,
+            &weights,
+            &mut runtime,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
 
-    let d_logits: Vec<Vec<f32>> = saved_tokens.iter().map(|s| s.logits.iter().map(|&v| 2.0 * v).collect()).collect();
+    let d_logits: Vec<Vec<f32>> = saved_tokens
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
     let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
-    kimi_k3_backward_sequence(&config, &weights, &runtime, &saved_tokens, &d_logits, &mut grads);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved_tokens,
+        &d_logits,
+        &mut grads,
+    );
 
     let mut max_rel_err = 0.0f32;
     let mut max_rel_err_label = String::new();
@@ -295,10 +392,18 @@ fn gradient_check_all_kda() {
     }
 
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.embed_weight[j], grads.embed_weight[j], format!("embed[{}]", j));
+        fd_check!(
+            &mut weights_mut.embed_weight[j],
+            grads.embed_weight[j],
+            format!("embed[{}]", j)
+        );
     }
     for j in 0..d.min(4) {
-        fd_check!(&mut weights_mut.final_norm_weight[j], grads.final_norm_weight[j], format!("final_norm[{}]", j));
+        fd_check!(
+            &mut weights_mut.final_norm_weight[j],
+            grads.final_norm_weight[j],
+            format!("final_norm[{}]", j)
+        );
     }
     for li in 0..config.num_layers {
         for j in 0..d.min(2) {
@@ -310,8 +415,17 @@ fn gradient_check_all_kda() {
         }
     }
 
-    eprintln!("All-KDA gradient check: max rel_err = {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
-    assert!(max_rel_err < tol, "all-KDA gradient check FAILED: {:.4}% at {}", max_rel_err * 100.0, max_rel_err_label);
+    eprintln!(
+        "All-KDA gradient check: max rel_err = {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
+    assert!(
+        max_rel_err < tol,
+        "all-KDA gradient check FAILED: {:.4}% at {}",
+        max_rel_err * 100.0,
+        max_rel_err_label
+    );
 }
 
 #[test]
@@ -339,17 +453,35 @@ fn gradient_check_model(config: KimiK3ModelConfig, l: usize, label: &str) {
 
     // Forward with saved for each token
     let mut runtime = KimiK3Runtime::new(&config, l);
-    let mut saved_tokens: Vec<TokenSavedActivations> = (0..l).map(|_| TokenSavedActivations::new()).collect();
+    let mut saved_tokens: Vec<TokenSavedActivations> =
+        (0..l).map(|_| TokenSavedActivations::new()).collect();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            &config,
+            &weights,
+            &mut runtime,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
 
     // dL/d(logits) = 2 * logits
-    let d_logits: Vec<Vec<f32>> = saved_tokens.iter().map(|s| s.logits.iter().map(|&v| 2.0 * v).collect()).collect();
+    let d_logits: Vec<Vec<f32>> = saved_tokens
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
 
     // Analytic backward
     let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
-    kimi_k3_backward_sequence(&config, &weights, &runtime, &saved_tokens, &d_logits, &mut grads);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved_tokens,
+        &d_logits,
+        &mut grads,
+    );
 
     // Finite-difference check
     let mut max_rel_err = 0.0f32;
@@ -470,7 +602,13 @@ fn gradient_check_model(config: KimiK3ModelConfig, l: usize, label: &str) {
     all_errs.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap());
     eprintln!("Top 15 errors:");
     for (label, analytic, numeric, err) in all_errs.iter().take(15) {
-        eprintln!("  {:<30} analytic={:>12.6e}  numeric={:>12.6e}  rel_err={:.4}%", label, analytic, numeric, err * 100.0);
+        eprintln!(
+            "  {:<30} analytic={:>12.6e}  numeric={:>12.6e}  rel_err={:.4}%",
+            label,
+            analytic,
+            numeric,
+            err * 100.0
+        );
     }
 
     assert!(
@@ -494,26 +632,50 @@ fn backward_smoke_kimi_k3_0_40b() {
     let tokens: Vec<u32> = vec![0, 1, 2];
 
     let mut runtime = KimiK3Runtime::new(&config, l);
-    let mut saved_tokens: Vec<TokenSavedActivations> = (0..l).map(|_| TokenSavedActivations::new()).collect();
+    let mut saved_tokens: Vec<TokenSavedActivations> =
+        (0..l).map(|_| TokenSavedActivations::new()).collect();
     for (pos, &tok) in tokens.iter().enumerate() {
-        kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved_tokens[pos]);
+        kimi_k3_forward_token_saved(
+            &config,
+            &weights,
+            &mut runtime,
+            tok,
+            pos,
+            &mut saved_tokens[pos],
+        );
     }
 
-    let d_logits: Vec<Vec<f32>> = saved_tokens.iter().map(|s| s.logits.iter().map(|&v| 2.0 * v).collect()).collect();
+    let d_logits: Vec<Vec<f32>> = saved_tokens
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
     let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
-    kimi_k3_backward_sequence(&config, &weights, &runtime, &saved_tokens, &d_logits, &mut grads);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved_tokens,
+        &d_logits,
+        &mut grads,
+    );
 
     let check_finite = |v: &[f32], label: &str| {
         for (i, &val) in v.iter().enumerate() {
-            assert!(val.is_finite(), "non-finite gradient at {}[{}]: {}", label, i, val);
+            assert!(
+                val.is_finite(),
+                "non-finite gradient at {label}[{i}]: {val}"
+            );
         }
     };
     check_finite(&grads.embed_weight, "embed_weight");
     check_finite(&grads.final_norm_weight, "final_norm_weight");
     check_finite(&grads.lm_head_weight, "lm_head_weight");
     for (i, lg) in grads.layers.iter().enumerate() {
-        check_finite(&lg.input_layernorm_weight, &format!("layer{}.input_ln", i));
-        check_finite(&lg.post_attention_layernorm_weight, &format!("layer{}.post_attn_ln", i));
+        check_finite(&lg.input_layernorm_weight, &format!("layer{i}.input_ln"));
+        check_finite(
+            &lg.post_attention_layernorm_weight,
+            &format!("layer{i}.post_attn_ln"),
+        );
     }
 
     eprintln!("Backward smoke test PASSED (kimi_k3_0_40b dims, vocab=64).");

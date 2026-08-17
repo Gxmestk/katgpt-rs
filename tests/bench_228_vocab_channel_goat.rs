@@ -534,7 +534,7 @@ fn bench_pruner_is_valid_throughput() {
 
     println!("\n[T6.3] Pruner is_valid throughput:");
     println!("  {total_checks} checks in {elapsed:?}");
-    println!("  Throughput: {:.0} checks/sec", checks_per_sec);
+    println!("  Throughput: {checks_per_sec:.0} checks/sec");
     println!(
         "  Valid: {valid_count}/{total_checks} ({:.1}%)",
         valid_count as f64 / total_checks as f64 * 100.0
@@ -585,5 +585,5 @@ fn bench_batch_is_valid_throughput() {
 
     println!("\n[T6.3b] Batch is_valid throughput:");
     println!("  {total_checks} checks in {elapsed:?}");
-    println!("  Throughput: {:.0} checks/sec", checks_per_sec);
+    println!("  Throughput: {checks_per_sec:.0} checks/sec");
 }

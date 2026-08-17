@@ -28,14 +28,16 @@
 
 #![cfg(feature = "dllm")]
 
+use katgpt_core::types::Rng;
 use katgpt_core::ugc_schedule::{
-    UgcDenoiser, UgcScratch, UGC_MASK, certified_block_plan, certified_iteration_count,
+    UGC_MASK, UgcDenoiser, UgcScratch, certified_block_plan, certified_iteration_count,
     dp_partition, estimate_profile,
 };
-use katgpt_core::types::Rng;
 use katgpt_rs::dllm::{D2fContext, forward_block_causal_with};
 use katgpt_rs::dllm::{generate_pattern_dataset, train_mini_dllm};
-use katgpt_rs::speculative::{D2fDecodeConfig, NoPruner, NoScreeningPruner, d2f_decode_block_with_prompt};
+use katgpt_rs::speculative::{
+    D2fDecodeConfig, NoPruner, NoScreeningPruner, d2f_decode_block_with_prompt,
+};
 use katgpt_rs::transformer::TransformerWeights;
 use katgpt_rs::types::Config;
 use std::cell::RefCell;
@@ -65,7 +67,11 @@ impl<'a> UgcDenoiser for D2fUgcDenoiser<'a> {
         let mask = self.config.mask_token;
         let mut tokens = self.prompt.clone();
         for &v in x.iter() {
-            tokens.push(if v == UGC_MASK { mask } else { self.alphabet[v] });
+            tokens.push(if v == UGC_MASK {
+                mask
+            } else {
+                self.alphabet[v]
+            });
         }
         let seq_len = tokens.len().min(self.config.block_size);
         {
@@ -216,7 +222,8 @@ fn run_cell(block_size: usize, model_seed: u64, tau: f32) -> (f64, f64, f64, boo
     let mut rng = Rng::new(model_seed);
     let train_data = generate_pattern_dataset(&mut rng, 30, config.block_size, vocab - 1);
     let test_data = generate_pattern_dataset(&mut rng, 10, config.block_size, vocab - 1);
-    let (weights, _) = train_mini_dllm(&config, &train_data, &test_data, 150, 0.01, 0.3, model_seed);
+    let (weights, _) =
+        train_mini_dllm(&config, &train_data, &test_data, 150, 0.01, 0.3, model_seed);
 
     let prompt = vec![config.bos_token];
     // The d2f sequence is prompt + block truncated at config.block_size —
@@ -303,7 +310,14 @@ fn run_cell(block_size: usize, model_seed: u64, tau: f32) -> (f64, f64, f64, boo
     };
     let mut eps_curve: Vec<(usize, f64, f64)> = Vec::new();
     for &n in n_scan {
-        let (st, steps) = collect_stats(&weights, &config, &make_dc(n, tau), &prompt, s_cand, 10_000 + model_seed * 100 + n as u64);
+        let (st, steps) = collect_stats(
+            &weights,
+            &config,
+            &make_dc(n, tau),
+            &prompt,
+            s_cand,
+            10_000 + model_seed * 100 + n as u64,
+        );
         let eps = proxy_kl(&st, &ref_stats, alpha);
         eps_curve.push((n, eps, steps));
     }
@@ -328,12 +342,18 @@ fn run_cell(block_size: usize, model_seed: u64, tau: f32) -> (f64, f64, f64, boo
         eps_curve
             .iter()
             .find(|&&(_, e, _)| e <= 1e-9)
-            .map(|&(n, _, _)| n)
-            .unwrap_or(48)
+            .map_or(48, |&(n, _, _)| n)
     } else {
         certified_iteration_count(chat as f32, eps_target as f32).min(48)
     };
-    let (st_star, steps_star) = collect_stats(&weights, &config, &make_dc(n_star, tau), &prompt, s_cand, 20_000 + model_seed);
+    let (st_star, steps_star) = collect_stats(
+        &weights,
+        &config,
+        &make_dc(n_star, tau),
+        &prompt,
+        s_cand,
+        20_000 + model_seed,
+    );
     let eps_star = proxy_kl(&st_star, &ref_stats, alpha);
     let preset_steps = eps_curve.iter().find(|&&(n, _, _)| n == 8).unwrap().2;
     let reduction = 1.0 - steps_star / preset_steps;

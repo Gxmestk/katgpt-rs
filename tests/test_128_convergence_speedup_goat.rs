@@ -103,15 +103,15 @@ fn convergence_pucb_finds_best_sketches() {
     // Count visits per tier
     let elite_visits: usize = elite_ids
         .iter()
-        .map(|id| pop.get(id).map(|e| e.visits).unwrap_or(0))
+        .map(|id| pop.get(id).map_or(0, |e| e.visits))
         .sum();
     let mid_visits: usize = mid_ids
         .iter()
-        .map(|id| pop.get(id).map(|e| e.visits).unwrap_or(0))
+        .map(|id| pop.get(id).map_or(0, |e| e.visits))
         .sum();
     let poor_visits: usize = poor_ids
         .iter()
-        .map(|id| pop.get(id).map(|e| e.visits).unwrap_or(0))
+        .map(|id| pop.get(id).map_or(0, |e| e.visits))
         .sum();
 
     let total = elite_visits + mid_visits + poor_visits;

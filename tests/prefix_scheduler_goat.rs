@@ -118,11 +118,7 @@ fn goat_g2_multi_request_throughput_gain() {
 
     assert!(
         ratio >= 1.05,
-        "G2 FAIL: scheduled Θ = {:.4}, uniform Θ = {:.4}, ratio = {:.4} (need ≥ 1.05); out = {:?}",
-        scheduled_theta,
-        uniform_theta,
-        ratio,
-        scheduled
+        "G2 FAIL: scheduled Θ = {scheduled_theta:.4}, uniform Θ = {uniform_theta:.4}, ratio = {ratio:.4} (need ≥ 1.05); out = {scheduled:?}"
     );
 
     println!(
@@ -223,8 +219,7 @@ fn goat_g4_zero_alloc_hot_path() {
     );
 
     println!(
-        "🐐 G4 PASS: schedule_with_scratch reuses scratch capacity ({}) across calls — zero alloc on hot path",
-        warmed_capacity
+        "🐐 G4 PASS: schedule_with_scratch reuses scratch capacity ({warmed_capacity}) across calls — zero alloc on hot path"
     );
 }
 
@@ -262,14 +257,10 @@ fn goat_g5_no_softmax_in_implementation() {
     // Θ = 1.1 * 4.0 = 4.4
     assert!(
         (theta - 4.4).abs() < 1e-5,
-        "Θ must be raw product (τ · SPS), not softmax-normalized; got {}",
-        theta
+        "Θ must be raw product (τ · SPS), not softmax-normalized; got {theta}"
     );
 
-    println!(
-        "🐐 G5 PASS: realized Θ = {:.4} (raw τ · SPS, no softmax normalization)",
-        theta
-    );
+    println!("🐐 G5 PASS: realized Θ = {theta:.4} (raw τ · SPS, no softmax normalization)");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -312,7 +303,6 @@ fn appendix_a_counterexample_explicit() {
     assert_eq!(out_base, vec![3]);
 
     println!(
-        "🐐 Appendix A PASS: ℓ* = {:?} stable across suffix extension (non-anticipating)",
-        out_base
+        "🐐 Appendix A PASS: ℓ* = {out_base:?} stable across suffix extension (non-anticipating)"
     );
 }

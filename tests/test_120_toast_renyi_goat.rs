@@ -57,7 +57,7 @@ mod tests {
             *word_counts.entry(word).or_default() += 1;
         }
 
-        let mut trees = HashMap::new();
+        let mut trees = HashMap::with_capacity(word_counts.len());
         let builder = SplitTreeBuilder::new(&ngram_counts, 1);
 
         for (word, &count) in &word_counts {

@@ -34,9 +34,7 @@
 #![cfg(feature = "kimi_k3_loader")]
 
 use katgpt_rs::kimi_k3::loader::KimiK3ModelWeights;
-use katgpt_rs::kimi_k3::model::{
-    KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token,
-};
+use katgpt_rs::kimi_k3::model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
 
 /// Skip when the caller sets `KIMI_K3_4B_SKIP=1` (CI / constrained runners).
 fn skip_requested() -> bool {
@@ -124,7 +122,11 @@ fn a3_4b_forward_pass_finite_logits() {
     let t_fwd = std::time::Instant::now();
     let logits = kimi_k3_forward_token(&config, &weights, &mut runtime, 1u32);
     let fwd_us = t_fwd.elapsed().as_secs_f64() * 1e6;
-    eprintln!("  forward pass: {:.0} µs ({:.2} ms)", fwd_us, fwd_us / 1000.0);
+    eprintln!(
+        "  forward pass: {:.0} µs ({:.2} ms)",
+        fwd_us,
+        fwd_us / 1000.0
+    );
 
     // ── 5. Assertions ────────────────────────────────────────────────────
     // G1 (correctness): logit shape matches vocab_size.
@@ -152,12 +154,9 @@ fn a3_4b_forward_pass_finite_logits() {
             max_abs = max_abs.max(l.abs());
         }
     }
-    eprintln!(
-        "  logits: {} finite, {} NaN, {} Inf, max|logit| = {:.3}",
-        n_finite, n_nan, n_inf, max_abs,
-    );
-    assert_eq!(n_nan, 0, "found {} NaN logits — forward diverged", n_nan);
-    assert_eq!(n_inf, 0, "found {} Inf logits — forward diverged", n_inf);
+    eprintln!("  logits: {n_finite} finite, {n_nan} NaN, {n_inf} Inf, max|logit| = {max_abs:.3}",);
+    assert_eq!(n_nan, 0, "found {n_nan} NaN logits — forward diverged");
+    assert_eq!(n_inf, 0, "found {n_inf} Inf logits — forward diverged");
     assert_eq!(n_finite, config.vocab_size, "all logits must be finite");
 
     // Sanity: argmax is a valid token id.
@@ -170,9 +169,12 @@ fn a3_4b_forward_pass_finite_logits() {
         }
     }
     assert!(best < config.vocab_size, "argmax out of range");
-    eprintln!("  argmax token: {} (logit {:.3})", best, best_v);
+    eprintln!("  argmax token: {best} (logit {best_v:.3})");
 
-    eprintln!("  ✅ A3 PASS: 4B-A2B forward produces {} finite logits", logits.len());
+    eprintln!(
+        "  ✅ A3 PASS: 4B-A2B forward produces {} finite logits",
+        logits.len()
+    );
     eprintln!("  total wall: {:.2?}", t0.elapsed());
 }
 
@@ -199,8 +201,7 @@ fn a5_4b_256k_kv_cache_allocates() {
 
     // The MLA KV cache at 256K: per MLA layer, kv_lora_rank (512) f32 per
     // token, plus the shared rope key (d_r = 64 f32). 3 MLA layers.
-    let per_token_bytes = (config.mla_config.kv_lora_rank + config.mla_config.qk_rope_head_dim)
-        * 4; // f32
+    let per_token_bytes = (config.mla_config.kv_lora_rank + config.mla_config.qk_rope_head_dim) * 4; // f32
     let n_mla = config.mla_layer_indices.len();
     let expected_kv_bytes = per_token_bytes * n_mla * 262144;
     eprintln!(
@@ -215,5 +216,8 @@ fn a5_4b_256k_kv_cache_allocates() {
     // This is the load-bearing line — if the KV cache sizing math is wrong,
     // this will OOM or panic on the allocation.
     let _runtime = KimiK3Runtime::new(&config, 262144);
-    eprintln!("  ✅ 256K KV cache allocated in {:.2?} (no OOM)", t.elapsed());
+    eprintln!(
+        "  ✅ 256K KV cache allocated in {:.2?} (no OOM)",
+        t.elapsed()
+    );
 }

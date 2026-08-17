@@ -252,8 +252,7 @@ fn arena_convergence_speedup_2x() {
     );
     println!("╠───────────────┼───────────────┼───────────┼─────────────────╣");
     println!(
-        "║  Rounds to 90%: Independent={:?}, Evolutionary={:?}     ║",
-        independent_rounds_to_90, evo_rounds_to_90
+        "║  Rounds to 90%: Independent={independent_rounds_to_90:?}, Evolutionary={evo_rounds_to_90:?}     ║"
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
 

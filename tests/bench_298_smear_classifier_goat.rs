@@ -223,10 +223,7 @@ fn g2_smear_class_predicts_unfaithfulness() {
 
     // ── Step 2: report. ──
     println!("\n=== Plan 298 G2 — Smear class predicts unfaithfulness ===");
-    println!(
-        "k={}, d={}, trials/class={}, threshold={}",
-        K, D, N_TRIALS, THRESHOLD
-    );
+    println!("k={K}, d={D}, trials/class={N_TRIALS}, threshold={THRESHOLD}");
     println!();
     println!(
         "{:>16} {:>14} {:>14}",
@@ -242,10 +239,7 @@ fn g2_smear_class_predicts_unfaithfulness() {
     } else {
         f32::INFINITY
     };
-    println!(
-        "SequenceSmear / TokenSmear unfaithfulness ratio = {:.4}×",
-        ratio
-    );
+    println!("SequenceSmear / TokenSmear unfaithfulness ratio = {ratio:.4}×");
 
     // ── Step 3: verdict. ──
     // Pass criterion: SequenceSmear rate ≥ 2× TokenSmear rate.
@@ -253,13 +247,13 @@ fn g2_smear_class_predicts_unfaithfulness() {
     // classification's *usefulness* (G1 covers correctness).
     let pass = ratio >= 2.0;
     if pass {
-        println!("\nG2 PASS: ratio {:.2}× ≥ 2.0× threshold.", ratio);
+        println!("\nG2 PASS: ratio {ratio:.2}× ≥ 2.0× threshold.");
         println!("SequenceSmear-flagged consumers are unfaithful at ≥ 2× the");
         println!("rate of TokenSmear-flagged consumers — the ternary classifier");
         println!("produces a measurably different downstream decision than the");
         println!("binary probe on this synthetic workload.");
     } else {
-        println!("\nG2 FAIL: ratio {:.2}× < 2.0× threshold.", ratio);
+        println!("\nG2 FAIL: ratio {ratio:.2}× < 2.0× threshold.");
         println!("Per Plan 298 T3.4: demote to opt-in Gain (already opt-in).");
         println!("The classifier is still a correct ternary diagnostic (G1");
         println!("passes) but does not produce measurably better downstream");

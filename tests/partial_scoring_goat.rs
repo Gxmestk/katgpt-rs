@@ -185,8 +185,7 @@ fn run_experiment(partial: bool, scorer: &BomberPartialScorer, seed: u64) -> Exp
                     .iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
+                    .map_or(0, |(i, _)| i);
 
                 if arm0_frac > 0.50 && best_q_arm == 0 {
                     // Check clear separation from second-best arm
@@ -252,15 +251,13 @@ fn test_partial_scoring_goat_convergence() {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         let partial_best = partial
             .q_values
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
 
         if binary_best == 0 {
             binary_best_correct += 1;
