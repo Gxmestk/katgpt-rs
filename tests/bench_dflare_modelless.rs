@@ -7,24 +7,14 @@
 //! T6: Position-Weighted DDTree Budget — exponential decay allocation
 //! T7: Integration — all three combined
 
-#[cfg(any(
-    feature = "dflare_fusion",
-    feature = "dflare_kv_routing",
-    feature = "dflare_progressive_budget"
-))]
+#[cfg(feature = "dflare_progressive_budget")]
 use katgpt_rs::speculative::dd_tree::build_dd_tree_screened;
-#[cfg(any(
-    feature = "dflare_fusion",
-    feature = "dflare_kv_routing",
-    feature = "dflare_progressive_budget"
-))]
+#[cfg(feature = "dflare_fusion")]
 use katgpt_rs::speculative::dflash::dflash_predict_ar;
-#[cfg(any(
-    feature = "dflare_fusion",
-    feature = "dflare_kv_routing",
-    feature = "dflare_progressive_budget"
-))]
-use katgpt_rs::speculative::types::{NoScreeningPruner, SpeculativeContext};
+#[cfg(feature = "dflare_progressive_budget")]
+use katgpt_rs::speculative::types::NoScreeningPruner;
+#[cfg(any(feature = "dflare_fusion", feature = "dflare_kv_routing"))]
+use katgpt_rs::speculative::types::SpeculativeContext;
 #[cfg(any(
     feature = "dflare_fusion",
     feature = "dflare_kv_routing",
@@ -267,10 +257,7 @@ mod t5_kv_routing {
                 / steps.max(1) as f32;
 
             results.push((relevance, avg_top1, steps));
-            println!(
-                "  relevance={:.2}: {} steps, avg top1={:.4}",
-                relevance, steps, avg_top1
-            );
+            println!("  relevance={relevance:.2}: {steps} steps, avg top1={avg_top1:.4}");
         }
 
         // T5b: High confidence should use conditioned KV (blend=1.0)
@@ -389,10 +376,7 @@ mod t6_progressive_budget {
             }
 
             let total = progressive_tree.len();
-            println!(
-                "  γ={gamma}: {} nodes, depth distribution: {:?}",
-                total, depth_counts
-            );
+            println!("  γ={gamma}: {total} nodes, depth distribution: {depth_counts:?}");
 
             // Verify total stays within budget
             assert!(
@@ -447,10 +431,7 @@ mod t6_progressive_budget {
             );
         }
 
-        println!(
-            "\n✅ T6b: Progressive budget front-loads: {:?}",
-            depth_counts
-        );
+        println!("\n✅ T6b: Progressive budget front-loads: {depth_counts:?}");
     }
 }
 
@@ -607,9 +588,6 @@ mod t7_integration {
             );
         }
 
-        println!(
-            "\n✅ T7c: Fusion + KV routing combined: {} valid steps",
-            steps
-        );
+        println!("\n✅ T7c: Fusion + KV routing combined: {steps} valid steps");
     }
 }

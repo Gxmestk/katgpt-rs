@@ -15,7 +15,7 @@
 #[cfg(feature = "unit_distance")]
 #[test]
 fn goat_proof_01_qi_erdos_grid_baseline() {
-    use katgpt_deprecated::unit_distance::{MinkowskiLattice, count_unit_distances};
+    use katgpt_deprecated::unit_distance::{count_unit_distances, MinkowskiLattice};
 
     println!("🐐 GOAT PROOF 1: Q(i) Erdős Grid Baseline");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -68,7 +68,7 @@ fn goat_proof_01_qi_erdos_grid_baseline() {
 #[cfg(feature = "unit_distance")]
 #[test]
 fn goat_proof_02_q_sqrt5_i_pigeonhole() {
-    use katgpt_deprecated::unit_distance::{CmField, sum_of_two_squares, verify_pigeonhole_bound};
+    use katgpt_deprecated::unit_distance::{sum_of_two_squares, verify_pigeonhole_bound, CmField};
 
     println!("🐐 GOAT PROOF 2: Q(√5, i) Pigeonhole Verification");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -146,7 +146,7 @@ fn goat_proof_02_q_sqrt5_i_pigeonhole() {
 #[cfg(feature = "unit_distance")]
 #[test]
 fn goat_proof_03_explicit_delta_bound() {
-    use katgpt_deprecated::unit_distance::{CmField, count_unit_distances};
+    use katgpt_deprecated::unit_distance::{count_unit_distances, CmField};
 
     println!("🐐 GOAT PROOF 3: Explicit ν(n) ≥ n^(1+δ) for δ > 0");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -170,28 +170,25 @@ fn goat_proof_03_explicit_delta_bound() {
     for (label, field) in &fields {
         let delta = field.delta();
 
-        match delta {
-            Some(d) => {
-                println!(
-                    "  {label}: δ = {:.6e} (γ={:.4}, B={:.4})",
-                    d.delta, d.gamma, d.b_param
-                );
-                assert!(d.delta > 0.0, "δ must be positive for {label}");
-                assert!(d.gamma > 0.0, "γ must be positive for {label}");
+        if let Some(d) = delta {
+            println!(
+                "  {label}: δ = {:.6e} (γ={:.4}, B={:.4})",
+                d.delta, d.gamma, d.b_param
+            );
+            assert!(d.delta > 0.0, "δ must be positive for {label}");
+            assert!(d.gamma > 0.0, "γ must be positive for {label}");
 
-                // Verify δ = γ/(4B)
-                let expected_delta = d.gamma / (4.0 * d.b_param);
-                assert!(
-                    (d.delta - expected_delta).abs() < 1e-12,
-                    "δ ≠ γ/(4B): {} vs {expected_delta}",
-                    d.delta
-                );
+            // Verify δ = γ/(4B)
+            let expected_delta = d.gamma / (4.0 * d.b_param);
+            assert!(
+                (d.delta - expected_delta).abs() < 1e-12,
+                "δ ≠ γ/(4B): {} vs {expected_delta}",
+                d.delta
+            );
 
-                any_valid = true;
-            }
-            None => {
-                println!("  {label}: γ ≤ 0 (construction not valid)");
-            }
+            any_valid = true;
+        } else {
+            println!("  {label}: γ ≤ 0 (construction not valid)");
         }
     }
 
@@ -241,7 +238,7 @@ fn goat_proof_03_explicit_delta_bound() {
 #[test]
 fn goat_proof_04_pro2_tower_structure() {
     use katgpt_deprecated::unit_distance::{
-        CmField, compare_delta, enumerate_split_primes, select_split_primes,
+        compare_delta, enumerate_split_primes, select_split_primes, CmField,
     };
 
     println!("🐐 GOAT PROOF 4: Pro-2 Tower Structure Verification");
@@ -318,15 +315,12 @@ fn goat_proof_05_sum_of_two_squares_completeness() {
     let primes_mod4_1: Vec<u64> = vec![5, 13, 17, 29, 37, 41, 53, 61, 73, 89, 97, 101, 109, 113];
 
     for &p in &primes_mod4_1 {
-        match sum_of_two_squares(p) {
-            Some((a, b)) => {
-                assert_eq!(a * a + b * b, p, "{p} ≠ {a}² + {b}²");
-                assert!(a <= b, "canonical order: a ≤ b for ({a}, {b})");
-                println!("  {p} = {a}² + {b}² ✅");
-            }
-            None => {
-                panic!("{p} ≡ 1 (mod 4) must be a sum of two squares");
-            }
+        if let Some((a, b)) = sum_of_two_squares(p) {
+            assert_eq!(a * a + b * b, p, "{p} ≠ {a}² + {b}²");
+            assert!(a <= b, "canonical order: a ≤ b for ({a}, {b})");
+            println!("  {p} = {a}² + {b}² ✅");
+        } else {
+            panic!("{p} ≡ 1 (mod 4) must be a sum of two squares");
         }
     }
 
@@ -462,7 +456,7 @@ fn goat_proof_07_c64_arithmetic_consistency() {
 #[cfg(feature = "unit_distance")]
 #[test]
 fn goat_proof_08_full_construction_pipeline() {
-    use katgpt_deprecated::unit_distance::{CmField, select_split_primes};
+    use katgpt_deprecated::unit_distance::{select_split_primes, CmField};
 
     println!("🐐 GOAT PROOF 8: Full Construction Pipeline");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

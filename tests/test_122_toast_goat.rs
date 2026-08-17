@@ -12,7 +12,7 @@ mod tests {
 
     fn make_simple_tokenizer() -> ToastTokenizer {
         let mut vocab_to_id = HashMap::new();
-        let mut id_to_vocab = Vec::new();
+        let mut id_to_vocab = Vec::with_capacity(127 + 1);
 
         // Special tokens
         for (id, tok) in [
@@ -84,7 +84,7 @@ mod tests {
         }
 
         let mut vocab_to_id = HashMap::new();
-        let mut id_to_vocab = Vec::new();
+        let mut id_to_vocab = Vec::with_capacity(127 + 1);
 
         for (id, tok) in [
             (0usize, b"<pad>".to_vec()),
@@ -110,7 +110,7 @@ mod tests {
             *word_counts.entry(word).or_default() += 1;
         }
 
-        let mut trees = HashMap::new();
+        let mut trees = HashMap::with_capacity(word_counts.len());
         let builder = SplitTreeBuilder::new(&ngram_counts, 1);
 
         for (word, &count) in &word_counts {

@@ -38,7 +38,7 @@
 #![cfg(all(feature = "cce_moderator", feature = "dec_operators"))]
 
 use katgpt_core::cce::{CceLp, Deviation, DeviationClass, OccupationMeasure, PayoffTensor};
-use katgpt_core::dec::{CellComplex, CochainField, codifferential};
+use katgpt_core::dec::{codifferential, CellComplex, CochainField};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Section 0: Local BFS-enumeration LP solver
@@ -87,7 +87,10 @@ fn solve_square_system(mat: &[Vec<f64>], rhs: &[f64], combo: &[usize]) -> Option
             let (left, right) = aug.split_at_mut(row);
             let aug_pivot_row = &left[pivot];
             let aug_row = &mut right[0];
-            for (arc, &apc) in aug_row[pivot..=n].iter_mut().zip(aug_pivot_row[pivot..=n].iter()) {
+            for (arc, &apc) in aug_row[pivot..=n]
+                .iter_mut()
+                .zip(aug_pivot_row[pivot..=n].iter())
+            {
                 *arc -= factor * apc;
             }
         }
@@ -417,7 +420,7 @@ fn t1_t2_reproduce_trivial_cce_artifact() {
 
     let gamma0 = rps_gamma0(&rho);
     eprintln!("T2: unconstrained RPS γ₀(CCE) = {gamma0:.6}");
-    eprintln!("    ρ = {:?}", rho);
+    eprintln!("    ρ = {rho:?}");
 
     // The trivial-CCE artifact: γ₀ = -1 (player 1 always wins).
     // This is the documented artifact — the LP exploits the free state
@@ -474,7 +477,10 @@ fn t4a_beckmann_marginal_constraint() {
     }
 
     eprintln!("T4a: LP with marginal constraint (isolated vertices)");
-    eprintln!("    n_vars = {n_vars_base}, n_cons = {} (3 CCE + 3 marginal)", mat.len());
+    eprintln!(
+        "    n_vars = {n_vars_base}, n_cons = {} (3 CCE + 3 marginal)",
+        mat.len()
+    );
 
     let rho = enumerate_bfs(&mat, &rhs, &obj, n_vars_base, n_rho)
         .expect("marginal-constrained LP must be feasible");
@@ -500,7 +506,7 @@ fn t4a_beckmann_marginal_constraint() {
     //   s=P: best a=S, cost = -RPS_REWARD[S][P] = -1
     //   s=S: best a=R, cost = -RPS_REWARD[R][S] = -1
     //   γ₀ = (1/3)(-1) × 3 = -1
-    eprintln!("    ρ = {:?}", rho);
+    eprintln!("    ρ = {rho:?}");
 
     // Verdict: the marginal constraint does NOT close the artifact.
     if gamma0 < -0.5 {
@@ -631,7 +637,10 @@ fn t4b_beckmann_edge_flow_constraint() {
     }
 
     eprintln!("T4b: LP with edge-flow constraint (path graph 0-1-2)");
-    eprintln!("    n_vars = {n_vars}, n_cons = {} (3 CCE + 3 divergence)", mat.len());
+    eprintln!(
+        "    n_vars = {n_vars}, n_cons = {} (3 CCE + 3 divergence)",
+        mat.len()
+    );
 
     let rho_full = enumerate_bfs(&mat, &rhs, &obj_full, n_vars, n_rho)
         .expect("edge-flow-constrained LP must be feasible");
@@ -714,7 +723,7 @@ fn t4c_verify_codifferential_on_cell_complex() {
 
     // Verify the boundary entries encode the edge-vertex incidence.
     let bnd = cx.boundary_entries(0);
-    eprintln!("    boundary_entries(0): {:?}", bnd);
+    eprintln!("    boundary_entries(0): {bnd:?}");
     eprintln!("    (dst_cell, src_cell, sign) — encodes edge→vertex incidence");
     eprintln!("    ✓ DEC codifferential is the correct divergence operator for Beckmann");
 }
@@ -747,8 +756,7 @@ fn t5_beckmann_does_not_over_restrict_chicken() {
 
     eprintln!("T5: Chicken — unconstrained vs Beckmann-constrained");
     eprintln!(
-        "    Unconstrained: γ₀ = {:.4}, welfare = {:.4}",
-        nw_unconstrained, welfare_unconstrained
+        "    Unconstrained: γ₀ = {nw_unconstrained:.4}, welfare = {welfare_unconstrained:.4}"
     );
     eprintln!("    ρ = {:?}", &rho_unconstrained[..n_rho]);
 
@@ -766,20 +774,14 @@ fn t5_beckmann_does_not_over_restrict_chicken() {
         rhs_constrained.push(mu0_chicken[s]);
     }
 
-    let rho_constrained = enumerate_bfs(
-        &mat_constrained,
-        &rhs_constrained,
-        &obj,
-        n_vars_base,
-        n_rho,
-    )
-    .expect("marginal-constrained chicken LP feasible");
+    let rho_constrained =
+        enumerate_bfs(&mat_constrained, &rhs_constrained, &obj, n_vars_base, n_rho)
+            .expect("marginal-constrained chicken LP feasible");
     let nw_constrained = chicken_neg_welfare(&rho_constrained);
     let welfare_constrained = -nw_constrained;
 
     eprintln!(
-        "    Marginal-constrained: γ₀ = {:.4}, welfare = {:.4}",
-        nw_constrained, welfare_constrained
+        "    Marginal-constrained: γ₀ = {nw_constrained:.4}, welfare = {welfare_constrained:.4}"
     );
     eprintln!("    ρ = {:?}", &rho_constrained[..n_rho]);
 

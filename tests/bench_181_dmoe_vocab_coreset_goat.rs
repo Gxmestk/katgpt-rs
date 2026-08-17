@@ -245,8 +245,7 @@ mod tests {
         // With coreset_ratio ≤ 0.01, this is always ≥ 20%.
         assert!(
             coreset_ratio <= 0.01,
-            "coreset ratio must be ≤ 1% for latency guarantee: got {:.4}",
-            coreset_ratio,
+            "coreset ratio must be ≤ 1% for latency guarantee: got {coreset_ratio:.4}",
         );
 
         // The net speedup proof:

@@ -74,12 +74,9 @@ fn run_ablation(name: &'static str, config: ParallelProbeConfig) -> AblationResu
         let decision = ctrl.probe(&answers);
         steps = step + 1;
 
-        match decision {
-            ProbeDecision::Stop { .. } | ProbeDecision::StopAndPrune { .. } => {
-                reached_consensus = true;
-                break;
-            }
-            _ => {}
+        if let ProbeDecision::Stop { .. } | ProbeDecision::StopAndPrune { .. } = decision {
+            reached_consensus = true;
+            break;
         }
     }
 
