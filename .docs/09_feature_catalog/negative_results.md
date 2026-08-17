@@ -803,3 +803,25 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Outcome.** No promotion. The CPU foundation + GPU upload infra stay in-tree as validated code for **potential CUDA (4090) use**, where the coalescing trade-off may differ. The `ternary_gemm_simdgroup` re-promotion question is filed separately in riir-ai.
 
 **Lesson.** Re-measure the baseline before optimizing against it — a stale ceiling (1.89×, likely contention- or device-skewed) can motivate a whole layout redesign that the current kernel already beats (5.89–6.27×). Mirrors the AGENTS.md GPU-exclusivity rule: a gate measured under contention is not evidence.
+
+
+## 39. UGC Certified Unmasking Schedules — G1b Promotion FAIL (substrate lands always-on)
+
+**Feature flag: NONE — deliberately.** The estimator + schedule construction are
+correct and land as an always-on diagnostic substrate
+(`katgpt-core/src/ugc_schedule.rs`, pure math + a denoiser trait, zero deps beyond
+`crate::types::Rng`); the `ugc_schedule` feature-flag plan opens ONLY if a future
+G1b gate passes — it did not.
+
+**What failed:** the promotion gate G1b (dllm, release, 5 cells —
+[Bench 659](../../.benchmarks/659_ugc_certified_schedule_poc.md), Research 485,
+Issue 664). UGC's predicted optimal schedule length N*=48 (the complexity formula
+saturates at ε≈0 there) vs the actual ε(N) curve measured **flat at the MC-noise
+floor** for all N ≥ 3 — the certified-complexity estimator sees structure the loss
+cannot feel. Cell verdicts: bs=8 → **−8.6%** (worse than preset-8), bs=15 →
+**+1.4%** (noise). Preset-8 wins outright (2.49/2.84 vs early-exit baselines).
+
+**What passed:** G1 / G1-cert / G1(exact) / G4 ALL PASS — the estimator is
+faithful to the paper, the schedules are constructible, and the arithmetic is
+exact. This is a **regime negative**, not an implementation bug: the GOAT track is
+CLOSED. Reopen only on a dllm regime with measurably non-flat ε(N).

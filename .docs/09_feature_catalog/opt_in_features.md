@@ -2548,3 +2548,74 @@ Two tiny trained MLPs (Q-Indexer + K-Indexer, 2114 params at Kimi-K3 d_h=64) tha
 🔧 Feature flags: `flashmemory_sparse` (root → `katgpt-attn/flashmemory_sparse`, implies `mla_attention` + `dash_attn`, opt-in) + `trained_indexer` (root → `katgpt-attn/trained_indexer`, implies `flashmemory_sparse`, opt-in never default-on).
 
 📖 Substrate: `crates/katgpt-attn/src/dash_attn/flashmemory_sparse.rs` (14 tests; both the modelless selector and the `trained_indexer` DualEncoderIndexer live in this one module) — landed across commits `8f030de2` (Phase 1 mechanism), `5ab63aef` (G1 bench_021), `7030cefa` (G4 bench_022), `865362e3` (G5 bench_024), `5e2b5f2b` (Plan 337 Phase B DualEncoderIndexer), `bca98f08` (Plan 337 bench_025), `4cdd0dec` (Plan 337 Phase C bench_026). Issue 584 (removed per noise-reduction rule — resolved 2026-08-15; G1-G5 evaluated, G2 via Bench 671; Benches 021-026 + 671 are the record). Training recipe: [riir-train Plan 337](../../../riir-train/.plans/337_flashmemory_indexer_training_recipe.md) (NOT the katgpt-rs Plan 337 — that is Tropical algebra).
+
+
+## 78. Clustered LM Head — two-stage admissible-set vocab head (Plan 574; Issues 657/658/661/666)
+
+**Feature flag:** `cluster_lm_head` (opt-in until GOAT passes — and the load-bearing gate
+is a REAL-checkpoint measurement, [Issue 662](../../.issues/662_clustered_lm_head_real_checkpoint.md)).
+
+Stage 1 scores k≈V/128 clusters via ❈h, centroid_c❉; stage 2 runs the exact head
+over the admissible set only. `ClusterStop::Admissible` (Cauchy–Schwarz radius bound)
++ `ClusterStop::TopK` budget stops. D² seeding (Bench 658's degenerate-strided-init
+fix) is the construction default; the strided variant survives as `ClusterInit::Strided`
+for bench attribution only.
+
+### GOAT trail (the honest arc)
+
+| Gate | Result | Record |
+|---|---|---|
+| G2b recall | **PASS after two root-cause fixes** — 0.675 → **1.0000**. Issue 657's own diagnosis (the scoring objective) was WRONG: the real defect was degenerate strided k-means init. The bound is a *worse* ranker than what it replaced; its value is making an **exact** (recall-1.0-by-construction) stop rule possible. | [Bench 658](../../.benchmarks/658_clustered_lm_head_admissible_goat.md) (supersedes 657) |
+| G2 structured | **8.3–9.2×** — after the cluster-contiguous row permutation (Issue 666): 2.2× → 8.3× by making each cluster's vocab rows memory-contiguous (the stage-2 GEMV reads whole clusters, not strided rows). | Bench 658 §addendum |
+| G2 wave-parallel stage 2 | **WASH (negative)** — parallelizing stage 2's per-cluster work gained nothing: the bottleneck is **locality, not work**. This finding directly motivated the row-permutation fix above. | Issue 661 |
+| G3 unstructured control | **HONEST FAIL — 0.08× loss** on uniform-random rows (99.99% admissible → all the overhead, none of the savings). | Bench 658 §Promotion |
+| Promotion | **BLOCKED** — both regimes are synthetic; where a real LM head sits between planted-Gaussian (7.30% admissible, 2.1–2.9× win) and uniform (99.99%, 0.08× loss) is precisely the promotion decision. | [Issue 662](../../.issues/662_clustered_lm_head_real_checkpoint.md) |
+
+**Unconditional landing:** D² seeding replaces strided seeding as the default in
+`cluster_map_from_embeddings` (regime-independent strict improvement).
+
+## 79. Bigram Markov Head — modelless sequential drafter (Issue 659)
+
+**Feature flag:** `bigram_markov = []` in katgpt-speculative (zero deps, opt-in).
+
+Deterministic CSR top-m successor table built from corpus bigram counts (packed-u64
+sort + two-pointer passes; `(count desc, next asc)` top-m tie-break — bit-identical
+rebuilds, brute-force-reference-pinned). Zero-alloc marginal emission
+(`BigramMarginalBuffer`: O(steps × top_m) touched-reset sparse writes), greedy-chain
+conditioning, zero-row fallback for unseen prevs (the `build_dd_tree` seam skips
+prob ≤ 0 — an unseen prev proposes nothing). Emits per-position marginals straight
+into `build_dd_tree(marginals, config)` — the existing seam with zero `dflash`
+coupling in production code.
+
+**Why:** Bonsai ships DSpark (6-layer drafter, 1.34× on 4090) but has NO working
+drafter on Apple Silicon — the forward doesn't amortize at batch-1 (Bench 656
+mode 2). A bigram table lookup is not a forward pass; it does not incur mode 2.
+
+### Primitive gate (Bench 663)
+
+181 ns/call (**23 ns/step**) at Bonsai scale on M3 release — ~5,600× under a
+6-layer drafter forward per step (the mode-2 avoidance, measured); 17 MB worst-case
+table vs 268 MB low-rank; G1 bit-identical rebuilds + brute-force-pinned; G4
+alloc-free steady state.
+
+**Deferred:** the consumer gate (acceptance rate at equal draft depth + wall-clock on
+Metal AND 4090 against the Bonsai target) belongs to the riir-ai Bonsai consumer
+(Plan 528) — the feature stays opt-in until it passes.
+
+## 80. Switch Cost Table — directed skill-entropy switch cost (Issue 663)
+
+**Feature flag:** `switch_cost = []` in katgpt-core (opt-in; `switch_cost_demo` example).
+
+`SwitchCostTable` — directed pairwise switch cost `ske(a,b) = ln(Z(a∪b)/Z(a))` over
+per-skill Bernoulli success counters: asymmetric by construction (`ske(0,1)=3.0` vs
+`ske(1,0)=0.667` on the hand-computed fixture), u32 counters commute exactly
+(record-order independent — forward vs reverse replay produce bit-identical
+`to_bits()`), zero allocs. For task-switch scheduling / router curriculum ordering
+(distilled from TTT-Discover via Research 484; consumed by the riir-clippy
+cross-domain switch-cost measurement — Bench 032 there).
+
+### GOAT (Bench 660)
+
+G1 formula PASS (fixture 3.0/0.667, tol 1e-6) · G1 directionality PASS (gap >1.0
+pinned constructible) · G1 determinism PASS (replay-order independence) · modelless
+throughout. Stays opt-in (diagnostic/curriculum tool; no default-on consumer yet).
