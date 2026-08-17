@@ -53,14 +53,15 @@ The lookahead-8 + Bonsai-vocab combination needs ≥ 144 bits. The fix is a wide
 path **type**, not a wider field: e.g. `[u32; 8]` (or a `SmallVec<[u32; 8]>`)
 with `extract_parent_tokens*` reading levels directly.
 
-## Blast radius (why this is a plan, not a patch)
+## Blast radius (measured 2026-08-18)
 
-`parent_path` is written/read by every `build_dd_tree*` variant in
-`katgpt-speculative/src/dd_tree/` (20+ builders), consumed by the verification
-seams (`extract_parent_tokens`, `extract_parent_tokens_into`), compared/stored
-in `TreeNode` (Eq/Ord derive), and read by riir-engine + downstream consumers.
-`TreeNode` lives in **katgpt-core** (`speculative/types.rs`) — the public crate —
-so the change is a cross-repo API break that must land in one coordinated pass.
+`parent_path` grep: **216 references across 17 files in katgpt-rs** (core:
+`speculative/types.rs` + `gdn_tree_verify/mod.rs`; the dd_tree builders +
+tests; `katgpt-attn/gdn2/tree_forward.rs`; `katgpt-forward/step.rs`;
+`katgpt-pruners` ×2; `spechop/hop_tree.rs`; `distill/ilc.rs`; a bench) —
+plus **9 references in 2 files in riir-ai**. `TreeNode` lives in
+**katgpt-core** (the public crate), so the change is a cross-repo API break
+that must land in one coordinated pass.
 
 ## Gate (GOAT)
 
