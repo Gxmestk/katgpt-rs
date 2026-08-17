@@ -697,8 +697,7 @@ impl TvpProbeCountBandit {
         Self::K_VALUES
             .iter()
             .position(|&kv| kv == k)
-            .map(|i| self.visits[i] as u64)
-            .unwrap_or(0)
+            .map_or(0, |i| self.visits[i] as u64)
     }
 
     /// Select next K via UCB1. Called at the start of each query.

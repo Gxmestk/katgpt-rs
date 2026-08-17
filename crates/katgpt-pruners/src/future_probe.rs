@@ -567,8 +567,7 @@ mod tests {
         // v2 direction is [-1, 0, 0, 0]; activation [1, 0, 0, 0] → dot = -1, bias = +1 → logit = 0 → σ(0) = 0.5.
         assert!(
             (forecast_after_swap - 0.5).abs() < 1e-6,
-            "after swap forecast should reflect v2: expected 0.5, got {}",
-            forecast_after_swap
+            "after swap forecast should reflect v2: expected 0.5, got {forecast_after_swap}"
         );
 
         // The pre-swap forecast is unchanged (it was a value snapshot, not a

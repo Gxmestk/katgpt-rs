@@ -111,7 +111,7 @@ impl SymbolicExpression {
             };
             let coeff = term.coefficient.abs();
             let sign = if term.coefficient >= 0.0 { "+" } else { "−" };
-            parts.push(format!("{sign} {:.2} × {basis_str}", coeff));
+            parts.push(format!("{sign} {coeff:.2} × {basis_str}"));
         }
 
         let bias_str = if self.bias >= 0.0 {
@@ -584,7 +584,7 @@ mod tests {
         // Verify decision boundary is roughly at 0.5
         let below = expr.evaluate(&[0.3]);
         let above = expr.evaluate(&[0.7]);
-        assert!(below < above, "below={} above={}", below, above);
+        assert!(below < above, "below={below} above={above}");
     }
 
     // ── Fitter respects max_terms ──────────────────────────────

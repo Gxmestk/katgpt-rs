@@ -199,8 +199,7 @@ mod tests {
         // Single region → entropy = 0 → sigmoid(1 * 0) = sigmoid(0) = 0.5
         assert!(
             (c - 0.5).abs() < 0.01,
-            "single-region complexity should be ~0.5 (sigmoid(0)), got {}",
-            c
+            "single-region complexity should be ~0.5 (sigmoid(0)), got {c}"
         );
     }
 
@@ -223,8 +222,7 @@ mod tests {
         // 30 regions * ln(3) ≈ 30 * 1.099 ≈ 33 → sigmoid(33) ≈ 1.0
         assert!(
             c > 0.99,
-            "complex partition should have high complexity, got {}",
-            c
+            "complex partition should have high complexity, got {c}"
         );
     }
 
@@ -318,8 +316,7 @@ mod tests {
         let expected = (3.0f32).ln(); // ln(3) ≈ 1.099
         assert!(
             (entropy - expected).abs() < 0.01,
-            "uniform distribution entropy should be ln(3) ≈ 1.099, got {}",
-            entropy
+            "uniform distribution entropy should be ln(3) ≈ 1.099, got {entropy}"
         );
     }
 }

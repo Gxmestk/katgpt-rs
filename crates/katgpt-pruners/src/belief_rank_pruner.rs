@@ -149,12 +149,11 @@ impl BeliefRankPruner {
             l4 += x2 * x2;
         }
 
-        match l4 < 1e-12 {
-            true => 0.0, // zero vector → peaked (trivially confident)
-            false => {
-                let pr = (l2_sq * l2_sq) / (self.n_embd as f32 * l4);
-                pr.clamp(0.0, 1.0)
-            }
+        if l4 < 1e-12 {
+            0.0
+        } else {
+            let pr = (l2_sq * l2_sq) / (self.n_embd as f32 * l4);
+            pr.clamp(0.0, 1.0)
         }
     }
 
@@ -227,12 +226,11 @@ impl BeliefRankPruner {
             l4 += x2 * x2;
         }
 
-        match l4 < 1e-20 {
-            true => 0.0,
-            false => {
-                let pr = (l2_sq * l2_sq) / (n as f32 * l4);
-                pr.clamp(0.0, 1.0)
-            }
+        if l4 < 1e-20 {
+            0.0
+        } else {
+            let pr = (l2_sq * l2_sq) / (n as f32 * l4);
+            pr.clamp(0.0, 1.0)
         }
     }
 

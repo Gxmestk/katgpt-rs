@@ -159,7 +159,7 @@ pub fn find_path_multifloor(
     let floor_sequence = bfs_floor_sequence(dungeon, from_floor, to_floor)?;
 
     // Chain paths through stairs for each floor transition
-    let mut actions = Vec::new();
+    let mut actions = Vec::with_capacity(floor_sequence.len());
     let mut current_pos = from_pos;
     let mut current_floor = from_floor;
 

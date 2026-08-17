@@ -492,7 +492,7 @@ mod tests {
         pruner.batch_is_valid(0, &candidates, &[], &mut verify);
         for (i, &c) in candidates.iter().enumerate() {
             let expected = c % 2 == 0 && c < 50 && c % 3 == 0;
-            assert_eq!(verify[i], expected, "correctness mismatch at token {}", c);
+            assert_eq!(verify[i], expected, "correctness mismatch at token {c}");
         }
 
         // Log timing for GOAT gate evaluation

@@ -484,8 +484,7 @@ impl FftSr2amPlayer {
                     .partial_cmp(&blended[*b])
                     .unwrap_or(Ordering::Equal)
             })
-            .map(ActionType::from)
-            .unwrap_or(ActionType::Wait)
+            .map_or(ActionType::Wait, ActionType::from)
     }
 }
 
@@ -521,21 +520,21 @@ impl FftPlayer for FftSr2amPlayer {
             PlanningDecision::PlanExtend => {
                 // Reuse last_template, recompute hint with current state
                 if let Some(template) = self.last_template {
-                        let tid = self.last_template_id.unwrap_or(0);
-                        self.round_template_ids.push(tid);
-                        let hinted =
-                            Self::compute_hinted_scores(template, &query_scores, state, unit_id);
-                        (hinted, Some(tid))
-                    } else {
-                        // No previous template — fall back to PlanNew
-                        let (template, tid) = self.template_proposer.select();
-                        self.last_template = Some(template);
-                        self.last_template_id = Some(tid);
-                        self.round_template_ids.push(tid);
-                        let hinted =
-                            Self::compute_hinted_scores(template, &query_scores, state, unit_id);
-                        (hinted, Some(tid))
-                    }
+                    let tid = self.last_template_id.unwrap_or(0);
+                    self.round_template_ids.push(tid);
+                    let hinted =
+                        Self::compute_hinted_scores(template, &query_scores, state, unit_id);
+                    (hinted, Some(tid))
+                } else {
+                    // No previous template — fall back to PlanNew
+                    let (template, tid) = self.template_proposer.select();
+                    self.last_template = Some(template);
+                    self.last_template_id = Some(tid);
+                    self.round_template_ids.push(tid);
+                    let hinted =
+                        Self::compute_hinted_scores(template, &query_scores, state, unit_id);
+                    (hinted, Some(tid))
+                }
             }
             PlanningDecision::PlanSkip => {
                 // Skip template entirely — use only heuristic query_scores + Q-values

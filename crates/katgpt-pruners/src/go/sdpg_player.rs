@@ -354,8 +354,7 @@ mod tests {
         let q = p.sdpg_q_values();
         assert!(
             q[GoMoveCategory::Capture as usize] > 0.0,
-            "Capture Q should be positive after win: {:?}",
-            q
+            "Capture Q should be positive after win: {q:?}"
         );
     }
 

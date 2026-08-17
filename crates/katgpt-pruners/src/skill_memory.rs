@@ -313,8 +313,7 @@ impl PrunerMemory {
         let mem = Self::thaw(&frozen)?;
         if !mem.verify_identity(pruner_id) {
             return Err(format!(
-                "Identity mismatch: loaded memory does not match pruner_id {:?}",
-                pruner_id
+                "Identity mismatch: loaded memory does not match pruner_id {pruner_id:?}"
             ));
         }
         Ok(mem)
@@ -439,10 +438,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         let per_append = elapsed / iterations as u32;
-        println!(
-            "[bench] PrunerMemory::append: {per_append:?} per call ({} iterations)",
-            iterations
-        );
+        println!("[bench] PrunerMemory::append: {per_append:?} per call ({iterations} iterations)");
 
         assert!(
             per_append.as_nanos() < 100,

@@ -364,8 +364,7 @@ impl BanditStats {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     }
 
     /// Q-value estimate for an arm.
@@ -689,15 +688,12 @@ impl<P: ScreeningPruner> BanditPruner<P> {
     #[cfg(feature = "partial_scoring")]
     #[inline]
     pub fn update_with_trace(&mut self, arm: usize, trace: &katgpt_core::GameTrace) {
-        let reward = match &self.partial_scorer {
-            Some(scorer) => scorer.partial_score(trace),
-            None => {
-                if trace.final_reward > 0.0 {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+        let reward = if let Some(scorer) = &self.partial_scorer {
+            scorer.partial_score(trace)
+        } else if trace.final_reward > 0.0 {
+            1.0
+        } else {
+            0.0
         };
         self.update_arm(arm, reward);
     }
@@ -1113,16 +1109,13 @@ impl<P: ScreeningPruner> BanditPruner<P> {
         // Vec — correctness over zero-alloc in that rare path.
         let mut local_scores;
         let mut scores_guard;
-        let scores: &mut Vec<f32> = match self.soft_route_scores.as_ref() {
-            Some(m) => {
-                scores_guard = m.lock().unwrap();
-                scores_guard.clear();
-                &mut scores_guard
-            }
-            None => {
-                local_scores = Vec::with_capacity(num_arms);
-                &mut local_scores
-            }
+        let scores: &mut Vec<f32> = if let Some(m) = self.soft_route_scores.as_ref() {
+            scores_guard = m.lock().unwrap();
+            scores_guard.clear();
+            &mut scores_guard
+        } else {
+            local_scores = Vec::with_capacity(num_arms);
+            &mut local_scores
         };
         let use_ci_fast_path = {
             #[cfg(feature = "idea_divergence")]
@@ -1150,16 +1143,13 @@ impl<P: ScreeningPruner> BanditPruner<P> {
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let mut local_weights;
         let mut weights_guard;
-        let weights: &mut Vec<f32> = match self.soft_route_weights.as_ref() {
-            Some(m) => {
-                weights_guard = m.lock().unwrap();
-                weights_guard.clear();
-                &mut weights_guard
-            }
-            None => {
-                local_weights = Vec::with_capacity(num_arms);
-                &mut local_weights
-            }
+        let weights: &mut Vec<f32> = if let Some(m) = self.soft_route_weights.as_ref() {
+            weights_guard = m.lock().unwrap();
+            weights_guard.clear();
+            &mut weights_guard
+        } else {
+            local_weights = Vec::with_capacity(num_arms);
+            &mut local_weights
         };
         let inv_tau = 1.0 / tau;
         weights.extend(scores.iter().map(|&s| {

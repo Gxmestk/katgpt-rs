@@ -244,14 +244,13 @@ pub fn verify_self_containment(pairs: &[ReflectionQA]) -> Vec<ReflectionQA> {
         .iter()
         .map(|pair| {
             let contained = is_self_contained(&pair.question, &pair.answer);
-            let (question, answer) = match contained {
-                true => (pair.question.clone(), pair.answer.clone()),
-                false => {
-                    let domain_str = format!("{domain}", domain = pair.domain);
-                    let q = format!("[{domain_str}] {q}", q = pair.question);
-                    let a = format!("[{domain_str}] {a}", a = pair.answer);
-                    (q, a)
-                }
+            let (question, answer) = if contained {
+                (pair.question.clone(), pair.answer.clone())
+            } else {
+                let domain_str = format!("{domain}", domain = pair.domain);
+                let q = format!("[{domain_str}] {q}", q = pair.question);
+                let a = format!("[{domain_str}] {a}", a = pair.answer);
+                (q, a)
             };
 
             ReflectionQA {
@@ -259,9 +258,10 @@ pub fn verify_self_containment(pairs: &[ReflectionQA]) -> Vec<ReflectionQA> {
                 answer,
                 // Preserve original step for self-contained pairs;
                 // mark rewritten (ambiguous) pairs as Verification step.
-                step: match contained {
-                    true => pair.step,
-                    false => ReflectionStep::Verification,
+                step: if contained {
+                    pair.step
+                } else {
+                    ReflectionStep::Verification
                 },
                 domain: pair.domain,
                 consolidation_count: pair.consolidation_count,
@@ -488,9 +488,10 @@ mod tests {
                 tick: i as u32,
                 state_description: format!("state_{i}"),
                 action_description: Some(format!("action_{i}")),
-                outcome_description: match i % 2 == 0 {
-                    true => Some(format!("outcome_{i}")),
-                    false => None,
+                outcome_description: if i % 2 == 0 {
+                    Some(format!("outcome_{i}"))
+                } else {
+                    None
                 },
                 score: 0.5 + i as f32 * 0.1,
             })

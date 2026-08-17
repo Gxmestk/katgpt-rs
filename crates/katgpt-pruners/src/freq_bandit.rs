@@ -473,12 +473,11 @@ impl FrequencyBandit {
         let q_mean = q_sum / 3.0_f64;
         let mut variances = [0.0; 3];
         for (i, &q) in self.arm_q_values.iter().enumerate() {
-            match self.arm_counts[i] {
-                0 | 1 => variances[i] = 0.0,
-                _ => {
-                    let delta = q - q_mean;
-                    variances[i] = delta * delta;
-                }
+            if let 0 | 1 = self.arm_counts[i] {
+                variances[i] = 0.0
+            } else {
+                let delta = q - q_mean;
+                variances[i] = delta * delta;
             }
         }
         variances
@@ -702,8 +701,7 @@ mod tests {
         let sum: f32 = weights.iter().sum();
         assert!(
             (sum - 1.0).abs() > 0.01,
-            "sigmoid weights should NOT sum to 1.0 (that would be softmax), got sum={}",
-            sum
+            "sigmoid weights should NOT sum to 1.0 (that would be softmax), got sum={sum}"
         );
 
         // Verify: sigmoid is monotonic → higher input → higher output

@@ -303,13 +303,12 @@ impl TemplateProposer {
     pub fn mean_delta(&self, template_id: usize) -> f32 {
         self.stats
             .get(template_id)
-            .map(TemplateStats::mean_delta)
-            .unwrap_or(0.0)
+            .map_or(0.0, TemplateStats::mean_delta)
     }
 
     /// Number of proposals for a specific template category.
     pub fn pull_count(&self, template_id: usize) -> usize {
-        self.stats.get(template_id).map(|s| s.pulls).unwrap_or(0)
+        self.stats.get(template_id).map_or(0, |s| s.pulls)
     }
 
     /// Total proposals generated.
@@ -370,7 +369,7 @@ impl TemplateProposer {
         // Select from top candidates with some randomness
         let top_k = candidates.len().min(3);
         let idx = self.rng.usize(0..top_k);
-        candidates.get(idx).map(|(i, _)| *i).unwrap_or(0)
+        candidates.get(idx).map_or(0, |(i, _)| *i)
     }
 
     /// Generate a (query, hint) pair from a specific template.

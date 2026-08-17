@@ -174,8 +174,7 @@ impl BomberTemplateProposer {
     pub fn mean_delta(&self, template_id: usize) -> f32 {
         self.stats
             .get(template_id)
-            .map(TemplateStats::mean_delta)
-            .unwrap_or(0.0)
+            .map_or(0.0, TemplateStats::mean_delta)
     }
 
     /// Template with highest mean outcome reward (most successful).
@@ -194,8 +193,7 @@ impl BomberTemplateProposer {
                 };
                 a_reward.partial_cmp(&b_reward).unwrap_or(Ordering::Equal)
             })
-            .map(|i| BomberTemplate::all()[i])
-            .unwrap_or(BomberTemplate::FleeBlast)
+            .map_or(BomberTemplate::FleeBlast, |i| BomberTemplate::all()[i])
     }
 
     /// Total number of template selections made.
@@ -218,8 +216,7 @@ impl BomberTemplateProposer {
     pub fn ucb1_score(&self, template_id: usize, total_pulls: u32) -> f32 {
         self.stats
             .get(template_id)
-            .map(|s| s.ucb1_score(total_pulls))
-            .unwrap_or(f32::MAX)
+            .map_or(f32::MAX, |s| s.ucb1_score(total_pulls))
     }
 
     /// Record a template pull without going through `select()`.
@@ -634,7 +631,7 @@ mod tests {
     #[test]
     fn test_template_names() {
         for t in BomberTemplate::all() {
-            assert!(!t.name().is_empty(), "{:?} should have a name", t);
+            assert!(!t.name().is_empty(), "{t:?} should have a name");
         }
     }
 

@@ -100,7 +100,7 @@ impl SensitivityCache {
 
     /// Whether the cache is empty.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.cache.pin().is_empty()
     }
 }
 
@@ -272,7 +272,7 @@ impl DecisionExplanation {
             }
 
             if !primary_driver.is_empty() {
-                lines.push(format!("  → Primary driver: {}", primary_driver));
+                lines.push(format!("  → Primary driver: {primary_driver}"));
             }
         }
 
@@ -370,7 +370,7 @@ impl DecisionExplainer for PerturbationExplainer {
             for pruner_idx in 0..chosen.pruner_scores.len().min(num_pruners) {
                 let raw_name: Cow<'static, str> = match self.pruner_names.get(pruner_idx) {
                     Some(n) => Cow::Owned(n.clone()),
-                    None => Cow::Owned(format!("pruner_{}", pruner_idx)),
+                    None => Cow::Owned(format!("pruner_{pruner_idx}")),
                 };
                 let score = chosen.pruner_scores[pruner_idx];
                 let sensitivity = self.compute_single_sensitivity(node, pruner_idx, self.delta);
@@ -552,17 +552,18 @@ impl PerturbationExplainer {
             }
         }
 
-        match primary.is_empty() {
-            true => format!(
+        if primary.is_empty() {
+            format!(
                 "{} token choices analyzed. No pruner showed significant sensitivity.",
                 choices.len(),
-            ),
-            false => format!(
+            )
+        } else {
+            format!(
                 "{} token choices analyzed. Primary driver: '{}' (sensitivity={:.3})",
                 choices.len(),
                 primary,
                 max_sens,
-            ),
+            )
         }
     }
 }
@@ -746,10 +747,7 @@ mod tests {
             for (i, &s) in sens.iter().enumerate() {
                 assert!(
                     s >= 0.0,
-                    "sensitivity()[{}] = {} for pruner {} should be non-negative",
-                    i,
-                    s,
-                    pruner_idx,
+                    "sensitivity()[{i}] = {s} for pruner {pruner_idx} should be non-negative",
                 );
             }
         }
@@ -821,22 +819,19 @@ mod tests {
         // Should mention depth
         assert!(
             report.contains("depth 0"),
-            "Report should mention depth 0: got\n{}",
-            report,
+            "Report should mention depth 0: got\n{report}",
         );
 
         // Should mention pruner names (raw or concept-grounded)
         assert!(
             report.contains("syntax") || report.contains("bandit") || report.contains("confidence"),
-            "Report should mention pruner names or grounded labels: got\n{}",
-            report,
+            "Report should mention pruner names or grounded labels: got\n{report}",
         );
 
         // Should NOT be the empty-trace message
         assert!(
             !report.contains("no token choices"),
-            "Non-empty trace should not produce empty message: got\n{}",
-            report,
+            "Non-empty trace should not produce empty message: got\n{report}",
         );
 
         // Empty explanation should produce special message
@@ -848,8 +843,7 @@ mod tests {
         let empty_report = empty_explanation.format_report(&[]);
         assert!(
             empty_report.contains("no token choices"),
-            "Empty explanation should say 'no token choices': got\n{}",
-            empty_report,
+            "Empty explanation should say 'no token choices': got\n{empty_report}",
         );
     }
 
@@ -1090,8 +1084,7 @@ mod tests {
             let grounded = explainer.ground_pruner_name("syntax", 0, 42);
             assert_eq!(
                 grounded, "low confidence / rejected",
-                "Default score 0.0 should ground to 'low confidence / rejected', got '{}'",
-                grounded
+                "Default score 0.0 should ground to 'low confidence / rejected', got '{grounded}'"
             );
         }
 
@@ -1102,8 +1095,7 @@ mod tests {
             let grounded = explainer.ground_pruner_name("unknown_pruner", 1, 5);
             assert_eq!(
                 grounded, "low confidence / rejected",
-                "Should produce score-based grounding even for unknown pruner, got '{}'",
-                grounded
+                "Should produce score-based grounding even for unknown pruner, got '{grounded}'"
             );
         }
 
@@ -1191,8 +1183,7 @@ mod tests {
             assert!(!report.is_empty(), "Report should not be empty");
             assert!(
                 report.contains("confidence"),
-                "Report should contain grounded label 'confidence', got:\n{}",
-                report
+                "Report should contain grounded label 'confidence', got:\n{report}"
             );
         }
     }

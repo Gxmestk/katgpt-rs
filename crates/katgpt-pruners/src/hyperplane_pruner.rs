@@ -87,21 +87,15 @@ impl ConstraintPruner for HyperplanePruner<'_> {
         }
         let mut product = 1.0f32;
         for pruner in &self.pruners {
-            let score = match pruner.constraint_vector(depth, parent_tokens) {
-                Some(_) => {
-                    // Sigmoid-softened score
-                    let raw = pruner.manifold_score(depth, token_idx, parent_tokens);
-                    let x = (raw - 0.5) / self.temperature;
-                    katgpt_core::simd::fast_sigmoid(x)
-                }
-                None => {
-                    // Binary: 1.0 or 0.0
-                    let raw = pruner.manifold_score(depth, token_idx, parent_tokens);
-                    match raw > 0.5 {
-                        true => 1.0,
-                        false => 0.0,
-                    }
-                }
+            let score = if pruner.constraint_vector(depth, parent_tokens).is_some() {
+                // Sigmoid-softened score
+                let raw = pruner.manifold_score(depth, token_idx, parent_tokens);
+                let x = (raw - 0.5) / self.temperature;
+                katgpt_core::simd::fast_sigmoid(x)
+            } else {
+                // Binary: 1.0 or 0.0
+                let raw = pruner.manifold_score(depth, token_idx, parent_tokens);
+                if raw > 0.5 { 1.0 } else { 0.0 }
             };
             product *= score;
             // Early exit: if any constraint is zero, total is zero

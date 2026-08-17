@@ -326,8 +326,7 @@ mod tests {
         let arm = router.select(&features);
         assert!(
             matches!(arm.regime(), Regime::Discovery),
-            "Expected Discovery regime, got {:?}",
-            arm
+            "Expected Discovery regime, got {arm:?}"
         );
     }
 
@@ -338,8 +337,7 @@ mod tests {
         let arm = router.select(&features);
         assert!(
             matches!(arm.regime(), Regime::Consolidation),
-            "Expected Consolidation regime, got {:?}",
-            arm
+            "Expected Consolidation regime, got {arm:?}"
         );
     }
 
@@ -350,8 +348,7 @@ mod tests {
         let arm = router.select(&features);
         assert!(
             matches!(arm.regime(), Regime::Standard),
-            "Expected Standard regime, got {:?}",
-            arm
+            "Expected Standard regime, got {arm:?}"
         );
     }
 
@@ -366,8 +363,7 @@ mod tests {
         let qv = router.q_value(arm);
         assert!(
             (qv - 0.75).abs() < 1e-6,
-            "Expected q_value ≈ 0.75, got {}",
-            qv
+            "Expected q_value ≈ 0.75, got {qv}"
         );
         assert_eq!(router.visits(arm), 2);
     }
@@ -387,8 +383,7 @@ mod tests {
         assert_eq!(
             arm,
             RegimeArm::StandardHeavy,
-            "UCB1 should prefer unvisited arm, got {:?}",
-            arm
+            "UCB1 should prefer unvisited arm, got {arm:?}"
         );
     }
 

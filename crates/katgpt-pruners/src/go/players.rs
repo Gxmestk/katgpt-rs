@@ -845,10 +845,7 @@ impl GoGZeroPlayer {
     /// Update template stats based on game outcome.
     pub fn update_outcome(&mut self, won: bool) {
         if let Some(tmpl) = self.last_template {
-            let reward = match won {
-                true => 1.0,
-                false => 0.0,
-            };
+            let reward = if won { 1.0 } else { 0.0 };
             self.stats.update(tmpl as usize, reward);
         }
         self.last_template = None;
@@ -967,9 +964,10 @@ impl GoGZeroPlayer {
             .copied()
             .collect();
 
-        match matching.is_empty() {
-            true => legal_moves.to_vec(),
-            false => matching,
+        if matching.is_empty() {
+            legal_moves.to_vec()
+        } else {
+            matching
         }
     }
 }
@@ -1462,8 +1460,7 @@ mod tests {
         let any_positive = q_after_win.iter().any(|&q| q > 0.0);
         assert!(
             any_positive,
-            "After a win, some Q-values should be > 0, got {:?}",
-            q_after_win,
+            "After a win, some Q-values should be > 0, got {q_after_win:?}",
         );
 
         // Round 2: play 5 moves on fresh board, then report LOSS
@@ -1493,8 +1490,7 @@ mod tests {
             .any(|(&q, &v)| v > 0 && q > 0.0 && q < 1.0);
         assert!(
             any_mixed,
-            "After mixed win/loss, some Q-values should be between 0 and 1, got {:?}",
-            q_mixed,
+            "After mixed win/loss, some Q-values should be between 0 and 1, got {q_mixed:?}",
         );
     }
 

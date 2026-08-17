@@ -256,7 +256,7 @@ impl fmt::Display for CompactBitmap {
             CompactBitmap::Sparse(a) => write!(f, "sparse({})", a.len()),
             CompactBitmap::Dense(bits) => {
                 let count: usize = bits.iter().map(|w| w.count_ones() as usize).sum();
-                write!(f, "dense({})", count)
+                write!(f, "dense({count})")
             }
         }
     }

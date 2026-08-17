@@ -232,7 +232,7 @@ fn topk_indices(values: &[f32], k: usize) -> Vec<usize> {
     top.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     for (i, &val) in values.iter().enumerate().skip(k) {
-        if val > top.last().map(|&(_, v)| v).unwrap_or(f32::NEG_INFINITY) {
+        if val > top.last().map_or(f32::NEG_INFINITY, |&(_, v)| v) {
             // Find insertion point
             let pos = top.partition_point(|&(_, v)| v > val);
             top.insert(pos, (i, val));
@@ -827,16 +827,13 @@ impl ConstraintPruner for VocabChannelPruner {
 
         // Fallback: per-layer union batch check
         let len = candidates.len().min(results.len());
-        match self.per_layer_union.get(layer) {
-            Some(tokens) => {
-                for i in 0..len {
-                    results[i] = tokens.binary_search(&candidates[i]).is_ok();
-                }
+        if let Some(tokens) = self.per_layer_union.get(layer) {
+            for i in 0..len {
+                results[i] = tokens.binary_search(&candidates[i]).is_ok();
             }
-            None => {
-                // Unknown layer → don't prune
-                results[..len].fill(true);
-            }
+        } else {
+            // Unknown layer → don't prune
+            results[..len].fill(true);
         }
     }
 }

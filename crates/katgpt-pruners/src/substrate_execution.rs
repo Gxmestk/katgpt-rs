@@ -490,8 +490,7 @@ mod tests {
         // Expected: 1.0 - (0.5 * 0.2) / 0.5 = 1.0 - 0.2 = 0.8
         assert!(
             (reduction - 0.8).abs() < 0.01,
-            "expected 0.8, got {}",
-            reduction
+            "expected 0.8, got {reduction}"
         );
     }
 
@@ -502,8 +501,7 @@ mod tests {
         let reduction = flops_reduction_ratio(&mask, 0.5);
         assert!(
             (reduction - 1.0).abs() < 0.001,
-            "expected 1.0, got {}",
-            reduction
+            "expected 1.0, got {reduction}"
         );
     }
 

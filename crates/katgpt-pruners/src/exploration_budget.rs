@@ -206,15 +206,14 @@ impl Default for ExplorationBudgetConfig {
 ///
 /// Returns `true` if the tier has budget remaining, `false` if exhausted.
 pub fn check_budget(budget: &mut ExplorationBudget, tier: VerificationTier) -> bool {
-    match budget.verify(tier) {
-        Some(_) => true,
-        None => {
-            log::warn!(
-                "Exploration budget exhausted for {:?} — entering conservative mode",
-                tier
-            );
-            false
-        }
+    if budget.verify(tier).is_some() {
+        true
+    } else {
+        log::warn!(
+            "Exploration budget exhausted for {:?} — entering conservative mode",
+            tier
+        );
+        false
     }
 }
 

@@ -8,13 +8,12 @@
 /// Solution density: fraction of scores ≥ base_score + margin.
 /// From RandOpt (Neural Thickets) — measures how many perturbations improve over baseline.
 pub fn solution_density(scores: &[f32], base_score: f32, margin: f32) -> f32 {
-    match scores.is_empty() {
-        true => 0.0,
-        false => {
-            let threshold = base_score + margin;
-            let above = scores.iter().filter(|&&s| s >= threshold).count();
-            above as f32 / scores.len() as f32
-        }
+    if scores.is_empty() {
+        0.0
+    } else {
+        let threshold = base_score + margin;
+        let above = scores.iter().filter(|&&s| s >= threshold).count();
+        above as f32 / scores.len() as f32
     }
 }
 

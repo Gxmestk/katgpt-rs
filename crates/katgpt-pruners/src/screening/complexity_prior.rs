@@ -733,9 +733,7 @@ mod tests {
         let lp_complex = s.log_prob(&complex);
         assert!(
             lp_simple > lp_complex,
-            "simpler candidate must have higher log_prob: {} vs {}",
-            lp_simple,
-            lp_complex
+            "simpler candidate must have higher log_prob: {lp_simple} vs {lp_complex}"
         );
     }
 

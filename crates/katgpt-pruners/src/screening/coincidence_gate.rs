@@ -71,10 +71,7 @@ impl CoincidenceGate {
     #[inline]
     #[must_use]
     pub fn should_probe(&self, k_tilde_of_f2: f32) -> bool {
-        match k_tilde_of_f2 < self.simple_set_size_estimate {
-            true => true,
-            false => false,
-        }
+        k_tilde_of_f2 < self.simple_set_size_estimate
     }
 
     /// Probe `x*` against each objective `f2_k`, returning indices where `x*`
@@ -120,8 +117,7 @@ impl CoincidenceGate {
     {
         debug_assert!(
             rank_threshold_r >= 1,
-            "rank_threshold_r must be >= 1, got {}",
-            rank_threshold_r
+            "rank_threshold_r must be >= 1, got {rank_threshold_r}"
         );
         let mut hits: Vec<usize> = Vec::with_capacity(objectives.len().min(8));
         if x_star.is_empty() {

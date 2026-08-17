@@ -160,9 +160,10 @@ mod tests {
         type Action = bool;
 
         fn available_actions(&self, _player_id: u8) -> Vec<Self::Action> {
-            match self.acted {
-                true => vec![],
-                false => vec![false, true],
+            if self.acted {
+                vec![]
+            } else {
+                vec![false, true]
             }
         }
 

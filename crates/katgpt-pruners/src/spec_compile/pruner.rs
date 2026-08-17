@@ -70,58 +70,55 @@ impl ConstraintPruner for CompiledSpec {
         // Find the applicable rule for this depth + prefix
         let applicable_rule = self.find_rule(depth, parent_tokens);
 
-        match applicable_rule {
-            Some((bitmap, is_allowlist)) => {
-                let len = candidates.len().min(results.len());
-                match bitmap {
-                    CompactBitmap::Empty => {
-                        for i in 0..len {
-                            results[i] = !is_allowlist; // Empty allowlist = all blocked
-                        }
+        if let Some((bitmap, is_allowlist)) = applicable_rule {
+            let len = candidates.len().min(results.len());
+            match bitmap {
+                CompactBitmap::Empty => {
+                    for i in 0..len {
+                        results[i] = !is_allowlist; // Empty allowlist = all blocked
                     }
-                    CompactBitmap::Sparse(a) => {
-                        // Sparse: binary search per candidate
-                        for i in 0..len {
-                            let idx = candidates[i];
-                            let in_bitmap = if idx <= u16::MAX as usize {
-                                a.binary_search(&(idx as u16)).is_ok()
-                            } else {
-                                false
-                            };
-                            results[i] = if is_allowlist { in_bitmap } else { !in_bitmap };
-                        }
+                }
+                CompactBitmap::Sparse(a) => {
+                    // Sparse: binary search per candidate
+                    for i in 0..len {
+                        let idx = candidates[i];
+                        let in_bitmap = if idx <= u16::MAX as usize {
+                            a.binary_search(&(idx as u16)).is_ok()
+                        } else {
+                            false
+                        };
+                        results[i] = if is_allowlist { in_bitmap } else { !in_bitmap };
                     }
-                    CompactBitmap::Dense(bits) => {
-                        // Dense: direct bit check — O(1) per candidate
-                        for i in 0..len {
-                            let idx = candidates[i];
-                            let word = idx / 64;
-                            let bit = idx % 64;
-                            let in_bitmap = if word < 1024 {
-                                (bits[word] >> bit) & 1 == 1
-                            } else {
-                                false
-                            };
-                            results[i] = if is_allowlist { in_bitmap } else { !in_bitmap };
-                        }
+                }
+                CompactBitmap::Dense(bits) => {
+                    // Dense: direct bit check — O(1) per candidate
+                    for i in 0..len {
+                        let idx = candidates[i];
+                        let word = idx / 64;
+                        let bit = idx % 64;
+                        let in_bitmap = if word < 1024 {
+                            (bits[word] >> bit) & 1 == 1
+                        } else {
+                            false
+                        };
+                        results[i] = if is_allowlist { in_bitmap } else { !in_bitmap };
                     }
                 }
             }
-            None => {
-                // No applicable rule — check global sets, then default allow.
-                // `global_allowed.is_empty()` does not depend on the candidate,
-                // so hoist it out of the per-candidate loop.
-                let len = candidates.len().min(results.len());
-                let has_global_allowlist = !self.global_allowed.is_empty();
-                for i in 0..len {
-                    let idx = candidates[i];
-                    if self.global_blocked.contains(idx) {
-                        results[i] = false;
-                    } else if has_global_allowlist {
-                        results[i] = self.global_allowed.contains(idx);
-                    } else {
-                        results[i] = true;
-                    }
+        } else {
+            // No applicable rule — check global sets, then default allow.
+            // `global_allowed.is_empty()` does not depend on the candidate,
+            // so hoist it out of the per-candidate loop.
+            let len = candidates.len().min(results.len());
+            let has_global_allowlist = !self.global_allowed.is_empty();
+            for i in 0..len {
+                let idx = candidates[i];
+                if self.global_blocked.contains(idx) {
+                    results[i] = false;
+                } else if has_global_allowlist {
+                    results[i] = self.global_allowed.contains(idx);
+                } else {
+                    results[i] = true;
                 }
             }
         }

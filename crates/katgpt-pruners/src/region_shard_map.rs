@@ -176,7 +176,7 @@ impl RegionSharding for RegionShardMap {
     }
 
     fn rebalance(&mut self, transitions: &[(RegionLabel, FreqTier, FreqTier)]) {
-        self.rebalance(transitions)
+        self.rebalance(transitions);
     }
 
     #[inline]

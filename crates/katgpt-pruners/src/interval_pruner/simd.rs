@@ -536,7 +536,7 @@ mod tests {
         // Gap should be filled.
         for (i, closed_i) in closed[100..300].iter().enumerate() {
             let i = i + 100;
-            assert!(*closed_i, "token {} should be valid after closure", i);
+            assert!(*closed_i, "token {i} should be valid after closure");
         }
     }
 

@@ -164,9 +164,10 @@ impl<S: ScreeningPruner> OptionStripper<S> {
         parent_tokens: &[usize],
         matched: bool,
     ) -> f32 {
-        match matched {
-            true => self.inner.relevance(depth, token_idx, parent_tokens),
-            false => 0.0,
+        if matched {
+            self.inner.relevance(depth, token_idx, parent_tokens)
+        } else {
+            0.0
         }
     }
 

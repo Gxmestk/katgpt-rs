@@ -33,18 +33,17 @@ impl ProcedureCostModel {
         let enumerator = PathEnumerator::new(graph, max_depth);
         let paths = enumerator.enumerate();
 
-        match paths.is_empty() {
-            true => None,
-            false => {
-                let total_steps: usize = paths.iter().map(|p| p.step_count()).sum();
-                let avg_path_length = total_steps as f64 / paths.len() as f64;
+        if paths.is_empty() {
+            None
+        } else {
+            let total_steps: usize = paths.iter().map(|p| p.step_count()).sum();
+            let avg_path_length = total_steps as f64 / paths.len() as f64;
 
-                Some(Self {
-                    node_count: graph.node_count(),
-                    path_count: paths.len(),
-                    avg_path_length,
-                })
-            }
+            Some(Self {
+                node_count: graph.node_count(),
+                path_count: paths.len(),
+                avg_path_length,
+            })
         }
     }
 
@@ -134,9 +133,10 @@ impl ProcedureCostModel {
     pub fn break_even_inferences(&self) -> usize {
         let training_cost_usd = self.estimated_training_hours() * 2.0;
         let savings_per_inference_usd = self.tokens_saved_per_inference() as f64 * 0.00001;
-        match savings_per_inference_usd > 0.0 {
-            true => (training_cost_usd / savings_per_inference_usd).ceil() as usize,
-            false => usize::MAX,
+        if savings_per_inference_usd > 0.0 {
+            (training_cost_usd / savings_per_inference_usd).ceil() as usize
+        } else {
+            usize::MAX
         }
     }
 }

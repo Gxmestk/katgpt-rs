@@ -74,9 +74,10 @@ impl<P: ScreeningPruner> EntropyBifurcatedPruner<P> {
     ///
     /// Call before relevance queries for each token position.
     pub fn update_entropy(&mut self, top1_prob: f32) {
-        self.state = match top1_prob < self.top1_threshold {
-            true => EntropyState::Forking,
-            false => EntropyState::Scaffolding,
+        self.state = if top1_prob < self.top1_threshold {
+            EntropyState::Forking
+        } else {
+            EntropyState::Scaffolding
         };
     }
 

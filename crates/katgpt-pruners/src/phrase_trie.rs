@@ -56,14 +56,13 @@ impl PhraseTrie {
         let mut node_idx = 0; // root
         for &tok in token_ids {
             let next = self.nodes[node_idx].children[tok];
-            node_idx = match next {
-                Some(child) => child,
-                None => {
-                    let child = self.nodes.len();
-                    self.nodes[node_idx].children[tok] = Some(child);
-                    self.nodes.push(PhraseTrieNode::new(self.vocab_size));
-                    child
-                }
+            node_idx = if let Some(child) = next {
+                child
+            } else {
+                let child = self.nodes.len();
+                self.nodes[node_idx].children[tok] = Some(child);
+                self.nodes.push(PhraseTrieNode::new(self.vocab_size));
+                child
             };
         }
         self.nodes[node_idx].is_terminal = true;

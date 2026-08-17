@@ -63,9 +63,8 @@ impl IntervalMask {
         }
 
         let intervals = self.valid_intervals();
-        match intervals.len() {
-            0 | 1 => return self.clone(),
-            _ => {}
+        if let 0 | 1 = intervals.len() {
+            return self.clone();
         }
 
         let mut result = self.mask.clone();
@@ -274,16 +273,12 @@ impl<P: ConstraintPruner> ConstraintPruner for IntervalPruner<P> {
         // Build mask only over the batch slice.
         // Compute intervals directly from `results` (no Vec<bool> allocation,
         // no IntervalMask wrapper), then fill gaps in place.
-        match self.gap_threshold {
-            0 => { /* no merging */ }
-            _ => {
-                let intervals = valid_intervals_from_slice(&results[..len]);
-                match intervals.len() {
-                    0 | 1 => {}
-                    _ => {
-                        close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold)
-                    }
-                }
+        if self.gap_threshold == 0 { /* no merging */
+        } else {
+            let intervals = valid_intervals_from_slice(&results[..len]);
+            if let 0 | 1 = intervals.len() {
+            } else {
+                close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold)
             }
         }
     }

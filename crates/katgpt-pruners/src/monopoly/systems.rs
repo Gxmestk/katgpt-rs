@@ -115,8 +115,7 @@ fn build_ctx_into(
                 // (railroads/utilities have Property with placeholder Brown group)
                 let is_street = world
                     .get::<BoardSquare>(sq_entity)
-                    .map(|bs| matches!(bs.kind, SquareKind::Property(_)))
-                    .unwrap_or(false);
+                    .map_or(false, |bs| matches!(bs.kind, SquareKind::Property(_)));
                 if is_street
                     && let Some(prop) = world.get::<Property>(sq_entity)
                     && (prop.group as usize) < group_counts.len()
@@ -135,7 +134,7 @@ fn build_ctx_into(
     for i in 0..4u8 {
         if i != player_id {
             let e = player_entities[i as usize];
-            opponent_cash[i as usize] = world.get::<Player>(e).map(|p| p.cash).unwrap_or(0);
+            opponent_cash[i as usize] = world.get::<Player>(e).map_or(0, |p| p.cash);
         }
     }
 
@@ -180,8 +179,7 @@ fn is_player_active(world: &World, id: u8) -> bool {
     let entity = pe.entities[id as usize];
     world
         .get::<Player>(entity)
-        .map(|p| !p.is_bankrupt)
-        .unwrap_or(false)
+        .map_or(false, |p| !p.is_bankrupt)
 }
 
 fn count_active_players(world: &World) -> u8 {
@@ -191,8 +189,7 @@ fn count_active_players(world: &World) -> u8 {
         let entity = pe.entities[i as usize];
         if world
             .get::<Player>(entity)
-            .map(|p| !p.is_bankrupt)
-            .unwrap_or(false)
+            .map_or(false, |p| !p.is_bankrupt)
         {
             count += 1;
         }
@@ -251,7 +248,7 @@ fn roll_dice(rng: &mut fastrand::Rng) -> (u8, u8, bool) {
 }
 
 fn move_forward(world: &mut World, entity: Entity, steps: u8) -> (u8, bool) {
-    let old = world.get::<Player>(entity).map(|p| p.position).unwrap_or(0);
+    let old = world.get::<Player>(entity).map_or(0, |p| p.position);
     let new = ((old as u16 + steps as u16) % BOARD_SIZE as u16) as u8;
     let passed_go = new < old;
     if let Some(mut p) = world.get_mut::<Player>(entity) {
@@ -330,8 +327,7 @@ pub fn owns_complete_set(world: &World, entity: Entity, group: PropertyGroup) ->
         let sq_entity = squares[sq as usize];
         world
             .get::<Owned>(sq_entity)
-            .map(|o| o.owner == entity && !o.is_mortgaged)
-            .unwrap_or(false)
+            .map_or(false, |o| o.owner == entity && !o.is_mortgaged)
     })
 }
 
@@ -343,8 +339,7 @@ pub fn count_railroads(world: &World, entity: Entity) -> u8 {
         .filter(|&&sq| {
             world
                 .get::<Owned>(squares[sq as usize])
-                .map(|o| o.owner == entity)
-                .unwrap_or(false)
+                .map_or(false, |o| o.owner == entity)
         })
         .count() as u8
 }
@@ -357,8 +352,7 @@ pub fn count_utilities(world: &World, entity: Entity) -> u8 {
         .filter(|&&sq| {
             world
                 .get::<Owned>(squares[sq as usize])
-                .map(|o| o.owner == entity)
-                .unwrap_or(false)
+                .map_or(false, |o| o.owner == entity)
         })
         .count() as u8
 }
@@ -376,8 +370,7 @@ pub fn calculate_rent(world: &World, square: u8, dice: (u8, u8), owner: Entity) 
     }
     let kind = world
         .get::<BoardSquare>(sq_entity)
-        .map(|bs| bs.kind)
-        .unwrap_or(SquareKind::Go);
+        .map_or(SquareKind::Go, |bs| bs.kind);
 
     match kind {
         SquareKind::Railroad => {
@@ -408,7 +401,7 @@ pub fn calculate_rent(world: &World, square: u8, dice: (u8, u8), owner: Entity) 
 
 /// Calculate total net worth (cash + properties + houses at half value).
 pub fn calculate_net_worth(world: &World, entity: Entity) -> u32 {
-    let cash = world.get::<Player>(entity).map(|p| p.cash).unwrap_or(0);
+    let cash = world.get::<Player>(entity).map_or(0, |p| p.cash);
     let squares = world.resource::<Board>().squares;
     let mut value = 0u32;
     for &sq_entity in &squares {
@@ -419,8 +412,7 @@ pub fn calculate_net_worth(world: &World, entity: Entity) -> u32 {
             if owned.is_mortgaged {
                 value += world
                     .get::<Property>(sq_entity)
-                    .map(|p| p.mortgage_value)
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.mortgage_value);
             } else if let Some(prop) = world.get::<Property>(sq_entity) {
                 value += prop.price;
                 value += (owned.houses.min(4) as u32) * prop.house_cost / 2;
@@ -455,8 +447,7 @@ pub fn can_build_house(world: &World, entity: Entity, square: u8) -> bool {
             world
                 .get::<Owned>(e)
                 .filter(|o| o.owner == entity)
-                .map(|o| o.houses)
-                .unwrap_or(0)
+                .map_or(0, |o| o.houses)
         })
         .min()
         .unwrap_or(0);
@@ -476,14 +467,8 @@ pub fn liquidate_assets(world: &mut World, entity: Entity, target: u32) -> u32 {
                 && owned.owner == entity
                 && owned.houses > 0
             {
-                let sq_idx = world
-                    .get::<BoardSquare>(sq_entity)
-                    .map(|bs| bs.index)
-                    .unwrap_or(0);
-                let cost = world
-                    .get::<Property>(sq_entity)
-                    .map(|p| p.house_cost)
-                    .unwrap_or(0);
+                let sq_idx = world.get::<BoardSquare>(sq_entity).map_or(0, |bs| bs.index);
+                let cost = world.get::<Property>(sq_entity).map_or(0, |p| p.house_cost);
                 list.push((sq_idx, owned.houses, cost));
             }
         }
@@ -514,14 +499,10 @@ pub fn liquidate_assets(world: &mut World, entity: Entity, target: u32) -> u32 {
                 && !owned.is_mortgaged
                 && owned.houses == 0
             {
-                let sq_idx = world
-                    .get::<BoardSquare>(sq_entity)
-                    .map(|bs| bs.index)
-                    .unwrap_or(0);
+                let sq_idx = world.get::<BoardSquare>(sq_entity).map_or(0, |bs| bs.index);
                 let val = world
                     .get::<Property>(sq_entity)
-                    .map(|p| p.mortgage_value)
-                    .unwrap_or(0);
+                    .map_or(0, |p| p.mortgage_value);
                 list.push((sq_idx, val));
             }
         }
@@ -561,7 +542,7 @@ pub fn transfer_assets(world: &mut World, from: Entity, to: Option<Entity>) {
         }
     }
     if let Some(to_entity) = to {
-        let cash = world.get::<Player>(from).map(|p| p.cash).unwrap_or(0);
+        let cash = world.get::<Player>(from).map_or(0, |p| p.cash);
         if let Some(mut r) = world.get_mut::<Player>(to_entity) {
             r.receive(cash);
         }
@@ -644,7 +625,7 @@ fn execute_card_effect(
             }
         }
         CardEffect::MoveTo(target) => {
-            let old = world.get::<Player>(entity).map(|p| p.position).unwrap_or(0);
+            let old = world.get::<Player>(entity).map_or(0, |p| p.position);
             if target < old {
                 collect_salary(world, entity, events);
             }
@@ -657,7 +638,7 @@ fn execute_card_effect(
             });
         }
         CardEffect::MoveBack(spaces) => {
-            let old = world.get::<Player>(entity).map(|p| p.position).unwrap_or(0);
+            let old = world.get::<Player>(entity).map_or(0, |p| p.position);
             let new_pos = if old >= spaces {
                 old - spaces
             } else {
@@ -672,7 +653,7 @@ fn execute_card_effect(
             });
         }
         CardEffect::MoveToNearest { is_railroad } => {
-            let from = world.get::<Player>(entity).map(|p| p.position).unwrap_or(0);
+            let from = world.get::<Player>(entity).map_or(0, |p| p.position);
             let target = find_nearest(world, from, is_railroad);
             if target < from {
                 collect_salary(world, entity, events);
@@ -716,8 +697,7 @@ fn execute_card_effect(
                 if other != entity && is_player_active(world, i as u8) {
                     let can_pay = world
                         .get::<Player>(other)
-                        .map(|p| p.cash >= amount)
-                        .unwrap_or(false);
+                        .map_or(false, |p| p.cash >= amount);
                     if can_pay {
                         if let Some(mut o) = world.get_mut::<Player>(other) {
                             o.pay(amount);
@@ -744,7 +724,7 @@ fn pay_debt(
     creditor: Option<Entity>,
     events: &mut Vec<GameEvent>,
 ) -> bool {
-    let cash = world.get::<Player>(entity).map(|p| p.cash).unwrap_or(0);
+    let cash = world.get::<Player>(entity).map_or(0, |p| p.cash);
     if cash >= amount {
         if let Some(mut p) = world.get_mut::<Player>(entity) {
             p.pay(amount);
@@ -758,7 +738,7 @@ fn pay_debt(
     }
     let shortfall = amount - cash;
     liquidate_assets(world, entity, shortfall);
-    let new_cash = world.get::<Player>(entity).map(|p| p.cash).unwrap_or(0);
+    let new_cash = world.get::<Player>(entity).map_or(0, |p| p.cash);
     if new_cash >= amount {
         if let Some(mut p) = world.get_mut::<Player>(entity) {
             p.pay(amount);
@@ -797,10 +777,7 @@ pub fn execute_turn(
     events.push(GameEvent::TurnStarted { player: player_id });
 
     // ── Phase 1: PreTurn (Jail) ──
-    let in_jail = world
-        .get::<Player>(entity)
-        .map(|p| p.in_jail)
-        .unwrap_or(false);
+    let in_jail = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
 
     // Reusable buffer for owned properties across build_ctx calls
     let mut owned_buf = Vec::new();
@@ -821,8 +798,7 @@ pub fn execute_turn(
             JailDecision::UseCard => {
                 let has_card = world
                     .get::<Player>(entity)
-                    .map(|p| p.get_out_of_jail_free > 0)
-                    .unwrap_or(false);
+                    .map_or(false, |p| p.get_out_of_jail_free > 0);
                 if has_card {
                     if let Some(mut p) = world.get_mut::<Player>(entity) {
                         p.get_out_of_jail_free -= 1;
@@ -872,10 +848,7 @@ pub fn execute_turn(
                             );
                         }
                     }
-                    let bankrupt = world
-                        .get::<Player>(entity)
-                        .map(|p| p.is_bankrupt)
-                        .unwrap_or(false);
+                    let bankrupt = world.get::<Player>(entity).map_or(false, |p| p.is_bankrupt);
                     return TurnResult {
                         player: player_id,
                         events,
@@ -917,7 +890,7 @@ pub fn execute_turn(
             doubles_count = 0;
         }
 
-        let old_pos = world.get::<Player>(entity).map(|p| p.position).unwrap_or(0);
+        let old_pos = world.get::<Player>(entity).map_or(0, |p| p.position);
         let (new_pos, passed_go) = move_forward(world, entity, d1 + d2);
         if passed_go {
             collect_salary(world, entity, &mut events);
@@ -945,10 +918,7 @@ pub fn execute_turn(
         }
 
         if is_doubles {
-            let jailed = world
-                .get::<Player>(entity)
-                .map(|p| p.in_jail)
-                .unwrap_or(false);
+            let jailed = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
             if jailed {
                 break;
             }
@@ -966,10 +936,7 @@ pub fn execute_turn(
     }
 
     // ── Phase 5: Strategic (Build) ──
-    let jailed = world
-        .get::<Player>(entity)
-        .map(|p| p.in_jail)
-        .unwrap_or(false);
+    let jailed = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
     if !jailed {
         let turn_number = world.resource::<TurnState>().turn_number;
         let ctx = build_ctx_into(world, player_id, turn_number, &mut owned_buf);
@@ -979,14 +946,10 @@ pub fn execute_turn(
             if can_build_house(world, entity, sq) {
                 let squares = world.resource::<Board>().squares;
                 let sq_entity = squares[sq as usize];
-                let cost = world
-                    .get::<Property>(sq_entity)
-                    .map(|p| p.house_cost)
-                    .unwrap_or(0);
+                let cost = world.get::<Property>(sq_entity).map_or(0, |p| p.house_cost);
                 let can_afford = world
                     .get::<Player>(entity)
-                    .map(|p| p.cash >= cost)
-                    .unwrap_or(false);
+                    .map_or(false, |p| p.cash >= cost);
                 if can_afford {
                     if let Some(mut p) = world.get_mut::<Player>(entity) {
                         p.pay(cost);
@@ -1011,10 +974,7 @@ pub fn execute_turn(
         stats.turns_played += 1;
     }
 
-    let bankrupt = world
-        .get::<Player>(entity)
-        .map(|p| p.is_bankrupt)
-        .unwrap_or(false);
+    let bankrupt = world.get::<Player>(entity).map_or(false, |p| p.is_bankrupt);
     TurnResult {
         player: player_id,
         events,
@@ -1041,8 +1001,7 @@ fn resolve_landing(
     let sq_entity = squares[square as usize];
     let kind = world
         .get::<BoardSquare>(sq_entity)
-        .map(|bs| bs.kind)
-        .unwrap_or(SquareKind::Go);
+        .map_or(SquareKind::Go, |bs| bs.kind);
 
     match kind {
         SquareKind::Go | SquareKind::FreeParking | SquareKind::Jail => {}
@@ -1102,8 +1061,7 @@ fn resolve_card_move(
 ) {
     let new_pos = world
         .get::<Player>(entity)
-        .map(|p| p.position)
-        .unwrap_or(original_square);
+        .map_or(original_square, |p| p.position);
     if new_pos == original_square {
         return;
     }
@@ -1111,8 +1069,7 @@ fn resolve_card_move(
     let sq_entity = squares[new_pos as usize];
     let kind = world
         .get::<BoardSquare>(sq_entity)
-        .map(|bs| bs.kind)
-        .unwrap_or(SquareKind::Go);
+        .map_or(SquareKind::Go, |bs| bs.kind);
     match kind {
         SquareKind::GoToJail => {
             send_to_jail(world, entity, events, JailReason::CardEffect);
@@ -1147,16 +1104,13 @@ fn resolve_property(
 ) {
     let owned_opt = world.get::<Owned>(sq_entity);
     let is_owned = owned_opt.is_some();
-    let is_self = owned_opt.map(|o| o.owner == entity).unwrap_or(false);
+    let is_self = owned_opt.map_or(false, |o| o.owner == entity);
     let owner_entity = owned_opt.map(|o| o.owner);
     let _ = owned_opt;
 
     if !is_owned {
         // Unowned — ask AI to buy or auction
-        let price = world
-            .get::<Property>(sq_entity)
-            .map(|p| p.price)
-            .unwrap_or(0);
+        let price = world.get::<Property>(sq_entity).map_or(0, |p| p.price);
         let turn_number = world.resource::<TurnState>().turn_number;
         let ctx = build_ctx(world, player_id, turn_number);
         if ai.should_buy_property(&ctx, square, price) && ctx.cash >= price {
@@ -1183,10 +1137,7 @@ fn resolve_property(
         // Own property — nothing
     } else if let Some(owner_e) = owner_entity {
         // Opponent's property — pay rent
-        let owner_bankrupt = world
-            .get::<Player>(owner_e)
-            .map(|p| p.is_bankrupt)
-            .unwrap_or(true);
+        let owner_bankrupt = world.get::<Player>(owner_e).map_or(true, |p| p.is_bankrupt);
         if owner_bankrupt {
             return;
         }
@@ -1248,8 +1199,7 @@ fn run_auction(
             let min_bid = (base_price / 2).max(super::AUCTION_MIN_BID);
             let can_afford = world
                 .get::<Player>(bidder_entity)
-                .map(|p| p.cash >= min_bid)
-                .unwrap_or(false);
+                .map_or(false, |p| p.cash >= min_bid);
             if can_afford {
                 highest_bid = min_bid;
                 highest_bidder = Some(i);

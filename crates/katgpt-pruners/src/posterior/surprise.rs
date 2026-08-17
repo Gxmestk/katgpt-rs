@@ -94,7 +94,10 @@ mod tests {
         // exactly 0.0 / 1.0, which is equivalent for all downstream gating use.
         for x in [-100.0, -10.0, -1.0, 0.0, 1.0, 10.0, 100.0] {
             let s = SurpriseComputer::sigmoid(x);
-            assert!((0.0..=1.0).contains(&s), "sigmoid({x}) = {s}, expected [0, 1]");
+            assert!(
+                (0.0..=1.0).contains(&s),
+                "sigmoid({x}) = {s}, expected [0, 1]"
+            );
         }
     }
 

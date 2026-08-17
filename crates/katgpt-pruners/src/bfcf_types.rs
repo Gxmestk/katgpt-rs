@@ -45,9 +45,10 @@ impl HalfSpace {
     #[inline]
     pub fn contains(&self, logits: &[f32]) -> bool {
         let val = logits.get(self.dim as usize).copied().unwrap_or(0.0);
-        match self.above {
-            true => val >= self.threshold,
-            false => val < self.threshold,
+        if self.above {
+            val >= self.threshold
+        } else {
+            val < self.threshold
         }
     }
 }

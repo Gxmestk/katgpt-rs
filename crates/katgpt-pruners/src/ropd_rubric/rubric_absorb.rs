@@ -299,8 +299,7 @@ impl<P: ScreeningPruner> RubricGatedAbsorbCompress<P> {
     pub fn is_above_threshold(&self, arm: usize) -> bool {
         self.arm_states
             .get(arm)
-            .map(|s| s.above_threshold)
-            .unwrap_or(false)
+            .map_or(false, |s| s.above_threshold)
     }
 
     /// Get the last computed gaps for an arm.
@@ -309,24 +308,17 @@ impl<P: ScreeningPruner> RubricGatedAbsorbCompress<P> {
     pub fn last_gaps(&self, arm: usize) -> &[(usize, f32, f32)] {
         self.arm_states
             .get(arm)
-            .map(|s| s.last_gaps.as_slice())
-            .unwrap_or(&[])
+            .map_or(&[], |s| s.last_gaps.as_slice())
     }
 
     /// Number of reference rubrics for a specific arm.
     pub fn reference_count(&self, arm: usize) -> usize {
-        self.arm_states
-            .get(arm)
-            .map(|s| s.references.len())
-            .unwrap_or(0)
+        self.arm_states.get(arm).map_or(0, |s| s.references.len())
     }
 
     /// Number of rubric observations for a specific arm.
     pub fn observation_count(&self, arm: usize) -> usize {
-        self.arm_states
-            .get(arm)
-            .map(|s| s.history.len())
-            .unwrap_or(0)
+        self.arm_states.get(arm).map_or(0, |s| s.history.len())
     }
 
     /// Which arms have the highest accumulated rubric gaps (top-K blind spots)?

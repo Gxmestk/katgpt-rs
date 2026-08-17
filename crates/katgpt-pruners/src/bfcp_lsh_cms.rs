@@ -258,8 +258,7 @@ mod tests {
         let tier = lsh.freq_tier(&hash);
         assert!(
             matches!(tier, FreqTier::Hot),
-            "after 150 accesses, should be Hot tier, got {:?}",
-            tier
+            "after 150 accesses, should be Hot tier, got {tier:?}"
         );
     }
 
@@ -280,8 +279,7 @@ mod tests {
         let tier = lsh.freq_tier(&hash);
         assert!(
             matches!(tier, FreqTier::Warm | FreqTier::Cold),
-            "after aggressive decay, should demote from Hot, got {:?}",
-            tier
+            "after aggressive decay, should demote from Hot, got {tier:?}"
         );
     }
 

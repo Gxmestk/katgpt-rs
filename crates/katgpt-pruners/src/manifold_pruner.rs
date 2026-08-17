@@ -32,20 +32,18 @@ impl<P: ConstraintPruner> ConstraintPruner for ManifoldPruner<P> {
     }
 
     fn manifold_score(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
-        match self.inner.constraint_vector(depth, parent_tokens) {
-            Some(_) => {
-                // Has geometric constraint: use sigmoid softened score
-                let raw = self.inner.manifold_score(depth, token_idx, parent_tokens);
-                let x = (raw - 0.5) / self.temperature;
-                katgpt_core::simd::fast_sigmoid(x)
-            }
-            None => {
-                // Binary fallback: sigmoid around boundary
-                let valid = self.inner.is_valid(depth, token_idx, parent_tokens);
-                match valid {
-                    true => katgpt_core::simd::fast_sigmoid(1.0 / self.temperature),
-                    false => katgpt_core::simd::fast_sigmoid(-1.0 / self.temperature),
-                }
+        if self.inner.constraint_vector(depth, parent_tokens).is_some() {
+            // Has geometric constraint: use sigmoid softened score
+            let raw = self.inner.manifold_score(depth, token_idx, parent_tokens);
+            let x = (raw - 0.5) / self.temperature;
+            katgpt_core::simd::fast_sigmoid(x)
+        } else {
+            // Binary fallback: sigmoid around boundary
+            let valid = self.inner.is_valid(depth, token_idx, parent_tokens);
+            if valid {
+                katgpt_core::simd::fast_sigmoid(1.0 / self.temperature)
+            } else {
+                katgpt_core::simd::fast_sigmoid(-1.0 / self.temperature)
             }
         }
     }
@@ -73,13 +71,11 @@ mod tests {
         // High temp -> both scores close to 0.5
         assert!(
             (valid_score - 0.5).abs() < 0.1,
-            "valid_score {} should be ~0.5",
-            valid_score
+            "valid_score {valid_score} should be ~0.5"
         );
         assert!(
             (invalid_score - 0.5).abs() < 0.1,
-            "invalid_score {} should be ~0.5",
-            invalid_score
+            "invalid_score {invalid_score} should be ~0.5"
         );
     }
 
@@ -92,13 +88,11 @@ mod tests {
         // Low temp -> valid ~1.0, invalid ~0.0
         assert!(
             valid_score > 0.99,
-            "valid_score {} should be ~1.0",
-            valid_score
+            "valid_score {valid_score} should be ~1.0"
         );
         assert!(
             invalid_score < 0.01,
-            "invalid_score {} should be ~0.0",
-            invalid_score
+            "invalid_score {invalid_score} should be ~0.0"
         );
     }
 

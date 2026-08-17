@@ -154,28 +154,27 @@ impl RandOptEnsemble {
 
     /// Aggregate discrete predictions via majority vote.
     pub fn aggregate_discrete(&self, predictions: &[u32]) -> u32 {
-        match predictions.is_empty() {
-            true => 0,
-            false => {
-                let mut counts: std::collections::HashMap<u32, usize> =
-                    std::collections::HashMap::new();
-                for &p in predictions {
-                    *counts.entry(p).or_insert(0) += 1;
-                }
-                counts
-                    .into_iter()
-                    .max_by_key(|&(_, c)| c)
-                    .map(|(v, _)| v)
-                    .unwrap_or(0)
+        if predictions.is_empty() {
+            0
+        } else {
+            let mut counts: std::collections::HashMap<u32, usize> =
+                std::collections::HashMap::new();
+            for &p in predictions {
+                *counts.entry(p).or_insert(0) += 1;
             }
+            counts
+                .into_iter()
+                .max_by_key(|&(_, c)| c)
+                .map_or(0, |(v, _)| v)
         }
     }
 
     /// Aggregate continuous predictions via mean.
     pub fn aggregate_continuous(&self, predictions: &[f32]) -> f32 {
-        match predictions.is_empty() {
-            true => 0.0,
-            false => predictions.iter().sum::<f32>() / predictions.len() as f32,
+        if predictions.is_empty() {
+            0.0
+        } else {
+            predictions.iter().sum::<f32>() / predictions.len() as f32
         }
     }
 }
@@ -249,9 +248,10 @@ impl RandOptSession {
             .collect();
 
         // 4. Compute ensemble score (average of top-K)
-        let ensemble_score = match top_k.is_empty() {
-            true => base_score,
-            false => top_k.iter().map(|(_, s)| *s).sum::<f32>() / top_k.len() as f32,
+        let ensemble_score = if top_k.is_empty() {
+            base_score
+        } else {
+            top_k.iter().map(|(_, s)| *s).sum::<f32>() / top_k.len() as f32
         };
 
         // 5. Compute solution density at margin=0

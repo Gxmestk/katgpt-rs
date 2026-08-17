@@ -34,11 +34,11 @@ use std::collections::HashMap;
 use fastrand::Rng;
 use serde::Deserialize;
 
-use crate::game_state::{GameState, mcts_search};
 use super::players::GoPlayer;
 use super::state::GoState;
 use super::types::{GoAction, GoCell};
 use super::utils::flood_group;
+use crate::game_state::{GameState, mcts_search};
 
 const BOARD_SIZE: usize = 9;
 const BOARD_AREA: usize = 81;
@@ -138,11 +138,11 @@ struct GlobalBranch {
 }
 
 struct ResidualBlock {
-    reduce: Wb,           // 32 -> 16, 1x1
-    first: Wb,            // 16 -> 16, 3x3
+    reduce: Wb, // 32 -> 16, 1x1
+    first: Wb,  // 16 -> 16, 3x3
     global: Option<GlobalBranch>,
-    second: Wb,           // 16 -> 16, 3x3
-    expand: Wb,           // 16 -> 32, 1x1
+    second: Wb, // 16 -> 16, 3x3
+    expand: Wb, // 16 -> 32, 1x1
 }
 
 pub struct MokaWeights {
@@ -312,7 +312,14 @@ fn conv2d_into(
 
 /// `weight` shape `[out_dim, in_dim]` flattened (row-major, out slowest).
 /// Writes `out_dim` floats into `out`. Allocation-free.
-fn linear_into(input: &[f32], in_dim: usize, out_dim: usize, weight: &[f32], bias: &[f32], out: &mut [f32]) {
+fn linear_into(
+    input: &[f32],
+    in_dim: usize,
+    out_dim: usize,
+    weight: &[f32],
+    bias: &[f32],
+    out: &mut [f32],
+) {
     debug_assert!(out.len() >= out_dim);
     for o in 0..out_dim {
         let base = o * in_dim;
@@ -354,18 +361,18 @@ fn global_mean_max_into(x: &[f32], h: usize, w: usize, ch: usize, out: &mut [f32
 /// allocated once and reused across every forward pass — this is what makes
 /// the search players affordable (they run one forward per visited node).
 pub struct MokaScratch {
-    trunk: Vec<f32>,     // 81*32 — residual stream
-    expand: Vec<f32>,    // 81*32 — block expand output
-    hidden_a: Vec<f32>,  // 81*16
-    hidden_b: Vec<f32>,  // 81*16
-    head4: Vec<f32>,     // 81*4  — policy conv
-    head2: Vec<f32>,     // 81*2  — value conv
-    patch: Vec<f32>,     // 3*3*32 — conv gather scratch (max over all layers)
-    pooled: Vec<f32>,    // 32 — global mean+max concat
-    gh: Vec<f32>,        // 8  — global hidden
-    gbias: Vec<f32>,     // 16 — global bias output
-    value_h: Vec<f32>,   // 32 — value hidden
-    policy: Vec<f32>,    // 82 — policy logits
+    trunk: Vec<f32>,    // 81*32 — residual stream
+    expand: Vec<f32>,   // 81*32 — block expand output
+    hidden_a: Vec<f32>, // 81*16
+    hidden_b: Vec<f32>, // 81*16
+    head4: Vec<f32>,    // 81*4  — policy conv
+    head2: Vec<f32>,    // 81*2  — value conv
+    patch: Vec<f32>,    // 3*3*32 — conv gather scratch (max over all layers)
+    pooled: Vec<f32>,   // 32 — global mean+max concat
+    gh: Vec<f32>,       // 8  — global hidden
+    gbias: Vec<f32>,    // 16 — global bias output
+    value_h: Vec<f32>,  // 32 — value hidden
+    policy: Vec<f32>,   // 82 — policy logits
 }
 
 impl MokaScratch {
@@ -396,10 +403,23 @@ impl Default for MokaScratch {
 /// Stem conv (12→32, 3×3, pad 1) + ReLU, into `scratch.trunk`. Split out so
 /// the parity test (Plan 563 T7) can check it against a hand-derived value
 /// without running the full 12-block network.
-fn stem_forward_into(weights: &MokaWeights, features: &[f32], patch: &mut [f32], trunk: &mut [f32]) {
+fn stem_forward_into(
+    weights: &MokaWeights,
+    features: &[f32],
+    patch: &mut [f32],
+    trunk: &mut [f32],
+) {
     conv2d_into(
-        features, BOARD_SIZE, BOARD_SIZE, INPUT_PLANES, TRUNK_CHANNELS, 3,
-        &weights.stem.w, &weights.stem.b, patch, trunk,
+        features,
+        BOARD_SIZE,
+        BOARD_SIZE,
+        INPUT_PLANES,
+        TRUNK_CHANNELS,
+        3,
+        &weights.stem.w,
+        &weights.stem.b,
+        patch,
+        trunk,
     );
     relu_inplace(&mut trunk[..BOARD_AREA * TRUNK_CHANNELS]);
 }
@@ -415,24 +435,77 @@ pub fn forward_with_scratch(
     // Destructure so each buffer is an independent &mut — avoids aliasing
     // complaints when several are live across one call.
     let MokaScratch {
-        trunk, expand, hidden_a, hidden_b, head4, head2, patch, pooled, gh, gbias, value_h, policy,
+        trunk,
+        expand,
+        hidden_a,
+        hidden_b,
+        head4,
+        head2,
+        patch,
+        pooled,
+        gh,
+        gbias,
+        value_h,
+        policy,
     } = scratch;
 
     stem_forward_into(weights, features, patch, trunk);
 
     for block in &weights.blocks {
         // reduce 32→16 (1×1), first 16→16 (3×3)
-        conv2d_into(trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1, &block.reduce.w, &block.reduce.b, patch, hidden_a);
+        conv2d_into(
+            trunk,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            TRUNK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            1,
+            &block.reduce.w,
+            &block.reduce.b,
+            patch,
+            hidden_a,
+        );
         relu_inplace(hidden_a);
-        conv2d_into(hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.first.w, &block.first.b, patch, hidden_b);
+        conv2d_into(
+            hidden_a,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            3,
+            &block.first.w,
+            &block.first.b,
+            patch,
+            hidden_b,
+        );
         relu_inplace(hidden_b);
 
         if let Some(g) = &block.global {
-            global_mean_max_into(hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, pooled);
-            linear_into(pooled, BOTTLENECK_CHANNELS * 2, g.hidden.b.len(), &g.hidden.w, &g.hidden.b, gh);
+            global_mean_max_into(
+                hidden_b,
+                BOARD_SIZE,
+                BOARD_SIZE,
+                BOTTLENECK_CHANNELS,
+                pooled,
+            );
+            linear_into(
+                pooled,
+                BOTTLENECK_CHANNELS * 2,
+                g.hidden.b.len(),
+                &g.hidden.w,
+                &g.hidden.b,
+                gh,
+            );
             relu_inplace(&mut gh[..g.hidden.b.len()]);
             // No activation on the global bias output.
-            linear_into(gh, g.hidden.b.len(), BOTTLENECK_CHANNELS, &g.output.w, &g.output.b, gbias);
+            linear_into(
+                gh,
+                g.hidden.b.len(),
+                BOTTLENECK_CHANNELS,
+                &g.output.w,
+                &g.output.b,
+                gbias,
+            );
             for pos in 0..BOARD_AREA {
                 let row = &mut hidden_b[pos * BOTTLENECK_CHANNELS..(pos + 1) * BOTTLENECK_CHANNELS];
                 for c in 0..BOTTLENECK_CHANNELS {
@@ -442,9 +515,31 @@ pub fn forward_with_scratch(
         }
 
         // second 16→16 (3×3) — reuse hidden_a — then expand 16→32 (1×1)
-        conv2d_into(hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.second.w, &block.second.b, patch, hidden_a);
+        conv2d_into(
+            hidden_b,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            3,
+            &block.second.w,
+            &block.second.b,
+            patch,
+            hidden_a,
+        );
         relu_inplace(hidden_a);
-        conv2d_into(hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1, &block.expand.w, &block.expand.b, patch, expand);
+        conv2d_into(
+            hidden_a,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            TRUNK_CHANNELS,
+            1,
+            &block.expand.w,
+            &block.expand.b,
+            patch,
+            expand,
+        );
 
         // Residual add + ReLU, in place on the trunk.
         for i in 0..BOARD_AREA * TRUNK_CHANNELS {
@@ -453,17 +548,60 @@ pub fn forward_with_scratch(
         }
     }
 
-    conv2d_into(trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, POLICY_CHANNELS, 1, &weights.policy_conv.w, &weights.policy_conv.b, patch, head4);
+    conv2d_into(
+        trunk,
+        BOARD_SIZE,
+        BOARD_SIZE,
+        TRUNK_CHANNELS,
+        POLICY_CHANNELS,
+        1,
+        &weights.policy_conv.w,
+        &weights.policy_conv.b,
+        patch,
+        head4,
+    );
     relu_inplace(head4);
-    linear_into(head4, POLICY_CHANNELS * BOARD_AREA, POLICY_MOVES, &weights.policy_linear.w, &weights.policy_linear.b, policy);
+    linear_into(
+        head4,
+        POLICY_CHANNELS * BOARD_AREA,
+        POLICY_MOVES,
+        &weights.policy_linear.w,
+        &weights.policy_linear.b,
+        policy,
+    );
 
-    conv2d_into(trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, VALUE_CHANNELS, 1, &weights.value_conv.w, &weights.value_conv.b, patch, head2);
+    conv2d_into(
+        trunk,
+        BOARD_SIZE,
+        BOARD_SIZE,
+        TRUNK_CHANNELS,
+        VALUE_CHANNELS,
+        1,
+        &weights.value_conv.w,
+        &weights.value_conv.b,
+        patch,
+        head2,
+    );
     relu_inplace(head2);
     let value_hidden_dim = weights.value_hidden.b.len();
-    linear_into(head2, VALUE_CHANNELS * BOARD_AREA, value_hidden_dim, &weights.value_hidden.w, &weights.value_hidden.b, value_h);
+    linear_into(
+        head2,
+        VALUE_CHANNELS * BOARD_AREA,
+        value_hidden_dim,
+        &weights.value_hidden.w,
+        &weights.value_hidden.b,
+        value_h,
+    );
     relu_inplace(&mut value_h[..value_hidden_dim]);
     let mut value_out = [0f32; 1];
-    linear_into(value_h, value_hidden_dim, 1, &weights.value_output.w, &weights.value_output.b, &mut value_out);
+    linear_into(
+        value_h,
+        value_hidden_dim,
+        1,
+        &weights.value_output.w,
+        &weights.value_output.b,
+        &mut value_out,
+    );
 
     let mut logits = [0f32; POLICY_MOVES];
     logits.copy_from_slice(&policy[..POLICY_MOVES]);
@@ -531,18 +669,15 @@ pub fn encode_features(state: &GoState, history: &[Option<(usize, usize)>]) -> V
         if history.len() < offset {
             continue;
         }
-        match history[history.len() - offset] {
-            Some((r, c)) => {
-                let plane = if offset == 1 { 7 } else { 8 };
-                feats[idx(r, c, plane)] = 1.0;
-            }
-            None => {
-                // Whole-plane fill marking "the move `offset` plies ago was a pass".
-                let plane = 8 + offset;
-                for row in 0..size {
-                    for col in 0..size {
-                        feats[idx(row, col, plane)] = 1.0;
-                    }
+        if let Some((r, c)) = history[history.len() - offset] {
+            let plane = if offset == 1 { 7 } else { 8 };
+            feats[idx(r, c, plane)] = 1.0;
+        } else {
+            // Whole-plane fill marking "the move `offset` plies ago was a pass".
+            let plane = 8 + offset;
+            for row in 0..size {
+                for col in 0..size {
+                    feats[idx(row, col, plane)] = 1.0;
                 }
             }
         }
@@ -550,7 +685,11 @@ pub fn encode_features(state: &GoState, history: &[Option<(usize, usize)>]) -> V
 
     // Black never receives komi (perspective -komi), White does (+komi) —
     // matches upstream's `next_color` sign convention (+1 first player).
-    let next_color: f32 = if state.to_play == GoCell::Black { 1.0 } else { -1.0 };
+    let next_color: f32 = if state.to_play == GoCell::Black {
+        1.0
+    } else {
+        -1.0
+    };
     let komi_value = (-MOKA_KOMI * next_color) / KOMI_NORMALIZATION;
     for row in 0..size {
         for col in 0..size {
@@ -607,7 +746,12 @@ impl Default for MokaPlayer {
 }
 
 impl GoPlayer for MokaPlayer {
-    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], _rng: &mut Rng) -> GoAction {
+    fn select_move(
+        &mut self,
+        state: &GoState,
+        legal_moves: &[(usize, usize)],
+        _rng: &mut Rng,
+    ) -> GoAction {
         let features = encode_features(state, &self.history);
         let (policy, _value) = forward_with_scratch(&self.weights, &features, &mut self.scratch);
 
@@ -694,7 +838,8 @@ impl MokaHeuristic {
         // encode with an empty history rather than a stale/wrong one.
         let features = encode_features(state, &[]);
         // value: to_play's perspective, [-1,1]
-        let (_, value) = forward_with_scratch(&self.weights, &features, &mut self.scratch.borrow_mut());
+        let (_, value) =
+            forward_with_scratch(&self.weights, &features, &mut self.scratch.borrow_mut());
         let value_for_player = if GoCell::from_player_id(player_id) == state.to_play {
             value
         } else {
@@ -734,7 +879,12 @@ impl GoMctsMokaPlayer {
 }
 
 impl GoPlayer for GoMctsMokaPlayer {
-    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], rng: &mut Rng) -> GoAction {
+    fn select_move(
+        &mut self,
+        state: &GoState,
+        legal_moves: &[(usize, usize)],
+        rng: &mut Rng,
+    ) -> GoAction {
         if legal_moves.is_empty() {
             return GoAction::Pass;
         }
@@ -747,7 +897,14 @@ impl GoPlayer for GoMctsMokaPlayer {
         let heuristic = &self.heuristic;
         let heuristic_fn = |s: &GoState, pid: u8| heuristic.evaluate(s, pid);
 
-        mcts_search(state, player_id, self.budget, self.rollout_depth, &heuristic_fn, rng)
+        mcts_search(
+            state,
+            player_id,
+            self.budget,
+            self.rollout_depth,
+            &heuristic_fn,
+            rng,
+        )
     }
 
     fn name(&self) -> &'static str {
@@ -799,9 +956,18 @@ struct SearchHistory {
 impl SearchHistory {
     fn from_slice(history: &[Option<(usize, usize)>]) -> Self {
         match history.len() {
-            0 => Self { buf: [None, None], len: 0 },
-            1 => Self { buf: [history[0], None], len: 1 },
-            n => Self { buf: [history[n - 2], history[n - 1]], len: 2 },
+            0 => Self {
+                buf: [None, None],
+                len: 0,
+            },
+            1 => Self {
+                buf: [history[0], None],
+                len: 1,
+            },
+            n => Self {
+                buf: [history[n - 2], history[n - 1]],
+                len: 2,
+            },
         }
     }
 
@@ -811,8 +977,14 @@ impl SearchHistory {
             GoAction::Pass => None,
         };
         match self.len {
-            0 => Self { buf: [m, None], len: 1 },
-            _ => Self { buf: [self.buf[self.len - 1], m], len: 2 },
+            0 => Self {
+                buf: [m, None],
+                len: 1,
+            },
+            _ => Self {
+                buf: [self.buf[self.len - 1], m],
+                len: 2,
+            },
         }
     }
 
@@ -929,12 +1101,21 @@ impl GoMokaSearchPlayer {
 
         // No candidate produced a value (shouldn't happen — `candidates`
         // always yields at least `Pass`), fall back to the static eval.
-        if best == f32::NEG_INFINITY { value } else { best }
+        if best == f32::NEG_INFINITY {
+            value
+        } else {
+            best
+        }
     }
 }
 
 impl GoPlayer for GoMokaSearchPlayer {
-    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], _rng: &mut Rng) -> GoAction {
+    fn select_move(
+        &mut self,
+        state: &GoState,
+        legal_moves: &[(usize, usize)],
+        _rng: &mut Rng,
+    ) -> GoAction {
         if legal_moves.is_empty() {
             let action = GoAction::Pass;
             self.observe_external_move(&action);
@@ -953,7 +1134,13 @@ impl GoPlayer for GoMokaSearchPlayer {
         for action in self.candidates(state, &policy) {
             let child = state.advance(&action, state.to_play.player_id());
             let child_hist = root_hist.push(&action);
-            let score = -self.negamax(&child, child_hist, self.depth - 1, f32::NEG_INFINITY, -alpha);
+            let score = -self.negamax(
+                &child,
+                child_hist,
+                self.depth - 1,
+                f32::NEG_INFINITY,
+                -alpha,
+            );
             if score > best_score {
                 best_score = score;
                 best_action = action;
@@ -1065,7 +1252,12 @@ impl GoOpeningBookSearchPlayer {
 }
 
 impl GoPlayer for GoOpeningBookSearchPlayer {
-    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], rng: &mut Rng) -> GoAction {
+    fn select_move(
+        &mut self,
+        state: &GoState,
+        legal_moves: &[(usize, usize)],
+        rng: &mut Rng,
+    ) -> GoAction {
         if legal_moves.is_empty() {
             let action = GoAction::Pass;
             self.observe_external_move(&action);
@@ -1240,7 +1432,10 @@ impl GoPuctMokaPlayer {
         scored.truncate(self.top_k);
 
         // Softmax the top_k priors for normalized P(s,a).
-        let max_logit = scored.iter().map(|(l, _)| *l).fold(f32::NEG_INFINITY, f32::max);
+        let max_logit = scored
+            .iter()
+            .map(|(l, _)| *l)
+            .fold(f32::NEG_INFINITY, f32::max);
         let exp_sum: f32 = scored.iter().map(|(l, _)| (l - max_logit).exp()).sum();
         let inv_exp_sum = if exp_sum > 0.0 { 1.0 / exp_sum } else { 1.0 };
 
@@ -1261,7 +1456,9 @@ impl GoPuctMokaPlayer {
             });
         }
         let children_end = self.arena.len();
-        self.arena[node_idx].children.extend(children_start..children_end);
+        self.arena[node_idx]
+            .children
+            .extend(children_start..children_end);
 
         value
     }
@@ -1313,7 +1510,12 @@ impl GoPuctMokaPlayer {
 }
 
 impl GoPlayer for GoPuctMokaPlayer {
-    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], _rng: &mut Rng) -> GoAction {
+    fn select_move(
+        &mut self,
+        state: &GoState,
+        legal_moves: &[(usize, usize)],
+        _rng: &mut Rng,
+    ) -> GoAction {
         if legal_moves.is_empty() {
             let action = GoAction::Pass;
             self.observe_external_move(&action);
@@ -1380,9 +1582,9 @@ impl GoPlayer for GoPuctMokaPlayer {
 pub mod ane_probe {
     use coreml_native as coreml;
     use coreml_proto::proto::{
-        ActivationParams, ActivationReLu, AddLayerParams, ArrayFeatureType,
-        ConvolutionLayerParams, FeatureDescription, FeatureType, Model, ModelDescription,
-        NeuralNetwork, NeuralNetworkLayer, SamePadding, WeightParams,
+        ActivationParams, ActivationReLu, AddLayerParams, ArrayFeatureType, ConvolutionLayerParams,
+        FeatureDescription, FeatureType, Model, ModelDescription, NeuralNetwork,
+        NeuralNetworkLayer, SamePadding, WeightParams,
         activation_params::NonlinearityType as ActivationKind, array_feature_type::ArrayDataType,
         convolution_layer_params::ConvolutionPaddingType, feature_type::Type as FeatureTypeKind,
         model::Type as ModelType, neural_network_layer::Layer as LayerKind,
@@ -1426,7 +1628,12 @@ pub mod ane_probe {
     /// permutation when `k == 1`, so this single function correctly handles
     /// both the 3×3 convs (stem/first/second) and the 1×1 convs
     /// (reduce/expand) — no special-casing needed.
-    fn transpose_conv_weight_to_coreml(src: &[f32], out_ch: usize, k: usize, in_ch: usize) -> Vec<f32> {
+    fn transpose_conv_weight_to_coreml(
+        src: &[f32],
+        out_ch: usize,
+        k: usize,
+        in_ch: usize,
+    ) -> Vec<f32> {
         let mut dst = vec![0f32; out_ch * in_ch * k * k];
         for o in 0..out_ch {
             for ky in 0..k {
@@ -1453,7 +1660,12 @@ pub mod ane_probe {
         }
     }
 
-    fn nn_layer(name: &str, input: &[&str], output: &[&str], layer: LayerKind) -> NeuralNetworkLayer {
+    fn nn_layer(
+        name: &str,
+        input: &[&str],
+        output: &[&str],
+        layer: LayerKind,
+    ) -> NeuralNetworkLayer {
         NeuralNetworkLayer {
             name: name.into(),
             input: input.iter().map(|s| (*s).into()).collect(),
@@ -1493,7 +1705,9 @@ pub mod ane_probe {
                     float_value: bias.to_vec(),
                     ..Default::default()
                 }),
-                convolution_padding_type: Some(ConvolutionPaddingType::Same(SamePadding::default())),
+                convolution_padding_type: Some(
+                    ConvolutionPaddingType::Same(SamePadding::default()),
+                ),
                 ..Default::default()
             }),
         )
@@ -1519,16 +1733,66 @@ pub mod ane_probe {
         debug_assert!(block.global.is_none(), "probe assumes a non-global block");
 
         let layers = vec![
-            conv_layer("stem", "input", "stem_out", TRUNK_CHANNELS, INPUT_PLANES, 3, &weights.stem.w, &weights.stem.b),
+            conv_layer(
+                "stem",
+                "input",
+                "stem_out",
+                TRUNK_CHANNELS,
+                INPUT_PLANES,
+                3,
+                &weights.stem.w,
+                &weights.stem.b,
+            ),
             relu_layer("stem_relu", "stem_out", "trunk"),
-            conv_layer("reduce", "trunk", "reduce_out", BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1, &block.reduce.w, &block.reduce.b),
+            conv_layer(
+                "reduce",
+                "trunk",
+                "reduce_out",
+                BOTTLENECK_CHANNELS,
+                TRUNK_CHANNELS,
+                1,
+                &block.reduce.w,
+                &block.reduce.b,
+            ),
             relu_layer("reduce_relu", "reduce_out", "reduce_act"),
-            conv_layer("first", "reduce_act", "first_out", BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.first.w, &block.first.b),
+            conv_layer(
+                "first",
+                "reduce_act",
+                "first_out",
+                BOTTLENECK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                3,
+                &block.first.w,
+                &block.first.b,
+            ),
             relu_layer("first_relu", "first_out", "first_act"),
-            conv_layer("second", "first_act", "second_out", BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.second.w, &block.second.b),
+            conv_layer(
+                "second",
+                "first_act",
+                "second_out",
+                BOTTLENECK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                3,
+                &block.second.w,
+                &block.second.b,
+            ),
             relu_layer("second_relu", "second_out", "second_act"),
-            conv_layer("expand", "second_act", "expand_out", TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1, &block.expand.w, &block.expand.b),
-            nn_layer("residual_add", &["expand_out", "trunk"], &["sum_out"], LayerKind::Add(AddLayerParams { alpha: 1.0 })),
+            conv_layer(
+                "expand",
+                "second_act",
+                "expand_out",
+                TRUNK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                1,
+                &block.expand.w,
+                &block.expand.b,
+            ),
+            nn_layer(
+                "residual_add",
+                &["expand_out", "trunk"],
+                &["sum_out"],
+                LayerKind::Add(AddLayerParams { alpha: 1.0 }),
+            ),
             relu_layer("final_relu", "sum_out", "output"),
         ];
 
@@ -1538,12 +1802,20 @@ pub mod ane_probe {
                 input: vec![FeatureDescription {
                     name: "input".into(),
                     short_description: "Moka features, CHW".into(),
-                    r#type: Some(multi_array_type(&[INPUT_PLANES as i64, BOARD_SIZE as i64, BOARD_SIZE as i64])),
+                    r#type: Some(multi_array_type(&[
+                        INPUT_PLANES as i64,
+                        BOARD_SIZE as i64,
+                        BOARD_SIZE as i64,
+                    ])),
                 }],
                 output: vec![FeatureDescription {
                     name: "output".into(),
                     short_description: "Trunk after stem + block 0, CHW".into(),
-                    r#type: Some(multi_array_type(&[TRUNK_CHANNELS as i64, BOARD_SIZE as i64, BOARD_SIZE as i64])),
+                    r#type: Some(multi_array_type(&[
+                        TRUNK_CHANNELS as i64,
+                        BOARD_SIZE as i64,
+                        BOARD_SIZE as i64,
+                    ])),
                 }],
                 ..Default::default()
             }),
@@ -1573,7 +1845,10 @@ pub mod ane_probe {
     /// multi-layer 9×9 conv workload; read `latency_us` and judge by eye
     /// (tens of µs to low-single-digit ms → plausibly ANE; tens of ms →
     /// plausibly CPU fallback).
-    pub fn run_probe(weights: &MokaWeights, features_hwc: &[f32]) -> Result<AneProbeResult, String> {
+    pub fn run_probe(
+        weights: &MokaWeights,
+        features_hwc: &[f32],
+    ) -> Result<AneProbeResult, String> {
         let spec = build_probe_spec(weights);
         let bytes = spec.encode_to_vec();
         let model = coreml::Model::load_from_bytes(&bytes, coreml::ComputeUnits::All)
@@ -1582,8 +1857,9 @@ pub mod ane_probe {
             .map_err(|e| format!("load_from_bytes block_on: {e}"))?;
 
         let input_chw = hwc_to_chw(features_hwc, BOARD_SIZE, BOARD_SIZE, INPUT_PLANES);
-        let tensor = coreml::BorrowedTensor::from_f32(&input_chw, &[INPUT_PLANES, BOARD_SIZE, BOARD_SIZE])
-            .map_err(|e| format!("tensor create: {e}"))?;
+        let tensor =
+            coreml::BorrowedTensor::from_f32(&input_chw, &[INPUT_PLANES, BOARD_SIZE, BOARD_SIZE])
+                .map_err(|e| format!("tensor create: {e}"))?;
 
         let start = std::time::Instant::now();
         let prediction = model
@@ -1591,7 +1867,9 @@ pub mod ane_probe {
             .map_err(|e| format!("predict: {e}"))?;
         let latency_us = start.elapsed().as_micros() as u64;
 
-        let (output_chw, _shape) = prediction.get_f32("output").map_err(|e| format!("get output: {e}"))?;
+        let (output_chw, _shape) = prediction
+            .get_f32("output")
+            .map_err(|e| format!("get output: {e}"))?;
         let output_hwc = chw_to_hwc(&output_chw, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS);
 
         // CPU reference for the IDENTICAL sub-graph (stem + non-global block),
@@ -1607,13 +1885,57 @@ pub mod ane_probe {
         let mut hidden_b = vec![0f32; BOARD_AREA * BOTTLENECK_CHANNELS];
         let mut expand_out = vec![0f32; BOARD_AREA * TRUNK_CHANNELS];
 
-        conv2d_into(&trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1, &block.reduce.w, &block.reduce.b, &mut patch, &mut hidden_a);
+        conv2d_into(
+            &trunk,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            TRUNK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            1,
+            &block.reduce.w,
+            &block.reduce.b,
+            &mut patch,
+            &mut hidden_a,
+        );
         relu_inplace(&mut hidden_a);
-        conv2d_into(&hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.first.w, &block.first.b, &mut patch, &mut hidden_b);
+        conv2d_into(
+            &hidden_a,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            3,
+            &block.first.w,
+            &block.first.b,
+            &mut patch,
+            &mut hidden_b,
+        );
         relu_inplace(&mut hidden_b);
-        conv2d_into(&hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.second.w, &block.second.b, &mut patch, &mut hidden_a);
+        conv2d_into(
+            &hidden_b,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            BOTTLENECK_CHANNELS,
+            3,
+            &block.second.w,
+            &block.second.b,
+            &mut patch,
+            &mut hidden_a,
+        );
         relu_inplace(&mut hidden_a);
-        conv2d_into(&hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1, &block.expand.w, &block.expand.b, &mut patch, &mut expand_out);
+        conv2d_into(
+            &hidden_a,
+            BOARD_SIZE,
+            BOARD_SIZE,
+            BOTTLENECK_CHANNELS,
+            TRUNK_CHANNELS,
+            1,
+            &block.expand.w,
+            &block.expand.b,
+            &mut patch,
+            &mut expand_out,
+        );
 
         let mut cpu_ref = trunk.clone();
         for (t, e) in cpu_ref.iter_mut().zip(&expand_out) {
@@ -1640,18 +1962,67 @@ pub mod ane_probe {
         let cpu_start = std::time::Instant::now();
         for _ in 0..cpu_iters {
             stem_forward_into(weights, features_hwc, &mut patch, &mut trunk);
-            conv2d_into(&trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1, &block.reduce.w, &block.reduce.b, &mut patch, &mut hidden_a);
+            conv2d_into(
+                &trunk,
+                BOARD_SIZE,
+                BOARD_SIZE,
+                TRUNK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                1,
+                &block.reduce.w,
+                &block.reduce.b,
+                &mut patch,
+                &mut hidden_a,
+            );
             relu_inplace(&mut hidden_a);
-            conv2d_into(&hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.first.w, &block.first.b, &mut patch, &mut hidden_b);
+            conv2d_into(
+                &hidden_a,
+                BOARD_SIZE,
+                BOARD_SIZE,
+                BOTTLENECK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                3,
+                &block.first.w,
+                &block.first.b,
+                &mut patch,
+                &mut hidden_b,
+            );
             relu_inplace(&mut hidden_b);
-            conv2d_into(&hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3, &block.second.w, &block.second.b, &mut patch, &mut hidden_a);
+            conv2d_into(
+                &hidden_b,
+                BOARD_SIZE,
+                BOARD_SIZE,
+                BOTTLENECK_CHANNELS,
+                BOTTLENECK_CHANNELS,
+                3,
+                &block.second.w,
+                &block.second.b,
+                &mut patch,
+                &mut hidden_a,
+            );
             relu_inplace(&mut hidden_a);
-            conv2d_into(&hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1, &block.expand.w, &block.expand.b, &mut patch, &mut expand_out);
+            conv2d_into(
+                &hidden_a,
+                BOARD_SIZE,
+                BOARD_SIZE,
+                BOTTLENECK_CHANNELS,
+                TRUNK_CHANNELS,
+                1,
+                &block.expand.w,
+                &block.expand.b,
+                &mut patch,
+                &mut expand_out,
+            );
             std::hint::black_box((&trunk, &expand_out));
         }
         let cpu_latency_us = (cpu_start.elapsed().as_micros() as f64 / f64::from(cpu_iters)) as u64;
 
-        Ok(AneProbeResult { latency_us, cpu_latency_us, max_abs_diff, mean_abs_diff })
+        Ok(AneProbeResult {
+            latency_us,
+            cpu_latency_us,
+            max_abs_diff,
+            mean_abs_diff,
+        })
     }
 
     #[cfg(test)]
@@ -1771,8 +2142,7 @@ mod tests {
 
         let (hand_weight, shape) = hand_dequantize("stem.weight");
         let (hand_bias, _) = {
-            let manifest: serde_json::Value =
-                serde_json::from_str(MANIFEST_JSON).unwrap();
+            let manifest: serde_json::Value = serde_json::from_str(MANIFEST_JSON).unwrap();
             let meta = &manifest["tensors"]["stem.bias"];
             let offset = meta["dataOffset"].as_u64().unwrap() as usize;
             let count = meta["shape"][0].as_u64().unwrap() as usize;
@@ -1829,9 +2199,15 @@ mod tests {
         let (policy, value) = forward(&weights, &features);
 
         assert_eq!(policy.len(), POLICY_MOVES);
-        assert!(policy.iter().all(|v| v.is_finite()), "policy logits must be finite");
+        assert!(
+            policy.iter().all(|v| v.is_finite()),
+            "policy logits must be finite"
+        );
         assert!(value.is_finite(), "value must be finite");
-        assert!((-1.0..=1.0).contains(&value), "tanh output must be in [-1,1], got {value}");
+        assert!(
+            (-1.0..=1.0).contains(&value),
+            "tanh output must be in [-1,1], got {value}"
+        );
     }
 
     // ── Optimized-kernel equivalence oracle ───────────────────────
@@ -1845,8 +2221,14 @@ mod tests {
     /// Original `for oc` outermost, single-accumulator convolution.
     #[allow(clippy::too_many_arguments)]
     fn conv2d_naive(
-        input: &[f32], h: usize, w: usize, in_ch: usize, out_ch: usize, k: usize,
-        weight: &[f32], bias: &[f32],
+        input: &[f32],
+        h: usize,
+        w: usize,
+        in_ch: usize,
+        out_ch: usize,
+        k: usize,
+        weight: &[f32],
+        bias: &[f32],
     ) -> Vec<f32> {
         let pad = (k / 2) as isize;
         let mut out = vec![0f32; h * w * out_ch];
@@ -1878,7 +2260,13 @@ mod tests {
         out
     }
 
-    fn linear_naive(input: &[f32], in_dim: usize, out_dim: usize, weight: &[f32], bias: &[f32]) -> Vec<f32> {
+    fn linear_naive(
+        input: &[f32],
+        in_dim: usize,
+        out_dim: usize,
+        weight: &[f32],
+        bias: &[f32],
+    ) -> Vec<f32> {
         (0..out_dim)
             .map(|o| {
                 let base = o * in_dim;
@@ -1896,7 +2284,9 @@ mod tests {
     fn fill_pseudo(buf: &mut [f32], seed: u64) {
         let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
         for v in buf.iter_mut() {
-            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             // Map to roughly [-1, 1).
             *v = ((s >> 33) as f32 / (1u64 << 30) as f32) - 1.0;
         }
@@ -1909,12 +2299,12 @@ mod tests {
     fn optimized_conv_matches_naive_reference() {
         // (in_ch, out_ch, k) for every distinct conv in the Moka topology.
         let shapes = [
-            (INPUT_PLANES, TRUNK_CHANNELS, 3),          // stem
-            (TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1),   // reduce
+            (INPUT_PLANES, TRUNK_CHANNELS, 3),             // stem
+            (TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1),      // reduce
             (BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3), // first / second
-            (BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1),   // expand
-            (TRUNK_CHANNELS, POLICY_CHANNELS, 1),       // policy conv
-            (TRUNK_CHANNELS, VALUE_CHANNELS, 1),        // value conv
+            (BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1),      // expand
+            (TRUNK_CHANNELS, POLICY_CHANNELS, 1),          // policy conv
+            (TRUNK_CHANNELS, VALUE_CHANNELS, 1),           // value conv
         ];
 
         for (idx, &(in_ch, out_ch, k)) in shapes.iter().enumerate() {
@@ -1925,11 +2315,16 @@ mod tests {
             fill_pseudo(&mut weight, 101 + idx as u64);
             fill_pseudo(&mut bias, 1009 + idx as u64);
 
-            let expected = conv2d_naive(&input, BOARD_SIZE, BOARD_SIZE, in_ch, out_ch, k, &weight, &bias);
+            let expected = conv2d_naive(
+                &input, BOARD_SIZE, BOARD_SIZE, in_ch, out_ch, k, &weight, &bias,
+            );
 
             let mut patch = vec![0f32; k * k * in_ch];
             let mut got = vec![0f32; BOARD_AREA * out_ch];
-            conv2d_into(&input, BOARD_SIZE, BOARD_SIZE, in_ch, out_ch, k, &weight, &bias, &mut patch, &mut got);
+            conv2d_into(
+                &input, BOARD_SIZE, BOARD_SIZE, in_ch, out_ch, k, &weight, &bias, &mut patch,
+                &mut got,
+            );
 
             for (i, (g, e)) in got.iter().zip(&expected).enumerate() {
                 assert!(
@@ -1943,7 +2338,13 @@ mod tests {
     #[test]
     fn optimized_linear_matches_naive_reference() {
         // Both linear shapes used: policy (324->82) and value (162->32).
-        for (idx, &(in_dim, out_dim)) in [(POLICY_CHANNELS * BOARD_AREA, POLICY_MOVES), (VALUE_CHANNELS * BOARD_AREA, 32)].iter().enumerate() {
+        for (idx, &(in_dim, out_dim)) in [
+            (POLICY_CHANNELS * BOARD_AREA, POLICY_MOVES),
+            (VALUE_CHANNELS * BOARD_AREA, 32),
+        ]
+        .iter()
+        .enumerate()
+        {
             let mut input = vec![0f32; in_dim];
             let mut weight = vec![0f32; out_dim * in_dim];
             let mut bias = vec![0f32; out_dim];
@@ -1984,10 +2385,15 @@ mod tests {
             let (p_fresh, v_fresh) = forward(&weights, &features);
             let (p_reuse, v_reuse) = forward_with_scratch(&weights, &features, &mut scratch);
 
-            assert_eq!(v_fresh.to_bits(), v_reuse.to_bits(), "value differs on reused scratch");
+            assert_eq!(
+                v_fresh.to_bits(),
+                v_reuse.to_bits(),
+                "value differs on reused scratch"
+            );
             for i in 0..POLICY_MOVES {
                 assert_eq!(
-                    p_fresh[i].to_bits(), p_reuse[i].to_bits(),
+                    p_fresh[i].to_bits(),
+                    p_reuse[i].to_bits(),
                     "policy[{i}] differs between fresh and reused scratch"
                 );
             }
@@ -2007,15 +2413,25 @@ mod tests {
             let action = player.select_move(&state, &legal, &mut rng);
             match &action {
                 GoAction::Place(r, c) => {
-                    assert!(legal.contains(&(*r, *c)), "search chose illegal move {r},{c}");
+                    assert!(
+                        legal.contains(&(*r, *c)),
+                        "search chose illegal move {r},{c}"
+                    );
                 }
                 GoAction::Pass => {}
             }
-            assert_eq!(player.history.len(), ply + 1, "history must grow one entry per ply");
+            assert_eq!(
+                player.history.len(),
+                ply + 1,
+                "history must grow one entry per ply"
+            );
             let mover = state.to_play;
             state = state.advance(&action, mover.player_id());
         }
-        assert!(player.nodes_evaluated() > 6, "search should evaluate more nodes than plies");
+        assert!(
+            player.nodes_evaluated() > 6,
+            "search should evaluate more nodes than plies"
+        );
     }
 
     /// `SearchHistory` must produce a 1-element slice for a 1-move game —
@@ -2047,7 +2463,10 @@ mod tests {
             let action = player.select_move(&state, &legal, &mut rng);
             match &action {
                 GoAction::Place(r, c) => {
-                    assert!(legal.contains(&(*r, *c)), "MokaPlayer chose an illegal move {r},{c}");
+                    assert!(
+                        legal.contains(&(*r, *c)),
+                        "MokaPlayer chose an illegal move {r},{c}"
+                    );
                 }
                 GoAction::Pass => {}
             }

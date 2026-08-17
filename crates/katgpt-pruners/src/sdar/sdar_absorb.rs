@@ -362,18 +362,12 @@ impl<P: ScreeningPruner> SdarGatedAbsorbCompress<P> {
 
     /// Get the current benefit ratio for a specific arm.
     pub fn benefit_ratio(&self, arm: usize) -> f32 {
-        self.arm_states
-            .get(arm)
-            .map(|s| s.benefit_ratio)
-            .unwrap_or(0.0)
+        self.arm_states.get(arm).map_or(0.0, |s| s.benefit_ratio)
     }
 
     /// Number of observations for a specific arm.
     pub fn observation_count(&self, arm: usize) -> usize {
-        self.arm_states
-            .get(arm)
-            .map(|s| s.observation_count)
-            .unwrap_or(0)
+        self.arm_states.get(arm).map_or(0, |s| s.observation_count)
     }
 
     /// Get promotion statistics for a specific arm (debug builds only).

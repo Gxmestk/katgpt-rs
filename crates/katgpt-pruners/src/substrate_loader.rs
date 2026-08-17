@@ -65,7 +65,7 @@ pub fn load_substrate_mask(data: &[u8]) -> Option<SubstrateMask> {
     let file: SubstrateMaskFile = match postcard::from_bytes(data) {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("[substrate_loader] failed to parse mask file: {}", e);
+            eprintln!("[substrate_loader] failed to parse mask file: {e}");
             return None;
         }
     };
@@ -166,7 +166,7 @@ pub fn save_substrate_mask(mask: &SubstrateMask) -> Option<Vec<u8>> {
     match postcard::to_allocvec(&file) {
         Ok(bytes) => Some(bytes),
         Err(e) => {
-            eprintln!("[substrate_loader] failed to serialize mask: {}", e);
+            eprintln!("[substrate_loader] failed to serialize mask: {e}");
             None
         }
     }

@@ -131,27 +131,24 @@ impl BfcpRegionCache {
 
     pub fn lookup(&self, hash: &[u8; 32]) -> Option<Arc<BFCP>> {
         let guard = self.map.pin();
-        match guard.get(hash) {
-            Some(entry) => {
-                let new_freq = entry.freq.saturating_add(1);
-                let tier = classify_tier(new_freq, self.hot_threshold, self.warm_threshold);
-                let partition = Arc::clone(&entry.partition);
-                let _ = guard.insert(
-                    *hash,
-                    CachedRegion {
-                        partition: Arc::clone(&partition),
-                        hash: *hash,
-                        freq: new_freq,
-                        tier,
-                    },
-                );
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                Some(partition)
-            }
-            None => {
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                None
-            }
+        if let Some(entry) = guard.get(hash) {
+            let new_freq = entry.freq.saturating_add(1);
+            let tier = classify_tier(new_freq, self.hot_threshold, self.warm_threshold);
+            let partition = Arc::clone(&entry.partition);
+            let _ = guard.insert(
+                *hash,
+                CachedRegion {
+                    partition: Arc::clone(&partition),
+                    hash: *hash,
+                    freq: new_freq,
+                    tier,
+                },
+            );
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            Some(partition)
+        } else {
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            None
         }
     }
 
@@ -272,7 +269,7 @@ impl BfcpRegionCache {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.map.pin().is_empty()
     }
 }
 

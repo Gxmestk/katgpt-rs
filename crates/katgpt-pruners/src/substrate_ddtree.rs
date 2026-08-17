@@ -176,8 +176,7 @@ mod tests {
         let score = substrate_branch_score(1.0, 0.5, 1.0);
         assert!(
             (score - 0.5).abs() < 0.01,
-            "sigmoid(0.5*10-5=0) = 0.5, expected ~0.5, got {}",
-            score,
+            "sigmoid(0.5*10-5=0) = 0.5, expected ~0.5, got {score}",
         );
     }
 
@@ -187,8 +186,7 @@ mod tests {
         let score = substrate_branch_score(1.0, 0.9, 1.0);
         assert!(
             score > 0.9,
-            "high recovery should give score close to logprob, got {}",
-            score,
+            "high recovery should give score close to logprob, got {score}",
         );
     }
 
@@ -198,8 +196,7 @@ mod tests {
         let score = substrate_branch_score(1.0, 0.0, 1.0);
         assert!(
             score < 0.01,
-            "zero recovery should give near-zero score, got {}",
-            score,
+            "zero recovery should give near-zero score, got {score}",
         );
     }
 

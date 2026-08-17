@@ -445,9 +445,10 @@ impl GoTemplateProposer {
             .copied()
             .collect();
 
-        match matching.is_empty() {
-            true => legal_moves.to_vec(),
-            false => matching,
+        if matching.is_empty() {
+            legal_moves.to_vec()
+        } else {
+            matching
         }
     }
 
@@ -462,18 +463,20 @@ impl GoTemplateProposer {
     /// Get average δ for a template.
     pub fn mean_delta(&self, template: GoTemplate) -> f32 {
         let idx = template as usize;
-        match idx < self.stats.len() {
-            true => self.stats[idx].mean_delta(),
-            false => 0.0,
+        if idx < self.stats.len() {
+            self.stats[idx].mean_delta()
+        } else {
+            0.0
         }
     }
 
     /// Get pull count for a template.
     pub fn pull_count(&self, template: GoTemplate) -> usize {
         let idx = template as usize;
-        match idx < self.stats.len() {
-            true => self.stats[idx].pulls,
-            false => 0,
+        if idx < self.stats.len() {
+            self.stats[idx].pulls
+        } else {
+            0
         }
     }
 
@@ -628,9 +631,10 @@ impl GoDeltaGatedAbsorbCompress {
     /// Check if a template has been promoted.
     pub fn is_promoted(&self, template: GoTemplate) -> bool {
         let idx = template as usize;
-        match idx < self.template_deltas.len() {
-            true => self.template_deltas[idx].is_promoted,
-            false => false,
+        if idx < self.template_deltas.len() {
+            self.template_deltas[idx].is_promoted
+        } else {
+            false
         }
     }
 
@@ -642,9 +646,10 @@ impl GoDeltaGatedAbsorbCompress {
     /// Get average δ for a template.
     pub fn mean_delta(&self, template: GoTemplate) -> f32 {
         let idx = template as usize;
-        match idx < self.template_deltas.len() {
-            true => self.template_deltas[idx].mean(),
-            false => 0.0,
+        if idx < self.template_deltas.len() {
+            self.template_deltas[idx].mean()
+        } else {
+            0.0
         }
     }
 }

@@ -357,9 +357,7 @@ mod tests {
         let expected = 1.0 / ((5 ^ 3) as f32 + 1.0 + 1.0);
         assert!(
             (r - expected).abs() < 1e-6,
-            "Should pass through to inner pruner, got {} expected {}",
-            r,
-            expected
+            "Should pass through to inner pruner, got {r} expected {expected}"
         );
 
         // Should be diagnosed as NOT static
@@ -383,9 +381,7 @@ mod tests {
         let r1 = pruner.relevance(1, 3, &[0, 1]);
         assert!(
             r1 > r0,
-            "After correction, relevance should increase: {} vs {}",
-            r1,
-            r0
+            "After correction, relevance should increase: {r1} vs {r0}"
         );
     }
 
@@ -402,8 +398,7 @@ mod tests {
         let tau = kendall_tau_normalized(&a, &b);
         assert!(
             tau > 0.9,
-            "Reversed rankings should have high tau, got {}",
-            tau
+            "Reversed rankings should have high tau, got {tau}"
         );
     }
 

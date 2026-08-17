@@ -268,8 +268,7 @@ impl TrialLog {
             .iter()
             .map(|(&arm, &(sum, count))| (arm, sum / count as f32))
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(arm, _)| arm)
-            .unwrap_or(0);
+            .map_or(0, |(arm, _)| arm);
 
         TrialSummary {
             total_episodes,

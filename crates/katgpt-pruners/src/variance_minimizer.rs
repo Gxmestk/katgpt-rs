@@ -79,18 +79,15 @@ impl VarianceMinimizer {
 
     /// Update running mean/variance with a new cost observation (EMA).
     pub fn observe(&mut self, cost: f32) {
-        match self.n_observations {
-            0 => {
-                self.running_mean = cost;
-                self.running_var = 0.0;
-            }
-            _ => {
-                self.running_mean = self.config.mean_decay * self.running_mean
-                    + (1.0 - self.config.mean_decay) * cost;
-                let delta = cost - self.running_mean;
-                self.running_var = self.config.var_decay * self.running_var
-                    + (1.0 - self.config.var_decay) * delta * delta;
-            }
+        if self.n_observations == 0 {
+            self.running_mean = cost;
+            self.running_var = 0.0;
+        } else {
+            self.running_mean =
+                self.config.mean_decay * self.running_mean + (1.0 - self.config.mean_decay) * cost;
+            let delta = cost - self.running_mean;
+            self.running_var = self.config.var_decay * self.running_var
+                + (1.0 - self.config.var_decay) * delta * delta;
         }
         self.n_observations += 1;
     }

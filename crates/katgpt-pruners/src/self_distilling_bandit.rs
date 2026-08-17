@@ -179,15 +179,12 @@ impl DomainQTable {
 
         // Update domain-specific if slot is claimed by same domain
         let slot = (domain_hash as usize) % self.domains.len();
-        match &mut self.domains[slot] {
-            Some(stats) => {
-                stats.update(arm, reward);
-            }
-            None => {
-                let mut stats = BanditStats::new(self.num_arms);
-                stats.update(arm, reward);
-                self.domains[slot] = Some(stats);
-            }
+        if let Some(stats) = &mut self.domains[slot] {
+            stats.update(arm, reward);
+        } else {
+            let mut stats = BanditStats::new(self.num_arms);
+            stats.update(arm, reward);
+            self.domains[slot] = Some(stats);
         }
     }
 
@@ -202,9 +199,9 @@ impl DomainQTable {
         self.domains
             .iter()
             .filter(|d| {
-                d.as_ref()
-                    .map(|s| u64::from(s.total_pulls()) >= self.min_domain_samples as u64)
-                    .unwrap_or(false)
+                d.as_ref().map_or(false, |s| {
+                    u64::from(s.total_pulls()) >= self.min_domain_samples as u64
+                })
             })
             .count()
     }
@@ -297,17 +294,14 @@ impl<P: ScreeningPruner, L: EpisodeLookup> SelfDistillingBandit<P, L> {
         acceptance_reward: f32,
         domain_hash: u64,
     ) {
-        let combined_reward = match self.lookup.lookup(prompt_hash) {
-            Some(episode) => {
-                self.episode_hits += 1;
-                let match_ratio = compute_match_ratio(generated, &episode.reference_tokens);
-                self.reward_computer
-                    .compute_reward(match_ratio, acceptance_reward)
-            }
-            None => {
-                // No episode → pure acceptance reward (zero regression)
-                acceptance_reward
-            }
+        let combined_reward = if let Some(episode) = self.lookup.lookup(prompt_hash) {
+            self.episode_hits += 1;
+            let match_ratio = compute_match_ratio(generated, &episode.reference_tokens);
+            self.reward_computer
+                .compute_reward(match_ratio, acceptance_reward)
+        } else {
+            // No episode → pure acceptance reward (zero regression)
+            acceptance_reward
         };
 
         // Update inner bandit
@@ -354,8 +348,7 @@ impl<P: ScreeningPruner, L: EpisodeLookup> SelfDistillingBandit<P, L> {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     }
 
     /// Get convergence metrics for monitoring.

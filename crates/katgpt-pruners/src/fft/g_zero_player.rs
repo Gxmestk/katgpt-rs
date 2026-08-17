@@ -344,8 +344,7 @@ impl GZeroFFTPlayer {
                     .partial_cmp(&blended[*b])
                     .unwrap_or(Ordering::Equal)
             })
-            .map(ActionType::from)
-            .unwrap_or(ActionType::Wait)
+            .map_or(ActionType::Wait, ActionType::from)
     }
 
     /// Resolve target for the selected action type.

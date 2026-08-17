@@ -159,12 +159,7 @@ pub fn self_advantage_margin(
     scratch: &mut [f32],
 ) -> f32 {
     let n = pre_logits.len();
-    assert!(
-        candidate < n,
-        "candidate {} out of range (n={})",
-        candidate,
-        n
-    );
+    assert!(candidate < n, "candidate {candidate} out of range (n={n})");
 
     // Populate scratch: [pre_lsm | post_lsm | advantage].
     // We discard the returned &mut to release the borrow before reading.
@@ -545,8 +540,7 @@ impl AdvantageDirectionAccumulator {
     pub fn new(lambda: f32) -> Self {
         debug_assert!(
             (0.0..=1.0).contains(&lambda),
-            "lambda must be in (0, 1], got {}",
-            lambda
+            "lambda must be in (0, 1], got {lambda}"
         );
         Self {
             direction: Vec::new(),
@@ -813,8 +807,7 @@ mod advantage_freeze_thaw_tests {
         let d = acc.direction()[0];
         assert!(
             d.abs() < 0.2,
-            "alternating input should smooth toward 0, got {}",
-            d
+            "alternating input should smooth toward 0, got {d}"
         );
     }
 
@@ -929,7 +922,7 @@ mod tests {
         let mut scratch = make_scratch(pre.len());
         let adv = self_advantage(&pre, &post, &mut scratch);
         for a in adv {
-            assert!(a.abs() < EPS, "expected zero advantage, got {}", a);
+            assert!(a.abs() < EPS, "expected zero advantage, got {a}");
         }
     }
 
@@ -980,11 +973,10 @@ mod tests {
         let mut scratch = make_scratch(pre.len());
         let adv = self_advantage(&pre, &post, &mut scratch);
         for a in adv {
-            assert!(a.is_finite(), "advantage must be finite, got {}", a);
+            assert!(a.is_finite(), "advantage must be finite, got {a}");
             assert!(
                 a.abs() < 1e5,
-                "advantage magnitude should be bounded, got {}",
-                a
+                "advantage magnitude should be bounded, got {a}"
             );
         }
     }
@@ -1014,7 +1006,7 @@ mod tests {
         let mut scratch = make_scratch(pre.len());
         for c in 0..pre.len() {
             let m = self_advantage_margin(&pre, &post, c, &mut scratch);
-            assert!(m.abs() < EPS, "margin for {} should be 0, got {}", c, m);
+            assert!(m.abs() < EPS, "margin for {c} should be 0, got {m}");
         }
     }
 
@@ -1027,8 +1019,7 @@ mod tests {
         let m = self_advantage_margin(&pre, &post, 2, &mut scratch);
         assert!(
             m > EPS,
-            "margin for boosted candidate should be positive, got {}",
-            m
+            "margin for boosted candidate should be positive, got {m}"
         );
     }
 
@@ -1041,8 +1032,7 @@ mod tests {
         let m = self_advantage_margin(&pre, &post, 0, &mut scratch);
         assert!(
             m < -EPS,
-            "margin for suppressed candidate should be negative, got {}",
-            m
+            "margin for suppressed candidate should be negative, got {m}"
         );
     }
 
@@ -1066,8 +1056,7 @@ mod tests {
         }
         assert!(
             weighted_sum.abs() < 1e-4,
-            "Σ π+(a)·margin(a) should be ≈ 0, got {}",
-            weighted_sum
+            "Σ π+(a)·margin(a) should be ≈ 0, got {weighted_sum}"
         );
     }
 
@@ -1097,11 +1086,7 @@ mod tests {
         for (i, &s) in sums.iter().enumerate() {
             assert!(
                 (s - first).abs() < 1e-4,
-                "A[{}] + clr[{}] = {} diverges from {} (KL should be constant)",
-                i,
-                i,
-                s,
-                first
+                "A[{i}] + clr[{i}] = {s} diverges from {first} (KL should be constant)"
             );
         }
     }
@@ -1143,7 +1128,7 @@ mod tests {
         let mut scratch = make_scratch(pre.len());
         for (c, &clr_c) in clr.iter().enumerate() {
             let m = self_advantage_margin(&pre, &post, c, &mut scratch);
-            assert!((m + clr_c).abs() < 1e-4, "τ=1.0 identity broken at {}", c);
+            assert!((m + clr_c).abs() < 1e-4, "τ=1.0 identity broken at {c}");
         }
     }
 
@@ -1161,7 +1146,7 @@ mod tests {
         let mut expected = vec![0.0; pre.len()];
         log_softmax_into(&pre, &mut expected);
         for i in 0..pre.len() {
-            assert!((out[i] - expected[i]).abs() < EPS, "w=0 mismatch at {}", i);
+            assert!((out[i] - expected[i]).abs() < EPS, "w=0 mismatch at {i}");
         }
     }
 
@@ -1176,7 +1161,7 @@ mod tests {
         let mut expected = vec![0.0; post.len()];
         log_softmax_into(&post, &mut expected);
         for i in 0..post.len() {
-            assert!((out[i] - expected[i]).abs() < EPS, "w=1 mismatch at {}", i);
+            assert!((out[i] - expected[i]).abs() < EPS, "w=1 mismatch at {i}");
         }
     }
 
@@ -1195,7 +1180,7 @@ mod tests {
         log_softmax_into(&post, &mut post_lsm);
         for i in 0..pre.len() {
             let expected = 0.5 * (pre_lsm[i] + post_lsm[i]);
-            assert!((out[i] - expected).abs() < EPS, "w=0.5 mismatch at {}", i);
+            assert!((out[i] - expected).abs() < EPS, "w=0.5 mismatch at {i}");
         }
     }
 
@@ -1249,8 +1234,7 @@ mod tests {
         let sum: f32 = lsm.iter().map(|&v| v.exp()).sum();
         assert!(
             (sum - 1.0).abs() < EPS,
-            "exp(log_softmax) must sum to 1, got {}",
-            sum
+            "exp(log_softmax) must sum to 1, got {sum}"
         );
     }
 
@@ -1394,8 +1378,7 @@ mod tests {
         let sum: f32 = out.iter().sum();
         assert!(
             (sum - 1.0).abs() < EPS,
-            "normalized output must sum to 1, got {}",
-            sum
+            "normalized output must sum to 1, got {sum}"
         );
     }
 

@@ -538,9 +538,7 @@ mod tests {
 
         assert!(
             bm_mem < bool_mem,
-            "CompactBitmap ({} B) should be smaller than Vec<bool> ({} B)",
-            bm_mem,
-            bool_mem
+            "CompactBitmap ({bm_mem} B) should be smaller than Vec<bool> ({bool_mem} B)"
         );
         // Expect at least 2× reduction for 30% fill.
         assert!(
@@ -635,8 +633,7 @@ mod tests {
         let elapsed = start.elapsed();
         assert!(
             elapsed.as_micros() < 1000,
-            "128K × 50 regions batch ops took {:?}, expected < 1ms",
-            elapsed
+            "128K × 50 regions batch ops took {elapsed:?}, expected < 1ms"
         );
 
         // Sanity: reject count should be non-trivial.
@@ -673,7 +670,7 @@ mod tests {
         assert_eq!(bm.len(), 5000);
         // Verify all inserted values are still present.
         for i in 0u32..5000 {
-            assert!(bm.contains(i), "should contain {}", i);
+            assert!(bm.contains(i), "should contain {i}");
         }
         assert!(!bm.contains(5001));
     }

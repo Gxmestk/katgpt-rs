@@ -36,9 +36,10 @@ impl<NodeId: Copy + Eq + std::fmt::Debug> Sample<NodeId> {
 
     /// Number of alternative actions that were available but not chosen.
     pub fn alternative_count(&self) -> usize {
-        match self.valid_next_actions.contains(&self.chosen_action) {
-            true => self.valid_next_actions.len().saturating_sub(1),
-            false => self.valid_next_actions.len(),
+        if self.valid_next_actions.contains(&self.chosen_action) {
+            self.valid_next_actions.len().saturating_sub(1)
+        } else {
+            self.valid_next_actions.len()
         }
     }
 

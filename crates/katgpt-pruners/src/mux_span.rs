@@ -86,7 +86,7 @@ impl MuxSpanPruner {
         // Check separation: k-th peak must be well above the next token's logit
         if k < logits.len() {
             // Find the (k+1)-th largest logit
-            let kth_peak_val = peaks.last().map(|&(_, v)| v).unwrap_or(f32::NEG_INFINITY);
+            let kth_peak_val = peaks.last().map_or(f32::NEG_INFINITY, |&(_, v)| v);
             // The background level is estimated as the mean of logits outside the top-k
             let bg_level = mean_of_remaining(logits, &peaks);
             if kth_peak_val - bg_level < self.separation_threshold {

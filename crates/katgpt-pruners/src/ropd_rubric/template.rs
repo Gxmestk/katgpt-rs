@@ -121,8 +121,7 @@ impl RubricTemplate {
         self.criteria
             .iter()
             .find(|(c, _)| *c == criterion)
-            .map(|(_, w)| *w)
-            .unwrap_or(0.0)
+            .map_or(0.0, |(_, w)| *w)
     }
 
     /// Whether this template includes the given criterion.

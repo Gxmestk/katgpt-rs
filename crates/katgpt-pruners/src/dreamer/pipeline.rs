@@ -462,7 +462,7 @@ mod tests {
         assert!(!r.decayed.is_empty());
         // Decayed values should be less than or equal to original
         for &(idx, decayed_q) in &r.decayed {
-            let original_q = arms.get(idx).map(|a| a.q_value).unwrap_or(0.0);
+            let original_q = arms.get(idx).map_or(0.0, |a| a.q_value);
             assert!(decayed_q <= original_q + f32::EPSILON);
         }
     }

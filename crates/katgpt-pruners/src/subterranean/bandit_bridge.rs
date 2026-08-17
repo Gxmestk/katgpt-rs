@@ -83,17 +83,11 @@ impl DecisionPointEnv {
 
 impl BanditEnv for DecisionPointEnv {
     fn pull(&self, arm: usize, _rng: &mut Rng) -> f32 {
-        match arm == self.optimal_arm {
-            true => 1.0,
-            false => 0.0,
-        }
+        if arm == self.optimal_arm { 1.0 } else { 0.0 }
     }
 
     fn expected_reward(&self, arm: usize) -> f32 {
-        match arm == self.optimal_arm {
-            true => 1.0,
-            false => 0.0,
-        }
+        if arm == self.optimal_arm { 1.0 } else { 0.0 }
     }
 
     fn optimal_reward(&self) -> f32 {
@@ -136,12 +130,11 @@ impl TrajectoryBanditSummary {
         trajectory_count: usize,
     ) -> Self {
         let total_decision_points = points.len();
-        let avg_branching_factor = match total_decision_points {
-            0 => 0.0,
-            _ => {
-                points.iter().map(|dp| dp.arms.len()).sum::<usize>() as f64
-                    / total_decision_points as f64
-            }
+        let avg_branching_factor = if total_decision_points == 0 {
+            0.0
+        } else {
+            points.iter().map(|dp| dp.arms.len()).sum::<usize>() as f64
+                / total_decision_points as f64
         };
 
         let mut histogram = std::collections::HashMap::new();
@@ -345,17 +338,11 @@ struct GlobalProcedureEnv {
 
 impl BanditEnv for GlobalProcedureEnv {
     fn pull(&self, arm: usize, _rng: &mut Rng) -> f32 {
-        match arm == self.optimal_arm {
-            true => 1.0,
-            false => 0.0,
-        }
+        if arm == self.optimal_arm { 1.0 } else { 0.0 }
     }
 
     fn expected_reward(&self, arm: usize) -> f32 {
-        match arm == self.optimal_arm {
-            true => 1.0,
-            false => 0.0,
-        }
+        if arm == self.optimal_arm { 1.0 } else { 0.0 }
     }
 
     fn optimal_reward(&self) -> f32 {

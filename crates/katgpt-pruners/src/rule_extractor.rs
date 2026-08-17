@@ -135,23 +135,18 @@ impl RuleExtractor {
 
         // Seed the DFS stack with root-level trees.
         for tree in trees {
-            match tree.children.is_empty() {
-                // Leaf at root level: single-node path.
-                true => {
-                    let path = PathAccumulator {
-                        nodes: vec![(tree.depth, tree.token_idx)],
-                        score: tree.score,
-                    };
-                    paths.push(path);
-                }
-                // Has children: push for DFS traversal.
-                false => {
-                    stack.push(WalkState {
-                        path: vec![(tree.depth, tree.token_idx)],
-                        cumulative_score: tree.score,
-                        children: &tree.children,
-                    });
-                }
+            if tree.children.is_empty() {
+                let path = PathAccumulator {
+                    nodes: vec![(tree.depth, tree.token_idx)],
+                    score: tree.score,
+                };
+                paths.push(path);
+            } else {
+                stack.push(WalkState {
+                    path: vec![(tree.depth, tree.token_idx)],
+                    cumulative_score: tree.score,
+                    children: &tree.children,
+                });
             }
         }
 
@@ -162,22 +157,17 @@ impl RuleExtractor {
                 let mut child_path = state.path.clone();
                 child_path.push((child.depth, child.token_idx));
 
-                match child.children.is_empty() {
-                    // Leaf node: complete path found.
-                    true => {
-                        paths.push(PathAccumulator {
-                            nodes: child_path,
-                            score: child_score,
-                        });
-                    }
-                    // Internal node: continue DFS.
-                    false => {
-                        stack.push(WalkState {
-                            path: child_path,
-                            cumulative_score: child_score,
-                            children: &child.children,
-                        });
-                    }
+                if child.children.is_empty() {
+                    paths.push(PathAccumulator {
+                        nodes: child_path,
+                        score: child_score,
+                    });
+                } else {
+                    stack.push(WalkState {
+                        path: child_path,
+                        cumulative_score: child_score,
+                        children: &child.children,
+                    });
                 }
             }
         }
@@ -187,21 +177,19 @@ impl RuleExtractor {
             .into_iter()
             .filter_map(|path| {
                 // A rule needs at least 2 nodes: conditions + action.
-                match path.nodes.len() < 2 {
-                    true => None,
-                    false => match path.score < self.min_score {
-                        true => None,
-                        false => {
-                            let action = path.nodes[path.nodes.len() - 1];
-                            let conditions = path.nodes[..path.nodes.len() - 1].to_vec();
-                            Some(ExtractedRule {
-                                conditions,
-                                action,
-                                score: path.score,
-                                support: 1,
-                            })
-                        }
-                    },
+                if path.nodes.len() < 2 {
+                    None
+                } else if path.score < self.min_score {
+                    None
+                } else {
+                    let action = path.nodes[path.nodes.len() - 1];
+                    let conditions = path.nodes[..path.nodes.len() - 1].to_vec();
+                    Some(ExtractedRule {
+                        conditions,
+                        action,
+                        score: path.score,
+                        support: 1,
+                    })
                 }
             })
             .collect();
@@ -235,9 +223,8 @@ impl RuleExtractor {
 ///
 /// O(n²) in the number of rules — acceptable because TOP-K bounds n.
 pub fn deduplicate_rules(rules: &mut Vec<ExtractedRule>, hamming_threshold: usize) {
-    match rules.len() {
-        0 | 1 => return,
-        _ => {}
+    if let 0 | 1 = rules.len() {
+        return;
     }
 
     // Sort by score descending so higher-scored rules come first.
@@ -285,9 +272,9 @@ fn hamming_distance(a: &[(usize, usize)], b: &[(usize, usize)]) -> usize {
 
     let mut dist = 0usize;
     for k in 0..min_len {
-        match a[k] == b[k] {
-            true => {}
-            false => dist += 1,
+        if a[k] == b[k] {
+        } else {
+            dist += 1
         }
     }
 
