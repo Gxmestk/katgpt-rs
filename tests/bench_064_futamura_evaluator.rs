@@ -19,12 +19,11 @@ mod tests {
     // ── Helpers ──────────────────────────────────────────────────
 
     fn skip_without_rustc() -> bool {
-        match find_rustc() {
-            Ok(_) => false,
-            Err(_) => {
-                eprintln!("skipping: no rustc with wasm32-unknown-unknown target");
-                true
-            }
+        if find_rustc().is_ok() {
+            false
+        } else {
+            eprintln!("skipping: no rustc with wasm32-unknown-unknown target");
+            true
         }
     }
 
