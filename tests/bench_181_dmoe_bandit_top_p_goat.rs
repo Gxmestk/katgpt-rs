@@ -52,8 +52,7 @@ mod tests {
 
         assert!(
             selected.contains(&1),
-            "selected arms must include the best arm: {:?}",
-            selected
+            "selected arms must include the best arm: {selected:?}"
         );
     }
 

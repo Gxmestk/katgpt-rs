@@ -57,7 +57,7 @@ use katgpt_rs::hla::MultiLayerAhlaCache;
 use katgpt_rs::transformer::{
     ForwardContext, MultiLayerKVCache, TransformerWeights, forward_looped,
 };
-use katgpt_rs::types::{Config, HybridPattern, LoopMode, Rng, ResidualGate, SdpaOutputGate};
+use katgpt_rs::types::{Config, HybridPattern, LoopMode, ResidualGate, Rng, SdpaOutputGate};
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -82,11 +82,7 @@ fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
         nb += b[i] * b[i];
     }
     let denom = na.sqrt() * nb.sqrt();
-    if denom > 0.0 {
-        1.0 - dot / denom
-    } else {
-        0.0
-    }
+    if denom > 0.0 { 1.0 - dot / denom } else { 0.0 }
 }
 
 /// Average pairwise cosine distance across a set of vectors.
@@ -103,11 +99,7 @@ fn avg_pairwise_cosine_distance(states: &[Vec<f32>]) -> f32 {
             count += 1;
         }
     }
-    if count > 0 {
-        sum / count as f32
-    } else {
-        0.0
-    }
+    if count > 0 { sum / count as f32 } else { 0.0 }
 }
 
 /// L2 norm of a vector.
@@ -119,8 +111,8 @@ fn l2_norm(v: &[f32]) -> f32 {
 
 struct KResult {
     k: usize,
-    disc: f32,   // G6-DISC: avg pairwise cosine distance of logits
-    norm: f32,   // G6-NORM: mean L2 norm of logits
+    disc: f32,    // G6-DISC: avg pairwise cosine distance of logits
+    norm: f32,    // G6-NORM: mean L2 norm of logits
     finite: bool, // all logits finite (G1 structural)
 }
 
@@ -208,10 +200,14 @@ fn forward_looped_depth_quality_ksweep() {
     println!("║  G6 analog, zero GPU, zero checkpoints (random weights)    ║");
     println!("╚════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Config::micro() (n_embd={}, n_layer={}, vocab={})",
-             Config::micro().n_embd, Config::micro().n_layer, Config::micro().vocab_size);
-    println!("K sweep: {:?}", K_CANDIDATES);
-    println!("N_DISTINCT prompt tokens: {}", N_DISTINCT);
+    println!(
+        "Config::micro() (n_embd={}, n_layer={}, vocab={})",
+        Config::micro().n_embd,
+        Config::micro().n_layer,
+        Config::micro().vocab_size
+    );
+    println!("K sweep: {K_CANDIDATES:?}");
+    println!("N_DISTINCT prompt tokens: {N_DISTINCT}");
     println!();
 
     // Run the K-sweep.
@@ -223,10 +219,16 @@ fn forward_looped_depth_quality_ksweep() {
 
     let mut results: Vec<KResult> = Vec::with_capacity(K_CANDIDATES.len());
     for &k in &K_CANDIDATES {
-        let label = if k == 1 { " (baseline)" } else { "            " };
+        let label = if k == 1 {
+            " (baseline)"
+        } else {
+            "            "
+        };
         let result = measure_k(k, &prompt_tokens);
-        println!("│ {:>4} │ {:>12.6} │ {:>12.6} │ {:>12} │{}",
-                 k, result.disc, result.norm, result.finite, label);
+        println!(
+            "│ {:>4} │ {:>12.6} │ {:>12.6} │ {:>12} │{}",
+            k, result.disc, result.norm, result.finite, label
+        );
         results.push(result);
     }
     println!("└──────┴──────────────┴──────────────┴──────────────┘");
@@ -234,7 +236,10 @@ fn forward_looped_depth_quality_ksweep() {
 
     // ── G1 structural: all finite ────────────────────────────────
     let all_finite = results.iter().all(|r| r.finite);
-    println!("G1 (all finite): {}", if all_finite { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "G1 (all finite): {}",
+        if all_finite { "✅ PASS" } else { "❌ FAIL" }
+    );
     assert!(all_finite, "G1 FAIL: non-finite logits at some K");
     println!();
 
@@ -244,20 +249,30 @@ fn forward_looped_depth_quality_ksweep() {
     println!();
 
     // G6-DISC: does any K>1 inter-prompt distance ≥ K=1?
-    let disc_best = results.iter().skip(1)
-        .max_by(|a, b| a.disc.partial_cmp(&b.disc).unwrap_or(std::cmp::Ordering::Equal));
+    let disc_best = results.iter().skip(1).max_by(|a, b| {
+        a.disc
+            .partial_cmp(&b.disc)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let disc_pass = disc_best.is_some_and(|r| r.disc >= baseline.disc);
     println!("  G6-DISC (logit discrimination):");
     println!("    K=1 baseline: {:.6}", baseline.disc);
     if let Some(best) = disc_best {
-        println!("    Best K>1:     K={}, disc={:.6} (delta {:+.6})",
-                 best.k, best.disc, best.disc - baseline.disc);
+        println!(
+            "    Best K>1:     K={}, disc={:.6} (delta {:+.6})",
+            best.k,
+            best.disc,
+            best.disc - baseline.disc
+        );
     }
-    println!("    Verdict: {}", if disc_pass {
-        "✅ PASS (K>1 preserves/amplifies discrimination)"
-    } else {
-        "❌ FAIL (loop washes out input signal on random weights)"
-    });
+    println!(
+        "    Verdict: {}",
+        if disc_pass {
+            "✅ PASS (K>1 preserves/amplifies discrimination)"
+        } else {
+            "❌ FAIL (loop washes out input signal on random weights)"
+        }
+    );
     println!();
 
     // G6-NORM: structural guard — does the output collapse?
@@ -265,23 +280,32 @@ fn forward_looped_depth_quality_ksweep() {
     let norm_pass = results.last().is_some_and(|r| r.norm >= norm_floor);
     println!("  G6-NORM (signal energy / structural guard):");
     println!("    K=1 baseline: {:.6}", baseline.norm);
-    println!("    K=8:          {:.6} (collapse floor = 10% of baseline = {:.6})",
-             results.last().unwrap().norm, norm_floor);
-    println!("    Verdict: {}", if norm_pass {
-        "✅ PASS (output doesn't collapse)"
-    } else {
-        "⚠️  COLLAPSE (weight-shared loop is contractive)"
-    });
+    println!(
+        "    K=8:          {:.6} (collapse floor = 10% of baseline = {:.6})",
+        results.last().unwrap().norm,
+        norm_floor
+    );
+    println!(
+        "    Verdict: {}",
+        if norm_pass {
+            "✅ PASS (output doesn't collapse)"
+        } else {
+            "⚠️  COLLAPSE (weight-shared loop is contractive)"
+        }
+    );
     println!();
 
     // Overall G6 modelless verdict.
     let overall_pass = disc_pass;
     println!("═══ Overall G6 Modelless Verdict ═══");
-    println!("  {}", if overall_pass {
-        "✅ PASS — weight-shared loop preserves input signal through depth."
-    } else {
-        "❌ FAIL — loop washes out input signal on random weights."
-    });
+    println!(
+        "  {}",
+        if overall_pass {
+            "✅ PASS — weight-shared loop preserves input signal through depth."
+        } else {
+            "❌ FAIL — loop washes out input signal on random weights."
+        }
+    );
     if overall_pass {
         println!("  The LT2 recurrence retains discriminability through K iterations.");
         println!("  A *trained* model could exploit this for depth-based quality gains.");
@@ -297,7 +321,9 @@ fn forward_looped_depth_quality_ksweep() {
     println!("═══ Corroborating Priors ═══");
     println!("  bench_gram_width_depth.rs: depth T=1→8 +6.46%, width +0.16% (depth dominates)");
     println!("  coherence_bench.rs: K=3 > K=1 on flip-flop count");
-    println!("  loop_stability_poc.rs: naive loop diverges (norm 11.19×); InterLoopNorm stabilizes");
+    println!(
+        "  loop_stability_poc.rs: naive loop diverges (norm 11.19×); InterLoopNorm stabilizes"
+    );
     println!();
     println!("  Note: Config::micro() uses naive ResidualGate (zero-init). The loop_stability_poc");
     println!("  shows naive loops diverge without InterLoopNorm. A FAIL here on the naive gate");

@@ -252,8 +252,7 @@ fn test_bench_dual_cutoff_vs_baseline() {
         results.push((*cutoff, active, masked, active_pct, rel_mass, avg_rel));
 
         println!(
-            "  {:20} | {:>7} | {:>7} | {:>7.1}% | {:>9.4} | {:>8.4}",
-            name, active, masked, active_pct, rel_mass, avg_rel
+            "  {name:20} | {active:>7} | {masked:>7} | {active_pct:>7.1}% | {rel_mass:>9.4} | {avg_rel:>8.4}"
         );
     }
 
@@ -324,9 +323,6 @@ fn test_bench_dual_cutoff_vs_baseline() {
         let rel_mass: f32 = relevances.iter().sum();
         let avg_rel = rel_mass / num_arms as f32;
 
-        println!(
-            "  {:20} | {:>7} | {:>7} | {:>9.4} | {:>8.4}",
-            name, active, masked, rel_mass, avg_rel
-        );
+        println!("  {name:20} | {active:>7} | {masked:>7} | {rel_mass:>9.4} | {avg_rel:>8.4}");
     }
 }

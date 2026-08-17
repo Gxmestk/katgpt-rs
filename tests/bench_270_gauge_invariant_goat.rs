@@ -178,11 +178,8 @@ fn t02_power_iteration_converges_within_5_percent() {
     let rel_err = (b_mut_max - expected_balanced).abs() / expected_balanced;
     assert!(
         rel_err < 0.10,
-        "Power iteration σ_max estimate error = {:.3} > 10% \
-         (b_mut_max={}, expected≈{}). Power iteration on rank-1 matrix should converge fast.",
-        rel_err,
-        b_mut_max,
-        expected_balanced
+        "Power iteration σ_max estimate error = {rel_err:.3} > 10% \
+         (b_mut_max={b_mut_max}, expected≈{expected_balanced}). Power iteration on rank-1 matrix should converge fast."
     );
     eprintln!(
         "t02 PASS: power iteration σ_max balanced to ≈ √(σ_a·σ_b) = {:.3} (got {:.3}, err {:.2}%)",

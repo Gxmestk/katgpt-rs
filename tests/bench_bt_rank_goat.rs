@@ -190,8 +190,7 @@ fn bench_bt_rank_goat_proof() {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
 
         if bt_pick == true_best {
             bt_best_count += 1;

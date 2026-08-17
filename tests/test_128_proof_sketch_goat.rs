@@ -736,27 +736,27 @@ mod tests {
         let guard = ParallelismGuard::new();
         let strategy = select_strategy(&guard);
 
-        match guard.population_enabled() {
-            true => assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb),
-            false => assert_eq!(strategy, SketchSelectionStrategy::BasicUcb),
+        if guard.population_enabled() {
+            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb)
+        } else {
+            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb)
         }
     }
 
     #[test]
     fn fallback_reason_consistency() {
         let guard = ParallelismGuard::new();
-        match guard.population_enabled() {
-            true => assert!(
+        if guard.population_enabled() {
+            assert!(
                 guard.fallback_reason().is_none(),
                 "population enabled → no fallback reason"
-            ),
-            false => {
-                let reason = guard.fallback_reason().expect("must have reason");
-                assert!(
-                    reason.contains("single-threaded"),
-                    "fallback reason must mention single-threaded: {reason}"
-                );
-            }
+            )
+        } else {
+            let reason = guard.fallback_reason().expect("must have reason");
+            assert!(
+                reason.contains("single-threaded"),
+                "fallback reason must mention single-threaded: {reason}"
+            );
         }
     }
 

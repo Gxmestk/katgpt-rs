@@ -758,7 +758,7 @@ fn g8_signal_mix_schedule_monotonic_in_step_index() {
         ratios.push(ratio);
     }
 
-    println!("G8 signal-mix ratios at steps 0..1024: {:?}", ratios);
+    println!("G8 signal-mix ratios at steps 0..1024: {ratios:?}");
 
     // Verify monotonic non-decreasing.
     for w in ratios.windows(2) {

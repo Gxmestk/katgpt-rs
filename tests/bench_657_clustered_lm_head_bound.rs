@@ -67,7 +67,10 @@ struct Lcg(u64);
 
 impl Lcg {
     fn next_f32(&mut self) -> f32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((self.0 >> 33) as f32 / (1u64 << 31) as f32) - 1.0
     }
 }
@@ -113,7 +116,10 @@ fn probe_vectors(count: usize, seed: u64) -> Vec<Vec<f32>> {
 }
 
 fn argmax(v: &[f32]) -> usize {
-    v.iter().enumerate().max_by(|(_, a), (_, b)| a.total_cmp(b)).map(|(i, _)| i).unwrap_or(0)
+    v.iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+        .map_or(0, |(i, _)| i)
 }
 
 fn true_argmaxes(lm_head: &[f32], probes: &[Vec<f32>]) -> Vec<usize> {
@@ -138,15 +144,16 @@ struct Arm {
 }
 
 impl Arm {
-    fn build(
-        label: &'static str,
-        lm_head: &[f32],
-        map: Vec<Vec<usize>>,
-        use_bound: bool,
-    ) -> Self {
+    fn build(label: &'static str, lm_head: &[f32], map: Vec<Vec<usize>>, use_bound: bool) -> Self {
         let classifier = cluster_classifier_from_map(lm_head, &map, N_EMBD);
         let radii = cluster_radii_from_map(lm_head, &map, &classifier, N_EMBD);
-        Self { label, map, classifier, radii, use_bound }
+        Self {
+            label,
+            map,
+            classifier,
+            radii,
+            use_bound,
+        }
     }
 
     /// Issue 666's cluster-contiguous layout for this arm.
@@ -160,9 +167,10 @@ impl Arm {
     fn packed_view<'a>(&'a self, layout: &'a ClusterLayout) -> PackedHeadView<'a> {
         PackedHeadView {
             classifier: &self.classifier,
-            radii: match self.use_bound {
-                true => Some(&self.radii),
-                false => None,
+            radii: if self.use_bound {
+                Some(&self.radii)
+            } else {
+                None
             },
             layout,
         }
@@ -171,9 +179,10 @@ impl Arm {
     fn view(&self) -> ClusterHeadView<'_> {
         ClusterHeadView {
             classifier: &self.classifier,
-            radii: match self.use_bound {
-                true => Some(&self.radii),
-                false => None,
+            radii: if self.use_bound {
+                Some(&self.radii)
+            } else {
+                None
             },
             map: &self.map,
         }
@@ -217,7 +226,10 @@ fn measure(
         }
         active += cost.tokens;
     }
-    (hits as f64 / probes.len() as f64, active as f64 / (probes.len() * VOCAB) as f64)
+    (
+        hits as f64 / probes.len() as f64,
+        active as f64 / (probes.len() * VOCAB) as f64,
+    )
 }
 
 /// Recall at the largest `topk` whose active fraction still fits `budget`.
@@ -238,15 +250,14 @@ fn recall_at_budget(
     while lo <= hi {
         let mid = lo + (hi - lo) / 2;
         let (recall, active) = measure(arm, lm_head, probes, truth, ClusterStop::TopK(mid));
-        match active <= budget {
-            true => {
-                best = (recall, mid);
-                lo = mid + 1;
-            }
-            false => match mid {
+        if active <= budget {
+            best = (recall, mid);
+            lo = mid + 1;
+        } else {
+            match mid {
                 0 => break,
                 _ => hi = mid - 1,
-            },
+            }
         }
     }
     best
@@ -284,7 +295,12 @@ fn run_regime(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
     let truth = true_argmaxes(lm_head, probes);
 
     let arms = vec![
-        Arm::build("round-robin  + mean ", lm_head, cluster_map_round_robin(VOCAB, CLUSTER_SIZE), false),
+        Arm::build(
+            "round-robin  + mean ",
+            lm_head,
+            cluster_map_round_robin(VOCAB, CLUSTER_SIZE),
+            false,
+        ),
         Arm::build("strided init + mean ", lm_head, strided.clone(), false),
         Arm::build("strided init + BOUND", lm_head, strided, true),
         Arm::build("D² init      + mean ", lm_head, dsq.clone(), false),
@@ -313,8 +329,13 @@ fn run_regime(label: &str, lm_head: &[f32], probes: &[Vec<f32>]) -> f64 {
 
     println!("  -- ADMISSIBLE stop (recall is 1.0 by construction; cost is the result) --");
     for arm in arms.iter().filter(|a| a.use_bound) {
-        let (r, active) =
-            measure(arm, lm_head, probes, &truth, ClusterStop::Admissible { wave: WAVE });
+        let (r, active) = measure(
+            arm,
+            lm_head,
+            probes,
+            &truth,
+            ClusterStop::Admissible { wave: WAVE },
+        );
         println!(
             "  {:<20} recall {r:.4}   active {:.2}%   speedup-vs-full {:.2}x",
             arm.label,
@@ -415,65 +436,71 @@ fn latency_for(
         let standard_first = pair % 2 == 0;
 
         let run_admissible = |logits: &mut [f32],
-                                  scores: &mut Vec<f32>,
-                                  indexed: &mut Vec<(usize, f32)>,
-                                  selected: &mut Vec<usize>,
-                                  gathered: &mut Vec<usize>,
-                                  dots: &mut Vec<f32>| {
+                              scores: &mut Vec<f32>,
+                              indexed: &mut Vec<(usize, f32)>,
+                              selected: &mut Vec<usize>,
+                              gathered: &mut Vec<usize>,
+                              dots: &mut Vec<f32>| {
             let t = Instant::now();
-            match packed {
-                true => {
-                    clustered_lm_head_packed(
-                        logits,
-                        hidden,
-                        arm.packed_view(&layout),
-                        VOCAB,
-                        N_EMBD,
-                        ClusterStop::Admissible { wave },
-                        ClusterScratch { scores, indexed, selected, gathered, dots },
-                    );
-                }
-                false => {
-                    clustered_lm_head_bounded(
-                        logits,
-                        hidden,
-                        lm_head,
-                        arm.view(),
-                        VOCAB,
-                        N_EMBD,
-                        ClusterStop::Admissible { wave },
-                        ClusterScratch { scores, indexed, selected, gathered, dots },
-                    );
-                }
+            if packed {
+                clustered_lm_head_packed(
+                    logits,
+                    hidden,
+                    arm.packed_view(&layout),
+                    VOCAB,
+                    N_EMBD,
+                    ClusterStop::Admissible { wave },
+                    ClusterScratch {
+                        scores,
+                        indexed,
+                        selected,
+                        gathered,
+                        dots,
+                    },
+                );
+            } else {
+                clustered_lm_head_bounded(
+                    logits,
+                    hidden,
+                    lm_head,
+                    arm.view(),
+                    VOCAB,
+                    N_EMBD,
+                    ClusterStop::Admissible { wave },
+                    ClusterScratch {
+                        scores,
+                        indexed,
+                        selected,
+                        gathered,
+                        dots,
+                    },
+                );
             }
             t.elapsed().as_secs_f64() * 1e3
         };
 
-        let (s_ms, a_ms) = match standard_first {
-            true => {
-                let s = time_standard(&mut logits);
-                let a = run_admissible(
-                    &mut logits,
-                    &mut scores,
-                    &mut indexed,
-                    &mut selected,
-                    &mut gathered,
-                    &mut dots,
-                );
-                (s, a)
-            }
-            false => {
-                let a = run_admissible(
-                    &mut logits,
-                    &mut scores,
-                    &mut indexed,
-                    &mut selected,
-                    &mut gathered,
-                    &mut dots,
-                );
-                let s = time_standard(&mut logits);
-                (s, a)
-            }
+        let (s_ms, a_ms) = if standard_first {
+            let s = time_standard(&mut logits);
+            let a = run_admissible(
+                &mut logits,
+                &mut scores,
+                &mut indexed,
+                &mut selected,
+                &mut gathered,
+                &mut dots,
+            );
+            (s, a)
+        } else {
+            let a = run_admissible(
+                &mut logits,
+                &mut scores,
+                &mut indexed,
+                &mut selected,
+                &mut gathered,
+                &mut dots,
+            );
+            let s = time_standard(&mut logits);
+            (s, a)
         };
 
         if pair >= WARMUP_PAIRS {
@@ -506,10 +533,18 @@ fn goat_657_clustered_lm_head_bound() {
     let n_clusters = VOCAB / CLUSTER_SIZE;
 
     let structured = structured_lm_head(n_clusters, DEFAULT_SPREAD, 0xA11CE);
-    let best = run_regime("STRUCTURED (groups == clusters — the verdict regime)", &structured, &probes);
+    let best = run_regime(
+        "STRUCTURED (groups == clusters — the verdict regime)",
+        &structured,
+        &probes,
+    );
 
     let split = structured_lm_head(64, DEFAULT_SPREAD, 0xA11CE);
-    let _ = run_regime("STRUCTURED (64 groups vs 256 clusters — split penalty)", &split, &probes);
+    let _ = run_regime(
+        "STRUCTURED (64 groups vs 256 clusters — split penalty)",
+        &split,
+        &probes,
+    );
 
     let random = random_lm_head(0xB0B);
     let _ = run_regime("RANDOM (no structure — control)", &random, &probes);
@@ -533,12 +568,23 @@ fn goat_657_clustered_lm_head_bound() {
     );
     let arm = Arm::build("D² + BOUND", &structured, map, true);
     let truth = true_argmaxes(&structured, &probes);
-    println!("  {:>5}  {:>9}  {:>10}  {:>8}", "wave", "active%", "vs wave 1", "speedup");
+    println!(
+        "  {:>5}  {:>9}  {:>10}  {:>8}",
+        "wave", "active%", "vs wave 1", "speedup"
+    );
     let mut base_active = 0.0f64;
     for (i, wave) in [1usize, 2, 4, 8, 16, 32, 64].into_iter().enumerate() {
-        let (recall, active) =
-            measure(&arm, &structured, &probes, &truth, ClusterStop::Admissible { wave });
-        assert!((recall - 1.0).abs() < 1e-9, "wave {wave} broke exactness: recall {recall}");
+        let (recall, active) = measure(
+            &arm,
+            &structured,
+            &probes,
+            &truth,
+            ClusterStop::Admissible { wave },
+        );
+        assert!(
+            (recall - 1.0).abs() < 1e-9,
+            "wave {wave} broke exactness: recall {recall}"
+        );
         if i == 0 {
             base_active = active;
         }
@@ -560,10 +606,14 @@ fn goat_657_clustered_lm_head_bound() {
     // addresses change (asserted bit-identical in `cluster_head`'s unit tests).
     println!("\n══ Issue 666 — scattered vs packed layout (structured, wave={WAVE}) ══");
     let layout = arm.layout(&structured);
-    let (_, active_666) =
-        measure(&arm, &structured, &probes, &truth, ClusterStop::Admissible { wave: WAVE });
-    let scattered_ratio =
-        latency_for("", &structured, &arm, &probes, WAVE, true, false);
+    let (_, active_666) = measure(
+        &arm,
+        &structured,
+        &probes,
+        &truth,
+        ClusterStop::Admissible { wave: WAVE },
+    );
+    let scattered_ratio = latency_for("", &structured, &arm, &probes, WAVE, true, false);
     let packed_ratio = latency_for("", &structured, &arm, &probes, WAVE, true, true);
     let bytes = (VOCAB * N_EMBD * 4) as f64;
     let gbs = |ratio: f64, std_ms: f64| bytes * active_666 / ((std_ms / ratio) * 1e-3) / 1e9;
@@ -579,8 +629,15 @@ fn goat_657_clustered_lm_head_bound() {
             .collect();
         median_ms(&mut samples)
     };
-    println!("  active {:.2}%   FLOP ratio {:.2}x", active_666 * 100.0, 1.0 / active_666);
-    println!("  full head        {std_ms:.4} ms   {:.1} GB/s", bytes / (std_ms * 1e-3) / 1e9);
+    println!(
+        "  active {:.2}%   FLOP ratio {:.2}x",
+        active_666 * 100.0,
+        1.0 / active_666
+    );
+    println!(
+        "  full head        {std_ms:.4} ms   {:.1} GB/s",
+        bytes / (std_ms * 1e-3) / 1e9
+    );
     println!(
         "  scattered        {:.4} ms   {:.1} GB/s   {scattered_ratio:.2}x",
         std_ms / scattered_ratio,
@@ -604,10 +661,11 @@ fn goat_657_clustered_lm_head_bound() {
     // 12x loss) and could not say where the sign flips. Walking the fixture's
     // separability dial produces the curve between them. The crossover active%
     // is the load-time enable condition: above it, use the full head.
+    println!("\n══ Issue 661b — crossover (separability sweep, wave={WAVE}, packed={PACKED}) ══");
     println!(
-        "\n══ Issue 661b — crossover (separability sweep, wave={WAVE}, packed={PACKED}) ══"
+        "  {:>7}  {:>9}  {:>8}  {:>9}",
+        "spread", "active%", "speedup", "verdict"
     );
-    println!("  {:>7}  {:>9}  {:>8}  {:>9}", "spread", "active%", "speedup", "verdict");
     let mut crossover: Option<(f64, f64)> = None;
     let mut prev: Option<(f64, f64)> = None;
     for spread in [0.05f32, 0.07, 0.09, 0.11, 0.13, 0.15, 0.3, 1.0] {
@@ -621,9 +679,11 @@ fn goat_657_clustered_lm_head_bound() {
         );
         let a = Arm::build("D² + BOUND", &w, m, true);
         let t = true_argmaxes(&w, &probes);
-        let (recall, active) =
-            measure(&a, &w, &probes, &t, ClusterStop::Admissible { wave: WAVE });
-        assert!((recall - 1.0).abs() < 1e-9, "spread {spread} broke exactness");
+        let (recall, active) = measure(&a, &w, &probes, &t, ClusterStop::Admissible { wave: WAVE });
+        assert!(
+            (recall - 1.0).abs() < 1e-9,
+            "spread {spread} broke exactness"
+        );
         let ratio = latency_for("", &w, &a, &probes, WAVE, true, PACKED);
         println!(
             "  {spread:>7.2}  {:>8.2}%  {ratio:>7.2}x  {:>9}",
@@ -654,8 +714,7 @@ fn goat_657_clustered_lm_head_bound() {
 
     // ── G3 perf: the admissible operating point vs the full head ──
     println!("\n══ G3 latency (admissible stop, both regimes) ══");
-    let g3_structured =
-        latency_layout("structured", &structured, &probes, WAVE, false, PACKED);
+    let g3_structured = latency_layout("structured", &structured, &probes, WAVE, false, PACKED);
     let g3_random = latency_layout("random", &random, &probes, WAVE, false, PACKED);
 
     println!("\n══ VERDICT ══");

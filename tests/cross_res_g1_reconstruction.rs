@@ -226,8 +226,7 @@ fn g1_reconstruction_cosine() {
     let median = cosines[cosines.len() / 2];
 
     println!(
-        "\nG1 RECONSTRUCTION RESULTS (n={}, d_src={}, d_dst={}, k={}, band_frac={}):",
-        N_SAMPLES, D_SRC, D_DST, K, BAND_ENERGY_FRAC
+        "\nG1 RECONSTRUCTION RESULTS (n={N_SAMPLES}, d_src={D_SRC}, d_dst={D_DST}, k={K}, band_frac={BAND_ENERGY_FRAC}):"
     );
     println!("  min cos:    {min:.4}");
     println!("  p10 cos:    {p10:.4}");

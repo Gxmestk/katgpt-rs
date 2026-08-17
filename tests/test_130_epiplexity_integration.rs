@@ -506,7 +506,7 @@ mod integration {
         let scorer = FactorizationScorer::new(300);
         let mut rng = fastrand::Rng::with_seed(42);
 
-        let mut gaps = Vec::new();
+        let mut gaps = Vec::with_capacity(20);
 
         for _ in 0..20 {
             // Go win-rate traces converted to "loss" (1 - win_rate)

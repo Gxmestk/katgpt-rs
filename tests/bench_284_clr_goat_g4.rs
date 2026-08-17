@@ -202,9 +202,11 @@ fn g4_zero_allocation() {
     let warmup_allocs = snap_alloc();
 
     eprintln!("──────── G4: Zero Allocation on Vote Path ────────");
-    eprintln!("Warmup (ClrScratch::new({}, {}, {})):", G4_K, G4_M, G4_DIM);
+    eprintln!("Warmup (ClrScratch::new({G4_K}, {G4_M}, {G4_DIM})):");
     eprintln!("  allocs: {warmup_allocs}");
-    eprintln!("  expected: 4 with_capacity calls (verdicts, reliability, cluster_id, claim_embeddings)");
+    eprintln!(
+        "  expected: 4 with_capacity calls (verdicts, reliability, cluster_id, claim_embeddings)"
+    );
 
     // ClrScratch::new allocates exactly 4 buffers. Allow a small margin for
     // any allocator-internal bookkeeping, but fail loudly if it's way off.
@@ -224,10 +226,7 @@ fn g4_zero_allocation() {
     let data_build_allocs = snap_alloc();
 
     eprintln!();
-    eprintln!(
-        "Data build (K={} trajectories, M={} claims each):",
-        G4_K, G4_M
-    );
+    eprintln!("Data build (K={G4_K} trajectories, M={G4_M} claims each):");
     eprintln!("  allocs: {data_build_allocs}");
 
     // ── Phase C: steady-state — 1000 clr_vote_minimal calls ────────────
@@ -322,10 +321,7 @@ fn g4_zero_allocation() {
 
     eprintln!();
     eprintln!("Vote-internals allocation overhead (Phase D):");
-    eprintln!(
-        "  Extractor only (K={} calls): {extract_only_allocs:>6} allocs",
-        G4_K
-    );
+    eprintln!("  Extractor only (K={G4_K} calls): {extract_only_allocs:>6} allocs");
     eprintln!("  One full vote call:          {one_vote_allocs:>6} allocs");
     eprintln!("  Vote-internals overhead:     {vote_overhead:>+6} allocs (target: 0)");
 

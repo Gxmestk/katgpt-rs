@@ -235,16 +235,12 @@ fn bench_single_layer_scan_time() {
     let d = guard.scan_layer(&weights, 0, "layer0.ffn.up_proj");
     let elapsed = start.elapsed();
 
-    println!(
-        "  [T7.1] Single layer scan: {} weights, D={:.4}, time={:?}",
-        PER_LAYER_WEIGHTS, d, elapsed
-    );
+    println!("  [T7.1] Single layer scan: {PER_LAYER_WEIGHTS} weights, D={d:.4}, time={elapsed:?}");
 
     assert!(d < 0.15, "normal weights should have D < 0.15, got {d:.4}");
     assert!(
         elapsed.as_secs() < 30,
-        "single layer scan should be <30s (debug build), got {:?}",
-        elapsed
+        "single layer scan should be <30s (debug build), got {elapsed:?}"
     );
 }
 
@@ -295,8 +291,7 @@ fn bench_model_scan_time() {
     );
     assert!(
         elapsed.as_secs() < 120,
-        "model scan should be <120s (debug build), got {:?}",
-        elapsed
+        "model scan should be <120s (debug build), got {elapsed:?}"
     );
 }
 
@@ -325,10 +320,7 @@ fn bench_zero_inference_impact() {
     }
     let _infer_time = infer_start.elapsed();
 
-    println!(
-        "  [T7.3] Scan time (one-time): {:?}, 100 inference steps: {:?}",
-        scan_time, _infer_time
-    );
+    println!("  [T7.3] Scan time (one-time): {scan_time:?}, 100 inference steps: {_infer_time:?}");
     println!(
         "  [T7.3] Scan is {}x the cost of one inference step",
         scan_time.as_nanos() / _infer_time.as_nanos().max(1)
@@ -382,7 +374,7 @@ fn bench_detection_accuracy() {
         fpr * 100.0
     );
     println!("    True positives:  {true_positives}/2");
-    println!("    False negatives: {}/2", false_negatives);
+    println!("    False negatives: {false_negatives}/2");
     println!("    Total scanned:   {}", report.total_scanned);
     println!("    Max D:           {:.4}", report.max_ks_d);
 

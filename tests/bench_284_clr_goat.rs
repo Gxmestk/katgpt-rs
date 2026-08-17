@@ -332,8 +332,7 @@ fn g1_clr_beats_best_of_n_majority() {
     eprintln!("──────── G1: CLR vs Best-of-N Majority ────────");
     eprintln!("Seeds          : {G1_NUM_SEEDS}");
     eprintln!(
-        "Suite          : {} clusters × {} trajectories, K={}, M={}, dim={}",
-        G1_NUM_CLUSTERS, G1_TRAJECTORIES_PER_CLUSTER, G1_K_TOTAL, G1_M, G1_DIM
+        "Suite          : {G1_NUM_CLUSTERS} clusters × {G1_TRAJECTORIES_PER_CLUSTER} trajectories, K={G1_K_TOTAL}, M={G1_M}, dim={G1_DIM}"
     );
     eprintln!("Correct cluster: {G1_CORRECT_CLUSTER} (highest baseline magnitude)");
     eprintln!("CLR pick dist  : {clr_picks:?}");

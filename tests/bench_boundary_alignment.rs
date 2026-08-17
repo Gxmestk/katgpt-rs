@@ -133,10 +133,7 @@ fn bench_multi_expert_alignment() {
         .collect();
 
     // Compute pairwise KL divergences
-    println!(
-        "Pairwise symmetric KL divergences ({} experts, vocab={vocab}):",
-        n_experts
-    );
+    println!("Pairwise symmetric KL divergences ({n_experts} experts, vocab={vocab}):");
     print!("{:>8}", "");
     for i in 0..n_experts {
         print!(" {:>8}", format!("E{i}"));
@@ -157,7 +154,7 @@ fn bench_multi_expert_alignment() {
                 print!(" {:>8}", "—");
             } else {
                 let kl = aligner.kl_divergence(&experts[i], &experts[j]);
-                print!(" {:>8.4}", kl);
+                print!(" {kl:>8.4}");
                 total_kl += kl;
                 pairs += 1;
             }

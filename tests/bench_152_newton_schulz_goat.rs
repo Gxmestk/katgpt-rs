@@ -464,7 +464,7 @@ fn goat_t3_2_momentum_accumulation() {
     let mut momentum = vec![0.0f32; 16];
     let mut out = vec![0.0f32; 16];
 
-    let mut norms = Vec::new();
+    let mut norms = Vec::with_capacity(5);
     for _ in 0..5 {
         muon_update(&grad, &mut momentum, 0.9, 4, 4, &mut out);
         let mom_norm: f32 = momentum.iter().map(|v| v * v).sum::<f32>().sqrt();

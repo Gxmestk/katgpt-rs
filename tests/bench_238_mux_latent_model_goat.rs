@@ -181,10 +181,7 @@ fn g1_ttft_reduction_at_scale() {
     );
     for (label, avg_us) in &compressed_durations {
         let speedup = baseline_us / avg_us;
-        println!(
-            "│ Comp {label:4}   │ {:>8} │ {avg_us:>12.1} │ {speedup:>11.2}× │",
-            n_tokens,
-        );
+        println!("│ Comp {label:4}   │ {n_tokens:>8} │ {avg_us:>12.1} │ {speedup:>11.2}× │",);
     }
     println!("└─────────────┴──────────┴──────────────┴──────────────┘");
 
@@ -196,13 +193,9 @@ fn g1_ttft_reduction_at_scale() {
     let speedup = baseline_us / best_compressed;
     assert!(
         speedup >= 2.0,
-        "G1 FAIL 🐐: best compressed TTFT is {:.2}× baseline (need ≥ 2.0× speedup)",
-        speedup
+        "G1 FAIL 🐐: best compressed TTFT is {speedup:.2}× baseline (need ≥ 2.0× speedup)"
     );
-    println!(
-        "✅ G1 PASS: {:.2}× TTFT speedup (≥ 2.0× required)\n",
-        speedup
-    );
+    println!("✅ G1 PASS: {speedup:.2}× TTFT speedup (≥ 2.0× required)\n");
 }
 
 // ── G2: Logit Quality — Compressed vs Baseline ───────────────────────
@@ -354,8 +347,7 @@ fn g3_kv_cache_memory_reduction() {
         let diff = (reduction - expected_reduction).abs();
 
         println!(
-            "│ Comp {label:4}   │ {:>8} │ {fill:>8} │ {expected_pos:>8} │ {reduction:>8.1}% │",
-            n_tokens
+            "│ Comp {label:4}   │ {n_tokens:>8} │ {fill:>8} │ {expected_pos:>8} │ {reduction:>8.1}% │"
         );
 
         // GOAT criterion: reduction matches expected within 5%
@@ -464,7 +456,7 @@ fn g4_lora_quality_preservation() {
     );
 
     // Decode 4 tokens autoregressively (no LoRA on decode path — forward() has no lora param)
-    let mut generated = Vec::new();
+    let mut generated = Vec::with_capacity(4);
     let mut pos = plan.token_ids.len();
     // Use argmax from a separate prefill to get first decode token
     let mut last_token = {
@@ -601,13 +593,11 @@ fn g5_ttft_scaling_by_context_length() {
     let base_64 = baseline_per_len
         .iter()
         .find(|&&(l, _)| l == 64)
-        .map(|&(_, us)| us)
-        .unwrap_or(1.0);
+        .map_or(1.0, |&(_, us)| us);
     let comp_64 = comp_per_len
         .iter()
         .find(|&&(l, _)| l == 64)
-        .map(|&(_, us)| us)
-        .unwrap_or(1.0);
+        .map_or(1.0, |&(_, us)| us);
 
     for (i, &len) in test_lengths.iter().enumerate() {
         let base_us = baseline_per_len[i].1;
@@ -632,16 +622,15 @@ fn g5_ttft_scaling_by_context_length() {
     let _comp_512 = comp_per_len
         .iter()
         .find(|&&(l, _)| l == 512)
-        .map(|&(_, us)| us)
-        .unwrap_or(1.0);
+        .map_or(1.0, |&(_, us)| us);
     // The compressed ratio should be ≤ expected_ratio (compressed scales with fewer tokens)
     // For X8: compressed(512) has 64 tokens, compressed(64) has 8 tokens → ratio = 8
     // baseline(512) has 512 tokens, baseline(64) has 64 tokens → ratio = 8
     // The ratios are the same — but the absolute TTFT is 8× lower for compressed.
     //
     // The real test: verify comp_ttft << base_ttft at all lengths.
-    let speedup_at_1024 = baseline_per_len.last().map(|&(_, us)| us).unwrap_or(1.0)
-        / comp_per_len.last().map(|&(_, us)| us).unwrap_or(1.0);
+    let speedup_at_1024 = baseline_per_len.last().map_or(1.0, |&(_, us)| us)
+        / comp_per_len.last().map_or(1.0, |&(_, us)| us);
 
     assert!(
         speedup_at_1024 >= 2.0,
@@ -652,8 +641,7 @@ fn g5_ttft_scaling_by_context_length() {
     let comp_1024 = comp_per_len
         .iter()
         .find(|&&(l, _)| l == 1024)
-        .map(|&(_, us)| us)
-        .unwrap_or(1.0);
+        .map_or(1.0, |&(_, us)| us);
     let comp_ratio_1024_vs_64 = comp_1024 / comp_64;
     // At X8, ratio should be ≈ 16 (=1024/64), same as baseline, but absolute times are 8× lower
     assert!(

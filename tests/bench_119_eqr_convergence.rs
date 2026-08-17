@@ -163,8 +163,7 @@ fn bench_eqr_convergence_comparison() {
                 let avg_latency = latencies.iter().sum::<f32>() / n_trials as f32;
 
                 println!(
-                    "║  │ {:<8} │ K={:>2}: {:.4}           │ {:.4}           │ {:.3}    │ {:>6.0} │║",
-                    mode_name, k, avg_quality, avg_agreement, diversity, avg_latency
+                    "║  │ {mode_name:<8} │ K={k:>2}: {avg_quality:.4}           │ {avg_agreement:.4}           │ {diversity:.3}    │ {avg_latency:>6.0} │║"
                 );
             }
         }

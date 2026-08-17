@@ -153,14 +153,10 @@ fn bench_483_lt2_loop_stable_goat() {
     // Uses layer 0's Wq as a representative spectral sample.
     let wq = &weights.layers[0].attn_wq;
     let lambda_max = dominant_eigenvalue(wq, config.n_embd, config.n_embd, 50);
-    println!(
-        "  T2.2 spectral analysis: λ_max(Wq layer 0) = {:.4}",
-        lambda_max
-    );
+    println!("  T2.2 spectral analysis: λ_max(Wq layer 0) = {lambda_max:.4}");
     let spectral_gate_val = (1.0 / lambda_max).clamp(0.01, 0.9);
     println!(
-        "  T2.2 spectral gate value: 1/λ_max = {:.4} (clamped to [0.01, 0.9])",
-        spectral_gate_val
+        "  T2.2 spectral gate value: 1/λ_max = {spectral_gate_val:.4} (clamped to [0.01, 0.9])"
     );
     println!();
 
@@ -284,10 +280,10 @@ fn bench_483_lt2_loop_stable_goat() {
         };
 
         // G2: carry-forward — any non-zero KL means the gate is doing something
-        let g2_str = format!("{:.6}", avg_kl_1_4);
+        let g2_str = format!("{avg_kl_1_4:.6}");
 
         // G3: convergence — lower KL(3→4) means output is converging
-        let g3_str = format!("{:.6}", avg_kl_3_4);
+        let g3_str = format!("{avg_kl_3_4:.6}");
 
         // G4: no-regression
         let g4_str = if g4_pass { "✅ PASS" } else { "❌ FAIL" };
@@ -310,8 +306,7 @@ fn bench_483_lt2_loop_stable_goat() {
     // Analysis
     println!("── Analysis ──────────────────────────────────────────────────");
     println!(
-        "  Zero-init baseline: KL(1→4) = {:.6}, KL(3→4) = {:.6}",
-        zero_init_kl_1_4, zero_init_kl_3_4
+        "  Zero-init baseline: KL(1→4) = {zero_init_kl_1_4:.6}, KL(3→4) = {zero_init_kl_3_4:.6}"
     );
     println!();
 
@@ -319,17 +314,11 @@ fn bench_483_lt2_loop_stable_goat() {
     println!("── GOAT Gate ─────────────────────────────────────────────────");
     println!("  G1 (stability): all logits finite at T=4 for all gate types");
     println!("  G2 (carry-forward): KL(1→4) measures how much T=4 differs from T=1");
-    println!(
-        "    - Zero-init: KL = {:.6} (carry-forward from AHLA state only)",
-        zero_init_kl_1_4
-    );
+    println!("    - Zero-init: KL = {zero_init_kl_1_4:.6} (carry-forward from AHLA state only)");
     println!("    - Loop-stable gates should show DIFFERENT KL values");
     println!("  G3 (convergence): KL(3→4) measures output stabilization");
     println!("    - Lower KL(3→4) = output is converging");
-    println!(
-        "    - Zero-init baseline: KL(3→4) = {:.6}",
-        zero_init_kl_3_4
-    );
+    println!("    - Zero-init baseline: KL(3→4) = {zero_init_kl_3_4:.6}");
     println!("  G4 (no-regression): all logits finite (no divergence)");
     println!();
 

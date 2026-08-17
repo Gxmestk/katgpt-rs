@@ -170,7 +170,7 @@ fn test_goat_g2_convergence_speed() {
     }
 
     // Random init convergence
-    let mut epochs_random = Vec::new();
+    let mut epochs_random = Vec::with_capacity(10);
     for seed in 0u64..10 {
         let start = schema_init_entity(&[], &cache, 0.3, &mut fastrand::Rng::with_seed(seed));
         let epochs = simulate_convergence(start, &centroid, lr, threshold);
@@ -178,7 +178,7 @@ fn test_goat_g2_convergence_speed() {
     }
 
     // Schema centroid init convergence
-    let mut epochs_schema = Vec::new();
+    let mut epochs_schema = Vec::with_capacity(10);
     for seed in 0u64..10 {
         let start = schema_init_entity(
             &[class_hash],
@@ -609,19 +609,14 @@ fn goat_g8_bake_integration_informed_prior() {
     let sparse_avg: f32 = sparse_prec.iter().sum::<f32>() / 8.0;
     assert!(
         dense_avg > sparse_avg,
-        "dense class ({}) should have higher precision than sparse ({})",
-        dense_avg,
-        sparse_avg
+        "dense class ({dense_avg}) should have higher precision than sparse ({sparse_avg})"
     );
 
     // Both should be > 0
     assert!(dense_avg > 0.0);
     assert!(sparse_avg > 0.0);
 
-    println!(
-        "✅ G8: Dense precision={:.4} > Sparse precision={:.4}",
-        dense_avg, sparse_avg
-    );
+    println!("✅ G8: Dense precision={dense_avg:.4} > Sparse precision={sparse_avg:.4}");
 }
 
 #[allow(dead_code)]

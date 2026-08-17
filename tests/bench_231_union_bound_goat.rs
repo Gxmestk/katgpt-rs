@@ -61,7 +61,7 @@ fn test_goat_g1_boole_correctness() {
             u,
             m
         );
-        assert!(u >= 0.0, "G1.2: union should be ≥ 0.0, got {}", u);
+        assert!(u >= 0.0, "G1.2: union should be ≥ 0.0, got {u}");
     }
 
     // G1.3: Both scorers agree on trivial cases
@@ -129,10 +129,7 @@ fn test_goat_g2_degradation_shapes() {
             "G2.1b: union formula mismatch"
         );
 
-        println!(
-            "       {:>4}  {:>10.6}  {:>10.6}  {:>12.6}  {:>12.6}",
-            len, m, u, mult_drop, union_drop
-        );
+        println!("       {len:>4}  {m:>10.6}  {u:>10.6}  {mult_drop:>12.6}  {union_drop:>12.6}");
 
         prev_mult = m;
         prev_union = u;

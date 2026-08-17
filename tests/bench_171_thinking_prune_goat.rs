@@ -152,16 +152,12 @@ fn proof_p1_structural_dominance() {
         }
     }
 
-    println!(
-        "\n  Summary: Frozen wins={}, Uniform wins={}, Ties={}",
-        frozen_wins, uniform_wins, ties
-    );
+    println!("\n  Summary: Frozen wins={frozen_wins}, Uniform wins={uniform_wins}, Ties={ties}");
 
     // Assert: FrozenBaseGuard should NEVER produce fewer total nodes
     assert_eq!(
         uniform_wins, 0,
-        "FrozenBaseGuard should produce >= Uniform nodes (Uniform won {} times)",
-        uniform_wins,
+        "FrozenBaseGuard should produce >= Uniform nodes (Uniform won {uniform_wins} times)",
     );
     println!("  ✅ P1 PASS: FrozenBaseGuard always produces >= Uniform nodes");
 }
@@ -326,9 +322,7 @@ fn proof_p3_wall_clock_timing() {
     assert!(
         ns_frozen < ns_uniform,
         "FrozenBaseGuard should be faster than Uniform with expensive screener \
-         (got {}ns vs {}ns, {speedup_pct:.1}%)",
-        ns_frozen,
-        ns_uniform,
+         (got {ns_frozen}ns vs {ns_uniform}ns, {speedup_pct:.1}%)",
     );
     println!("  ✅ P3 PASS: FrozenBaseGuard is {speedup_pct:.1}% faster with expensive screener");
 }
@@ -420,8 +414,8 @@ fn proof_p5_final_hop_quality_identical() {
         uniform_path, frozen_path,
         "Final hop paths should be identical between Uniform and FrozenBaseGuard",
     );
-    println!("  Uniform path: {:?}", uniform_path);
-    println!("  Frozen path:  {:?}", frozen_path);
+    println!("  Uniform path: {uniform_path:?}");
+    println!("  Frozen path:  {frozen_path:?}");
     println!("  ✅ P5 PASS: Final hop produces identical paths");
 }
 

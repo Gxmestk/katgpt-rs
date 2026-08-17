@@ -42,14 +42,15 @@ const CLUSTER_SIZE: usize = 128;
 /// Probe vectors per recall measurement.
 const PROBES: usize = 200;
 
-
-
 /// Deterministic LCG — reproducible across runs and platforms.
 struct Lcg(u64);
 
 impl Lcg {
     fn next_f32(&mut self) -> f32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((self.0 >> 33) as f32 / (1u64 << 31) as f32) - 1.0
     }
 }
@@ -98,8 +99,7 @@ fn argmax(v: &[f32]) -> usize {
     v.iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .map_or(0, |(i, _)| i)
 }
 
 /// Fraction of probes whose true argmax survives cluster pruning, plus the
@@ -214,15 +214,14 @@ fn recall_at_budget(
     while lo <= hi {
         let mid = lo + (hi - lo) / 2;
         let (recall, active) = argmax_recall(lm_head, map, classifier, probes, truth, mid);
-        match active <= budget {
-            true => {
-                best = (recall, active, mid);
-                lo = mid + 1;
-            }
-            false => match mid {
+        if active <= budget {
+            best = (recall, active, mid);
+            lo = mid + 1;
+        } else {
+            match mid {
                 0 => break,
                 _ => hi = mid - 1,
-            },
+            }
         }
     }
     best
@@ -324,8 +323,8 @@ fn goat_574_clustered_lm_head() {
     let mut scores = vec![0.0f32; map.len()];
     let (mut idx_buf, mut out_buf) = (Vec::new(), Vec::new());
 
-    let mut std_samples = Vec::new();
-    let mut clu_samples = Vec::new();
+    let mut std_samples = Vec::with_capacity(50);
+    let mut clu_samples = Vec::with_capacity(50);
     for _ in 0..50 {
         let t = Instant::now();
         standard_lm_head(&mut logits, hidden, &structured, VOCAB, N_EMBD);
@@ -333,8 +332,17 @@ fn goat_574_clustered_lm_head() {
 
         let t = Instant::now();
         clustered_lm_head(
-            &mut logits, hidden, &structured, &cls, &map, VOCAB, N_EMBD, 32, &mut scores,
-            &mut idx_buf, &mut out_buf,
+            &mut logits,
+            hidden,
+            &structured,
+            &cls,
+            &map,
+            VOCAB,
+            N_EMBD,
+            32,
+            &mut scores,
+            &mut idx_buf,
+            &mut out_buf,
         );
         clu_samples.push(t.elapsed().as_secs_f64() * 1e3);
     }
@@ -355,10 +363,7 @@ fn goat_574_clustered_lm_head() {
     let g2_absolute = km_s >= RECALL_TARGET;
     let g3 = std_ms > clu_ms;
 
-    let verdict = |ok: bool| match ok {
-        true => "PASS",
-        false => "FAIL",
-    };
+    let verdict = |ok: bool| if ok { "PASS" } else { "FAIL" };
     println!(
         "G2a relative (kmeans > round-robin):          {}",
         verdict(g2_relative)
@@ -367,7 +372,10 @@ fn goat_574_clustered_lm_head() {
         "G2b absolute (recall >= {RECALL_TARGET}, best {km_s:.4}):    {}",
         verdict(g2_absolute)
     );
-    println!("G3  perf (clustered < standard):              {}", verdict(g3));
+    println!(
+        "G3  perf (clustered < standard):              {}",
+        verdict(g3)
+    );
     println!(
         "\nPROMOTION: {} — AGENTS.md requires the quality gate to pass modellessly;\n\
          a speedup on a wrong argmax is not a modelless gain.",
