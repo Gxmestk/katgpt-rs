@@ -65,3 +65,22 @@ depend on a private sibling.
 - [ ] Feed the result back into Plan 574 T6 and `.benchmarks/658`.
 - [ ] If active% lands near the random control, record Plan 574 as a permanent
       negative and stop — do not tune the fixture until it agrees.
+
+## 2026-08-17 update — harness AUTHORED (riir-ai Bench 688), run deferred
+
+`riir-ai/crates/riir-engine/tests/bench_662_clustered_lm_head_real_checkpoint.rs`
+(#[ignore]d, 2 tests: `smoke_real_pipeline_and_exactness` +
+`measurement_real_checkpoint`; compile + clippy verified CPU-only). Everything
+per spec above: real tied wte head, D² clustering at the shipping ratio 128,
+`after_final_norm` probes from `forward_gemma2_trace` over 6 real prompts
+(chat-templated + plain), TopK budget curve + packed Admissible exactness
+(asserted) + interleaved latency. Full record:
+`riir-ai/.benchmarks/688_clustered_lm_head_real_checkpoint_harness.md`.
+
+**Why the run waits:** the 32 GB 4090 box hosts the sibling bonsai training
+job (~7.3 GB resident); the bench peaks at ~13 GB host RAM (f32 model + the
++2.4 GB packed permuted copy). RAM-gated, not GPU-gated — run in the same
+exclusive window as riir-ai Issue 714 (when bonsai ends), smoke first
+(cluster_size=4096, minutes), then the measurement (cluster_size=128 — the
+serial PROJ_SEED-pinned k-means over 256000×2304 at k≈2000 is multi-hour CPU;
+`RIIR_662_CLUSTER_SIZE=256` halves it).
