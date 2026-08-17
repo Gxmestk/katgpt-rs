@@ -94,7 +94,7 @@ fn accepted_prefix_len(tree: &[TreeNode], gt: &[usize]) -> usize {
             continue;
         }
         let path = extract_parent_tokens(node.parent_path, node.depth + 1);
-        if path.len() == node.depth + 1 && path == gt[..node.depth + 1] && node.depth + 1 > best {
+        if path.len() == node.depth + 1 && path == gt[..=node.depth] && node.depth + 1 > best {
             best = node.depth + 1;
         }
     }

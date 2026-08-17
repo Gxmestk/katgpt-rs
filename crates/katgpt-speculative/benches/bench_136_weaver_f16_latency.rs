@@ -205,7 +205,7 @@ fn main() {
         cfg.max_depth + 1,
         cfg.k_candidates
     );
-    println!("Iterations: {}", N);
+    println!("Iterations: {N}");
     println!();
 
     if speedup >= 1.5 {
