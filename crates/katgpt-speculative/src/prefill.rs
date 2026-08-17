@@ -618,11 +618,10 @@ mod tests {
             selected_uniform.contains(&5) && selected_uniform.contains(&6);
         // This is expected to usually be false — proving why scoring matters
         // We don't assert it's false (could be coincidentally true), but log the result
-        match needle_survives_uniform {
-            true => eprintln!("  [NIAH] Needle coincidentally survived with uniform scores"),
-            false => {
-                eprintln!("  [NIAH] Needle lost with uniform scores (expected — scoring matters)")
-            }
+        if needle_survives_uniform {
+            eprintln!("  [NIAH] Needle coincidentally survived with uniform scores");
+        } else {
+            eprintln!("  [NIAH] Needle lost with uniform scores (expected — scoring matters)");
         }
     }
 

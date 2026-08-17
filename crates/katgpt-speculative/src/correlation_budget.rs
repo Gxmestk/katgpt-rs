@@ -63,9 +63,10 @@ impl CorrelationBudgetAllocator {
 
     /// Get the current EMA alpha (warmup-aware).
     fn current_alpha(&self) -> f32 {
-        match self.update_count < self.warmup_steps {
-            true => self.ema_alpha_warmup,
-            false => self.ema_alpha,
+        if self.update_count < self.warmup_steps {
+            self.ema_alpha_warmup
+        } else {
+            self.ema_alpha
         }
     }
 
@@ -88,10 +89,7 @@ impl CorrelationBudgetAllocator {
 
         let alpha = self.current_alpha();
         let old = self.depth_agreement_rate[depth];
-        let new_val = match accepted {
-            true => 1.0_f32,
-            false => 0.0_f32,
-        };
+        let new_val = if accepted { 1.0_f32 } else { 0.0_f32 };
         self.depth_agreement_rate[depth] = old * (1.0 - alpha) + new_val * alpha;
         self.update_count += 1;
     }

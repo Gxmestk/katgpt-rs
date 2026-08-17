@@ -259,7 +259,7 @@ impl ChainFolder {
             return 0;
         }
 
-        let total_tokens = self.boundaries.last().map(|b| b.token_pos).unwrap_or(0);
+        let total_tokens = self.boundaries.last().map_or(0, |b| b.token_pos);
         let mut kept = 0_usize;
 
         for (i, decision) in self.decisions.iter().enumerate() {
@@ -268,8 +268,7 @@ impl ChainFolder {
                 let end = self
                     .boundaries
                     .get(i + 1)
-                    .map(|b| b.token_pos)
-                    .unwrap_or(total_tokens);
+                    .map_or(total_tokens, |b| b.token_pos);
                 kept += end.saturating_sub(start);
             }
         }
@@ -375,16 +374,13 @@ fn build_decisions(
 
 /// Estimate token savings from fold decisions.
 fn estimate_tokens_saved(boundaries: &[StepBoundary], decisions: &[FoldDecision]) -> usize {
-    let total_tokens = boundaries.last().map(|b| b.token_pos).unwrap_or(0);
+    let total_tokens = boundaries.last().map_or(0, |b| b.token_pos);
 
     let mut saved = 0_usize;
     for (i, decision) in decisions.iter().enumerate() {
         if *decision == FoldDecision::Fold {
             let start = boundaries[i].token_pos;
-            let end = boundaries
-                .get(i + 1)
-                .map(|b| b.token_pos)
-                .unwrap_or(total_tokens);
+            let end = boundaries.get(i + 1).map_or(total_tokens, |b| b.token_pos);
             saved += end.saturating_sub(start);
         }
     }

@@ -890,7 +890,7 @@ fn test_deep_argmax_acceptance_benchmark() {
     let mv: Vec<&[f32]> = marginals.iter().map(|s| s.as_slice()).collect();
 
     eprintln!("=== Plan 424 T6.2: deep-argmax acceptance benchmark ===");
-    eprintln!("  vocab={}, lookahead={}", vocab, lookahead);
+    eprintln!("  vocab={vocab}, lookahead={lookahead}");
     eprintln!("  marginals: sharp (0.55) at d<4, diluted (0.20) at d>=4");
     eprintln!();
     eprintln!(
@@ -905,10 +905,10 @@ fn test_deep_argmax_acceptance_benchmark() {
             let tree = build_dd_tree_deep_argmax(&mv, &config, threshold);
             let path = best_path(&tree);
             let acc = acceptance_length(&path, &target);
-            let score = tree.first().map(|n| n.score).unwrap_or(f32::NEG_INFINITY);
+            let score = tree.first().map_or(f32::NEG_INFINITY, |n| n.score);
             let label = match threshold {
                 None => "None".to_string(),
-                Some(t) => format!("Some({})", t),
+                Some(t) => format!("Some({t})"),
             };
             eprintln!(
                 "  {:<8} {:<14} {:>5} {:>5} {:>5} {:>10.4}",

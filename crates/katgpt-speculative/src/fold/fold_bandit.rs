@@ -85,9 +85,10 @@ impl FoldBandit {
             None => return,
         };
 
-        let reward = match accepted {
-            true => tokens_saved_ratio.max(0.0),
-            false => 0.0,
+        let reward = if accepted {
+            tokens_saved_ratio.max(0.0)
+        } else {
+            0.0
         };
 
         // Update Beta posterior.

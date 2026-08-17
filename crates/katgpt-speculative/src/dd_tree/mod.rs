@@ -1009,8 +1009,7 @@ pub fn best_of_k_rollouts(
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
             paths.into_iter().nth(best_idx).unwrap_or_default()
         }
         WidthSelectionMode::MostFrequent => {
@@ -1035,15 +1034,13 @@ pub fn best_of_k_rollouts(
                         .iter()
                         .enumerate()
                         .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                        .map(|(i, _)| i)
-                        .unwrap_or(0)
+                        .map_or(0, |(i, _)| i)
                 } else {
                     final_residuals
                         .iter()
                         .enumerate()
                         .min_by(|(_, a), (_, b)| a.total_cmp(b))
-                        .map(|(i, _)| i)
-                        .unwrap_or(0)
+                        .map_or(0, |(i, _)| i)
                 };
             paths.into_iter().nth(best_idx).unwrap_or_default()
         }
@@ -1084,9 +1081,10 @@ fn cumulative_relevance(path: &[usize], screener: &dyn ScreeningPruner) -> f32 {
 pub fn entropy_truncate_horizon(entropy: f32, max_horizon: usize) -> usize {
     const ENTROPY_THRESHOLD: f32 = 2.5;
     const TRUNCATED_HORIZON: usize = 2;
-    match entropy > ENTROPY_THRESHOLD {
-        true => TRUNCATED_HORIZON.min(max_horizon),
-        false => max_horizon,
+    if entropy > ENTROPY_THRESHOLD {
+        TRUNCATED_HORIZON.min(max_horizon)
+    } else {
+        max_horizon
     }
 }
 
@@ -1781,27 +1779,24 @@ pub fn build_dd_tree_and_or<P: ScreeningPruner>(
     let and_or_tree = builder.build(marginals);
 
     // Step 2: Check if decomposition happened.
-    match &and_or_tree {
-        AndOrNode::Leaf { .. } => {
-            // No decomposition needed — use standard screened build.
-            build_dd_tree_screened(marginals, config, pruner, chain_seed)
+    if let AndOrNode::Leaf { .. } = &and_or_tree {
+        // No decomposition needed — use standard screened build.
+        build_dd_tree_screened(marginals, config, pruner, chain_seed)
+    } else {
+        // Decomposition happened — extract best path from AND-OR tree.
+        let _blueprint = BlueprintPass::generate(marginals);
+        let _reviewer = DecompositionReviewer::new(0.3);
+
+        // Collect all solved leaf solutions into a combined path.
+        let combined_path = collect_solved_path(&and_or_tree);
+
+        // If we got a complete solution from cache, convert to TreeNode directly.
+        if !combined_path.is_empty() {
+            return path_to_tree_nodes(&combined_path);
         }
-        _ => {
-            // Decomposition happened — extract best path from AND-OR tree.
-            let _blueprint = BlueprintPass::generate(marginals);
-            let _reviewer = DecompositionReviewer::new(0.3);
 
-            // Collect all solved leaf solutions into a combined path.
-            let combined_path = collect_solved_path(&and_or_tree);
-
-            // If we got a complete solution from cache, convert to TreeNode directly.
-            if !combined_path.is_empty() {
-                return path_to_tree_nodes(&combined_path);
-            }
-
-            // Partial solution — fall back to screened DDTree.
-            build_dd_tree_screened(marginals, config, pruner, chain_seed)
-        }
+        // Partial solution — fall back to screened DDTree.
+        build_dd_tree_screened(marginals, config, pruner, chain_seed)
     }
 }
 

@@ -86,8 +86,7 @@ impl RegexAnswerExtractor {
             // Unmatched braces — take to end of line as fallback.
             let line_end = text[content_start..]
                 .find('\n')
-                .map(|i| content_start + i)
-                .unwrap_or(text.len());
+                .map_or(text.len(), |i| content_start + i);
             Some(text[content_start..line_end].trim().to_string())
         }
     }

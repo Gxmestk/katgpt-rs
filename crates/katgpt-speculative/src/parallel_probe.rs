@@ -211,10 +211,7 @@ impl<A: Clone> ProbingMatrix<A> {
 
     /// Get all answers for a specific branch across all probe steps.
     pub fn row(&self, branch_idx: usize) -> &[Option<A>] {
-        self.answers
-            .get(branch_idx)
-            .map(|r| r.as_slice())
-            .unwrap_or(&[])
+        self.answers.get(branch_idx).map_or(&[], |r| r.as_slice())
     }
 
     /// Get answers for all branches at a specific probe step.

@@ -117,7 +117,7 @@ impl SpsCurve {
         // (override semantics: a later sample overrides an earlier one).
         let mut deduped: Vec<(usize, f32)> = Vec::with_capacity(sorted.len());
         for (b, s) in sorted.into_iter() {
-            if deduped.last().map(|(lb, _)| *lb == b).unwrap_or(false) {
+            if deduped.last().is_some_and(|(lb, _)| *lb == b) {
                 if let Some((_, last_s)) = deduped.last_mut() {
                     *last_s = s;
                 }

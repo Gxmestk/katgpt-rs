@@ -325,9 +325,10 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
         let mut refined_tokens = Vec::with_capacity(raw_branch.len());
         // Copy the accepted prefix (before failure point), optionally pre-folded
         let cutoff = failure.token_idx.min(raw_branch.len());
-        let prefix = match self.config.enable_prefold {
-            true => prefold_prefix(&raw_branch[..cutoff]),
-            false => raw_branch[..cutoff].to_vec(),
+        let prefix = if self.config.enable_prefold {
+            prefold_prefix(&raw_branch[..cutoff])
+        } else {
+            raw_branch[..cutoff].to_vec()
         };
         refined_tokens.extend(prefix);
 

@@ -607,7 +607,7 @@ impl WeaverCorrector {
             }
 
             // Build WeaverInput for this single depth.
-            let h_dflash_slice: &[&[f32]] = &h_dflash[di..di + 1];
+            let h_dflash_slice: &[&[f32]] = &h_dflash[di..=di];
             let topk_ids_slice: &[&[u32]] = &[&topk_ids[..]];
             let topk_logits_slice: &[&[f32]] = &[&topk_logits[..]];
 
@@ -764,7 +764,7 @@ impl WeaverCorrector {
             }
 
             // Build WeaverInput for this single depth and run forward_into.
-            let h_dflash_slice: &[&[f32]] = &h_dflash[di..di + 1];
+            let h_dflash_slice: &[&[f32]] = &h_dflash[di..=di];
             let topk_ids_slice: &[&[u32]] = &[&topk_ids[..]];
             let topk_logits_slice: &[&[f32]] = &[&topk_logits[..]];
             let input = WeaverInput {

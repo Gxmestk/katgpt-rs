@@ -142,9 +142,10 @@ impl SelectivityRouter {
     /// - Low kurtosis → complex → `GpuAutoregressive`
     /// - No data → `CpuSpeculative` (optimistic)
     pub fn recommend_route(&self, position: usize) -> ComputeRoute {
-        match self.should_think(position) {
-            true => ComputeRoute::GpuAutoregressive,
-            false => ComputeRoute::CpuSpeculative,
+        if self.should_think(position) {
+            ComputeRoute::GpuAutoregressive
+        } else {
+            ComputeRoute::CpuSpeculative
         }
     }
 

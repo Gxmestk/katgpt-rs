@@ -136,8 +136,7 @@ impl AdaptiveReconciler {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(1)
+            .map_or(1, |(i, _)| i)
     }
 
     /// Update Q-value for the last chosen arm.
