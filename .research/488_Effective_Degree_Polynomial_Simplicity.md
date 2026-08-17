@@ -3,7 +3,7 @@
 **Paper:** Zhang, Li, Xiao, Chen, Chen (Tsinghua). *Quantifying and Optimizing Simplicity via Polynomial Representations*. [arXiv:2605.29823](https://arxiv.org/abs/2605.29823), ICML 2026.
 **Code:** https://github.com/xinzaixinzai/Effective-Degree
 **Date:** 2026-08-17
-**Status:** DISTILLED — pending owner decision. Gain verdict; open primitive filed as [Issue 668](../.issues/668_effective_degree_open_primitive.md); Super-GOAT pending the freeze-gate PoC ([riir-neuron-db Issue 602](../../riir-neuron-db/.issues/602_effective_degree_freeze_gate_poc.md)).
+**Status:** DISTILLED — open primitive **SHIPPED opt-in** 2026-08-17 ([Issue 668](../.issues/668_effective_degree_open_primitive.md) T1-T6 complete; GOAT record [Bench 665](../.benchmarks/665_effective_degree_goat.md), G1+G2+G3+G4 ALL PASS, feature `effective_degree`, default-OFF). Gain verdict stands; Super-GOAT still pending the freeze-gate PoC ([riir-neuron-db Issue 602](../../riir-neuron-db/.issues/602_effective_degree_freeze_gate_poc.md)), which is the gating consumer for promotion.
 **Classification:** Open (the metric is generic math, no game IP). The freeze-gate consumer story is private (riir-neuron-db).
 
 ---
@@ -93,7 +93,7 @@ Training-cost-weighted assessment: the ED regularizer is a real recipe (label-an
 
 ## 8. Connection map
 
-- **Issue 668** (katgpt-rs): `effective_degree` open primitive — `EdConfig{r,K,ε,n_pairs,seed}` + `randomized_cosine_nodes` + `effective_degree_along_path` over caller-supplied outputs; reuses `karc::ChebyshevBasis`; feature `effective_degree`, opt-in; G1 = PNN degree-ordering preservation (paper Appendix I protocol), G2 = per-path latency, G4 = scratch alloc-free.
+- **Issue 668** (katgpt-rs) — **SHIPPED** (Bench 665): `effective_degree` open primitive — `EdConfig{r,K,ε,n_pairs,seed}` + `randomized_cosine_nodes` + `effective_degree_along_path` over caller-supplied outputs; reuses `karc::ChebyshevBasis`; feature `effective_degree`, opt-in; G1 = PNN degree-ordering preservation (paper Appendix I protocol), G2 = per-path latency, G4 = scratch alloc-free.
 - **riir-neuron-db Issue 602**: defend-wrong PoC — ED vs `output_flatness` vs input-gate control on the Bench-010-style consolidation benchmark; ground truth = held-out wake-event decode error; feature `ed_freeze_poc`, revert after; three arms per §3.6.
 - **riir-ai (post-PoC, if confirmed)**: per-NPC KARC ED diagnostic; crowd-volatility monitor; consolidation-window gate.
 - **R284**: `EdComplexity` as a new `ComplexityProxy` impl for callable/function objects — the sampler gains a principled function-space arm.

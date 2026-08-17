@@ -283,6 +283,21 @@ pub mod extension_count;
 pub use extension_count::{
     ExtensionOccupancy, LossGate, FIRST_ACTIVATION_GAIN, freedom_gain, log_freedom,
 };
+// Effective Degree — function-space simplicity via polynomial representations
+// along data-anchored interpolation paths (Research 488 / arXiv:2605.29823,
+// Issue 668). Modelless measurement only; the paper's differentiable
+// regularizer is training-side (riir-train). Reuses `karc::ChebyshevBasis` +
+// `linalg`'s damped Cholesky, so the feature implies `karc_forecaster`.
+// Opt-in: promotion to default is blocked on a consumer verdict
+// (riir-neuron-db Issue 602 freeze-gate PoC — does ED beat `output_flatness`?).
+#[cfg(feature = "effective_degree")]
+pub mod effective_degree;
+#[cfg(feature = "effective_degree")]
+pub use effective_degree::{
+    EdConfig, EdError, EdResult, EdScratch, MAX_ED_DEGREE, MAX_ED_TERMS, ed_from_coeff_norms,
+    ed_over_pairs, effective_degree_along_path, effective_degree_along_path_multi,
+    randomized_cosine_nodes,
+};
 // SIMD-accelerated linear algebra kernels (NEON / AVX2 / WASM-SIMD128 /
 // scalar fallback). Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::simd` for backwards
