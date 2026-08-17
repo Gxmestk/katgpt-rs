@@ -842,6 +842,358 @@ mod tests {
         );
     }
 
+    // ── Issue 659 T4 (hardware-independent half): acceptance gate ───
+    //
+    // G2 asks for "acceptance rate vs the DFlash baseline at equal draft
+    // depth". The *literal* DFlash arm needs TRAINED low-rank weights
+    // (Prism-ML's DSpark head) and the Bonsai target to verify against, so it
+    // belongs to the riir-ai consumer gate — as does G3 wall-clock. What IS
+    // measurable modellessly, here, today, is the structural question the
+    // DFlash pattern raises: DFlash is a FACTORIZED head — its per-depth
+    // marginals do not condition on the drafted prefix, which is exactly the
+    // deep-position dilution Plan 424 T6.2 records. The bigram head
+    // conditions every depth on its greedy predecessor. So at equal draft
+    // depth, equal tree budget, equal vocabulary, on a held-out split of a
+    // fixed corpus, we measure three arms:
+    //
+    //   arm F (factorized) — position-independent unigram marginals: the
+    //                        modelless FLOOR for a non-conditioning head.
+    //                        Not trained DFlash; a floor, and labelled one.
+    //   arm B (bigram)     — this primitive, via `bigram_build_tree`.
+    //   arm C (chain)      — the greedy argmax chain alone, no tree, to
+    //                        separate "conditioning" from "tree branching".
+    //
+    // Metric: mean acceptance length = tokens of the drafted best chain that
+    // match the held-out continuation before the first mismatch (the count a
+    // lossless verifier would commit per draft cycle).
+
+    /// Fixed corpus (embedded so the numbers are reproducible forever — a
+    /// repo file would drift commit to commit). Byte-level tokens, vocab 256.
+    const ACCEPTANCE_CORPUS: &str = "\
+The assessment of a river valley begins with the water itself. A river carries \
+sediment from the highlands toward the sea, and the sediment settles wherever \
+the current slows. Where the channel widens the water slows and the coarse sand \
+drops first; the finer clay travels farther and settles in the still reaches \
+near the mouth. Over many seasons this sorting builds a delta, a fan of low \
+islands separated by shallow channels that shift from one year to the next. \
+The surveyor who returns to the same bend after a decade finds the bank moved, \
+the gravel bar grown, the side channel closed and a new one opened downstream. \
+Nothing in the valley is fixed except the slope, and even the slope yields to \
+the patient work of the water over a long enough interval of time. \
+A map of such a valley is therefore a claim about a moment, not about the \
+ground. The careful reader of maps asks when the survey was made before asking \
+where the channel ran. Two maps of the same river drawn thirty years apart will \
+disagree about the position of every bar and bend, and both may be correct. \
+The disagreement is the signal: it measures how much sediment the river moved \
+between the surveys, and from that the surveyor estimates the load the river \
+carries in an ordinary year. Where the maps agree, the bank is armoured by rock \
+or by the roots of old trees, and the river has spent its energy elsewhere. \
+Downstream of the delta the water spreads and loses the last of its load. The \
+sea returns some of it to the shore as a beach, and the wind carries the driest \
+of the sand inland to build low dunes behind the beach. Grasses root in the \
+dunes and hold them, and behind that shelter a marsh forms in the still water. \
+The marsh traps more sediment than the beach and rises faster, and in time the \
+marsh becomes meadow and the meadow becomes forest, and the shore has moved \
+seaward by the width of the whole sequence. Every stage of that succession is \
+readable in a core taken through the ground beneath the forest floor, where the \
+sand of the old beach lies under the peat of the old marsh under the soil. \
+The same reasoning applies to the survey of a mountain front, where the rock \
+rather than the water sets the pace of change. A glacier grinds the valley into \
+the shape of a trough, and when the ice retreats the trough remains, too wide \
+and too deep for the small stream that now runs along its floor. The surveyor \
+who measures the stream and the valley together sees at once that the one did \
+not cut the other, and looks for the ice that did. Above the trough the rock \
+walls are polished where the ice pressed against them and shattered where the \
+water froze in the joints, and the difference between the polish and the \
+shatter marks the highest level the ice reached in the last cold season. \
+Below the front of the old glacier a ridge of unsorted rubble marks where the \
+ice stood longest, and beyond the ridge a plain of sorted gravel marks where \
+the meltwater ran. The rubble is the work of the ice, which carries every size \
+of rock without regard to weight, and the sorted gravel is the work of the \
+water, which cannot. That single contrast lets the surveyor read the boundary \
+between ice and water on the ground long after both have gone. Where a later \
+stream has cut through the ridge, the cut exposes the unsorted rubble in \
+section, and the section shows how many times the ice advanced and withdrew, \
+one layer of rubble for each advance, separated by the soils of the warm \
+intervals between them. Counting the layers counts the cold seasons. \
+The valley and the shore therefore record the same history in different hands. \
+The shore writes in sand and peat and reads forward from the sea; the valley \
+writes in rubble and gravel and reads down from the ice. A survey that uses \
+only one of the two records will date the history correctly and explain it \
+wrongly, because each record preserves the events that moved its own material \
+and is silent about the rest. The surveyor who walks from the ice front to the \
+sea in one season, and writes down the slope and the sediment at every bend \
+along the way, holds the whole of it, and can say not merely when the ground \
+changed but which of the several agents of change was at work at each place \
+and in what order the agents took their turns upon the ground.";
+
+    /// Tokens a **tree** verifier commits: the longest root-to-leaf path in
+    /// the tree that matches `target` from depth 0. This — not the
+    /// highest-*scored* chain — is the acceptance a tree-structured
+    /// speculative decoder realises, because the verifier checks every path
+    /// in one batched forward and commits the longest match.
+    ///
+    /// A node's `parent_path` packs its whole ancestor chain including itself,
+    /// one 16-bit token per level, depth 0 in the most significant position
+    /// (`tree_builder`: `node_path = (parent_path << 16) | token_idx`).
+    fn tree_acceptance(tree: &[TreeNode], target: &[u32]) -> usize {
+        let mut best = 0usize;
+        for n in tree {
+            if n.depth + 1 > target.len() || n.depth < best {
+                continue;
+            }
+            let matches = (0..=n.depth).all(|k| {
+                let tok = ((n.parent_path >> (16 * (n.depth - k))) & 0xFFFF) as u32;
+                tok == target[k]
+            });
+            if matches {
+                best = n.depth + 1;
+            }
+        }
+        best
+    }
+
+    /// Greedy argmax chain, no tree (arm C).
+    fn greedy_chain(table: &BigramMarkovTable, last: u32, steps: usize) -> Vec<usize> {
+        let mut prev = last;
+        let mut out = Vec::with_capacity(steps);
+        for _ in 0..steps {
+            match table.successors(prev) {
+                Some((s, _)) => {
+                    out.push(s[0] as usize);
+                    prev = s[0];
+                }
+                None => break,
+            }
+        }
+        out
+    }
+
+    /// Tokens matching the target before the first mismatch.
+    fn acceptance_len(path: &[usize], target: &[u32]) -> usize {
+        path.iter()
+            .zip(target.iter())
+            .take_while(|(a, b)| **a == **b as usize)
+            .count()
+    }
+
+    /// Word-level tokenisation (whitespace split, first-appearance ids). The
+    /// tokenizer is built over the whole corpus — standard practice; only the
+    /// bigram *table* is fitted on the train split, so held-out words the
+    /// train split never saw become zero rows, as they would in production.
+    fn word_tokens(corpus: &str) -> (Vec<u32>, usize) {
+        let mut ids = std::collections::HashMap::new();
+        let mut out = Vec::new();
+        for w in corpus.split_whitespace() {
+            let n = ids.len() as u32;
+            let id = *ids.entry(w).or_insert(n);
+            out.push(id);
+        }
+        let vocab = ids.len();
+        (out, vocab)
+    }
+
+    /// One (budget × top_m) sweep.
+    /// Returns `(budget, top_m, bigram, chain, floor, zero_row_pct)`.
+    fn acceptance_sweep(
+        tokens: &[u32],
+        vocab: usize,
+        label: &str,
+    ) -> Vec<(usize, usize, f64, f64, f64, f64)> {
+        let split = tokens.len() * 4 / 5;
+        let (train, test) = tokens.split_at(split);
+
+        let mut config = katgpt_types::Config::draft();
+        config.vocab_size = vocab;
+        config.draft_lookahead = 8;
+        let look = config.draft_lookahead;
+
+        // Arm F: unigram marginals from the SAME train split, repeated at
+        // every depth (a non-conditioning head proposes the same chain
+        // everywhere — that is the property being measured, not a bug).
+        let mut uni = vec![0.0f32; vocab];
+        for &t in train {
+            uni[t as usize] += 1.0;
+        }
+        let total: f32 = uni.iter().sum();
+        for p in uni.iter_mut() {
+            *p /= total;
+        }
+        let uni_rows: Vec<&[f32]> = (0..look).map(|_| uni.as_slice()).collect();
+
+        println!(
+            "--- {label}: {} tokens (train {} / held-out {}), vocab {vocab}, lookahead {look} ---",
+            tokens.len(),
+            train.len(),
+            test.len(),
+        );
+        println!(
+            "  {:>6} {:>7} {:>12} {:>12} {:>12} {:>8} {:>8}",
+            "budget", "top_m", "B (bigram)", "C (chain)", "F (floor)", "B/F", "0-row%"
+        );
+        println!("  {}", "-".repeat(73));
+
+        let mut results = Vec::new();
+        for &budget in &[16usize, 64, 256] {
+            config.tree_budget = budget;
+            let fac_tree = crate::dd_tree::build_dd_tree(&uni_rows, &config);
+            for &top_m in &[1usize, 4, 16] {
+                let mut b = BigramMarkovBuilder::new();
+                b.add_sequence(train);
+                let table = b.build(vocab, top_m);
+                let mut buf = BigramMarginalBuffer::new(look, vocab);
+
+                let (mut sb, mut sc, mut sf, mut n, mut zero) = (0usize, 0usize, 0usize, 0, 0usize);
+                for i in 0..test.len().saturating_sub(look + 1) {
+                    let prev = test[i];
+                    let target = &test[i + 1..i + 1 + look];
+                    let tree = bigram_build_tree(&table, prev, &config, &mut buf);
+                    sb += tree_acceptance(&tree, target);
+                    sc += acceptance_len(&greedy_chain(&table, prev, look), target);
+                    sf += tree_acceptance(&fac_tree, target);
+                    // Held-out prev the train split never saw → zero row →
+                    // the head proposes nothing. High rate = data starvation,
+                    // which confounds any quality claim.
+                    if table.successors(prev).is_none() {
+                        zero += 1;
+                    }
+                    n += 1;
+                }
+                assert!(n >= 150, "held-out split too small, got {n}");
+                let (mb, mc, mf) = (
+                    sb as f64 / n as f64,
+                    sc as f64 / n as f64,
+                    sf as f64 / n as f64,
+                );
+                let zr = 100.0 * zero as f64 / n as f64;
+                let ratio = if mf > 0.0 {
+                    format!("{:.2}x", mb / mf)
+                } else {
+                    "inf".to_string()
+                };
+                println!(
+                    "  {budget:>6} {top_m:>7} {mb:>12.4} {mc:>12.4} {mf:>12.4} {ratio:>8} {zr:>7.1}"
+                );
+                results.push((budget, top_m, mb, mc, mf, zr));
+            }
+            println!();
+        }
+        results
+    }
+
+    #[test]
+    fn g2_acceptance_bigram_vs_factorized_floor_heldout() {
+        println!(
+            "=== Issue 659 T4 (G2, hardware-independent): mean acceptance length ===\n\
+             metric: mean tokens a lossless TREE verifier commits per draft cycle\n\
+             F = factorized floor (position-independent unigram marginals),\n\
+             NOT trained DFlash — that arm needs riir-ai's Bonsai target.\n"
+        );
+
+        let bytes: Vec<u32> = ACCEPTANCE_CORPUS.bytes().map(u32::from).collect();
+        let dense = acceptance_sweep(&bytes, 256, "byte-level (DENSE vocab, 256)");
+
+        let (words, wvocab) = word_tokens(ACCEPTANCE_CORPUS);
+        let sparse = acceptance_sweep(&words, wvocab, "word-level (SPARSE vocab)");
+
+        // ── Structural invariants — must hold in BOTH regimes ──
+        for (label, results) in [("byte", &dense), ("word", &sparse)] {
+            for &(budget, top_m, mb, mc, _, _) in results {
+                let at = format!("{label} budget={budget} top_m={top_m}");
+                // The tree contains the greedy chain, so it cannot accept less.
+                assert!(
+                    mb >= mc - 1e-9,
+                    "{at}: tree ({mb:.4}) lost to the bare chain ({mc:.4})"
+                );
+                // At top_m=1 the table has no siblings: the tree IS the chain.
+                if top_m == 1 {
+                    assert!(
+                        (mb - mc).abs() < 1e-9,
+                        "{at}: tree ({mb:.4}) must equal the chain ({mc:.4})"
+                    );
+                }
+            }
+            // More successors cannot reduce what a wide budget can match.
+            let wide = results.iter().find(|r| r.0 == 256 && r.1 == 16).unwrap();
+            let narrow = results.iter().find(|r| r.0 == 256 && r.1 == 1).unwrap();
+            assert!(
+                wide.2 >= narrow.2 - 1e-9,
+                "{label}: at budget=256, top_m=16 ({:.4}) must not lose to top_m=1 ({:.4})",
+                wide.2,
+                narrow.2
+            );
+        }
+
+        // ── G2, byte-level: the one regime this corpus can actually fit ──
+        //
+        // 3.4 k training tokens over a 256-symbol vocabulary is a well-fitted
+        // bigram model (the 0-row column confirms it: ~0% of held-out prevs
+        // are unseen). Here the head has a real, measured edge over the
+        // coverage floor at its intended operating point.
+        for &(budget, top_m, mb, mc, mf, zr) in dense.iter() {
+            let at = format!("byte budget={budget} top_m={top_m}");
+            assert!(zr < 5.0, "{at}: {zr:.1}% zero rows — corpus no longer fits");
+            assert!(mb > 0.4, "{at}: no held-out signal ({mb:.4})");
+            assert!(mc > 0.4, "{at}: chain shows no held-out signal ({mc:.4})");
+            if top_m == 16 {
+                assert!(
+                    mb > mf,
+                    "{at}: bigram ({mb:.4}) must beat the factorized floor ({mf:.4}) \
+                     at the intended operating point"
+                );
+            }
+        }
+        // MEASURED SCOPE LIMIT (pinned so it cannot rot): the floor is a
+        // *coverage* strategy — spend the budget enumerating the globally most
+        // frequent tokens at every depth. Its strength scales with budget,
+        // while a top_m=1 head proposes exactly one chain no matter the
+        // budget. So at top_m=1 the floor WINS, and the head's margin shrinks
+        // as budget grows (1.39x at budget 16 → 1.09x at budget 256).
+        // Consequence for the consumer: this head must be run with a wide
+        // top_m, and it is most valuable under TIGHT budget — which is the
+        // Metal batch-1 regime it is proposed for.
+        let d1 = dense.iter().find(|r| r.0 == 256 && r.1 == 1).unwrap();
+        assert!(
+            d1.2 < d1.4,
+            "byte budget=256 top_m=1: floor no longer wins ({:.4} vs {:.4}) — \
+             re-derive the scope note",
+            d1.2,
+            d1.4
+        );
+        let (tight, loose) = (
+            dense.iter().find(|r| r.0 == 16 && r.1 == 16).unwrap(),
+            dense.iter().find(|r| r.0 == 256 && r.1 == 16).unwrap(),
+        );
+        assert!(
+            tight.2 / tight.4 > loose.2 / loose.4,
+            "the head's edge over the floor must shrink as budget grows \
+             (tight {:.2}x vs loose {:.2}x)",
+            tight.2 / tight.4,
+            loose.2 / loose.4
+        );
+
+        // ── Word-level: DATA-STARVED, NOT a quality verdict ──
+        //
+        // 636 training words over a 356-word vocabulary cannot fit a bigram
+        // model: most held-out prevs were never seen, so the head emits a zero
+        // row and proposes nothing (that is the honest designed behaviour, not
+        // a bug — see the module docs). The floor needs no conditioning and so
+        // is unaffected. This arm therefore measures CORPUS SIZE, not the
+        // sparse-vocabulary question it was meant to probe, and NO quality
+        // conclusion is drawn from it. Answering the sparse-vocab question
+        // needs a Bonsai-scale corpus + the Bonsai target — the riir-ai
+        // consumer gate (Issue 659 T4). The assertion below pins the confound
+        // itself, so this note cannot be mistaken for a measured verdict.
+        let w = sparse.iter().find(|r| r.1 == 16).unwrap();
+        assert!(
+            w.5 > 25.0,
+            "word-level arm was expected to be data-starved (zero-row rate \
+             {:.1}%); if the corpus now fits, this arm has become a real \
+             measurement and the note above must be rewritten",
+            w.5
+        );
+    }
+
     // Small accessors used by g1_row_offsets_sparse_prevs.
     impl BigramMarkovTable {
         fn row_offsets_len(&self) -> usize {

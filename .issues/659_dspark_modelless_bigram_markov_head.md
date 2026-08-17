@@ -94,7 +94,10 @@ wants this.
 - [x] Bigram table builder from corpus counts (deterministic). — `BigramMarkovBuilder` (packed-u64 sort + two-pointer-pass; `(count desc, next asc)` top-m; bit-identical rebuilds, brute-force-reference-pinned).
 - [x] Top-`m` successor storage + marginal emission. — `BigramMarkovTable` (CSR) + `bigram_predict`/`BigramMarginalBuffer`: zero-alloc steady state, O(steps × top_m) touched-reset sparse writes, greedy-chain conditioning, zero-row fallback for unseen prevs (the seam skips `prob ≤ 0` — unseen proposes nothing).
 - [x] Wire into `build_dd_tree`. — `bigram_build_tree` (emits `config.draft_lookahead` marginals → `build_dd_tree` seam).
-- [-] Bench on Bonsai; Metal and 4090. — **Primitive gate landed (Bench 663, 2026-08-17)**: 181 ns/call (23 ns/step) at Bonsai scale on M3 release — ~5,600× under a 6-layer drafter forward per step (the mode-2 avoidance measured); 17 MB worst-case table vs 268 MB low-rank. **Deferred**: the consumer gate (acceptance rate at equal draft depth + wall-clock on Metal AND 4090 against the Bonsai target) — belongs to the riir-ai Bonsai consumer (Plan 528), and the 4090 is occupied by a sibling's p336 run. The `bigram_markov` feature stays opt-in until this gate passes.
+- [x] **T4a — acceptance rate at equal draft depth (G2).** — **MEASURED, PASS (scoped)**: [Bench 664](../.benchmarks/664_bigram_markov_acceptance_gate.md). Acceptance needs no GPU and no target model (it is a count of matching tokens); it was deferred only because T4 bundled it with wall-clock. At `top_m=16` the head beats a factorized floor (position-independent unigram marginals — **not** trained DFlash, which needs Prism-ML weights) at every budget: **1.39× / 1.21× / 1.09×** at budget 16 / 64 / 256. Two findings: (1) tree branching, not conditioning, carries the gain (bare chain 0.7024 flat vs tree 2.0235) — the consumer must use the `build_dd_tree` seam, not the chain; (2) **scope limit** — the floor is a *coverage* strategy that scales with budget, so the head's edge shrinks as budget grows and at `top_m=1` the floor **wins**. Run wide-`top_m`, tight-budget; that is the Metal batch-1 regime. Both directions assertion-pinned.
+- [-] **T4b — wall-clock on Metal AND 4090 vs the Bonsai target (G3).** — **still deferred, needs riir-ai.** katgpt-rs's Metal forward (`GpuBackend`, Bench 661/662) runs `Config::micro()`, not a 27B GGUF; the Bonsai runner is riir-ai's. Handed off as **riir-ai Issue 717** (the handoff was previously nominal — riir-ai Plan 528 contained no bigram task, so nothing was actually queued there). Also open: acceptance vs *trained* DFlash, and the sparse-vocabulary question — the word-level arm in Bench 664 is **data-starved (36% unseen prevs), not a verdict**; it needs a Bonsai-scale corpus. The 4090 is now free (9% util), so the blocker is the runner, not the hardware.
+
+**Promotion: NO.** `bigram_markov` stays opt-in. G3 is Issue 659's headline motivation (the Bench 656 mode-2 claim); promoting on G2 alone would promote an unproven wall-clock win.
 
 > Note: Plan 339's scheduler GOAT is *vacuous* today ("katgpt-rs default is
 > single-request, so the gate is vacuous without a multi-request batch
@@ -112,3 +115,19 @@ wants this.
   moot — 708 resolved (`42b564759`). The batched width-N Metal forward
   (Bench 662) landed the verification side, so the remaining gap is exactly
   the consumer gate above. Record: [Bench 663](../.benchmarks/663_bigram_markov_head_primitive.md).
+- **2026-08-17 (T4a — acceptance gate)**: split T4 into T4a (acceptance,
+  hardware-independent) and T4b (wall-clock, needs the Bonsai runner) and
+  closed T4a. Record: [Bench 664](../.benchmarks/664_bigram_markov_acceptance_gate.md).
+  Two corrections came out of it worth carrying forward:
+  1. **Metric**: the first harness scored the highest-*scored* chain and
+     produced a false "the tree loses to the bare chain as top_m grows"
+     result. A tree verifier commits the **longest matching root-to-leaf
+     path** — every path is checked in one batched forward. The corrected
+     metric reverses the finding (0.76 → 2.02).
+  2. **The floor is strong for a structural reason**, not a weak strawman:
+     position-independent unigram marginals are a *coverage* strategy whose
+     acceptance scales with tree budget. Any drafter proposing few chains
+     loses to coverage at a wide budget. This is the real bar for a
+     table-lookup drafter and should be carried into the riir-ai gate.
+  Also filed the handoff that was previously only nominal: **riir-ai Issue
+  717** (Plan 528 had no bigram task, so T4b was assigned to no one).
