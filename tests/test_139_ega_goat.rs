@@ -38,10 +38,9 @@ fn proof_ega_parameter_overhead() {
     let overhead = total_ega as f64 / total_model as f64 * 100.0;
     assert!(
         overhead < 1.0,
-        "EGA overhead should be < 1%, got {:.4}%",
-        overhead
+        "EGA overhead should be < 1%, got {overhead:.4}%"
     );
-    println!("G2 PASS: EGA overhead = {:.4}% (< 1%)", overhead);
+    println!("G2 PASS: EGA overhead = {overhead:.4}% (< 1%)");
 }
 
 /// G3: Attention quality — cosine similarity of attention output with/without EGA is reasonable (> 0.5)
@@ -74,18 +73,13 @@ fn proof_ega_attention_quality() {
 
     assert!(
         cosine > 0.5,
-        "Cosine similarity should be > 0.5, got {:.4}",
-        cosine
+        "Cosine similarity should be > 0.5, got {cosine:.4}"
     );
     assert!(
         cosine <= 1.0,
-        "Cosine similarity should be ≤ 1.0, got {:.4}",
-        cosine
+        "Cosine similarity should be ≤ 1.0, got {cosine:.4}"
     );
-    println!(
-        "G3 PASS: Cosine similarity with/without EGA = {:.4} (> 0.5)",
-        cosine
-    );
+    println!("G3 PASS: Cosine similarity with/without EGA = {cosine:.4} (> 0.5)");
 }
 
 /// G4: KV eviction feasibility — energy scores produce meaningful threshold separation
@@ -128,22 +122,13 @@ fn proof_ega_eviction_feasibility() {
     // High energy positions should have higher energy
     assert!(
         avg_high > avg_low,
-        "High-energy positions ({:.4}) should exceed low-energy ({:.4})",
-        avg_high,
-        avg_low
+        "High-energy positions ({avg_high:.4}) should exceed low-energy ({avg_low:.4})"
     );
 
     // Ratio should be meaningful (> 2× separation)
     let ratio = avg_high / (avg_low.abs() + 1e-10);
-    assert!(
-        ratio > 2.0,
-        "Energy ratio should be > 2×, got {:.2}×",
-        ratio
-    );
-    println!(
-        "G4 PASS: Energy separation = {:.2}× (high={:.4}, low={:.4})",
-        ratio, avg_high, avg_low
-    );
+    assert!(ratio > 2.0, "Energy ratio should be > 2×, got {ratio:.2}×");
+    println!("G4 PASS: Energy separation = {ratio:.2}× (high={avg_high:.4}, low={avg_low:.4})");
 }
 
 /// G5: Compute overhead — EGA energy + gate adds minimal overhead

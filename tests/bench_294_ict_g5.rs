@@ -93,8 +93,7 @@ fn g5_zero_alloc_hot_path() {
 
     println!("\n=== G5 — Zero-alloc hot path ===");
     println!(
-        "K={}, action_dim={}, warmup={}, measured={}",
-        K_TRAJECTORIES, ACTION_DIM, WARMUP_ITERS, MEASURE_ITERS
+        "K={K_TRAJECTORIES}, action_dim={ACTION_DIM}, warmup={WARMUP_ITERS}, measured={MEASURE_ITERS}"
     );
     println!("Allocations during measured window: count = {count}, bytes = {bytes}");
     println!("Tolerance: {TOLERANCE} allocs/call.");
