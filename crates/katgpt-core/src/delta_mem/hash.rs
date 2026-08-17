@@ -121,6 +121,15 @@ impl FeatureHasher {
     #[inline]
     fn project_into(&self, features: &[f32], out: &mut [f32]) {
         assert_eq!(out.len(), self.rank, "output dimension must match rank");
+        // Issue 669: a caller passing features.len() != feature_dim made
+        // simd_dot_f32 read past the features slice (silent UB in release,
+        // debug-precondition abort). The row length comes from the projection
+        // layout, so only this guard catches the mismatch.
+        assert_eq!(
+            features.len(),
+            self.feature_dim,
+            "features dimension must match feature_dim"
+        );
         let fd = self.feature_dim;
         if fd == 0 {
             out.fill(0.0);
