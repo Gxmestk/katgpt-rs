@@ -58,15 +58,12 @@ fn b1_cache_hit_rate_synthetic_100_steps() {
         let logits = cyclic_logits(step, pattern_size);
         let hash = blake3_logit_hash(&logits);
 
-        match cache.lookup(&hash) {
-            Some(_partition) => {
-                // Cache hit — no recompute needed.
-            }
-            None => {
-                // Cache miss — recompute partition and insert.
-                let partition = make_partition(n_regions, step);
-                cache.insert(hash, Arc::new(partition));
-            }
+        if let Some(_partition) = cache.lookup(&hash) {
+            // Cache hit — no recompute needed.
+        } else {
+            // Cache miss — recompute partition and insert.
+            let partition = make_partition(n_regions, step);
+            cache.insert(hash, Arc::new(partition));
         }
     }
 

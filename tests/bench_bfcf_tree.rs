@@ -203,10 +203,7 @@ fn bench_region_pruning_vs_token_pruning() {
 
     let speedup = token_per_iter / region_per_iter;
     let pct_gain = (speedup - 1.0) * 100.0;
-    println!(
-        "  Speedup: {:.1}× ({:.0}% throughput gain)",
-        speedup, pct_gain
-    );
+    println!("  Speedup: {speedup:.1}× ({pct_gain:.0}% throughput gain)");
     println!(
         "  Evaluations: token={} vs region={}",
         VOCAB_SIZE,
@@ -257,8 +254,7 @@ fn bench_pwc_bandit_convergence_vs_flat() {
     // Verify PWC closure maintained (Theorem 2)
     assert!(
         pwc_bandit.verify_pwc_closure(),
-        "PWC closure must hold after {} updates",
-        BANDIT_ROUNDS,
+        "PWC closure must hold after {BANDIT_ROUNDS} updates",
     );
 
     // --- Flat (global) bandit ---
@@ -287,10 +283,7 @@ fn bench_pwc_bandit_convergence_vs_flat() {
     );
 
     let accuracy_gain = (pwc_accuracy - flat_accuracy) * 100.0;
-    println!(
-        "  PWC advantage: +{:.1}% accuracy over flat bandit",
-        accuracy_gain
-    );
+    println!("  PWC advantage: +{accuracy_gain:.1}% accuracy over flat bandit");
 
     // PWC should converge faster due to per-region specialization
     assert!(
@@ -384,8 +377,7 @@ fn bench_bfcf_throughput_gain() {
         without_evals / speculative_steps,
     );
     println!(
-        "  Throughput change: {:.1}% (wall-clock, includes partition build overhead)",
-        throughput_gain,
+        "  Throughput change: {throughput_gain:.1}% (wall-clock, includes partition build overhead)",
     );
 
     // The key metric is evaluation reduction (tokens we don't need to screen)
@@ -408,15 +400,11 @@ fn bench_bfcf_throughput_gain() {
     let router = SigmoidPerceptRouter::default_router();
     let complexity = router.complexity(partition);
     let path = router.route(partition);
-    println!(
-        "  Percept route: complexity={:.3}, path={:?}",
-        complexity, path,
-    );
+    println!("  Percept route: complexity={complexity:.3}, path={path:?}",);
 
     // The evaluation reduction should be meaningful
     assert!(
         eval_reduction > 10.0,
-        "expected ≥10% evaluation reduction from region pruning, got {:.1}%",
-        eval_reduction,
+        "expected ≥10% evaluation reduction from region pruning, got {eval_reduction:.1}%",
     );
 }
