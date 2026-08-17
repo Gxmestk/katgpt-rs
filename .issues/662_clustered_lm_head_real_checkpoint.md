@@ -68,6 +68,15 @@ depend on a private sibling.
 
 ## 2026-08-17 update — harness AUTHORED (riir-ai Bench 688), run deferred
 
+> **CLAIMED — M3 run IN FLIGHT (2026-08-17 ~08:55 +07).** The harness landed
+> on origin/develop (`b3952f0e5` + clippy-1.95 fix `25fbfd229`) — the M3 box
+> (64 GB RAM — no RAM gate) is running the measurement NOW: smoke
+> (cluster_size=4096) first, then `measurement_real_checkpoint`
+> (cluster_size=128, multi-hour serial CPU). **Do not start a second run** —
+> on bonsai-end, check this file + riir-ai `.benchmarks/688` for results
+> before touching the 4090 box. Results + verdict land in this issue +
+> Bench 688 + Plan 574 T11.
+
 `riir-ai/crates/riir-engine/tests/bench_662_clustered_lm_head_real_checkpoint.rs`
 (#[ignore]d, 2 tests: `smoke_real_pipeline_and_exactness` +
 `measurement_real_checkpoint`; compile + clippy verified CPU-only). Everything
