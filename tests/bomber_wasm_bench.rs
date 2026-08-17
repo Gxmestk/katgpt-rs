@@ -157,7 +157,7 @@ fn bench_is_safe_action_empty_grid() {
     });
 
     let overhead = wasm_ns / native_ns;
-    println!("  → WASM overhead: {:.1}×", overhead);
+    println!("  → WASM overhead: {overhead:.1}×");
     assert!(
         wasm_ns < 10_000.0,
         "WASM is_safe_action should be < 10µs, got {:.2}µs",
@@ -178,7 +178,7 @@ fn bench_is_safe_action_empty_grid() {
 
     for (action, idx, name) in &actions {
         let native_ns = bench_ns(
-            &format!("Native is_safe_action ({})", name),
+            &format!("Native is_safe_action ({name})"),
             WARMUP / 10,
             ITERS / 10,
             || {
@@ -186,7 +186,7 @@ fn bench_is_safe_action_empty_grid() {
             },
         );
         let wasm_ns = bench_ns(
-            &format!("WASM  is_safe_action ({})", name),
+            &format!("WASM  is_safe_action ({name})"),
             WARMUP / 10,
             ITERS / 10,
             || {
@@ -228,7 +228,7 @@ fn bench_is_safe_action_with_bombs() {
     });
 
     let overhead = wasm_ns / native_ns;
-    println!("  → WASM overhead with bombs: {:.1}×", overhead);
+    println!("  → WASM overhead with bombs: {overhead:.1}×");
 }
 
 #[test]
@@ -334,13 +334,10 @@ fn bench_full_game_simulation() {
     let overhead = wasm_elapsed.as_secs_f64() / native_elapsed.as_secs_f64();
     let checks_per_game = native_total_checks / GAME_ROUNDS as u64;
 
-    println!(
-        "  Checks per game: {} ({} ticks × 4 players × 6 actions)",
-        checks_per_game, GAME_TICKS
-    );
+    println!("  Checks per game: {checks_per_game} ({GAME_TICKS} ticks × 4 players × 6 actions)");
     println!("  Native per game:  {:.2} ms", native_per_game / 1000.0);
     println!("  WASM   per game:  {:.2} ms", wasm_per_game / 1000.0);
-    println!("  WASM overhead:    {:.1}×", overhead);
+    println!("  WASM overhead:    {overhead:.1}×");
     println!(
         "  Native per check: {:.0} ns",
         native_elapsed.as_nanos() as f64 / native_total_checks as f64
@@ -410,7 +407,7 @@ fn bench_batch_vs_individual() {
     });
 
     let speedup = individual_ns / batch_ns;
-    println!("  → Batch speedup:      {:.1}× faster", speedup);
+    println!("  → Batch speedup:      {speedup:.1}× faster");
     println!(
         "  → Per-tick: individual={:.2}µs  batch={:.2}µs",
         individual_ns / 1000.0,
@@ -445,11 +442,8 @@ fn bench_zero_copy_vs_vec() {
     );
 
     let speedup = vec_ns / zerocopy_ns;
-    println!("  → Zero-copy speedup:  {:.1}× faster", speedup);
-    println!(
-        "  → Vec: {:.0} ns/call   Zero-copy: {:.0} ns/call",
-        vec_ns, zerocopy_ns,
-    );
+    println!("  → Zero-copy speedup:  {speedup:.1}× faster");
+    println!("  → Vec: {vec_ns:.0} ns/call   Zero-copy: {zerocopy_ns:.0} ns/call",);
 }
 
 #[test]
@@ -525,16 +519,13 @@ fn bench_full_game_batch() {
     let speedup = individual_elapsed.as_secs_f64() / batch_elapsed.as_secs_f64();
     let checks_per_game = batch_total_checks / GAME_ROUNDS as u64;
 
-    println!(
-        "  Checks per game: {} ({} ticks × 4 players × 6 actions)",
-        checks_per_game, GAME_TICKS,
-    );
+    println!("  Checks per game: {checks_per_game} ({GAME_TICKS} ticks × 4 players × 6 actions)",);
     println!(
         "  Individual per game: {:.2} ms",
         individual_per_game / 1000.0
     );
     println!("  Batch     per game: {:.2} ms", batch_per_game / 1000.0);
-    println!("  Batch speedup:      {:.1}×", speedup);
+    println!("  Batch speedup:      {speedup:.1}×");
     println!(
         "  Individual per check: {:.0} ns",
         individual_elapsed.as_nanos() as f64 / individual_total_checks as f64,
@@ -581,7 +572,7 @@ fn bench_batch_relevance() {
     });
 
     let speedup = individual_ns / batch_ns;
-    println!("  → Batch relevance speedup: {:.1}× faster", speedup);
+    println!("  → Batch relevance speedup: {speedup:.1}× faster");
     println!(
         "  → Individual: {:.2}µs   Batch: {:.2}µs",
         individual_ns / 1000.0,

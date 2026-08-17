@@ -182,11 +182,10 @@ fn is_in_single_blast_native(
             let step = dx.signum();
             let mut cx = bx + step;
             while cx != x {
-                match grid.get(cx, by) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
-                        return false;
-                    }
-                    _ => {}
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) =
+                    grid.get(cx, by)
+                {
+                    return false;
                 }
                 cx += step;
             }
@@ -201,11 +200,10 @@ fn is_in_single_blast_native(
             let step = dy.signum();
             let mut cy = by + step;
             while cy != y {
-                match grid.get(bx, cy) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
-                        return false;
-                    }
-                    _ => {}
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) =
+                    grid.get(bx, cy)
+                {
+                    return false;
                 }
                 cy += step;
             }
@@ -736,8 +734,7 @@ fn test_debug_bomb_mismatch_seed_1000_pos_7_9() {
                 ""
             };
             println!(
-                "    ({cx},{cy}) {} nw={native_walk} nb={native_in_blast} ww={wasm_wait}{mismatch}",
-                cell_ch,
+                "    ({cx},{cy}) {cell_ch} nw={native_walk} nb={native_in_blast} ww={wasm_wait}{mismatch}",
             );
         }
     }
