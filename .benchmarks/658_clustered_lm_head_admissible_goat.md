@@ -262,15 +262,22 @@ cluster on the hot path.
 
 ## Promotion
 
-**NOT promoted to default-on.** G2b passes and G1 holds, but:
+**NOT promoted to default-on — RESOLVED PERMANENT NEGATIVE by the real-checkpoint
+measurement (Issue 662 / riir-ai Bench 688, 2026-08-17).** G2b passes and G1
+holds, but:
 
-- **G3 fails on the control regime** (0.08×). A primitive whose cost depends on
-  input geometry cannot be defaulted on without knowing which regime production
-  is in.
-- **Both regimes are synthetic.** Planted-Gaussian and uniform-random are the
-  two extremes; a real LM head sits somewhere between, and *where* is precisely
-  the number that decides this. Unmeasured — Issue 662.
+- **The real checkpoint landed at the random-control extreme**: Gemma 2 2B
+  tied wte at the shipping ratio (k≈2000), 123 real `after_final_norm` probes
+  → **Admissible active 99.95%** (vs planted-Gaussian 7.30%, uniform-random
+  99.99%), packed head **0.44×** (2.3× slower) under the interleaved protocol.
+  Exactness holds (recall 1.0000 asserted) — the bound is sound but
+  all-inclusive on real geometry. The pre-committed decision rule in Issue 662
+  task 5 fires: permanent negative, do not tune the fixture. See
+  `riir-ai/.benchmarks/688_clustered_lm_head_real_checkpoint_harness.md`.
+- **G3 fails on the control regime** (0.08×) — and the real head IS the
+  control regime.
 - The measured operating point is a **serial** stage 2. Re-gate after Issue 661.
+  (Moot — no promotion.)
 
 What did land, unconditionally: **D² seeding replaces strided seeding as the
 default** in `cluster_map_from_embeddings`. That is a strict improvement with no

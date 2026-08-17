@@ -179,17 +179,23 @@ speedup on a wrong argmax is not a modelless gain.
       the exact byte cost; `TiedPolicy::Accept` is the deliberate override. The
       check is storage identity, not content equality.
 
-- [ ] **T11** **STILL NOT PROMOTED — one blocker left, and it is not quality.**
-      G1 holds, G2b passes at recall 1.0000, G3 passes at 8.3–9.2×.
-      1. **Issue 662** — both fixtures are synthetic extremes with opposite
-         verdicts. A real checkpoint decides it. The bar is now much weaker
-         (~50% active, was ~15%), so this is likelier to pass than before — but
-         it is still unmeasured, and "likelier" is not a measurement. Owned by
-         riir-ai: katgpt-rs has no GGUF reader and must not path-depend on a
-         private sibling.
-      2. **Memory policy.** 100% of `lm_head` is not a cost to default on. Even
-         if Issue 662 passes, promotion should enable the primitive *behind the
-         `TiedPolicy` refusal*, not around it.
+- [x] **T11** **NOT PROMOTED — permanent negative (Issue 662 measured
+      2026-08-17, Bench 688 in riir-ai).** G1 holds, G2b passes at recall
+      1.0000, G3 passes at 8.3–9.2× — but the real-checkpoint gate FIRED the
+      pre-committed negative rule: on Gemma 2 2B's tied wte at the shipping
+      ratio (k≈2000), real `after_final_norm` probes drive **Admissible active
+      to 99.95% — the random-control regime** (99.99%), with the packed head
+      2.3× SLOWER than standard (0.44× median, interleaved). Exactness holds
+      (recall 1.0000 asserted — the bound is sound, just all-inclusive on real
+      geometry: real h is anisotropic with norms that make cluster radii
+      loose, exactly as Issue 662 predicted). The D² clusters DO carry real
+      structure (TopK: 68% argmax recall at 1.58% active — 43× over random),
+      but TopK is inexact and the value proposition required the EXACT
+      admissible bound. Per the issue's own rule the fixture is NOT tuned
+      further; `clustered_lm_head` stays unpromoted. Reopen triggers: a
+      fundamentally different bound (not radius-of-cluster), or a head whose
+      geometry is planted-cluster-like by construction. The memory-policy
+      point (2) is moot — no promotion to gate.
 
 ## Non-goals
 
