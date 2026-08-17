@@ -52,8 +52,7 @@ fn p1_catalyst_detection_structural_scores_high_natural_scores_low() {
         assert_ne!(
             score.pattern,
             CatalystPattern::None,
-            "P1 FAIL: structural sample should detect a pattern, got None for: {:.60}...",
-            sample
+            "P1 FAIL: structural sample should detect a pattern, got None for: {sample:.60}..."
         );
     }
 
@@ -106,7 +105,7 @@ fn p2_catalyst_scored_topk_better_than_random_topk() {
     .collect();
 
     let natural: Vec<String> = (0..40)
-        .map(|i| format!("This is natural language sentence number {} with prose.", i))
+        .map(|i| format!("This is natural language sentence number {i} with prose."))
         .collect();
 
     let all_samples: Vec<String> = structural
@@ -128,9 +127,7 @@ fn p2_catalyst_scored_topk_better_than_random_topk() {
     // At least 50% of top-K should be structural (indices 0..10)
     assert!(
         structural_in_top_k as f32 / top_k as f32 >= 0.5,
-        "P2 FAIL: catalyst-scored top-K should be majority structural, got {}/{}",
-        structural_in_top_k,
-        top_k
+        "P2 FAIL: catalyst-scored top-K should be majority structural, got {structural_in_top_k}/{top_k}"
     );
 
     // Compare: catalyst top-K average score vs random top-K average score
@@ -152,9 +149,7 @@ fn p2_catalyst_scored_topk_better_than_random_topk() {
 
     assert!(
         catalyst_top_avg > random_top_avg,
-        "P2 FAIL: catalyst top-K avg ({:.3}) should exceed random top-K avg ({:.3})",
-        catalyst_top_avg,
-        random_top_avg
+        "P2 FAIL: catalyst top-K avg ({catalyst_top_avg:.3}) should exceed random top-K avg ({random_top_avg:.3})"
     );
 }
 
@@ -217,9 +212,7 @@ fn p3_synthetic_catalyst_data_improves_metrics_vs_random() {
 
     assert!(
         synthetic_avg > random_avg,
-        "P3 FAIL: synthetic catalyst avg ({:.3}) should exceed random avg ({:.3})",
-        synthetic_avg,
-        random_avg
+        "P3 FAIL: synthetic catalyst avg ({synthetic_avg:.3}) should exceed random avg ({random_avg:.3})"
     );
 
     // Also verify synthetic data maintains structural pattern
@@ -320,7 +313,7 @@ fn p5_top_10_percent_have_40_percent_cumulative_overlap() {
     for i in 0..20 {
         match i % 5 {
             0 => samples.push(format!("<data><row>{}</row><row>{}</row></data>", i, i + 1)),
-            1 => samples.push(format!("fn func_{}(x: i32) -> i32 {{ x + {} }}", i, i)),
+            1 => samples.push(format!("fn func_{i}(x: i32) -> i32 {{ x + {i} }}")),
             2 => samples.push(format!(r"\frac{{{}}}{{{}}} + \sqrt{{{}}}", i, i + 1, i + 2)),
             3 => samples.push(format!(
                 "a|b|c\n{}|{}|{}\n{}|{}|{}",
@@ -332,10 +325,9 @@ fn p5_top_10_percent_have_40_percent_cumulative_overlap() {
                 i + 5
             )),
             _ => {
-                let token = format!("abc{}", i);
+                let token = format!("abc{i}");
                 samples.push(format!(
-                    "{} {} {} {} {} {} {}",
-                    token, token, token, token, token, token, token
+                    "{token} {token} {token} {token} {token} {token} {token}"
                 ));
             }
         }
@@ -344,8 +336,7 @@ fn p5_top_10_percent_have_40_percent_cumulative_overlap() {
     // 80 natural language samples
     for i in 0..80 {
         samples.push(format!(
-            "This is a normal prose sentence about topic number {} that has no structural patterns.",
-            i
+            "This is a normal prose sentence about topic number {i} that has no structural patterns."
         ));
     }
 
@@ -400,8 +391,7 @@ fn p6_augmented_data_reaches_target_in_80_percent_of_baseline_rounds() {
     }
     for i in 0..200 {
         pool.push(format!(
-            "Natural language text number {} with no structure at all.",
-            i
+            "Natural language text number {i} with no structure at all."
         ));
     }
 
