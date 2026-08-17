@@ -38,7 +38,7 @@ fn rules_count(rules: &[ValidatorRule]) -> usize {
 #[cfg(feature = "bomber-agent")]
 fn improvement_pct(agent: f32, baseline: f32) -> String {
     if baseline == 0.0 {
-        format!("+{:.1}", agent)
+        format!("+{agent:.1}")
     } else {
         format!("{:+.1}%", (agent - baseline) / baseline.abs() * 100.0)
     }
