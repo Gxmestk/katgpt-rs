@@ -2,7 +2,9 @@
 
 > **Source:** "Why the Third Axis Is Freedom" — Michael Timothy Bennett (ANU, Machine Intelligence and Normative Theory Lab), 16 Aug 2026. Zenodo [10.5281/zenodo.21965230](https://doi.org/10.5281/zenodo.21965230) / arXiv:2608.05423. Analyzes Explorative Modeling (XM), Gladstone, Ji & Du, arXiv:2607.27372.
 > **Date:** 2026-08-16
-> **Status:** DISTILLED — pending owner decision (PoC issue 665 filed)
+> **Status:** DISTILLED — PoC PASS (Issue 665 T1–T4, 2026-08-17; see §PoC
+> Addendum) — primitive shipped opt-in `freedom_selection`; promotion pending
+> a production consumer A/B
 > **Related Research:** 369 (Renoise-CE best-of-N), 323 (TEMP diversity fingerprints), 320 (best_belief), 240 (CGSP curiosity), 479→riir-games coverage curiosity, 484 (percepta skill entropy)
 > **Related Issues:** [665](../.issues/665_freedom_guided_best_of_k_poc.md) — PoC: freedom-guided best-of-K selection mode
 > **Classification:** Public
@@ -108,3 +110,63 @@ Bennett proves that XM's best-of-K generative training works because it increase
 - Best-of-K training lineage (cited by paper): MCL (2012), SMCL (2016), Fan et al. min-of-N (2017), IMLE (2018) — XM is the scaling framework around an older update; Bennett supplies the *criterion* explaining why it works.
 
 **Follow-ups:** issue 665 (PoC) is the only actionable file; fusion leads 2–5 recorded here for future pickup — do not open plans until each has a consumer and a falsifiable gate.
+
+---
+
+## PoC Addendum (2026-08-17, Issue 665 T1–T4)
+
+**Verdict: T4 gate PASS — the relaxation confound is separated; freedom
+guidance is real on the controlled toy.** Primitive shipped opt-in
+(`freedom_selection`) in katgpt-rs; PoC in riir-poc
+`examples/freedom_best_of_k.rs`.
+
+- **Toy:** 4 contexts × 8 cells, 40 steps, K=8 candidates/step, gate 0.5,
+  64 seeds; child = long-tail within context (0.35/0.35/0.05×6), parent =
+  uniform (Exp-2 shape). Candidate loss = per-cell quality (uniform, fixed
+  per seed) + ≈N(0, 0.35) draw noise — INDEPENDENT of cell identity by
+  design (if loss tracked −log child_p, tail cells could never enter the
+  gate and all arms would degenerate to min-loss; the paper's controller
+  gates on validation loss of genuinely-similar candidates).
+- **Arms (matched pools — all replay identical candidates):** MinLoss /
+  RandomNearBest (the confound control, SAME gate) / Stability (the REAL
+  `best_of_n_stability` substrate) / FreedomGain (the REAL
+  `best_of_n_freedom` substrate).
+
+| arm | parent_hit | child_mass | mean_loss | active cells | log-freedom |
+|---|---:|---:|---:|---:|---:|
+| MinLoss | 0.4453 | 2.4750 | 0.0183 | 14 | 9.338 |
+| RandomNearBest | 0.5156 | 2.9719 | 0.2141 | 16 | 11.084 |
+| Stability | 0.4453 | 2.4750 | 0.0183 | 14 | 9.338 |
+| FreedomGain | **0.7075** | **3.4242** | 0.0932 | **22** | **15.566** |
+
+- **Per-seed wins: FreedomGain vs MinLoss 64/64, vs RandomNearBest 64/64**
+  (paper Exp-2 shape 29/30, here a clean sweep). Decomposition: relaxation
+  alone buys +0.070 parent-hit (RandomNearBest − MinLoss); freedom guidance
+  buys +0.192 MORE on top (FreedomGain − RandomNearBest) — 73% of the total
+  gain is the freedom signal, not the gate.
+- **Honest findings:** (1) Stability ≡ MinLoss bit-identical on this toy —
+  the shipped selection family (BestQ / mode@K / Top1Converged analogs) is
+  occupancy-blind by construction; that is the gap FreedomGain fills, not a
+  straw man. (2) FreedomGain ALSO wins child coverage (3.42 vs 2.48) — in a
+  coverage toy opening cells strictly adds covered mass on BOTH
+  distributions; the real-world trade appears on a loss/quality axis, where
+  freedom pays +0.075 mean loss (within the 0.5 gate) for +8 active cells —
+  the Exp-2 trade shape (paper: −0.022 child hit for +2.69 active outputs).
+  (3) child_mass sums to ≤ 4.0 (per-context mass 1.0 × 4 contexts) — it is
+  covered child MASS, not a probability; compare arms relatively.
+- **API notes (deviations from the issue sketch, documented):**
+  `freedom_gain` takes 3 args (per-cell occupancy + cell→context partition +
+  candidate cell) — the 2-arg sketch cannot distinguish "occupied cell in
+  context a" from "fresh cell in context a". Empty contexts (a=0) are
+  excluded from the product (factor 1; the raw 2^0−1=0 zero-annihilates);
+  first activation pinned to FIRST_ACTIVATION_GAIN=2.0 > ln 3 (raw increment
+  is +∞ from the excluded state — ordering "open an unvisited context
+  first" preserved with a finite constant).
+- **G1:** deterministic (seeded fastrand, no wall-clock) — seed-0 double-run
+  bit-identical, asserted in the example. **Cost:** the primitive is
+  closed-form f32 arithmetic — no bench needed at PoC tier (selection-time,
+  not hot-path; the substrate's one Vec alloc per call is documented).
+- **Promotion status:** stays opt-in. The T4 pass opens (does not compel)
+  the promotion path: a production consumer A/B (the switch_cost / Issue-663
+  precedent) + a GOAT gate. T5 (Thm-7 allocation formula) remains unbundled
+  and unstarted — separate gate if ever consumed.

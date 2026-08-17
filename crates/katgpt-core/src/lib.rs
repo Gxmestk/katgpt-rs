@@ -271,6 +271,18 @@ pub use switch_cost::{
     FactorizedSwitchCost, SwitchCostSnapshot, SwitchCostTable, DEFAULT_ALPHA, NEUTRAL_ACC,
     cdf_rank,
 };
+// Extension-count (freedom-of-function) selection criterion — closed-form
+// near-best selection over a declared finite output partition (Research 486,
+// arXiv:2608.05423, Issue 665). Opt-in PoC-gated: promotion to default
+// requires the Issue 665 PoC gate (freedom-guided near-best beats min-loss
+// AND random-near-best under a declared distribution shift) plus a
+// production consumer.
+#[cfg(feature = "freedom_selection")]
+pub mod extension_count;
+#[cfg(feature = "freedom_selection")]
+pub use extension_count::{
+    ExtensionOccupancy, LossGate, FIRST_ACTIVATION_GAIN, freedom_gain, log_freedom,
+};
 // SIMD-accelerated linear algebra kernels (NEON / AVX2 / WASM-SIMD128 /
 // scalar fallback). Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::simd` for backwards
@@ -484,6 +496,11 @@ pub use renoise_ce::{
     Proposer, RenoiseCeConfig, RenoiseCeProbe, RenoiseCeScore, best_of_n_stability,
     renoise_ce_score, verify_and_restart,
 };
+// Freedom-guided sibling of best_of_n_stability (Issue 665 / Research 486):
+// near-best drift gate + Δ-log-extension-count selection over a caller-owned
+// occupancy table. Gated on freedom_selection (implies renoise_ce).
+#[cfg(feature = "freedom_selection")]
+pub use renoise_ce::best_of_n_freedom;
 
 #[cfg(feature = "dual_leo")]
 pub use traits::{
