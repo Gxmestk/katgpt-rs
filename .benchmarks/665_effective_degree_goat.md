@@ -100,23 +100,80 @@ Test binaries: `crates/katgpt-core/tests/bench_668_effective_degree_goat.rs`
    correctness arm; ED can only ever upgrade the *output-simplicity* arm of a
    two-sided conjunction, never replace both.
 
-## Verdict — ship opt-in, promotion deferred to the consumer
+## Verdict — ship opt-in; consumer verdict is IN, gate unchanged
 
 G1 (all sub-gates), G2, G3, G4 **PASS**. The primitive is correct, fast, and
 allocation-free.
 
-It is **NOT promoted to default**, per the no-default-consumer rule: nothing in
-the default build calls it. The gating consumer is **riir-neuron-db Issue 602**
-— the defend-wrong freeze-gate PoC asking whether ED (function-space,
-data-anchored) predicts held-out shard-decode error better than the incumbent
-`can_freeze::output_flatness` (parameter-space, data-blind). That PoC is running
-in a sibling session and will report WIN or REFUTE.
-
-Per Issue 668's deferral trigger, a REFUTE does **not** delete the primitive: it
-stays as a diagnostic surface (the KARC regime-mismatch probe of Research 488 §4
-still consumes it) and the refutation gets recorded here. Note also that ED is
+It is **NOT promoted to default**, per the no-default-consumer rule. ED is
 **not UQ-bearing** — it emits a complexity scalar, not a distribution, interval,
 or coverage claim — so the "Report the Floor" rule (Issue 010) does not apply.
+
+### Consumer verdict — riir-neuron-db Issue 602, CLOSED 2026-08-17
+
+The gating consumer reported: **SCOPE-LIMITED — no gate change, stays opt-in**
+([riir-neuron-db Bench 484](../../riir-neuron-db/.benchmarks/484_ed_vs_flatness_freeze_gate_poc.md),
+commit `5e75bb6`; Research 488 §10 PoC Addendum, commit `349324e0`). 360 shard
+states (30 cycles × 4 scenarios × 3 seeds), ground truth = held-out wake-event
+recall error.
+
+| arm | pooled \|Pearson\| vs generalization gap |
+|---|---|
+| **`ed_norm`** | **0.598** |
+| `output_flatness` (incumbent) | 0.047 |
+| control | 0.032 |
+| permutation floor | 0.042 |
+
+ED out-correlates the incumbent **12.6×**, beat it 4/4 scenarios raw and
+cycle-controlled on 3 disjoint seed sets — the incumbent is indistinguishable
+from noise on that substrate. **But the sign inverts between grains**
+(Simpson's paradox, reproduced on all 3 seed sets): pooled across regimes
+**+0.598**, within-regime cycle-controlled **all four negative**
+(−0.18, −0.68, −0.35, −0.25). A gate is one threshold on one shard state, so
+`ed_norm < τ` rejects the memorizing regime wholesale while *inside* every
+regime preferring the shards with the largest held-out gap. No threshold fixes
+that, so ED is not wirable as the proposed one-sided freeze gate. Issue 668's
+deferral trigger is the one that fired: the primitive stays as a **diagnostic
+surface**, not deleted.
+
+**The DC finding from §"Honest findings" #1 changed the consumer's conclusion.**
+The consumer carried `ed_ac` (zeroing `coeff_norms[0]`, per this bench's
+recommendation) as a 4th arm: correlation collapses **0.598 → +0.122**, below
+flatness-plus-noise. So nearly all of ED's power on that substrate lives in the
+**DC term** — for a cosine decode, the along-path mean level, i.e. shard-event
+*alignment*, not shape complexity. **The paper's actual thesis (function-space
+*complexity* predicts generalization) is therefore NOT confirmed at shard
+scale.** What is confirmed is weaker: a data-anchored function-space probe
+out-predicts a data-blind parameter-space one. Without the AC arm this would
+have been reported as a clean 12.6× win with the mechanism mis-attributed.
+
+### Independent external confirmation of two gates here
+
+- **`EdConfig::cheap()` is validated; cost is not the limiter.** cheap
+  (r=4/K=3, 8 paths) 0.598 vs precise (r=15/K=7, 32 paths) 0.623 — ~4% of the
+  correlation for ~5× less work. The 195.9 ns/path figure held on real
+  substrate and the consumer's decode dominated, exactly as G2 predicted.
+- **G1a's path-averaging premise (paper Theorem 3.1) confirmed on real data.**
+  **0 ranking flips** across `n_pairs ∈ {1,2,4,8,16,32,64}`, and per-path spread
+  falls monotonically **8.8×** (seed_std 0.0335 → 0.0038). That is an external
+  check on the synthetic G1a/G1e ordering result.
+
+### New risk this surfaced — grain-dependent sign
+
+Added to the module docs as caveat 4. **Any ED consumer must state which grain
+it operates at and verify the sign there.** This generalizes beyond the freeze
+gate: the paper's own 27-config correlation study measures only the
+*across-model* grain, so the within-trajectory grain is unmeasured upstream and
+can invert. This is the transferable lesson, not a substrate quirk.
+
+### Surviving promotion axis
+
+Not freeze timing. **Cross-regime triage** is the grain where ED's sign is
+correct, at 12.6× the incumbent and 196 ns/path — i.e. the **KARC
+regime-mismatch probe** already anticipated by Issue 668 and Research 488 §4
+(high decode ED + low flatness ⇒ polynomial-basis-strained, making Bench 010's
+documented KARC scope-limit *measurable* rather than inferred from a CRPS loss).
+A future promotion case should be built on that axis.
 
 ## Task status (Issue 668)
 

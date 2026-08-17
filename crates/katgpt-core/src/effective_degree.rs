@@ -34,7 +34,7 @@
 //! (its §7) is training-only and is explicitly out of scope — see Research 488
 //! §7 for the riir-train record.
 //!
-//! # Three caveats that decide whether a number here means anything
+//! # Four caveats that decide whether a number here means anything
 //!
 //! 1. **Data-manifold dependence (paper C.1).** The path endpoints MUST be real
 //!    data pairs. With random-noise endpoints the ED signal collapses to
@@ -57,7 +57,18 @@
 //!    through [`ed_from_coeff_norms`]; that quantity is bounded in `[1, p]` for
 //!    a degree-`p` restriction.
 //!
-//! A fourth, softer caveat (paper §7 MNIST-CIFAR failure): ED enforces/measures
+//! 4. **The sign is grain-dependent — verify it at YOUR grain.** Measured on
+//!    real substrate (riir-neuron-db Bench 484, 360 shard states): ED correlates
+//!    with the generalization gap at **+0.598 pooled across regimes** but
+//!    **negative within every individual regime** (−0.18, −0.68, −0.35, −0.25) —
+//!    a Simpson reversal reproduced on 3 disjoint seed sets. A one-sided
+//!    threshold `ed_norm < τ` therefore does the right thing *between* regimes
+//!    and the exactly wrong thing *inside* one, and no choice of `τ` fixes it.
+//!    The paper's own correlation study measures only the across-model grain, so
+//!    this inversion is unmeasured upstream. **State which grain you operate at
+//!    and measure the sign there before wiring ED into any gate.**
+//!
+//! A fifth, softer caveat (paper §7 MNIST-CIFAR failure): ED enforces/measures
 //! *simplicity*, not *correctness*. A wrong-but-simple decode passes an ED
 //! gate. Any consumer gate must keep a correctness arm alongside ED.
 //!
@@ -89,10 +100,15 @@
 //! multi-path entry points take a caller-owned [`EdScratch`], allocated once
 //! and reused; steady state is zero-alloc (G4).
 //!
-//! Feature: `effective_degree` (opt-in, implies `karc_forecaster`). Promotion
-//! to default is blocked on a consumer verdict — riir-neuron-db Issue 602's
-//! freeze-gate PoC (does ED beat `can_freeze::output_flatness` at predicting
-//! held-out shard-decode error?). Until that lands this is a diagnostic surface.
+//! Feature: `effective_degree` (opt-in, implies `karc_forecaster`). **Consumer
+//! verdict is in and the gate did not change:** riir-neuron-db Issue 602's
+//! freeze-gate PoC closed SCOPE-LIMITED 2026-08-17 (Bench 484). ED out-predicts
+//! the incumbent `can_freeze::output_flatness` 12.6× pooled (0.598 vs 0.047) but
+//! is not wirable as a one-sided freeze gate because of caveat 4, and its power
+//! there traces to the DC term (caveat 3), not to shape complexity. Stays
+//! **opt-in as a diagnostic surface**; the live consumer axis is cross-regime
+//! triage — the KARC regime-mismatch probe of Research 488 §4, which is the
+//! grain where the sign is correct.
 
 use crate::karc::{ChebyshevBasis, KarcBasis};
 use crate::linalg::{chol_solve_f64, cholesky_f64};

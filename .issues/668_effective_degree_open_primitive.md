@@ -21,7 +21,7 @@ The stack has no function-space complexity metric (Research 488 §3: greps clean
 - [x] T5: Docs — module doc citing Research 488 + the data-manifold caveat (endpoints must be real-data pairs, not random noise — paper C.1) + scale-dependence note (prefer `ed_norm` or normalized outputs).
 - [x] T6: GOAT gate record in `.benchmarks/`; promotion decision (default-off until the Issue 602 PoC lands a consumer verdict — the no-default-consumer rule).
 
-## Status — SHIPPED opt-in (2026-08-17)
+## Status — SHIPPED opt-in, CLOSED (2026-08-17)
 
 All six tasks complete. GOAT record: [`.benchmarks/665_effective_degree_goat.md`](../.benchmarks/665_effective_degree_goat.md).
 
@@ -40,11 +40,36 @@ All six tasks complete. GOAT record: [`.benchmarks/665_effective_degree_goat.md`
   algebraic degree (deg-5 fixture reads 1.15; with `c₀` zeroed, 1.63). Ordering
   is unaffected — but `ed_norm` is comparative-only, never an absolute degree
   read. An offset-free arm is one line via `ed_from_coeff_norms`.
-- **Promotion: default-OFF**, per the no-default-consumer rule. Awaiting the
-  riir-neuron-db Issue 602 freeze-gate verdict (that session has been notified
-  and is running it now). ED is **not** UQ-bearing (it emits a complexity
-  scalar, not a distribution/interval/coverage claim), so the Issue 010
-  "Report the Floor" rule does not apply.
+- **Promotion: default-OFF and it stays there.** ED is **not** UQ-bearing (it
+  emits a complexity scalar, not a distribution/interval/coverage claim), so the
+  Issue 010 "Report the Floor" rule does not apply.
+
+**Consumer verdict — riir-neuron-db Issue 602 CLOSED 2026-08-17: SCOPE-LIMITED,
+no gate change.** ([Bench 484](../../riir-neuron-db/.benchmarks/484_ed_vs_flatness_freeze_gate_poc.md),
+Research 488 §10.) Over 360 shard states, `ed_norm` out-correlates the incumbent
+`output_flatness` **12.6×** pooled (0.598 vs 0.047, control 0.032, permutation
+floor 0.042) and beat it 4/4 scenarios — but the **sign inverts between grains**
+(pooled +0.598, within-regime all four negative), a Simpson reversal on 3
+disjoint seed sets, so no threshold wires it as the proposed one-sided freeze
+gate. **This issue's deferral trigger is the one that fired:** the primitive
+stays as a diagnostic surface and is NOT deleted.
+
+Two consequences folded back into the docs:
+- **The Bench 665 DC finding changed the consumer's conclusion.** Carried as an
+  `ed_ac` arm, zeroing `coeff_norms[0]` collapses the correlation 0.598 → +0.122
+  (below flatness-plus-noise), so ED's power on that substrate lives in the DC
+  term — event *alignment*, not shape complexity. The paper's actual thesis is
+  therefore **not** confirmed at shard scale; the weaker claim (data-anchored
+  function-space beats data-blind parameter-space) is.
+- **New documented risk: grain-dependent sign** (module-doc caveat 4). Consumers
+  must state their grain and verify the sign there; the paper measures only the
+  across-model grain.
+
+Externally confirmed here: `EdConfig::cheap()` is sufficient (0.598 vs precise's
+0.623 for ~5× less work), 195.9 ns/path held on real substrate, and Theorem
+3.1's path-averaging shows **0 ranking flips** across `n_pairs ∈ {1..64}` with
+per-path spread falling **8.8×**. Surviving promotion axis is **cross-regime
+triage** (the KARC regime-mismatch probe, Research 488 §4) — not freeze timing.
 
 ## Non-goals
 
