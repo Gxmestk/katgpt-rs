@@ -168,7 +168,8 @@ If softmax gives 1/3 and the paper's argument is "nonlinearity fixes exponent", 
 - **katgpt-rs/.plans/297_personality_weighted_composition.md** — coefficient-space navigation at the personality-weight layer (shipped, GOAT).
 - **katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md** — coefficient-space navigation at the archetype-commitment layer (shipped, GOAT).
 - **riir-neuron-db/src/freeze.rs** (`MerkleFrozenEnvelope`) — atomic coefficient-space snapshot swap.
-- **riir-chain/src/encoding/latcal*.rs** — deterministic fixed-point raw-scalar bridge; no exponent in the paper's sense (pure coefficient space).
+- `riir-chain/src/encoding/latcal*.rs` — deterministic fixed-point raw-scalar bridge; no exponent in the paper's sense (pure coefficient space).
+- **riir-train/.research/422_Neural_Quadratic_Forms_LoRA_Ignition_Width.md** — the time-axis sequel (same first-author lineage): Liu Ziyin, Yizhou Xu, Tomaso Poggio, Isaac Chuang [arXiv:2608.13335 "Neural Quadratic Forms: A Unified Minimal Model for Sudden Learning and Scaling Laws"] derive the loss-vs-TIME exponent from the data spectrum (`E(τ) = Θ(τ^-(α1-1)/α2)`) — the mechanism this note's "first kind" law lacked; complementary to (not contradicting) the scale-exponent universality argued here. Distilled in riir-train (LoRA ignition times + width-from-effective-rank + `rank_one_spectral` GOAT framing); verdict Gain, POC filed as riir-train Issue 459.
 
 ---
 
