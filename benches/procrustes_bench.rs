@@ -171,9 +171,9 @@ fn main() {
             residual_pct,
             scratch_bytes,
             if all {
-                format!("✓ {}", gate_name)
+                format!("✓ {gate_name}")
             } else {
-                format!("✗ {} (gate={} us)", gate_name, fmt_us(gate_us))
+                format!("✗ {gate_name} (gate={} us)", fmt_us(gate_us))
             }
         );
         if !latency_pass {
