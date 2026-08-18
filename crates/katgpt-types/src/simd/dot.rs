@@ -330,7 +330,7 @@ pub fn simd_outer_product_acc(acc: &mut [f32], a: &[f32], b: &[f32], m: usize, n
         if is_avx2_fma_available() {
             unsafe { avx2_outer_product_acc(acc, a, b, m, n) }
         } else {
-            scalar_outer_product_acc(acc, a, b, m, n)
+            scalar_outer_product_acc(acc, a, b, m, n);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -343,7 +343,7 @@ pub fn simd_outer_product_acc(acc: &mut [f32], a: &[f32], b: &[f32], m: usize, n
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_outer_product_acc(acc, a, b, m, n)
+        scalar_outer_product_acc(acc, a, b, m, n);
     }
 }
 
@@ -498,12 +498,12 @@ pub fn simd_outer_product_acc_scaled(
         if is_avx2_fma_available() {
             unsafe { avx2_outer_product_acc_scaled(acc, scale, a, b, m, n) }
         } else {
-            scalar_outer_product_acc_scaled(acc, scale, a, b, m, n)
+            scalar_outer_product_acc_scaled(acc, scale, a, b, m, n);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_outer_product_acc_scaled(acc, scale, a, b, m, n)
+        scalar_outer_product_acc_scaled(acc, scale, a, b, m, n);
     }
 }
 
@@ -672,7 +672,7 @@ pub fn simd_transpose_matvec_acc(out: &mut [f32], mat: &[f32], v: &[f32], rows: 
         if is_avx2_fma_available() {
             unsafe { avx2_transpose_matvec_acc(out, mat, v, rows, cols) }
         } else {
-            scalar_transpose_matvec_acc(out, mat, v, rows, cols)
+            scalar_transpose_matvec_acc(out, mat, v, rows, cols);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -685,7 +685,7 @@ pub fn simd_transpose_matvec_acc(out: &mut [f32], mat: &[f32], v: &[f32], rows: 
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_transpose_matvec_acc(out, mat, v, rows, cols)
+        scalar_transpose_matvec_acc(out, mat, v, rows, cols);
     }
 }
 

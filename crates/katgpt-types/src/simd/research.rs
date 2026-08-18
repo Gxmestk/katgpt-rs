@@ -1345,12 +1345,12 @@ pub fn simd_fused_sub_acc(dst: &mut [f32], a: &[f32], b: &[f32], len: usize) {
         if is_avx2_fma_available() {
             unsafe { avx2_fused_sub_acc(dst, a, b, len) }
         } else {
-            scalar_fused_sub_acc(dst, a, b, len)
+            scalar_fused_sub_acc(dst, a, b, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_sub_acc(dst, a, b, len)
+        scalar_fused_sub_acc(dst, a, b, len);
     }
 }
 
@@ -1430,12 +1430,12 @@ pub fn simd_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: usize
         if is_avx2_fma_available() {
             unsafe { avx2_fused_scale_acc(dst, src, scale, len) }
         } else {
-            scalar_fused_scale_acc(dst, src, scale, len)
+            scalar_fused_scale_acc(dst, src, scale, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_scale_acc(dst, src, scale, len)
+        scalar_fused_scale_acc(dst, src, scale, len);
     }
 }
 
@@ -1529,12 +1529,12 @@ pub fn simd_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f
         if is_avx2_fma_available() {
             unsafe { avx2_fused_scale_acc_f16(dst, src_f16, scale, len) }
         } else {
-            scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+            scalar_fused_scale_acc_f16(dst, src_f16, scale, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+        scalar_fused_scale_acc_f16(dst, src_f16, scale, len);
     }
 }
 

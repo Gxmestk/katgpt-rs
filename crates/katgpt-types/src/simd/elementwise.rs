@@ -33,7 +33,7 @@ pub fn simd_scale_inplace(x: &mut [f32], scale: f32) {
         if is_avx2_fma_available() {
             unsafe { avx2_scale_inplace(x, scale) }
         } else {
-            scalar_scale_inplace(x, scale)
+            scalar_scale_inplace(x, scale);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -46,7 +46,7 @@ pub fn simd_scale_inplace(x: &mut [f32], scale: f32) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_scale_inplace(x, scale)
+        scalar_scale_inplace(x, scale);
     }
 }
 
@@ -122,7 +122,7 @@ pub fn simd_add_scalar_inplace(x: &mut [f32], val: f32) {
         if is_avx2_fma_available() {
             unsafe { avx2_add_scalar_inplace(x, val) }
         } else {
-            scalar_add_scalar_inplace(x, val)
+            scalar_add_scalar_inplace(x, val);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -135,7 +135,7 @@ pub fn simd_add_scalar_inplace(x: &mut [f32], val: f32) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_add_scalar_inplace(x, val)
+        scalar_add_scalar_inplace(x, val);
     }
 }
 
@@ -154,7 +154,7 @@ pub fn simd_fused_sub_scale_inplace(x: &mut [f32], sub: f32, scale: f32) {
         if is_avx2_fma_available() {
             unsafe { avx2_fused_sub_scale_inplace(x, sub, scale) }
         } else {
-            scalar_fused_sub_scale_inplace(x, sub, scale)
+            scalar_fused_sub_scale_inplace(x, sub, scale);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -167,7 +167,7 @@ pub fn simd_fused_sub_scale_inplace(x: &mut [f32], sub: f32, scale: f32) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_fused_sub_scale_inplace(x, sub, scale)
+        scalar_fused_sub_scale_inplace(x, sub, scale);
     }
 }
 
@@ -281,7 +281,7 @@ pub fn simd_add_inplace(dst: &mut [f32], src: &[f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_add_inplace(dst, src) }
         } else {
-            scalar_add_inplace(dst, src)
+            scalar_add_inplace(dst, src);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -294,7 +294,7 @@ pub fn simd_add_inplace(dst: &mut [f32], src: &[f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_add_inplace(dst, src)
+        scalar_add_inplace(dst, src);
     }
 }
 
@@ -323,7 +323,7 @@ pub fn simd_add_into(dst: &mut [f32], a: &[f32], b: &[f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_add_into(dst, a, b) }
         } else {
-            scalar_add_into(dst, a, b)
+            scalar_add_into(dst, a, b);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -336,7 +336,7 @@ pub fn simd_add_into(dst: &mut [f32], a: &[f32], b: &[f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_add_into(dst, a, b)
+        scalar_add_into(dst, a, b);
     }
 }
 
@@ -395,7 +395,7 @@ pub fn simd_fused_decay_write(dst: &mut [f32], decay: f32, src: &[f32], write: f
         if is_avx2_fma_available() {
             unsafe { avx2_fused_decay_write(dst, decay, src, write) }
         } else {
-            scalar_fused_decay_write(dst, decay, src, write)
+            scalar_fused_decay_write(dst, decay, src, write);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -408,7 +408,7 @@ pub fn simd_fused_decay_write(dst: &mut [f32], decay: f32, src: &[f32], write: f
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_fused_decay_write(dst, decay, src, write)
+        scalar_fused_decay_write(dst, decay, src, write);
     }
 }
 
@@ -452,7 +452,7 @@ pub fn simd_scale_mul_inplace(x: &mut [f32], gamma: &[f32], scale: f32) {
         if is_avx2_fma_available() {
             unsafe { avx2_scale_mul_inplace(x, gamma, scale) }
         } else {
-            scalar_scale_mul_inplace(x, gamma, scale)
+            scalar_scale_mul_inplace(x, gamma, scale);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -465,7 +465,7 @@ pub fn simd_scale_mul_inplace(x: &mut [f32], gamma: &[f32], scale: f32) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_scale_mul_inplace(x, gamma, scale)
+        scalar_scale_mul_inplace(x, gamma, scale);
     }
 }
 
