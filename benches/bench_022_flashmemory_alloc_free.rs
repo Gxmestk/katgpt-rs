@@ -130,7 +130,7 @@ fn main() {
 
     println!("Config: hidden={}, n_heads={}, kv_lora_rank={}", config.hidden_size, config.n_heads, config.kv_lora_rank);
     println!("FlashMemory: block_size={}, refresh_period={}, threshold={}", fm_config.block_size, fm_config.refresh_period, fm_config.threshold);
-    println!("Tokens: warmup={}, steady={}, total={}", WARMUP_TOKENS, STEADY_TOKENS, TOTAL_TOKENS);
+    println!("Tokens: warmup={WARMUP_TOKENS}, steady={STEADY_TOKENS}, total={TOTAL_TOKENS}");
     println!();
 
     // ── Warmup: decode WARMUP_TOKENS to stabilize capacities ─────────
@@ -152,7 +152,7 @@ fn main() {
     }
 
     let warmup_refreshes = selector.refresh_count();
-    println!("Warmup complete: {} tokens, {} selector refreshes", WARMUP_TOKENS, warmup_refreshes);
+    println!("Warmup complete: {WARMUP_TOKENS} tokens, {warmup_refreshes} selector refreshes");
     assert!(warmup_refreshes > 0, "warmup must trigger at least one selector refresh");
 
     // ── Measure: decode STEADY_TOKENS, counting allocations ───────────
@@ -183,10 +183,10 @@ fn main() {
 
     println!();
     println!("── G4 Result ──");
-    println!("  Steady tokens decoded : {}", STEADY_TOKENS);
-    println!("  Total allocations     : {}", total_allocs);
-    println!("  Per-token allocations : {}", per_token);
-    println!("  Steady refreshes      : {} (each refresh re-scores all blocks)", steady_refreshes);
+    println!("  Steady tokens decoded : {STEADY_TOKENS}");
+    println!("  Total allocations     : {total_allocs}");
+    println!("  Per-token allocations : {per_token}");
+    println!("  Steady refreshes      : {steady_refreshes} (each refresh re-scores all blocks)");
     println!();
 
     let g4_pass = total_allocs == 0;
@@ -194,7 +194,7 @@ fn main() {
     println!();
 
     if !g4_pass {
-        eprintln!("FAIL: FlashMemory sparse MLA forward allocated {} bytes across {} steady tokens.", total_allocs, STEADY_TOKENS);
+        eprintln!("FAIL: FlashMemory sparse MLA forward allocated {total_allocs} bytes across {STEADY_TOKENS} steady tokens.");
         eprintln!("      Expected 0 (alloc-free steady state per GOAT G4).");
         eprintln!("      This means a per-token or per-refresh allocation was introduced.");
         std::process::exit(1);
