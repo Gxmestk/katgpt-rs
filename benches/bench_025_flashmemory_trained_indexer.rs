@@ -579,7 +579,7 @@ fn run_bench() {
     println!("\n=== Results ===");
     println!("Modelless sparse vs dense (cosine sim):");
     let cos_m_sorted = sort_median(&cos_modelless);
-    println!("  median cos: {:.4}", cos_m_sorted);
+    println!("  median cos: {cos_m_sorted:.4}");
 
     println!("\nBlock selection recall (fraction of golden blocks selected):");
     println!("  Trained indexer:   recall={trained_recall:.4}  precision={trained_precision:.4}");

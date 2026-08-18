@@ -437,7 +437,7 @@ fn main() {
     println!("Summary dim: {D}, archetypes: {N} (original vs perturbed)");
     println!("Tokens: {N_TOKENS} ({N_TRAIN} train + {} test per model)",
         N_TOKENS - N_TRAIN);
-    println!("Sigma levels: {:?}", SIGMA_LEVELS);
+    println!("Sigma levels: {SIGMA_LEVELS:?}");
     println!();
 
     // ── Load real model (REQUIRED — no fallback for this experiment) ──────

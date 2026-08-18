@@ -815,7 +815,7 @@ fn main() {
     println!("Config: D_model={d_model}, layers={}", config.num_layers);
     println!("Tokens: {N_TOKENS} ({N_TRAIN} train + {} test per model)",
         N_TOKENS - N_TRAIN);
-    println!("Sigma levels: {:?}", SIGMA_LEVELS);
+    println!("Sigma levels: {SIGMA_LEVELS:?}");
     println!();
 
     // ── Load real model ───────────────────────────────────────────────────

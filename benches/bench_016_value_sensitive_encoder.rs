@@ -669,7 +669,7 @@ fn main() {
     println!("Summary dim: {D}, archetypes: {N} (original vs perturbed)");
     println!("Tokens: {N_TOKENS} ({N_TRAIN} train + {} test per model)",
         N_TOKENS - N_TRAIN);
-    println!("Sigma levels: {:?}", SIGMA_LEVELS);
+    println!("Sigma levels: {SIGMA_LEVELS:?}");
     println!();
 
     // ── Load real model ───────────────────────────────────────────────────
@@ -720,7 +720,7 @@ fn main() {
         let mut weights_b = weights_a.clone();
         perturb_model(&mut weights_b, sigma);
 
-        println!("── σ = {} ──────────────────────────────────────────", sigma);
+        println!("── σ = {sigma} ──────────────────────────────────────────");
         println!("  {:>12}  {:>8}  {:>10}  {:>8}  {:>6}  {:>8}  {:>8}",
             "encoder", "acc", "centroid_d", "within_σ", "SNR", "centroid", "verdict");
         println!("  {}", "-".repeat(78));

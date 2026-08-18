@@ -157,7 +157,7 @@ fn main() {
     let mut all_inert = true;
 
     for &(prompt_label, prompt) in prompts {
-        println!("--- {} {:?} ---", prompt_label, prompt);
+        println!("--- {prompt_label} {prompt:?} ---");
 
         // Compute N=0 baseline logits (the prompt's natural next-token distribution).
         let pause_zero = PauseConfig {
@@ -168,7 +168,7 @@ fn main() {
         let probs_n0 = softmax_stable(&logits_n0);
 
         for &(strategy_name, strategy) in STRATEGIES {
-            print!("  {:>14}:", strategy_name);
+            print!("  {strategy_name:>14}:");
             for &n in PAUSE_COUNTS {
                 let pause = PauseConfig {
                     n_pause: n,
@@ -181,7 +181,7 @@ fn main() {
                     let probs_n = softmax_stable(&logits_n);
                     let kl = symmetric_kl(&probs_n0, &probs_n);
                     // Expected ~0 (identical computation). Report for sanity.
-                    print!("  N={:<2} KL={:.6}", n, kl);
+                    print!("  N={n:<2} KL={kl:.6}");
                 } else {
                     let probs_n = softmax_stable(&logits_n);
                     let kl = symmetric_kl(&probs_n0, &probs_n);
@@ -191,7 +191,7 @@ fn main() {
                     if kl >= DIVERGENCE_THRESHOLD {
                         all_inert = false;
                     }
-                    print!("  N={:<2} KL={:.6}", n, kl);
+                    print!("  N={n:<2} KL={kl:.6}");
                 }
             }
             println!();
@@ -200,12 +200,11 @@ fn main() {
     }
 
     println!("=== Diagnostic verdict ===");
-    println!("Max symmetric KL divergence observed: {:.6} nats", max_divergence_any);
-    println!("Divergence threshold (precondition for T4): {:.6} nats", DIVERGENCE_THRESHOLD);
+    println!("Max symmetric KL divergence observed: {max_divergence_any:.6} nats");
+    println!("Divergence threshold (precondition for T4): {DIVERGENCE_THRESHOLD:.6} nats");
     if all_inert {
         println!(
-            "VERDICT: MECHANISM INERT on random weights. Pause tokens produce < {:.6} nats",
-            DIVERGENCE_THRESHOLD
+            "VERDICT: MECHANISM INERT on random weights. Pause tokens produce < {DIVERGENCE_THRESHOLD:.6} nats"
         );
         println!("divergence across all strategy x prompt x N configs. The KDA state change");
         println!("from pause tokens does NOT reach the output distribution on random weights.");
@@ -214,8 +213,7 @@ fn main() {
         println!("quality gate may not be designable without at least a partially-trained base.");
     } else {
         println!(
-            "VERDICT: MECHANISM ACTIVE. At least one config produced >= {:.6} nats divergence.",
-            DIVERGENCE_THRESHOLD
+            "VERDICT: MECHANISM ACTIVE. At least one config produced >= {DIVERGENCE_THRESHOLD:.6} nats divergence."
         );
         println!("The KDA state change from pause tokens DOES reach the output distribution");
         println!("on random weights. The precondition for T4 (modelless G5-K3 quality gate) is");

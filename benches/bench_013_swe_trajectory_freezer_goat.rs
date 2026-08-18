@@ -415,7 +415,7 @@ fn main() {
             p.mode_name, p.argmax_k, p.matching_gate, p.correct);
     }
     println!();
-    println!("   accuracy: {:.2} (target ≥0.80)", accuracy);
+    println!("   accuracy: {accuracy:.2} (target ≥0.80)");
     println!("   G3 verdict: {}", if g3_pass { "PASS" } else { "FAIL" });
     println!();
 

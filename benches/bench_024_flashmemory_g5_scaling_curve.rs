@@ -338,7 +338,7 @@ fn main() {
 
     println!("\n{}", "─".repeat(78));
     println!("G1 GATE (all scales): {}", if all_g1 { "✅ PASS" } else { "❌ FAIL" });
-    println!("G5 (M3 max KV reduction): {:.1}% (at longest M3-feasible scale)", max_kv_red);
+    println!("G5 (M3 max KV reduction): {max_kv_red:.1}% (at longest M3-feasible scale)");
     println!("G5 (paper claim @ 500K): 90% — requires 256K test on 4090 (Bonsai)");
     println!("\nNote: the ~74% plateau at ≤4K is expected — at short context most blocks");
     println!("remain relevant. The 90% is a long-context phenomenon (most tokens become");

@@ -884,7 +884,7 @@ fn main() {
     println!("Sequence length: {SEQ_LEN} tokens per prompt (KV cache grows)");
     println!("Prompts: {N_PROMPTS} ({N_TRAIN} train + {} test per model)",
         N_PROMPTS - N_TRAIN);
-    println!("Sigma levels: {:?}", SIGMA_LEVELS);
+    println!("Sigma levels: {SIGMA_LEVELS:?}");
     println!();
     println!("KEY DIFFERENCE from bench_012-017:");
     println!("  - Depth trajectory: 9 steps per token (embed -> 8 layers)");
@@ -972,7 +972,7 @@ fn main() {
         println!("done ({:.1}s)", t0.elapsed().as_secs_f64());
 
         println!();
-        println!("── σ = {} ──────────────────────────────────────────", sigma);
+        println!("── σ = {sigma} ──────────────────────────────────────────");
         println!(
             "  {:>14}  {:>3}  {:>9}  {:>9}  {:>9}  {:>6}  {:>9}  {:>9}  {:>8}",
             "encoder", "d", "Euclidean", "DiagMaha", "FullMaha", "λ_LW", "d_Euclid", "d_Maha", "BayesOpt"
@@ -1098,13 +1098,13 @@ fn main() {
         println!("VERDICT: Bayes-optimal ceiling is ≥70% — IMPROVEMENT over bench_017's");
         println!("~55%, but still below 80%. The sequence trajectory helps but the");
         println!("per-prompt signal is insufficient for reliable discrimination.");
-        println!("Best d_M = {:.3} (vs bench_017's 0.285, ratio = {:.1}×)", best_dm, dm_ratio);
+        println!("Best d_M = {best_dm:.3} (vs bench_017's 0.285, ratio = {dm_ratio:.1}×)");
     } else {
         println!("VERDICT: Bayes-optimal ceiling <70% for all encoders at σ=0.5.");
         println!("The sequence trajectory ({SEQ_LEN} steps) does NOT provide enough");
         println!("SNR boost over the depth trajectory (9 steps) to overcome the");
         println!("fundamental information floor.");
-        println!("Best d_M = {:.3} (vs bench_017's 0.285, ratio = {:.1}×)", best_dm, dm_ratio);
+        println!("Best d_M = {best_dm:.3} (vs bench_017's 0.285, ratio = {dm_ratio:.1}×)");
         println!();
         println!("This closes the sequence trajectory hypothesis: the information");
         println!("deficit is not a trajectory-length problem — it's a fundamental");

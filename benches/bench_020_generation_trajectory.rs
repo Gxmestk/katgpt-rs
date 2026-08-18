@@ -237,9 +237,7 @@ fn extract_generation_trajectory(
         let next_tok = current_logits
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal))
-            .map(|(idx, _)| idx as u32)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)).map_or(0, |(idx, _)| idx as u32);
 
         generated.push(next_tok);
 
@@ -614,14 +612,10 @@ fn run_bench() {
     // Check if generation works as well as processing.
     let gen_at_01 = all_results
         .iter()
-        .find(|r| r.sigma == 0.1 && r.regime == "generation")
-        .map(|r| r.euclidean_acc)
-        .unwrap_or(0.0);
+        .find(|r| r.sigma == 0.1 && r.regime == "generation").map_or(0.0, |r| r.euclidean_acc);
     let proc_at_01 = all_results
         .iter()
-        .find(|r| r.sigma == 0.1 && r.regime == "processing")
-        .map(|r| r.euclidean_acc)
-        .unwrap_or(0.0);
+        .find(|r| r.sigma == 0.1 && r.regime == "processing").map_or(0.0, |r| r.euclidean_acc);
 
     println!("At σ=0.1: generation={:.1}% vs processing={:.1}%", gen_at_01 * 100.0, proc_at_01 * 100.0);
     if gen_at_01 >= 0.8 {
