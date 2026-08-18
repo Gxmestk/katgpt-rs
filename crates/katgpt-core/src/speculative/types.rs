@@ -79,13 +79,110 @@ impl<P: Default + ScreeningPruner> Default for EarlyStopGate<P> {
 
 // ── DDTree Node ────────────────────────────────────────────────
 
+/// Fixed-capacity root→node token path carried by [`TreeNode`] (Issue 670).
+///
+/// Level `k` holds the token chosen at depth `k` (root first); levels beyond
+/// a node's `depth` are zero. One `u32` per level supports vocabularies up to
+/// 2^32 — the prior `u128` packing shifted 16 bits per level and corrupted any
+/// token id ≥ 65,536 (Bonsai vocab = 248,320): the id's high bits aliased into
+/// the parent's slot at insert time and the 16-bit extraction mask could never
+/// recover them.
+///
+/// `Copy`, allocation-free. The derived `Ord`/`Hash` reproduce the old
+/// packing's root-first lexicographic order for well-formed same-depth paths,
+/// so `(depth, parent_path)` keys and sorts keep their pre-widening behavior.
+///
+/// # Conventions
+/// - `TreeBuilder` (and every `build_dd_tree*` variant) packs root-first:
+///   each push writes the child's token at level `child_depth`.
+/// - `path_to_tree_nodes` (and_or) historically packed LSB-first (first token
+///   in the low bits); it stores its levels reversed to preserve that legacy
+///   behavior exactly, including the reversed `extract_parent_tokens` output.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
+pub struct TokenPath(pub [u32; TokenPath::MAX_LEVELS]);
+
+impl TokenPath {
+    /// Maximum number of tokens in one path (levels `0..8`). A node's `depth`
+    /// must be `< MAX_LEVELS`; operations at or beyond the capacity are total
+    /// no-ops (the old u128 shift silently dropped overflow bits — never a
+    /// panic), with `debug_assert!` guards to surface misuse in debug builds.
+    pub const MAX_LEVELS: usize = 8;
+
+    /// The all-zero path (no tokens).
+    #[inline]
+    pub const fn empty() -> Self {
+        Self([0; Self::MAX_LEVELS])
+    }
+
+    /// Path of a depth-0 node: `[token_idx, 0, ...]`.
+    #[inline]
+    pub const fn from_token(token_idx: usize) -> Self {
+        let mut levels = [0u32; Self::MAX_LEVELS];
+        levels[0] = token_idx as u32;
+        Self(levels)
+    }
+
+    /// Path from explicit levels (root first). Levels beyond `levels.len()`
+    /// are zero. In debug, asserts `levels.len() <= MAX_LEVELS`.
+    #[inline]
+    pub fn from_levels(levels: &[u32]) -> Self {
+        debug_assert!(levels.len() <= Self::MAX_LEVELS);
+        let mut path = Self::empty();
+        for (slot, &level) in path.0.iter_mut().zip(levels.iter()) {
+            *slot = level;
+        }
+        path
+    }
+
+    /// Extend `self` (a node's path at depth `at_depth - 1`) with `token_idx`
+    /// at depth `at_depth` — the array analogue of `(path << 16) | token`.
+    ///
+    /// Total: a write at `at_depth >= MAX_LEVELS` is a no-op.
+    #[inline]
+    pub fn extend(self, at_depth: usize, token_idx: usize) -> Self {
+        debug_assert!(at_depth < Self::MAX_LEVELS);
+        let mut path = self;
+        if at_depth < Self::MAX_LEVELS {
+            path.0[at_depth] = token_idx as u32;
+        }
+        path
+    }
+
+    /// The parent's path: drops the token at `child_depth` (and any stray
+    /// levels beyond it) — the array analogue of `path >> 16` for a node at
+    /// `child_depth`.
+    #[inline]
+    pub fn parent_of(self, child_depth: usize) -> Self {
+        let mut path = self;
+        if child_depth < Self::MAX_LEVELS {
+            path.0[child_depth..].fill(0);
+        }
+        path
+    }
+
+    /// Token at `depth`; `0` outside the packed window (the old extraction
+    /// masked 16 bits per level and read zeros for out-of-range shifts).
+    #[inline]
+    pub fn token_at(self, depth: usize) -> usize {
+        if depth < Self::MAX_LEVELS {
+            self.0[depth] as usize
+        } else {
+            0
+        }
+    }
+}
+
 /// DDTree node for Best-First Search.
 ///
-/// Field order: largest alignment first (u128, usize) → f32 last.
-/// Eliminates 4 bytes of padding between `score` and `depth` on 64-bit targets.
+/// `parent_path` packs the root→node token sequence — see [`TokenPath`] for
+/// the convention and the Issue 670 vocab-widening rationale.
+///
+/// Field order kept from the pre-widening layout; with the 4-aligned path
+/// first there is no interior padding (52 bytes of fields, 56 with tail
+/// padding to the struct's 8-alignment).
 #[derive(Copy, Clone, PartialEq)]
 pub struct TreeNode {
-    pub parent_path: u128,
+    pub parent_path: TokenPath,
     pub depth: usize,
     pub token_idx: usize,
     pub score: f32,
@@ -1751,6 +1848,113 @@ mod tests {
             let cfg = PositionWeightedBudget::default();
             let allocation = cfg.allocate(16, 0);
             assert!(allocation.is_empty());
+        }
+    }
+
+    // ── TokenPath (Issue 670: vocab-widening of TreeNode.parent_path) ──
+    mod token_path {
+        use super::*;
+
+        #[test]
+        fn token_path_from_token_roundtrip() {
+            let p = TokenPath::from_token(7);
+            assert_eq!(p.token_at(0), 7);
+            assert_eq!(p.token_at(1), 0, "levels beyond depth are zero");
+        }
+
+        #[test]
+        fn token_path_extend_matches_push_shift_or() {
+            // The pre-widening packing: node_path = (parent_path << 16) | token.
+            // The array analogue must reproduce its extraction exactly for
+            // 16-bit-representable tokens (the lossless regime, G1).
+            let old_pack = |tokens: &[usize]| -> u128 {
+                tokens
+                    .iter()
+                    .fold(0u128, |acc, &t| (acc << 16) | (t as u128))
+            };
+            let old_extract = |path: u128, num: usize| -> Vec<usize> {
+                (0..num)
+                    .map(|k| ((path >> ((num - 1 - k) * 16)) & 0xFFFF) as usize)
+                    .collect()
+            };
+
+            let tokens = [3usize, 7, 1, 0, 65535, 42, 9, 12]; // 8 levels, incl. 0 + 65_535
+            let mut path = TokenPath::empty();
+            for (depth, &t) in tokens.iter().enumerate() {
+                path = path.extend(depth, t);
+            }
+            assert_eq!(
+                extract(&path, tokens.len()),
+                old_extract(old_pack(&tokens), tokens.len()),
+                "array packing must equal the u128 packing in the lossless regime"
+            );
+        }
+
+        fn extract(path: &TokenPath, num: usize) -> Vec<usize> {
+            (0..num).map(|k| path.token_at(k)).collect()
+        }
+
+        #[test]
+        fn token_path_parent_of_drops_last_token() {
+            let mut path = TokenPath::from_token(5);
+            path = path.extend(1, 10);
+            path = path.extend(2, 3);
+
+            let parent = path.parent_of(2);
+            assert_eq!(extract(&parent, 2), vec![5, 10]);
+            let grandparent = parent.parent_of(1);
+            assert_eq!(extract(&grandparent, 1), vec![5]);
+        }
+
+        #[test]
+        fn token_path_full_bonsai_vocab_roundtrip() {
+            // G2 (Issue 670): an 8-level path round-trips every token id in the
+            // full Bonsai vocabulary (248,320 ids incl. 248,319) — the exact
+            // regime where the u128/16-bit packing aliased and lost tokens.
+            const BONSAI_VOCAB: usize = 248_320;
+            let probes: Vec<usize> = (0..BONSAI_VOCAB)
+                .step_by(97) // ~2,559 samples across the full range
+                .chain([
+                    65_535,
+                    65_536, // first id the old packing corrupted
+                    65_537,
+                    248_319, // the last Bonsai id
+                    BONSAI_VOCAB - 1,
+                ])
+                .collect();
+
+            for &id in &probes {
+                let mut path = TokenPath::from_token(id);
+                assert_eq!(path.token_at(0), id, "depth 0 must round-trip {id}");
+                for level in 1..TokenPath::MAX_LEVELS {
+                    path = path.extend(level, id);
+                }
+                for level in 0..TokenPath::MAX_LEVELS {
+                    assert_eq!(path.token_at(level), id, "level {level} must round-trip {id}");
+                }
+            }
+        }
+
+        #[test]
+        fn token_path_ord_is_root_first_lexicographic() {
+            // The (depth, parent_path) sort in build_topology_from_tree_nodes
+            // relied on u128 comparison == lexicographic from the root token.
+            // Derived array Ord must preserve that ordering.
+            let a = TokenPath::from_levels(&[5, 100]);
+            let b = TokenPath::from_levels(&[5, 200]);
+            let c = TokenPath::from_levels(&[6, 0]);
+            assert!(a < b, "same root: deeper token decides");
+            assert!(b < c, "root token dominates");
+        }
+
+        #[test]
+        fn token_path_is_copy_and_32_bytes() {
+            // G3 shape guard: copy-cheap, same class as the old u128 path.
+            assert_eq!(std::mem::size_of::<TokenPath>(), 32);
+            assert!(!std::mem::needs_drop::<TokenPath>());
+            let p = TokenPath::from_token(1);
+            let q = p; // Copy
+            assert_eq!(p, q);
         }
     }
 }

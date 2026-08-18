@@ -24,7 +24,7 @@
 use std::collections::HashSet;
 
 use crate::dd_tree::{build_dd_tree_screened, extract_parent_tokens_into};
-use crate::{ScreeningPruner, TreeNode};
+use crate::{ScreeningPruner, TokenPath, TreeNode};
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -482,12 +482,23 @@ pub fn build_dd_tree_screened_synonyms(
     // `state_from_path` returned a fresh `Vec<f32>` every call).
     let mut state_buf = vec![0.0f32; context_dim];
 
-    // Helper: write a lightweight state from path info for cluster lookup
-    let fill_state = |state: &mut [f32], depth: usize, token_idx: usize, parent_path: u128| {
+    // Helper: write a lightweight state from path info for cluster lookup.
+    // `path_hash` mimics the pre-widening `parent_path & 0xFFFFFF`: the most
+    // recent token's full 16 bits plus the low 8 bits of the token before it.
+    let fill_state = |state: &mut [f32], depth: usize, token_idx: usize, path_hash: u32| {
         state[0] = depth as f32;
         state[1] = token_idx as f32;
         // Hash parent path into a single f32
-        state[2] = (parent_path & 0xFFFFFF) as f32;
+        state[2] = path_hash as f32;
+    };
+    let low24 = |path: TokenPath, last_level: usize| -> u32 {
+        let last = path.token_at(last_level) as u32;
+        let second = if last_level > 0 {
+            (path.token_at(last_level - 1) & 0xFF) as u32
+        } else {
+            0
+        };
+        last | (second << 16)
     };
 
     // Helper: check if cluster at depth is already explored, if not mark it
@@ -506,7 +517,7 @@ pub fn build_dd_tree_screened_synonyms(
     if chain_seed {
         // Phase A: Build greedy chain backbone
         let mut cumulative_score: f32 = 0.0;
-        let mut parent_path: u128 = 0;
+        let mut parent_path = TokenPath::empty();
         let mut chain_parent_tokens: Vec<usize> = Vec::with_capacity(config.draft_lookahead);
 
         for (depth, marginal) in marginals.iter().enumerate() {
@@ -534,16 +545,22 @@ pub fn build_dd_tree_screened_synonyms(
                 break;
             }
 
-            // Synonym check for chain backbone
-            fill_state(&mut state_buf, depth, token_idx, parent_path);
+            // Synonym check for chain backbone (pre-widening: the path
+            // BEFORE this depth's token, hashed to its low 24 bits).
+            let chain_hash = if depth == 0 {
+                0
+            } else {
+                low24(parent_path, depth - 1)
+            };
+            fill_state(&mut state_buf, depth, token_idx, chain_hash);
             let cluster = synonym_map.lookup(&state_buf);
             let _ = check_and_mark(cluster, depth, &mut explored_clusters);
 
             cumulative_score += prob.ln() + relevance.ln();
             let node_path = if depth == 0 {
-                token_idx as u128
+                TokenPath::from_token(token_idx)
             } else {
-                (parent_path << 16) | (token_idx as u128)
+                parent_path.extend(depth, token_idx)
             };
 
             tree.push(TreeNode {
@@ -568,7 +585,7 @@ pub fn build_dd_tree_screened_synonyms(
                     continue;
                 }
 
-                fill_state(&mut state_buf, 0, i, i as u128);
+                fill_state(&mut state_buf, 0, i, low24(TokenPath::from_token(i), 0));
                 let cluster = synonym_map.lookup(&state_buf);
                 if !check_and_mark(cluster, 0, &mut explored_clusters) {
                     continue; // Cluster already explored
@@ -578,7 +595,7 @@ pub fn build_dd_tree_screened_synonyms(
                     score: prob.ln() + relevance.ln(),
                     depth: 0,
                     token_idx: i,
-                    parent_path: i as u128,
+                    parent_path: TokenPath::from_token(i),
                 });
             }
         }
@@ -596,7 +613,7 @@ pub fn build_dd_tree_screened_synonyms(
             }
 
             // Synonym check
-            fill_state(&mut state_buf, 0, i, i as u128);
+            fill_state(&mut state_buf, 0, i, low24(TokenPath::from_token(i), 0));
             let cluster = synonym_map.lookup(&state_buf);
             if !check_and_mark(cluster, 0, &mut explored_clusters) {
                 continue; // Cluster already explored at this depth
@@ -606,7 +623,7 @@ pub fn build_dd_tree_screened_synonyms(
                 score: prob.ln() + relevance.ln(),
                 depth: 0,
                 token_idx: i,
-                parent_path: i as u128,
+                parent_path: TokenPath::from_token(i),
             });
         }
     }
@@ -686,8 +703,8 @@ pub fn build_dd_tree_screened_synonyms(
                 }
 
                 // Synonym pruning: skip branches in already-explored clusters
-                let child_path = (best.parent_path << 16) | (i as u128);
-                fill_state(&mut state_buf, next_depth, i, child_path);
+                let child_path = best.parent_path.extend(next_depth, i);
+                fill_state(&mut state_buf, next_depth, i, low24(child_path, next_depth));
                 let cluster = synonym_map.lookup(&state_buf);
                 if !check_and_mark(cluster, next_depth, &mut explored_clusters) {
                     continue; // Cluster already explored — skip this branch

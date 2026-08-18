@@ -1,7 +1,7 @@
 
 use super::*;
 use crate::dflash::dflash_predict;
-use katgpt_core::speculative::types::SdeConfig;
+use katgpt_core::speculative::types::{SdeConfig, TokenPath};
 use katgpt_transformer::TransformerWeights;
 use katgpt_types::{Config, Rng};
 
@@ -16,14 +16,14 @@ fn make_draft() -> (TransformerWeights, Config) {
 
 #[test]
 fn test_extract_parent_tokens_roundtrip() {
-    let path_d0 = 3u128;
-    let path_d1 = (path_d0 << 16) | 7;
-    let path_d2 = (path_d1 << 16) | 1;
+    let path_d0 = TokenPath::from_token(3);
+    let path_d1 = path_d0.extend(1, 7);
+    let path_d2 = path_d1.extend(2, 1);
 
     assert_eq!(extract_parent_tokens(path_d0, 1), vec![3]);
     assert_eq!(extract_parent_tokens(path_d1, 2), vec![3, 7]);
     assert_eq!(extract_parent_tokens(path_d2, 3), vec![3, 7, 1]);
-    let empty: Vec<usize> = extract_parent_tokens(0, 0);
+    let empty: Vec<usize> = extract_parent_tokens(TokenPath::empty(), 0);
     assert!(empty.is_empty());
 }
 
@@ -135,7 +135,7 @@ fn test_merge_empty_retrieval_noop() {
         score: 1.0,
         depth: 0,
         token_idx: 0,
-        parent_path: 0,
+        parent_path: TokenPath::from_token(0),
     }];
     let original_len = tree.len();
 
@@ -268,15 +268,19 @@ fn test_chain_seed_produces_chain_path() {
     assert_eq!(tree[2].token_idx, 3, "chain node depth 2 = argmax token 3");
 
     // Verify chain node parent_paths form contiguous path
-    assert_eq!(tree[0].parent_path, 5, "depth 0 parent_path = token 5");
+    assert_eq!(
+        tree[0].parent_path,
+        TokenPath::from_levels(&[5]),
+        "depth 0 parent_path = token 5"
+    );
     assert_eq!(
         tree[1].parent_path,
-        (5u128 << 16) | 10,
+        TokenPath::from_levels(&[5, 10]),
         "depth 1 parent_path = [5, 10]"
     );
     assert_eq!(
         tree[2].parent_path,
-        ((5u128 << 16) | 10) << 16 | 3,
+        TokenPath::from_levels(&[5, 10, 3]),
         "depth 2 parent_path = [5, 10, 3]"
     );
 

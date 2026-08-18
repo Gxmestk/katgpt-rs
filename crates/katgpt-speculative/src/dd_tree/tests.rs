@@ -16,14 +16,14 @@ use katgpt_types::Config;
 
 #[test]
 fn test_extract_parent_tokens_roundtrip() {
-    let path_d0 = 3u128;
-    let path_d1 = (path_d0 << 16) | 7;
-    let path_d2 = (path_d1 << 16) | 1;
+    let path_d0 = TokenPath::from_token(3);
+    let path_d1 = path_d0.extend(1, 7);
+    let path_d2 = path_d1.extend(2, 1);
 
     assert_eq!(extract_parent_tokens(path_d0, 1), vec![3]);
     assert_eq!(extract_parent_tokens(path_d1, 2), vec![3, 7]);
     assert_eq!(extract_parent_tokens(path_d2, 3), vec![3, 7, 1]);
-    let empty: Vec<usize> = extract_parent_tokens(0, 0);
+    let empty: Vec<usize> = extract_parent_tokens(TokenPath::empty(), 0);
     assert!(empty.is_empty());
 }
 
@@ -53,7 +53,7 @@ fn test_merge_empty_retrieval_noop() {
         score: 1.0,
         depth: 0,
         token_idx: 0,
-        parent_path: 0,
+        parent_path: TokenPath::from_token(0),
     }];
     let original_len = tree.len();
 
@@ -186,15 +186,19 @@ fn test_chain_seed_produces_chain_path() {
     assert_eq!(tree[2].token_idx, 3, "chain node depth 2 = argmax token 3");
 
     // Verify chain node parent_paths form contiguous path
-    assert_eq!(tree[0].parent_path, 5, "depth 0 parent_path = token 5");
+    assert_eq!(
+        tree[0].parent_path,
+        TokenPath::from_levels(&[5]),
+        "depth 0 parent_path = token 5"
+    );
     assert_eq!(
         tree[1].parent_path,
-        (5u128 << 16) | 10,
+        TokenPath::from_levels(&[5, 10]),
         "depth 1 parent_path = [5, 10]"
     );
     assert_eq!(
         tree[2].parent_path,
-        ((5u128 << 16) | 10) << 16 | 3,
+        TokenPath::from_levels(&[5, 10, 3]),
         "depth 2 parent_path = [5, 10, 3]"
     );
 
@@ -826,14 +830,14 @@ fn best_path(tree: &[TreeNode]) -> Vec<usize> {
         current_depth += 1;
         let target_parent_path = current_path;
         // Find the highest-score node at current_depth whose ancestor chain
-        // matches (parent_path >> shift matches).
+        // matches (parent path matches).
         let next = tree.iter().find(|n| {
             if n.depth != current_depth {
                 return false;
             }
-            // Check if this node's parent_path, shifted right by 16, matches
-            // our current_path (i.e., this node is a child of our path).
-            n.parent_path >> 16 == target_parent_path
+            // Check if this node's parent path matches our current_path
+            // (i.e., this node is a child of our path).
+            n.parent_path.parent_of(n.depth) == target_parent_path
         });
         match next {
             Some(n) => {

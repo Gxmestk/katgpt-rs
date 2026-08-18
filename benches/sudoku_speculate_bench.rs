@@ -237,7 +237,7 @@ fn backtrack_with_initial_fallback(board: &mut Sudoku9x9) -> (bool, usize, bool)
 /// Inkala and the fallback fires. The bench reports this honestly.
 ///
 /// NOTE: `lookahead` is capped internally at 8 because `TreeNode.parent_path`
-/// is `u128` packing 16-bit tokens (128/16 = 8 max). The DDTree speculate
+/// (`TokenPath`) holds 8 token levels. The DDTree speculate
 /// primitive is architecturally an 8-deep lookahead, designed for token-level
 /// speculative decoding — NOT full-puzzle search.
 fn solve_speculate_iterative(lookahead_in: usize, tree_budget: usize) -> SolveStats {
@@ -296,7 +296,7 @@ where
     F: Fn(&Sudoku9x9, usize) -> Vec<Vec<f32>>,
     P: Fn(Sudoku9x9) -> SudokuPruner,
 {
-    // Architectural ceiling: u128 parent_path packs 16-bit tokens → max 8.
+    // Architectural ceiling: TokenPath holds 8 token levels → max 8.
     const MAX_LOOKAHEAD: usize = 8;
     let lookahead = lookahead_in.min(MAX_LOOKAHEAD);
 
@@ -390,7 +390,7 @@ where
 /// draft+prune machinery produce a lookahead tree?
 ///
 /// A full oneshot solve is architecturally impossible: `TreeNode.parent_path`
-/// is `u128` packing 16-bit tokens, so max lookahead = 8. The hardest Sudoku
+/// (`TokenPath`) holds 8 token levels, so max lookahead = 8. The hardest Sudoku
 /// has 60 empties — it can never fit in one tree. Mode 3 instead reports the
 /// primitive's nodes/µs throughput, which is the building block Mode 2 pays
 /// per round.
@@ -502,7 +502,7 @@ fn main() {
 
     // ── Mode 2: speculate_iterative ──
     println!("── Mode 2: speculate_iterative (DDTree + greedy commit + fallback) ──");
-    println!("  (lookahead capped at 8 — TreeNode.parent_path u128 / 16-bit ceiling)");
+    println!("  (lookahead capped at 8 — TreeNode.parent_path holds 8 token levels)");
     println!(
         "{:<10} {:>10} {:>10} {:>12} {:>10} {:>12} {:>12} {:>10}",
         "lookahead",
@@ -548,7 +548,7 @@ fn main() {
     // drafting make speculation actually beat backtrack?
     println!("── Mode 5: speculate_latent (constraint-aware drafter) ──────");
     println!("  drafter: naked single → p=1.0; N candidates → uniform 1/N");
-    println!("  (same 8-deep u128 ceiling; plasma SIMD has nothing extra to");
+    println!("  (same 8-deep TokenPath ceiling; plasma SIMD has nothing extra to");
     println!("   accelerate here — the marginals are already sharp)");
     println!(
         "{:<10} {:>10} {:>10} {:>12} {:>10} {:>12} {:>12} {:>10}",
@@ -676,8 +676,8 @@ fn main() {
         fmt_us(t_bt)
     );
     println!();
-    println!("  ARCHITECTURAL CEILING: TreeNode.parent_path is u128 packing");
-    println!("  16-bit tokens → max lookahead = 8 (128/16). The DDTree speculate");
+    println!("  ARCHITECTURAL CEILING: TreeNode.parent_path (TokenPath) holds");
+    println!("  8 token levels → max lookahead = 8. The DDTree speculate");
     println!("  primitive is a token-level speculative-decoding kernel, NOT a");
     println!("  full-puzzle search. A 60-empty Sudoku cannot be solved in one tree.");
     println!();

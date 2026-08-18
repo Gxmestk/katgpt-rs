@@ -934,18 +934,14 @@ and in what order the agents took their turns upon the ground.";
     /// in one batched forward and commits the longest match.
     ///
     /// A node's `parent_path` packs its whole ancestor chain including itself,
-    /// one 16-bit token per level, depth 0 in the most significant position
-    /// (`tree_builder`: `node_path = (parent_path << 16) | token_idx`).
+    /// one token per level, depth 0 at level 0 (root first).
     fn tree_acceptance(tree: &[TreeNode], target: &[u32]) -> usize {
         let mut best = 0usize;
         for n in tree {
             if n.depth + 1 > target.len() || n.depth < best {
                 continue;
             }
-            let matches = (0..=n.depth).all(|k| {
-                let tok = ((n.parent_path >> (16 * (n.depth - k))) & 0xFFFF) as u32;
-                tok == target[k]
-            });
+            let matches = (0..=n.depth).all(|k| n.parent_path.token_at(k) as u32 == target[k]);
             if matches {
                 best = n.depth + 1;
             }

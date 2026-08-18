@@ -77,8 +77,8 @@ impl SudokuPruner {
 /// existing examples/tests are unaffected — MRV is strictly opt-in.
 ///
 /// Why this matters for the speculate drafter: the DDTree primitive is
-/// hard-capped at 8-deep (`TreeNode.parent_path: u128` packs 16-bit tokens →
-/// 128/16 = 8). With row-major ordering, Inkala's first 8 empties all have
+/// hard-capped at 8-deep (`TreeNode.parent_path: TokenPath` holds 8 token
+/// levels). With row-major ordering, Inkala's first 8 empties all have
 /// 2–4 candidates and zero naked singles, so the latent drafter (Option B)
 /// can't sharpen marginals inside the window. MRV reorders so any forced
 /// cells (1 candidate) sit at depths 0–7, where the drafter assigns `p=1.0`

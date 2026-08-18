@@ -10,7 +10,7 @@
 //! |---------------------|---------------------------------|--------------------------------------|
 //! | Node payload        | `token_idx: usize`              | `action + observation: String`       |
 //! | Score source        | `ln(P_llm)` marginals           | `ln(confidence)` from speculator     |
-//! | Parent tracking     | `parent_path: u128` bitfield    | `parent_idx: Option<usize>`          |
+//! | Parent tracking     | `TokenPath` level array          | `parent_idx: Option<usize>`          |
 //! | Verification        | Exact logit match               | `ObservationVerifier` (fuzzy match)  |
 //!
 //! ## Verification (T27)
