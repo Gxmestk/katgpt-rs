@@ -82,10 +82,7 @@ fn main() {
         } else {
             "FAIL ❌ (over 1ms)"
         };
-        println!(
-            "{:>6} {:>14.2} {:>14} {:>14}",
-            n, us_per_call, verdict, last_verdict
-        );
+        println!("{n:>6} {us_per_call:>14.2} {verdict:>14} {last_verdict:>14}");
     }
 
     println!("\nNote: this is audit-cadence cost (every N ticks), NOT hot-path.");
