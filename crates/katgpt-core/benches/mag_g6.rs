@@ -41,7 +41,7 @@ fn main() {
 
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 418 Phase 2 — MAG G6 latency gate");
-    println!("  D = {}", D);
+    println!("  D = {D}");
     println!("══════════════════════════════════════════════════════════════════\n");
 
     // ── Fixture 1: 500×64 paired data for mine_direction. ─────────────
@@ -191,7 +191,7 @@ fn main() {
     let transfer_pass = per_score_us < 10.0;
     let recon_pass = recon_us < 50.0;
 
-    println!("── G6 latency results ({} iters) ──", ITERS);
+    println!("── G6 latency results ({ITERS} iters) ──");
     println!(
         "  mine_direction  500×64     {:>8.2} µs   (target < 100 µs)   {}",
         mine_us,

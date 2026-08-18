@@ -203,10 +203,7 @@ fn print_filtered_aggregates_table(
     println!("  {:<22} {:>+14.6}", "TOP-K∩NO-COPY (k=10)", topk_nocopy);
     println!("  {:<22} {:>+14.6}", "COPY-N-ONLY (n=2)", copy_only);
     println!();
-    println!(
-        "  Amplification |TOP-K∩NO-COPY| / |ALL_TOKENS| = {:.3}×",
-        amplification
-    );
+    println!("  Amplification |TOP-K∩NO-COPY| / |ALL_TOKENS| = {amplification:.3}×");
     println!("  Paper §6 Fig 7: filtered loss ~doubles the separation. Target ≥ 1.5×.");
     let verdict = if amplification >= 1.5 {
         "PASS ✓"

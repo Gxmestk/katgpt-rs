@@ -56,11 +56,11 @@ fn make_pool(n: usize, d: usize, seed: u64) -> Vec<f32> {
 }
 
 fn pass(name: &str) {
-    println!("✅ GATE PASS: {}", name);
+    println!("✅ GATE PASS: {name}");
 }
 
 fn fail(name: &str, msg: &str) -> ! {
-    println!("❌ GATE FAIL: {} — {}", name, msg);
+    println!("❌ GATE FAIL: {name} — {msg}");
     std::process::exit(1);
 }
 
@@ -104,8 +104,7 @@ fn g1a_erasure_reduces_target_energy() {
         fail(
             "G1a",
             &format!(
-                "reduction = {:.4} (< 0.5) after {} rounds, before={}, after={}",
-                reduction, n_rounds, before, after
+                "reduction = {reduction:.4} (< 0.5) after {n_rounds} rounds, before={before}, after={after}"
             ),
         );
     }
@@ -147,13 +146,13 @@ fn g1b_preserves_orthogonal_directions() {
     if (e3_after - e3_before).abs() > 1e-6 {
         fail(
             "G1b",
-            &format!("e3 changed: before={}, after={}", e3_before, e3_after),
+            &format!("e3 changed: before={e3_before}, after={e3_after}"),
         );
     }
     if (e4_after - e4_before).abs() > 1e-6 {
         fail(
             "G1b",
-            &format!("e4 changed: before={}, after={}", e4_before, e4_after),
+            &format!("e4 changed: before={e4_before}, after={e4_after}"),
         );
     }
     pass("G1b orthogonal directions preserved");
@@ -237,8 +236,7 @@ fn g1e_trust_region_bound() {
         );
     }
     pass(&format!(
-        "G1e trust region: disp={:.6} ≤ bound={:.6}",
-        displacement, bound
+        "G1e trust region: disp={displacement:.6} ≤ bound={bound:.6}"
     ));
 }
 
@@ -325,11 +323,10 @@ fn g2a_hla_scale_latency() {
     let per_call_ns = elapsed.as_nanos() as f64 / iters as f64;
 
     if per_call_ns > 10_000.0 {
-        fail("G2a", &format!("latency = {:.0}ns > 10µs", per_call_ns));
+        fail("G2a", &format!("latency = {per_call_ns:.0}ns > 10µs"));
     }
     pass(&format!(
-        "G2a HLA scale: {:.0}ns/call (< 10µs — SVD dominates, ~4µs for 8×8 Jacobi)",
-        per_call_ns
+        "G2a HLA scale: {per_call_ns:.0}ns/call (< 10µs — SVD dominates, ~4µs for 8×8 Jacobi)"
     ));
 }
 
@@ -370,11 +367,10 @@ fn g2b_shard_scale_latency() {
     let per_call_us = elapsed.as_nanos() as f64 / iters as f64 / 1000.0;
 
     if per_call_us > 1_000.0 {
-        fail("G2b", &format!("latency = {:.2}µs > 1ms", per_call_us));
+        fail("G2b", &format!("latency = {per_call_us:.2}µs > 1ms"));
     }
     pass(&format!(
-        "G2b shard scale: {:.2}µs/call (< 1ms — 16×64 SVD dominates)",
-        per_call_us
+        "G2b shard scale: {per_call_us:.2}µs/call (< 1ms — 16×64 SVD dominates)"
     ));
 }
 
@@ -419,10 +415,10 @@ fn g2c_loop_latency() {
     if per_call_us > 50.0 {
         fail(
             "G2c",
-            &format!("10-round loop = {:.2}µs > 50µs", per_call_us),
+            &format!("10-round loop = {per_call_us:.2}µs > 50µs"),
         );
     }
-    pass(&format!("G2c 10-round loop: {:.2}µs (< 50µs)", per_call_us));
+    pass(&format!("G2c 10-round loop: {per_call_us:.2}µs (< 50µs)"));
 }
 
 // ─── G4: Alloc-free ──────────────────────────────────────────────────────────
@@ -460,7 +456,7 @@ fn g4_alloc_free_hot_path() {
     if allocs > 0 {
         fail(
             "G4",
-            &format!("{} allocs over 100 calls (expected 0)", allocs),
+            &format!("{allocs} allocs over 100 calls (expected 0)"),
         );
     }
 
@@ -533,14 +529,12 @@ fn g6_ablation_mance_vs_unconstrained() {
         fail(
             "G6",
             &format!(
-                "MANCE orthogonal energy {:.6} < unconstrained {:.6}",
-                mance_orth, uncon_orth
+                "MANCE orthogonal energy {mance_orth:.6} < unconstrained {uncon_orth:.6}"
             ),
         );
     }
     pass(&format!(
-        "G6 MANCE preserves ≥ orthogonal energy: mance_orth={:.6} ≥ uncon_orth={:.6}",
-        mance_orth, uncon_orth
+        "G6 MANCE preserves ≥ orthogonal energy: mance_orth={mance_orth:.6} ≥ uncon_orth={uncon_orth:.6}"
     ));
 }
 
@@ -606,8 +600,7 @@ fn g2d_cached_loop_latency() {
         fail(
             "G2d",
             &format!(
-                "cached 10-round loop = {:.2}µs > 25µs (50% of 50µs gate)",
-                per_call_us
+                "cached 10-round loop = {per_call_us:.2}µs > 25µs (50% of 50µs gate)"
             ),
         );
     }
@@ -676,8 +669,7 @@ fn g4c_cached_loop_alloc_free() {
     // the uncached loop. The cache itself adds 0. We report the total and note
     // that the cache optimization is alloc-free.
     pass(&format!(
-        "G4c cached loop: {} allocs/100 loops (cache itself adds 0; loop allocs inherited from uncached pattern)",
-        allocs
+        "G4c cached loop: {allocs} allocs/100 loops (cache itself adds 0; loop allocs inherited from uncached pattern)"
     ));
 }
 
@@ -726,7 +718,7 @@ fn g4d_cached_step_alloc_free() {
     if allocs > 0 {
         fail(
             "G4d",
-            &format!("{} allocs over 100 cached step calls (expected 0)", allocs),
+            &format!("{allocs} allocs over 100 cached step calls (expected 0)"),
         );
     }
 

@@ -113,7 +113,7 @@ fn main() {
     }; // fixed 8 groups (perf cores on Apple Silicon)
 
     let n_workers = rayon::current_num_threads();
-    println!("rayon threads: {}\n", n_workers);
+    println!("rayon threads: {n_workers}\n");
 
     let evecs = {
         let mut e = vec![0.0f32; K * D];
@@ -448,10 +448,7 @@ fn main() {
         + scratch_g6.w.len()
         + scratch_g6.mean.len())
         * 4;
-    println!(
-        "    (pre-parallel heap = {}B; chunk_cov grows on first N>threshold call)",
-        heap_min
-    );
+    println!("    (pre-parallel heap = {heap_min}B; chunk_cov grows on first N>threshold call)");
 
     // ── Verdict ───────────────────────────────────────────────────
     println!("\n=== Verdict ===");

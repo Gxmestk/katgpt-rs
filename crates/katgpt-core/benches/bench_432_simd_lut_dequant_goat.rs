@@ -273,8 +273,7 @@ fn gate_g3_feature_isolation() -> GateResult {
     let mut out = [0.0_f32; 2];
     dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out);
     let detail = format!(
-        "simd_lut_dequant feature compiles and runs: dequant([0x01,0x02], UInt4, shift=0) = {:?}",
-        out
+        "simd_lut_dequant feature compiles and runs: dequant([0x01,0x02], UInt4, shift=0) = {out:?}"
     );
     GateResult::pass("G3", detail)
 }

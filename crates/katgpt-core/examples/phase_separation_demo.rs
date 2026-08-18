@@ -61,10 +61,10 @@ fn main() {
     }
 
     // ── Report ────────────────────────────────────────────────────────────
-    println!("Lonely Runner Conjecture — N = {} entities", n);
-    println!("Speeds: {:?}", SPEEDS);
-    println!("Orbit period P = lcm(1..=7) = {}", PERIOD);
-    println!("LRC bound: 1/N = 1/{} ≈ {:.6} (eps slack ±{:.6})", n, BOUND, EPS);
+    println!("Lonely Runner Conjecture — N = {n} entities");
+    println!("Speeds: {SPEEDS:?}");
+    println!("Orbit period P = lcm(1..=7) = {PERIOD}");
+    println!("LRC bound: 1/N = 1/{n} ≈ {BOUND:.6} (eps slack ±{EPS:.6})");
     println!();
     println!("{:<10}{:<16}{:<16}MaxSeparation", "Entity", "Speed", "LoneliestTick");
     println!("{}", "-".repeat(58));

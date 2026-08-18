@@ -327,8 +327,7 @@ fn g5_perf() -> (GateResult, u64, u64) {
     let reach_p50 = samples[samples.len() / 2];
 
     let mut detail = format!(
-        "compile_schema(199 regions)={}ns (budget {}ns); reaches p50={}ns (budget {}ns)",
-        compile_ns_per, G5_COMPILE_BUDGET_NS, reach_p50, G5_REACH_BUDGET_NS
+        "compile_schema(199 regions)={compile_ns_per}ns (budget {G5_COMPILE_BUDGET_NS}ns); reaches p50={reach_p50}ns (budget {G5_REACH_BUDGET_NS}ns)"
     );
     let _ = &mut detail; // silence unused-mut on some toolchains
     let passed = compile_ns_per <= G5_COMPILE_BUDGET_NS && reach_p50 <= G5_REACH_BUDGET_NS;

@@ -176,8 +176,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!(
-        "Graph config: avg out-degree = {}, {} timed runs (median), seed = 42",
-        AVG_DEGREE, TIMED_RUNS
+        "Graph config: avg out-degree = {AVG_DEGREE}, {TIMED_RUNS} timed runs (median), seed = 42"
     );
     println!();
 
@@ -204,10 +203,7 @@ fn main() {
             g4_1024_passes = true;
         }
 
-        println!(
-            "{:>8}  {:>12}  {:>12}  {:>8}  {:>8}",
-            n, refine_str, infer_str, n_classes, n_ops
-        );
+        println!("{n:>8}  {refine_str:>12}  {infer_str:>12}  {n_classes:>8}  {n_ops:>8}");
     }
     println!();
     let g4_status = if g4_1024_passes {
@@ -215,7 +211,7 @@ fn main() {
     } else {
         "❌ FAIL"
     };
-    println!("G4 (partition_refine ≤ 1ms @ N=1024): {}", g4_status);
+    println!("G4 (partition_refine ≤ 1ms @ N=1024): {g4_status}");
     println!();
 
     // ── G5: class_of throughput ─────────────────────────────────────────
@@ -236,8 +232,8 @@ fn main() {
 
     // ── Summary ─────────────────────────────────────────────────────────
     println!("── Summary ────────────────────────────────────────────────────");
-    println!("G4 latency:        {}", g4_status);
-    println!("G5 class_of tput:  {}", g5_status);
+    println!("G4 latency:        {g4_status}");
+    println!("G5 class_of tput:  {g5_status}");
     if !g4_1024_passes || throughput < 1e8 {
         std::process::exit(1);
     }
@@ -246,7 +242,7 @@ fn main() {
 fn format_duration(d: Duration) -> String {
     let ns = d.as_nanos();
     if ns < 1_000 {
-        format!("{}ns", ns)
+        format!("{ns}ns")
     } else if ns < 1_000_000 {
         format!("{:.1}µs", ns as f64 / 1_000.0)
     } else {

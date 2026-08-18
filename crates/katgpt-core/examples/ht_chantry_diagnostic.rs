@@ -172,8 +172,7 @@ fn ensure_connected(map: &mut GridMap) {
             .iter()
             .enumerate()
             .max_by_key(|(_, s)| *s)
-            .map(|(i, _)| i as i32)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i as i32);
         'outer: for wy in 0..h {
             for wx in 0..w {
                 if map.is_passable(wx, wy) {

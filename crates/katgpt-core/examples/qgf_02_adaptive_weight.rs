@@ -75,7 +75,7 @@ fn main() {
         let c = i as f32 / 10.0;
         let w_gentle = adaptive_guidance_weight(c, THRESHOLD, 4.0);
         let w_sharp = adaptive_guidance_weight(c, THRESHOLD, 12.0);
-        println!("  {:<12.2} {:>14.6} {:>14.6}", c, w_gentle, w_sharp);
+        println!("  {c:<12.2} {w_gentle:>14.6} {w_sharp:>14.6}");
     }
     println!();
     println!("  Reading: low confidence → ~0 (pure BC), high confidence → ~1");
@@ -113,12 +113,9 @@ fn main() {
     );
 
     println!("── Step 2: high-confidence oracle (LeoHead-tier) ──");
-    println!(
-        "  confidence = 1.0  →  adaptive weight = {:.6}",
-        weight_high
-    );
+    println!("  confidence = 1.0  →  adaptive weight = {weight_high:.6}");
     println!("  tilt applied? {applied_high}");
-    println!("  tilted logits: {:?}", logits_high);
+    println!("  tilted logits: {logits_high:?}");
     let e_ref = expected_q(&ref_logits, &q_landscape);
     let e_high = expected_q(&logits_high, &q_landscape);
     println!(
@@ -154,12 +151,9 @@ fn main() {
     );
 
     println!("── Step 3: low-confidence oracle (BFN/freeze-tier) ──");
-    println!(
-        "  confidence = 0.05  →  adaptive weight = {:.6}",
-        weight_low
-    );
+    println!("  confidence = 0.05  →  adaptive weight = {weight_low:.6}");
     println!("  tilt applied? {applied_low}  (weight = 0.0045 → near-zero tilt)");
-    println!("  tilted logits: {:?}", logits_low);
+    println!("  tilted logits: {logits_low:?}");
     let e_low = expected_q(&logits_low, &q_landscape);
     println!(
         "  E[Q]: ref={:.4} → 'guided'={:.4}  (relative gain {:.2}%)",

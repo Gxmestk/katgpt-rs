@@ -393,10 +393,7 @@ fn main() {
         _ => "FAIL",
     };
     println!("════════════════════════════════════════════════════════════════");
-    println!(
-        "  G1 NON-REDUNDANCY VERDICT: {}/3 substrates PASS  →  {}",
-        pass_count, verdict
-    );
+    println!("  G1 NON-REDUNDANCY VERDICT: {pass_count}/3 substrates PASS  →  {verdict}");
     println!(
         "    S1 (DEC cochain):    {} (|Δ△|={})",
         if s1.pass { "PASS" } else { "FAIL" },

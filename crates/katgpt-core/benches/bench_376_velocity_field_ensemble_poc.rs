@@ -280,8 +280,7 @@ impl Metrics {
             let rank_of_true = ranked
                 .iter()
                 .position(|(_, idx)| *idx == true_argmax)
-                .map(|p| p + 1)
-                .unwrap_or(D);
+                .map_or(D, |p| p + 1);
             sum_rank += rank_of_true as u64;
 
             // NLL: sigmoid-normalized categorical.
@@ -573,8 +572,7 @@ fn print_metrics_row(label: &str, m: &Metrics) {
 fn print_regime(r: &RegimeResult) {
     println!("\n=== Regime: {} ===", r.regime_name);
     println!(
-        "  D={}, N_sources={}, N_train={}, N_test={}, σ_bias={}, σ_noise={}",
-        D, N_SOURCES, N_TRAIN, N_TEST, SIGMA_BIAS, SIGMA_NOISE
+        "  D={D}, N_sources={N_SOURCES}, N_train={N_TRAIN}, N_test={N_TEST}, σ_bias={SIGMA_BIAS}, σ_noise={SIGMA_NOISE}"
     );
     println!(
         "  per-source test MSE: [{:.5}, {:.5}, {:.5}]  (best={} → competitor a)",

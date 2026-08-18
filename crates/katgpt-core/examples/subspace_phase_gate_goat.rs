@@ -235,8 +235,7 @@ fn main() {
     println!("  Plan 301 Phase 2 — G1 GOAT: Subspace Phase Transition");
     println!("  Paper: arXiv:2409.02426 (Wang et al., Theorem 4)");
     println!(
-        "  Setup: D={}  K={}  d={}  subspaces,  N ∈ {:?}",
-        AMBIENT_DIM, NUM_SUBSPACES, INTRINSIC_DIM, SAMPLE_SIZES
+        "  Setup: D={AMBIENT_DIM}  K={NUM_SUBSPACES}  d={INTRINSIC_DIM}  subspaces,  N ∈ {SAMPLE_SIZES:?}"
     );
     println!("═══════════════════════════════════════════════════════════════");
     println!();
@@ -261,8 +260,7 @@ fn main() {
         }
     }
     println!(
-        "✓ T2.2: K={} mutually-orthogonal d={} orthonormal bases in R^{}",
-        NUM_SUBSPACES, INTRINSIC_DIM, AMBIENT_DIM
+        "✓ T2.2: K={NUM_SUBSPACES} mutually-orthogonal d={INTRINSIC_DIM} orthonormal bases in R^{AMBIENT_DIM}"
     );
     println!();
 
@@ -295,8 +293,7 @@ fn main() {
         let nr_mean = nrs.iter().sum::<f32>() / NUM_SUBSPACES as f32;
         let gate = phase_transition_gate(n, INTRINSIC_DIM);
         println!(
-            "{},{},{:.6},{:.6},{:.6},{},{:.3},{:.1}",
-            n, INTRINSIC_DIM, mean_err, min_err, max_err, gate, pr_mean, nr_mean
+            "{n},{INTRINSIC_DIM},{mean_err:.6},{min_err:.6},{max_err:.6},{gate},{pr_mean:.3},{nr_mean:.1}"
         );
         rows.push(NRow {
             n,
@@ -309,10 +306,7 @@ fn main() {
 
     // T2.5 — verify phase transition: N<d → err>0.5, N≥d → err<0.1.
     println!("── T2.5: Phase-transition check ──");
-    println!(
-        "  Rule: N<d → err>{},  N≥d → err<{}",
-        FAIL_THRESHOLD, PASS_THRESHOLD
-    );
+    println!("  Rule: N<d → err>{FAIL_THRESHOLD},  N≥d → err<{PASS_THRESHOLD}");
     let mut t25_pass = true;
     for r in &rows {
         let expect_high = r.n < INTRINSIC_DIM;
@@ -354,10 +348,7 @@ fn main() {
     println!();
 
     // T2.7 — participation_ratio vs numerical_rank as intrinsic-dim estimators.
-    println!(
-        "── T2.7: Intrinsic-dim estimation (true d={}) ──",
-        INTRINSIC_DIM
-    );
+    println!("── T2.7: Intrinsic-dim estimation (true d={INTRINSIC_DIM}) ──");
     println!(
         "  {:>4}  {:>10}  {:>10}  {:>8}",
         "N", "PR_round", "NR99", "winner"
@@ -384,10 +375,7 @@ fn main() {
         );
     }
     println!();
-    println!(
-        "  Summary: PR wins {} row(s), NR wins {} row(s).",
-        pr_wins, nr_wins
-    );
+    println!("  Summary: PR wins {pr_wins} row(s), NR wins {nr_wins} row(s).");
     println!("  On this synthetic MoLRG, NR tracks the true d better than PR");
     println!("  (sharp spectral elbow). For N<d, both correctly report N — the");
     println!("  true d is information-theoretically unrecoverable. NR is the");

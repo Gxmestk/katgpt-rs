@@ -260,7 +260,7 @@ where
 fn format_duration(d: Duration) -> String {
     let ns = d.as_nanos();
     if ns < 1_000 {
-        format!("{:>5} ns", ns)
+        format!("{ns:>5} ns")
     } else if ns < 1_000_000 {
         format!("{:>5.2} µs", ns as f64 / 1_000.0)
     } else {
@@ -276,8 +276,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!(
-        "Config: {} timed runs (median), {} warmup, seed=42",
-        TIMED_RUNS, WARMUP
+        "Config: {TIMED_RUNS} timed runs (median), {WARMUP} warmup, seed=42"
     );
     println!();
 

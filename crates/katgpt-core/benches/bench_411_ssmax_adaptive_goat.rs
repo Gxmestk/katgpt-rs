@@ -110,7 +110,7 @@ fn attention_output_cosine_sim(logits: &[f32], gold_index: usize, d_model: usize
 fn main() {
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 411 S2 — SSMax Rolling-Δ Estimator GOAT gate");
-    println!("  Δ (true gold-distractor gap) = {}", DELTA);
+    println!("  Δ (true gold-distractor gap) = {DELTA}");
     println!("══════════════════════════════════════════════════════════════════\n");
 
     let ns: &[usize] = &[64, 1_000, 10_000];
@@ -255,7 +255,7 @@ fn main() {
     let after = ALLOC_COUNT.load(Ordering::Relaxed);
     let allocs = after - before;
     let g4_pass = allocs == 0;
-    println!("  Allocations: {}", allocs);
+    println!("  Allocations: {allocs}");
     println!(
         "\nG4 (alloc-free): {}\n",
         if g4_pass { "✅ PASS" } else { "❌ FAIL" }
@@ -269,8 +269,7 @@ fn main() {
     let fixed_s_l = SsmaxMode::Fixed { s_l: 1.0 }.resolve_s_l();
     let g5_pass = (warm_s_l - fixed_s_l).abs() < 1e-6;
     println!(
-        "  Warm-start s_L = {:.6}, Fixed s_L = {:.6}",
-        warm_s_l, fixed_s_l
+        "  Warm-start s_L = {warm_s_l:.6}, Fixed s_L = {fixed_s_l:.6}"
     );
     println!(
         "\nG5 (no-regression): {}\n",

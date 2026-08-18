@@ -324,24 +324,21 @@ fn main() {
     println!();
     println!("Configuration:");
     println!(
-        "  PKM:      SQRT_N={} (N={} slots), D_K={}, D_V={}, K={}",
-        SQRT_N, N_SLOTS, D_K, D_V, K
+        "  PKM:      SQRT_N={SQRT_N} (N={N_SLOTS} slots), D_K={D_K}, D_V={D_V}, K={K}"
     );
     println!(
-        "  Write:    pool={}, t={} (smallest write-set regime — the paper's widest-gap regime)",
-        POOL, T
+        "  Write:    pool={POOL}, t={T} (smallest write-set regime — the paper's widest-gap regime)"
     );
     println!(
         "  Background: {} queries × batch {} → |B|={} batches",
         N_BG, BG_BATCH, N_BG / BG_BATCH
     );
     println!(
-        "  Facts:    A={} then B={} (same broad distribution — overlapping pools)",
-        N_FACTS, N_FACTS
+        "  Facts:    A={N_FACTS} then B={N_FACTS} (same broad distribution — overlapping pools)"
     );
-    println!("  Recall:   max-cos over top-16 neighborhood ≥ {:.2}", RECALL_COS);
-    println!("  Gates:    {:?}", GATES);
-    println!("  NormRamp spread: {:.1}", NORM_SPREAD);
+    println!("  Recall:   max-cos over top-16 neighborhood ≥ {RECALL_COS:.2}");
+    println!("  Gates:    {GATES:?}");
+    println!("  NormRamp spread: {NORM_SPREAD:.1}");
     println!();
 
     // ── Build stats + sweep per regime; G1 gates on NormRamp ──────────────
@@ -384,7 +381,7 @@ fn main() {
         }
         println!("── Regime: {} ──", regime.label());
         println!("  stats built in {:?}: |B|={}, idf range [{:.3}, {:.3}]", stats_build, stats.n_batches(), idf_min, idf_max);
-        println!("  slot count histogram (count/|B| buckets 0,⅛,…,1): {:?}", hist);
+        println!("  slot count histogram (count/|B| buckets 0,⅛,…,1): {hist:?}");
         println!();
 
         for (ai, &arm) in arms.iter().enumerate() {
@@ -407,7 +404,7 @@ fn main() {
 
     // ── G1 verdict per regime ─────────────────────────────────────────────
     println!("── G1 Interference/Retention Gate ───────────────────────────────────");
-    println!("  target: IDF recall(A)_post − TF recall(A)_post ≥ +{:.2} at matched recall(B)", G1_MARGIN_TARGET);
+    println!("  target: IDF recall(A)_post − TF recall(A)_post ≥ +{G1_MARGIN_TARGET:.2} at matched recall(B)");
     let mut g1_verdicts = [false; 2];
     for (ri, &regime) in regimes.iter().enumerate() {
         // Matched-learning target: min(0.85, TF's best recall(B)).
@@ -525,10 +522,10 @@ fn main() {
 
     let overhead = ns_idf - ns_plain;
     println!(
-        "  write_idf (pool={}, t={}): {:>8.0} ns/write", POOL, T, ns_idf
+        "  write_idf (pool={POOL}, t={T}): {ns_idf:>8.0} ns/write"
     );
     println!(
-        "  write     (k={} plain):   {:>8.0} ns/write", T, ns_plain
+        "  write     (k={T} plain):   {ns_plain:>8.0} ns/write"
     );
     println!(
         "  idf-fold overhead:        {:>8.0} ns/write ({:.1}× plain)",
@@ -546,8 +543,7 @@ fn main() {
         }
     });
     println!(
-        "  allocations across 1000 steady-state write_idf calls: {}",
-        allocs
+        "  allocations across 1000 steady-state write_idf calls: {allocs}"
     );
     let g4_pass = allocs == 0;
     println!("  G4 verdict: {}", if g4_pass { "✅ PASS" } else { "❌ FAIL" });
@@ -556,7 +552,7 @@ fn main() {
     // ── Final ─────────────────────────────────────────────────────────────
     let pass = g1_pass && g4_pass;
     if pass {
-        println!("═══ Issue 650 GOAT: ✅ PASS — G1 (norm-ramp) margin {:+.3}, G4 {} allocs ═══", ramp_margin, allocs);
+        println!("═══ Issue 650 GOAT: ✅ PASS — G1 (norm-ramp) margin {ramp_margin:+.3}, G4 {allocs} allocs ═══");
     } else {
         println!(
             "═══ Issue 650 GOAT: ❌ FAIL — G1 {} (norm-ramp margin {:+.3}), G4 {} allocs ═══",

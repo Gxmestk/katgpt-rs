@@ -141,7 +141,7 @@ fn main() {
     println!("  Plan 417 — Cross-Resolution SIMD Encode GOAT gate");
     println!("  baseline: pre-417 strided gather-dot");
     println!("  candidate: post-417 transposed-basis simd_matmul_rows");
-    println!("  ITERS={}, ALLOC_ITERS={}", ITERS, ALLOC_ITERS);
+    println!("  ITERS={ITERS}, ALLOC_ITERS={ALLOC_ITERS}");
     println!("══════════════════════════════════════════════════════════════════\n");
 
     let mut all_g1_pass = true;
@@ -167,7 +167,7 @@ fn main() {
         let bases = match bases {
             Ok(b) => b,
             Err(e) => {
-                println!("  (d_src={}, k={}): construction failed: {:?}", d_src, k, e);
+                println!("  (d_src={d_src}, k={k}): construction failed: {e:?}");
                 all_g1_pass = false;
                 continue;
             }
@@ -335,8 +335,7 @@ fn main() {
     println!("\n── Full sweep (including non-production, for transparency) ──");
     for &((d_src, k), baseline_ns, candidate_ns, speedup, _) in &all_results {
         println!(
-            "  d_src={:>3} k={:>2}   baseline {:>7.1} ns → candidate {:>7.1} ns   {:>5.2}×",
-            d_src, k, baseline_ns, candidate_ns, speedup
+            "  d_src={d_src:>3} k={k:>2}   baseline {baseline_ns:>7.1} ns → candidate {candidate_ns:>7.1} ns   {speedup:>5.2}×"
         );
     }
 
@@ -362,8 +361,7 @@ fn main() {
             );
         } else if !any_prod_g2_pass {
             eprintln!(
-                "\nFAIL reason: G2 perf did not clear {:.1}× at ANY production point.",
-                G2_SPEEDUP_TARGET
+                "\nFAIL reason: G2 perf did not clear {G2_SPEEDUP_TARGET:.1}× at ANY production point."
             );
             eprintln!(
                 "Honest verdict: the pre-417 strided gather-dot was already optimal at these scales."

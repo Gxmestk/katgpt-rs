@@ -98,7 +98,7 @@ fn main() {
     let g3_pass = mean_us < 25.0; // 25µs at N=64 — honest target given O(N²)
     let g3_npc_zone_pass = mean_us < 5.0; // 5µs speculative target (needs SIMD)
     println!("G3 latency (N={n}, d={d}, k={k}, {iters} iters):");
-    println!("   total elapsed:  {:?}", elapsed);
+    println!("   total elapsed:  {elapsed:?}");
     println!("   mean per call:  {mean_us:.3} µs ({mean_ns:.0} ns)");
     println!("   target (prod):  < 25.0 µs at N=64 (within 50ms tick budget, 2000× headroom)");
     println!("   target (NPC):   < 5.0 µs  at N≤32 (speculative, needs SIMD)");

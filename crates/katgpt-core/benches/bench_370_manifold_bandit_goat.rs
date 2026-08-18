@@ -505,8 +505,7 @@ fn run_trial_shift<B: Bandit>(
 
 fn gate_g1_structural_advantage() -> GateResult {
     println!(
-        "\n--- G1: Structural Advantage (64 arms, 8 clusters, T={}, {} trials) ---",
-        T_G1, TRIALS_G1
+        "\n--- G1: Structural Advantage (64 arms, 8 clusters, T={T_G1}, {TRIALS_G1} trials) ---"
     );
 
     let mut flat_steps = Vec::with_capacity(TRIALS_G1);
@@ -552,27 +551,24 @@ fn gate_g1_structural_advantage() -> GateResult {
     let ratio = med_hier as f64 / med_flat as f64;
     let passed = ratio <= RATIO_GATE_G1 as f64;
 
-    println!("  flat Thompson    median steps-to-90%: {}", med_flat);
-    println!("  hierarchical     median steps-to-90%: {}", med_hier);
+    println!("  flat Thompson    median steps-to-90%: {med_flat}");
+    println!("  hierarchical     median steps-to-90%: {med_hier}");
     println!(
-        "  ratio (hier/flat): {:.3}  (gate: ≤ {:.1})",
-        ratio, RATIO_GATE_G1
+        "  ratio (hier/flat): {ratio:.3}  (gate: ≤ {RATIO_GATE_G1:.1})"
     );
 
     if passed {
         GateResult::pass(
             "G1 structural advantage",
             format!(
-                "hier {med_hier} ≤ {:.1}× flat {med_flat} (ratio {ratio:.3})",
-                RATIO_GATE_G1
+                "hier {med_hier} ≤ {RATIO_GATE_G1:.1}× flat {med_flat} (ratio {ratio:.3})"
             ),
         )
     } else {
         GateResult::fail(
             "G1 structural advantage",
             format!(
-                "hier {med_hier} > {:.1}× flat {med_flat} (ratio {ratio:.3}) — structure does not accelerate convergence",
-                RATIO_GATE_G1
+                "hier {med_hier} > {RATIO_GATE_G1:.1}× flat {med_flat} (ratio {ratio:.3}) — structure does not accelerate convergence"
             ),
         )
     }
@@ -613,8 +609,7 @@ fn gen_clustered_embeddings_bench(trial: u64) -> Vec<Vec<f32>> {
 fn gate_g1_real_tree_structural_advantage() -> GateResult {
     println!("\n--- G1-real: Structural Advantage with Phase 3 build() tree ---");
     println!(
-        "    ({} arms, {} clusters, T={}, {} trials)",
-        N_ARMS, N_CLUSTERS, T_G1, TRIALS_G1
+        "    ({N_ARMS} arms, {N_CLUSTERS} clusters, T={T_G1}, {TRIALS_G1} trials)"
     );
 
     let mut flat_steps = Vec::with_capacity(TRIALS_G1);
@@ -677,31 +672,27 @@ fn gate_g1_real_tree_structural_advantage() -> GateResult {
     n_top_clusters_seen.sort();
     let median_top = n_top_clusters_seen[n_top_clusters_seen.len() / 2];
 
-    println!("  flat Thompson    median steps-to-90%: {}", med_flat);
-    println!("  hier (real tree) median steps-to-90%: {}", med_hier);
+    println!("  flat Thompson    median steps-to-90%: {med_flat}");
+    println!("  hier (real tree) median steps-to-90%: {med_hier}");
     println!(
-        "  ratio (hier/flat): {:.3}  (gate: ≤ {:.1})",
-        ratio, RATIO_GATE_G1
+        "  ratio (hier/flat): {ratio:.3}  (gate: ≤ {RATIO_GATE_G1:.1})"
     );
     println!(
-        "  real tree median top-level clusters: {} (domain has {})",
-        median_top, N_CLUSTERS
+        "  real tree median top-level clusters: {median_top} (domain has {N_CLUSTERS})"
     );
 
     if passed {
         GateResult::pass(
             "G1-real structural advantage (Phase 3 build)",
             format!(
-                "hier {med_hier} ≤ {:.1}× flat {med_flat} (ratio {ratio:.3}, {median_top} top clusters)",
-                RATIO_GATE_G1
+                "hier {med_hier} ≤ {RATIO_GATE_G1:.1}× flat {med_flat} (ratio {ratio:.3}, {median_top} top clusters)"
             ),
         )
     } else {
         GateResult::fail(
             "G1-real structural advantage (Phase 3 build)",
             format!(
-                "hier {med_hier} > {:.1}× flat {med_flat} (ratio {ratio:.3}, {median_top} top clusters) — real tree does not accelerate convergence",
-                RATIO_GATE_G1
+                "hier {med_hier} > {RATIO_GATE_G1:.1}× flat {med_flat} (ratio {ratio:.3}, {median_top} top clusters) — real tree does not accelerate convergence"
             ),
         )
     }
@@ -723,10 +714,9 @@ fn gate_g1_real_phase_gate_sweep() -> GateResult {
     const D_VALUES: [u32; 5] = [0, 1, 2, 4, 8];
 
     println!(
-        "\n--- G1-real Phase Gate Sweep (T4.2): {} arms, {} clusters, T={}, {} trials ---",
-        N_ARMS, N_CLUSTERS, T_G1, TRIALS_SWEEP
+        "\n--- G1-real Phase Gate Sweep (T4.2): {N_ARMS} arms, {N_CLUSTERS} clusters, T={T_G1}, {TRIALS_SWEEP} trials ---"
     );
-    println!("    d_values: {:?}", D_VALUES);
+    println!("    d_values: {D_VALUES:?}");
 
     // Flat Thompson baseline is the same across all d values.
     let mut flat_steps = Vec::with_capacity(TRIALS_SWEEP);
@@ -747,7 +737,7 @@ fn gate_g1_real_phase_gate_sweep() -> GateResult {
         flat_steps.push(r.steps_to_threshold as u64);
     }
     let med_flat = median_u64(&mut flat_steps);
-    println!("  flat Thompson median steps-to-90%: {}", med_flat);
+    println!("  flat Thompson median steps-to-90%: {med_flat}");
 
     // Sweep d values.
     let mut best_ratio = f64::INFINITY;
@@ -783,8 +773,7 @@ fn gate_g1_real_phase_gate_sweep() -> GateResult {
         let med_hier = median_u64(&mut hier_steps);
         let ratio = med_hier as f64 / med_flat as f64;
         println!(
-            "  d={:<2}  hier median steps-to-90%: {:<6}  ratio: {:.3}",
-            d, med_hier, ratio
+            "  d={d:<2}  hier median steps-to-90%: {med_hier:<6}  ratio: {ratio:.3}"
         );
         sweep_results.push((d, med_hier, ratio));
         if ratio < best_ratio {
@@ -911,8 +900,7 @@ fn gate_g2_diversity() -> GateResult {
         hier_reward_advantage * 100.0
     );
     println!(
-        "  ratio (hier/flat): {:.3}  (gate: ≥ {:.1})",
-        ratio, RATIO_GATE_G2
+        "  ratio (hier/flat): {ratio:.3}  (gate: ≥ {RATIO_GATE_G2:.1})"
     );
 
     // The plan expected hierarchical to visit MORE clusters (diversity claim
@@ -942,8 +930,7 @@ fn gate_g2_diversity() -> GateResult {
             )
         } else {
             format!(
-                "hier {med_hier_c} < {:.1}× flat {med_flat_c}",
-                RATIO_GATE_G2
+                "hier {med_hier_c} < {RATIO_GATE_G2:.1}× flat {med_flat_c}"
             )
         };
         GateResult::fail("G2 diversity preservation", reason)
@@ -952,8 +939,7 @@ fn gate_g2_diversity() -> GateResult {
 
 fn gate_g3_nonstationarity() -> GateResult {
     println!(
-        "\n--- G3: Non-Stationarity Recovery (16 arms, shift @ {}, {} trials) ---",
-        SHIFT_STEP, TRIALS_G3
+        "\n--- G3: Non-Stationarity Recovery (16 arms, shift @ {SHIFT_STEP}, {TRIALS_G3} trials) ---"
     );
 
     let mut flat_no_filter = Vec::with_capacity(TRIALS_G3);
@@ -1027,38 +1013,32 @@ fn gate_g3_nonstationarity() -> GateResult {
     let ratio = med_hier_f as f64 / med_flat as f64;
     let passed = ratio <= RATIO_GATE_G3 as f64;
 
-    println!("  flat (no filter)          median recovery: {}", med_flat);
+    println!("  flat (no filter)          median recovery: {med_flat}");
     println!(
-        "  flat (filter={})          median recovery: {}",
-        DRIFT_RATE, med_flat_f
+        "  flat (filter={DRIFT_RATE})          median recovery: {med_flat_f}"
     );
     println!(
-        "  hier (filter={})          median recovery: {}",
-        DRIFT_RATE, med_hier_f
+        "  hier (filter={DRIFT_RATE})          median recovery: {med_hier_f}"
     );
     println!(
-        "  sliding-window (W={})     median recovery: {}",
-        SLIDING_WINDOW_SIZE, med_slide
+        "  sliding-window (W={SLIDING_WINDOW_SIZE})     median recovery: {med_slide}"
     );
     println!(
-        "  ratio (hier+filter / flat-no-filter): {:.3}  (gate: ≤ {:.1})",
-        ratio, RATIO_GATE_G3
+        "  ratio (hier+filter / flat-no-filter): {ratio:.3}  (gate: ≤ {RATIO_GATE_G3:.1})"
     );
 
     if passed {
         GateResult::pass(
             "G3 non-stationarity recovery",
             format!(
-                "hier+filter {med_hier_f} ≤ {:.1}× flat-no-filter {med_flat} (ratio {ratio:.3}); flat+filter={med_flat_f}, sliding={med_slide}",
-                RATIO_GATE_G3
+                "hier+filter {med_hier_f} ≤ {RATIO_GATE_G3:.1}× flat-no-filter {med_flat} (ratio {ratio:.3}); flat+filter={med_flat_f}, sliding={med_slide}"
             ),
         )
     } else {
         GateResult::fail(
             "G3 non-stationarity recovery",
             format!(
-                "hier+filter {med_hier_f} > {:.1}× flat-no-filter {med_flat} (ratio {ratio:.3})",
-                RATIO_GATE_G3
+                "hier+filter {med_hier_f} > {RATIO_GATE_G3:.1}× flat-no-filter {med_flat} (ratio {ratio:.3})"
             ),
         )
     }
@@ -1119,12 +1099,10 @@ fn gate_g4_latency() -> GateResult {
     let med_observe = median_duration_ns_arr(&mut observe_ns);
 
     println!(
-        "  sample  p50: {} ns  (gate: ≤ {} ns)",
-        med_sample, LATENCY_TARGET_SAMPLE_NS
+        "  sample  p50: {med_sample} ns  (gate: ≤ {LATENCY_TARGET_SAMPLE_NS} ns)"
     );
     println!(
-        "  observe p50: {} ns  (gate: ≤ {} ns)",
-        med_observe, LATENCY_TARGET_OBSERVE_NS
+        "  observe p50: {med_observe} ns  (gate: ≤ {LATENCY_TARGET_OBSERVE_NS} ns)"
     );
 
     // ── Alloc-free hot path ──
@@ -1140,8 +1118,8 @@ fn gate_g4_latency() -> GateResult {
         }
     });
 
-    println!("  sample  allocs/100 calls: {}  (gate: 0)", sample_allocs);
-    println!("  observe allocs/100 calls: {}  (gate: 0)", observe_allocs);
+    println!("  sample  allocs/100 calls: {sample_allocs}  (gate: 0)");
+    println!("  observe allocs/100 calls: {observe_allocs}  (gate: 0)");
 
     let latency_pass =
         med_sample <= LATENCY_TARGET_SAMPLE_NS && med_observe <= LATENCY_TARGET_OBSERVE_NS;
@@ -1158,14 +1136,12 @@ fn gate_g4_latency() -> GateResult {
         let mut reasons = Vec::new();
         if med_sample > LATENCY_TARGET_SAMPLE_NS {
             reasons.push(format!(
-                "sample {}ns > {}",
-                med_sample, LATENCY_TARGET_SAMPLE_NS
+                "sample {med_sample}ns > {LATENCY_TARGET_SAMPLE_NS}"
             ));
         }
         if med_observe > LATENCY_TARGET_OBSERVE_NS {
             reasons.push(format!(
-                "observe {}ns > {}",
-                med_observe, LATENCY_TARGET_OBSERVE_NS
+                "observe {med_observe}ns > {LATENCY_TARGET_OBSERVE_NS}"
             ));
         }
         if !alloc_pass {
@@ -1178,7 +1154,7 @@ fn gate_g4_latency() -> GateResult {
 }
 
 fn gate_g5_reproducibility() -> GateResult {
-    println!("\n--- G5: Bit-Reproducibility ({} samples) ---", G5_SAMPLES);
+    println!("\n--- G5: Bit-Reproducibility ({G5_SAMPLES} samples) ---");
 
     let config = LatentTaskTreeConfig::default();
 
@@ -1190,7 +1166,7 @@ fn gate_g5_reproducibility() -> GateResult {
 
     // BLAKE3 match.
     let blake3_match = tree_a.blake3_root() == tree_b.blake3_root();
-    println!("  BLAKE3 match: {}", blake3_match);
+    println!("  BLAKE3 match: {blake3_match}");
 
     // Identical sample sequences from identical seeds (no observations).
     let mut rng_a = fastrand::Rng::with_seed(12345);
@@ -1204,7 +1180,7 @@ fn gate_g5_reproducibility() -> GateResult {
             break;
         }
     }
-    println!("  pre-observe sample sequences identical: {}", seq_match);
+    println!("  pre-observe sample sequences identical: {seq_match}");
 
     // Identical sample sequences after identical observation sequences.
     let (root_a, n_arms) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
@@ -1232,7 +1208,7 @@ fn gate_g5_reproducibility() -> GateResult {
             break;
         }
     }
-    println!("  post-observe sample sequences identical: {}", post_match);
+    println!("  post-observe sample sequences identical: {post_match}");
 
     if blake3_match && seq_match && post_match {
         GateResult::pass(

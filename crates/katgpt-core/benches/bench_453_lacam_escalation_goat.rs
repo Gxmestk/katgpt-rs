@@ -414,7 +414,7 @@ fn main() {
     } else {
         "FAIL (< 0.50)"
     };
-    println!("  G6c gate: {} (threshold ≥ 0.50)", g6c_verdict);
+    println!("  G6c gate: {g6c_verdict} (threshold ≥ 0.50)");
     println!();
 
     // ─── Latency sweep ─────────────────────────────────────────────────────
@@ -447,7 +447,7 @@ fn main() {
 
     // ─── Summary ───────────────────────────────────────────────────────────
     println!("─── Summary ───\n");
-    println!("  G6c delta: {:.3} ({})", g6c_delta, g6c_verdict);
+    println!("  G6c delta: {g6c_delta:.3} ({g6c_verdict})");
     println!(
         "  G-col gate: vertex collision rate {:.1}% (target ≤ 10%)",
         lacam_metrics.vertex_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0

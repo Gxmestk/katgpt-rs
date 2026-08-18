@@ -68,7 +68,7 @@ const G2_TARGET_MS: u64 = 50;
 fn format_duration(d: Duration) -> String {
     let ns = d.as_nanos();
     if ns < 1_000 {
-        format!("{:>5} ns", ns)
+        format!("{ns:>5} ns")
     } else if ns < 1_000_000 {
         format!("{:>5.2} µs", ns as f64 / 1_000.0)
     } else {
@@ -132,8 +132,7 @@ fn gate_g1_correctness() -> bool {
 fn gate_g2_perf() -> bool {
     println!();
     println!(
-        "── G2: perf at n={} × d={} ─────────────────────────────",
-        N_ANCHORS, DIM
+        "── G2: perf at n={N_ANCHORS} × d={DIM} ─────────────────────────────"
     );
 
     let space = EuclideanLatentSpace::<DIM>;
@@ -223,8 +222,7 @@ fn gate_g4_zero_alloc() -> bool {
     let imauve_allocs = ALLOC_COUNT.load(Ordering::Relaxed);
     let imauve_deallocs = DEALLOC_COUNT.load(Ordering::Relaxed);
     println!(
-        "  imauve_score × 100 calls: {} allocs, {} deallocs  (target: 0, 0)",
-        imauve_allocs, imauve_deallocs
+        "  imauve_score × 100 calls: {imauve_allocs} allocs, {imauve_deallocs} deallocs  (target: 0, 0)"
     );
 
     // intervention_battery: build donors + scratch.
@@ -251,8 +249,7 @@ fn gate_g4_zero_alloc() -> bool {
     let battery_allocs = ALLOC_COUNT.load(Ordering::Relaxed);
     let battery_deallocs = DEALLOC_COUNT.load(Ordering::Relaxed);
     println!(
-        "  intervention_battery × 100 calls: {} allocs, {} deallocs  (target: 0, 0)",
-        battery_allocs, battery_deallocs
+        "  intervention_battery × 100 calls: {battery_allocs} allocs, {battery_deallocs} deallocs  (target: 0, 0)"
     );
 
     imauve_allocs == 0 && battery_allocs == 0
@@ -266,12 +263,10 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!(
-        "Config: n={} anchors, dim={} (NeuronShard::style_weights scale)",
-        N_ANCHORS, DIM
+        "Config: n={N_ANCHORS} anchors, dim={DIM} (NeuronShard::style_weights scale)"
     );
     println!(
-        "       {} timed runs (median), {} warmup, seed=42",
-        TIMED_RUNS, WARMUP
+        "       {TIMED_RUNS} timed runs (median), {WARMUP} warmup, seed=42"
     );
 
     let g1 = gate_g1_correctness();

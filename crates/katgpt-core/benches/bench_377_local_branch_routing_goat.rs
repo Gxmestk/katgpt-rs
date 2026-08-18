@@ -61,8 +61,7 @@ fn main() {
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 377 Phase 3 — Local Branch Routing GOAT gate");
     println!(
-        "  K={}, D={}, ITERS={}, ALLOC_ITERS={}",
-        K, D, ITERS, ALLOC_ITERS
+        "  K={K}, D={D}, ITERS={ITERS}, ALLOC_ITERS={ALLOC_ITERS}"
     );
     println!("══════════════════════════════════════════════════════════════════\n");
 
@@ -86,8 +85,7 @@ fn main() {
     let sanity_idx = router.route_argmax(&parent, &candidates_ref);
     assert_eq!(
         sanity_idx, 0,
-        "fixture broken: expected argmax=0, got {}",
-        sanity_idx
+        "fixture broken: expected argmax=0, got {sanity_idx}"
     );
 
     // ── G2: route_argmax latency ────────────────────────────────────────
@@ -169,8 +167,7 @@ fn main() {
     );
     println!("\n── G4: alloc-free hot path ──");
     println!(
-        "  DotProductRouter::new    {:>4} alloc (one-time, the Box<[f32]> direction)",
-        construct_allocs
+        "  DotProductRouter::new    {construct_allocs:>4} alloc (one-time, the Box<[f32]> direction)"
     );
     println!(
         "  route_argmax × {}       {:>4} alloc   (target 0)   {}",

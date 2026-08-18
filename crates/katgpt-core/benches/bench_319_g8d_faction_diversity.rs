@@ -329,18 +329,9 @@ fn main() {
     println!("║  Plan 319 — G8d: Emergent Faction Diversity Simulation      ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "  Pool: {} NPCs (80% specialists, 20% generalists), D={}",
-        POOL_SIZE, DIM
-    );
-    println!(
-        "  Factions: {}, roles: {} (Tank/Healer/DPS/Support)",
-        N_FACTIONS, N_ROLES
-    );
-    println!(
-        "  Target: complementarity faction diversity ≥ {:.0}× similarity",
-        G8D_RATIO_TARGET
-    );
+    println!("  Pool: {POOL_SIZE} NPCs (80% specialists, 20% generalists), D={DIM}");
+    println!("  Factions: {N_FACTIONS}, roles: {N_ROLES} (Tank/Healer/DPS/Support)");
+    println!("  Target: complementarity faction diversity ≥ {G8D_RATIO_TARGET:.0}× similarity");
     println!();
 
     let pool = generate_pool(0x068D_FACE);
@@ -371,7 +362,7 @@ fn main() {
         ("Complementarity (wedge)", &diverse_order),
         ("Similarity (dot)", &similar_order),
     ] {
-        println!("  {}:", strategy_name);
+        println!("  {strategy_name}:");
         let mut coverages = Vec::with_capacity(N_FACTIONS);
         let mut variances = Vec::with_capacity(N_FACTIONS);
         for f in 0..N_FACTIONS {
@@ -391,8 +382,7 @@ fn main() {
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                .map(|(r, _)| r)
-                .unwrap_or(0);
+                .map_or(0, |(r, _)| r);
             println!(
                 "    Faction {}: {} members, coverage={}/{}, variance={:.4}, dominant={}",
                 f,
@@ -405,10 +395,7 @@ fn main() {
         }
         let mean_cov: f32 = coverages.iter().map(|&c| c as f32).sum::<f32>() / N_FACTIONS as f32;
         let mean_var: f32 = variances.iter().sum::<f32>() / N_FACTIONS as f32;
-        println!(
-            "    Mean: coverage={:.2}/{}, variance={:.4}",
-            mean_cov, N_ROLES, mean_var
-        );
+        println!("    Mean: coverage={mean_cov:.2}/{N_ROLES}, variance={mean_var:.4}");
         if strategy_name.starts_with("Complementarity") {
             diverse_coverages = coverages;
             diverse_variances = variances;
@@ -435,12 +422,10 @@ fn main() {
 
     println!("── Gate Results ──");
     println!(
-        "  Variance:  complementarity={:.4}  similarity={:.4}  ratio={:.2}×  (target ≥ {:.0}×)",
-        diverse_mean_var, similar_mean_var, variance_ratio, G8D_RATIO_TARGET
+        "  Variance:  complementarity={diverse_mean_var:.4}  similarity={similar_mean_var:.4}  ratio={variance_ratio:.2}×  (target ≥ {G8D_RATIO_TARGET:.0}×)"
     );
     println!(
-        "  Coverage:  complementarity={:.2}/{}  similarity={:.2}/{}",
-        diverse_mean_cov, N_ROLES, similar_mean_cov, N_ROLES
+        "  Coverage:  complementarity={diverse_mean_cov:.2}/{N_ROLES}  similarity={similar_mean_cov:.2}/{N_ROLES}"
     );
     println!();
 
@@ -458,28 +443,22 @@ fn main() {
     );
     if pass {
         if variance_ratio >= G8D_RATIO_TARGET {
-            println!(
-                "  → Complementarity-driven factions have {:.1}× higher",
-                variance_ratio
-            );
+            println!("  → Complementarity-driven factions have {variance_ratio:.1}× higher");
             println!("    intra-faction role variance than similarity-driven factions.");
         } else {
             println!(
-                "  → Variance ratio {:.2}× below {:.0}× (variance is noisy at faction scale;",
-                variance_ratio, G8D_RATIO_TARGET
+                "  → Variance ratio {variance_ratio:.2}× below {G8D_RATIO_TARGET:.0}× (variance is noisy at faction scale;"
             );
             println!("    coverage is the more stable diversity metric at this size).");
             println!(
-                "  → Coverage signal: complementarity {:.2}/{} vs similarity {:.2}/{} → the",
-                diverse_mean_cov, N_ROLES, similar_mean_cov, N_ROLES
+                "  → Coverage signal: complementarity {diverse_mean_cov:.2}/{N_ROLES} vs similarity {similar_mean_cov:.2}/{N_ROLES} → the"
             );
             println!("    Clifford wedge produces factions that span all roles.");
         }
         println!("  → The Clifford wedge produces diverse, balanced factions.");
     } else {
         println!(
-            "  → FAIL: variance ratio {:.2}× below {:.0}× threshold.",
-            variance_ratio, G8D_RATIO_TARGET
+            "  → FAIL: variance ratio {variance_ratio:.2}× below {G8D_RATIO_TARGET:.0}× threshold."
         );
     }
     println!("════════════════════════════════════════════════════════════════");

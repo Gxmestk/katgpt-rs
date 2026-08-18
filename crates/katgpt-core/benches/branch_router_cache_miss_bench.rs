@@ -173,7 +173,7 @@ fn measure<F: FnMut()>(label: &str, iters: usize, mut f: F) -> f64 {
 fn main() {
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Issue 636 — BranchRouter route step cache-miss measurement");
-    println!("  N_BRANCHES={}, D={}, ITERS={}", N_BRANCHES, D, ITERS);
+    println!("  N_BRANCHES={N_BRANCHES}, D={D}, ITERS={ITERS}");
     println!("  (production shape: 8 active branches per NPC, D=8 HLA dim)");
     println!("══════════════════════════════════════════════════════════════════\n");
 
@@ -206,7 +206,7 @@ fn main() {
         probe_soa,
         "AoS vs SoA disagree — fixture is broken"
     );
-    let resolved_branch = probe_aos.branch.map(|b| b.0 as usize).unwrap_or(usize::MAX);
+    let resolved_branch = probe_aos.branch.map_or(usize::MAX, |b| b.0 as usize);
     println!("  sanity: both paths resolve to branch {resolved_branch}\n");
 
     // ── Cache pollution scratch buffer ───────────────────────────────────

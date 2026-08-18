@@ -445,7 +445,7 @@ fn gate_g1_nonlinear_correctness() -> (f32, f32, bool) {
             heat_kernel_trajectory_nonlinear(&cx, &eig, &h0, &motor, dim, t_diag, nq, relu_slope);
         let hk_e = l2_dist(&hk_nl, &fine_d) / fnorm_d;
         let imp = co_e_d / hk_e.max(1e-12);
-        println!("    {:>8} {:>12.3e} {:>14.2}×", nq, hk_e, imp);
+        println!("    {nq:>8} {hk_e:>12.3e} {imp:>14.2}×");
     }
 
     // ── Formal gate at t=1.0 ──
@@ -682,8 +682,7 @@ fn main() {
     // G1: linear correctness.
     let (hk_rel, improvement, g1) = gate_g1_linear_correctness();
     println!(
-        "G1 linear correctness : single-mode hk rel err @t1 = {:.3e} (informational, eigensolver-limited)  |  multi-mode hk-vs-coarse improvement @t15 = {:.2}×  (gate > 1.5×)",
-        hk_rel, improvement
+        "G1 linear correctness : single-mode hk rel err @t1 = {hk_rel:.3e} (informational, eigensolver-limited)  |  multi-mode hk-vs-coarse improvement @t15 = {improvement:.2}×  (gate > 1.5×)"
     );
     println!("                        → {}", verdict(g1));
     all_pass &= g1;
@@ -697,8 +696,7 @@ fn main() {
     println!();
     let (nl_improvement, nl_hk_err, g1_nl) = gate_g1_nonlinear_correctness();
     println!(
-        "G1-nl nonlinear (T5.2) : hk-vs-coarse improvement @t1.0 = {:.2}×  |  hk_err = {:.3e}  (gate > 1.5×)  [INFORMATIONAL — nonlinear path stays opt-in]",
-        nl_improvement, nl_hk_err
+        "G1-nl nonlinear (T5.2) : hk-vs-coarse improvement @t1.0 = {nl_improvement:.2}×  |  hk_err = {nl_hk_err:.3e}  (gate > 1.5×)  [INFORMATIONAL — nonlinear path stays opt-in]"
     );
     println!("                        → {}", verdict(g1_nl));
     // NOTE: g1_nl does NOT contribute to all_pass. The linear promotion decision
@@ -708,8 +706,7 @@ fn main() {
     let (krylov_us, euler_us, g2) = gate_g2_latency();
     let ratio = krylov_us / euler_us.max(1e-9);
     println!(
-        "G2 latency             : Krylov(k=30,t=100) = {:.1} µs  |  Euler(T=100) = {:.1} µs  |  ratio = {:.2}×  (gate ≤ 2.0×)",
-        krylov_us, euler_us, ratio
+        "G2 latency             : Krylov(k=30,t=100) = {krylov_us:.1} µs  |  Euler(T=100) = {euler_us:.1} µs  |  ratio = {ratio:.2}×  (gate ≤ 2.0×)"
     );
     println!("                        → {}", verdict(g2));
     all_pass &= g2;
@@ -717,8 +714,7 @@ fn main() {
     // G3: Hodge preservation drift.
     let (hk_drift, coarse_drift, g3) = gate_g3_hodge_drift();
     println!(
-        "G3 Hodge preservation  : hk drift vs fine = {:.3e}  |  coarse Euler drift vs fine = {:.3e}  (gate hk < coarse)",
-        hk_drift, coarse_drift
+        "G3 Hodge preservation  : hk drift vs fine = {hk_drift:.3e}  |  coarse Euler drift vs fine = {coarse_drift:.3e}  (gate hk < coarse)"
     );
     println!("                        → {}", verdict(g3));
     all_pass &= g3;
@@ -726,8 +722,7 @@ fn main() {
     // G4: zero-alloc.
     let (allocs, g4) = gate_g4_zero_alloc();
     println!(
-        "G4 zero-alloc (linear) : allocs / 1000 calls (after precompute) = {}  (gate = 0)",
-        allocs
+        "G4 zero-alloc (linear) : allocs / 1000 calls (after precompute) = {allocs}  (gate = 0)"
     );
     println!("                        → {}", verdict(g4));
     all_pass &= g4;
@@ -735,8 +730,7 @@ fn main() {
     // G5: no-regression smoke (finiteness + stable-decay sanity).
     let (decay_ratio, g5) = gate_g5_no_regression_smoke();
     println!(
-        "G5 no-regression smoke : ‖h(5)‖/‖h(0)‖ = {:.3e} (stable decay < 1.0) + all-finite",
-        decay_ratio
+        "G5 no-regression smoke : ‖h(5)‖/‖h(0)‖ = {decay_ratio:.3e} (stable decay < 1.0) + all-finite"
     );
     println!("                        → {}", verdict(g5));
     all_pass &= g5;

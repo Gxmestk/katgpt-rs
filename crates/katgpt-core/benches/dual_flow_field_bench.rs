@@ -282,7 +282,7 @@ fn evaluate_quality(
     goal_y: f32,
 ) -> QualityReport {
     let mut rng = katgpt_core::Rng::new(seed);
-    let mut reached_steps = Vec::new();
+    let mut reached_steps = Vec::with_capacity(n_npcs);
     let mut stuck = 0;
     let mut oob = 0;
     for _ in 0..n_npcs {
@@ -718,8 +718,8 @@ fn main() {
     println!(
         "G2 (Cache-miss perf overhead, median of {trials} trials × {iters} cold-cache computes, {grid_w}×{grid_h}):"
     );
-    println!("  LeoOnly (single):       {:?}", t_leo);
-    println!("  LeoOnly (dual UvfaOnly):{:?}", t_uvfa);
+    println!("  LeoOnly (single):       {t_leo:?}");
+    println!("  LeoOnly (dual UvfaOnly):{t_uvfa:?}");
     println!(
         "  Lc α=0.3:               {:?}  (ratio {:.2}×)",
         t_lc,
@@ -868,7 +868,7 @@ fn main() {
     println!(
         "G2 postmax (Cache-miss perf overhead, median of {trials} trials × {iters} cold-cache computes, {grid_w}×{grid_h}):"
     );
-    println!("  LeoOnly (single):       {:?}", t_leo);
+    println!("  LeoOnly (single):       {t_leo:?}");
     println!(
         "  Postmax Lc α=0.3:       {:?}  (ratio {:.2}×)",
         t_postmax_lc,

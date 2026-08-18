@@ -329,7 +329,7 @@ fn bench_staging_commit(c: &mut Criterion) {
             .map(|i| vec![(i as f32 * 0.1).sin(); d])
             .collect();
 
-        let name = format!("p{:04}_d{:03}_{}slots", n_pending, d, STAGING_N_SLOTS);
+        let name = format!("p{n_pending:04}_d{d:03}_{STAGING_N_SLOTS}slots");
 
         group.bench_function(&name, |b| {
             b.iter_batched(

@@ -118,8 +118,7 @@ fn bench_perturbed_loss_vector(c: &mut Criterion) {
         }
     });
     eprintln!(
-        "G3-alloc: perturbed_loss_vector 100 calls: {} allocs (expected 0)",
-        allocs
+        "G3-alloc: perturbed_loss_vector 100 calls: {allocs} allocs (expected 0)"
     );
     assert_eq!(
         allocs, 0,
@@ -170,16 +169,14 @@ fn bench_select_diverse_subset(c: &mut Criterion) {
         }
     });
     eprintln!(
-        "G3-alloc: select_diverse_subset_into 100 calls: {} allocs (expected ~100 from return Vec<usize>)",
-        allocs
+        "G3-alloc: select_diverse_subset_into 100 calls: {allocs} allocs (expected ~100 from return Vec<usize>)"
     );
     // The return Vec<usize> allocates once per call. 100 calls ≈ 100 allocs.
     // Any allocs beyond the return-Vec count would indicate workspace leakage.
     assert!(
         allocs <= 100,
-        "G3-alloc FAIL: {} allocs for 100 calls — expected ≤100 (return Vec only), \
-         excess indicates workspace reallocation",
-        allocs
+        "G3-alloc FAIL: {allocs} allocs for 100 calls — expected ≤100 (return Vec only), \
+         excess indicates workspace reallocation"
     );
 }
 

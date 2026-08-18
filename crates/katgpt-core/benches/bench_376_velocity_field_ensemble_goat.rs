@@ -130,8 +130,7 @@ fn median_u64(v: &mut [u64]) -> u64 {
 
 fn gate_g4_fit_latency() -> GateResult {
     println!(
-        "\n--- G4: fit_into latency (N={}, P={}, D={}) ---",
-        N_FIT_PAIRS, P, D
+        "\n--- G4: fit_into latency (N={N_FIT_PAIRS}, P={P}, D={D}) ---"
     );
 
     // Pre-build pairs (one-time alloc, outside the measured region).
@@ -203,8 +202,7 @@ fn gate_g4_fit_latency() -> GateResult {
 
 fn gate_g4_eval_latency() -> GateResult {
     println!(
-        "\n--- G4: eval_into latency (single call, P={}, D={}) ---",
-        P, D
+        "\n--- G4: eval_into latency (single call, P={P}, D={D}) ---"
     );
 
     let mut ensemble = build_ensemble();
@@ -270,8 +268,7 @@ fn gate_g4_eval_latency() -> GateResult {
     let med = median_u64(&mut per_call_ns);
 
     println!(
-        "  eval_into p50: {} ns  (target ≤ {} ns)",
-        med, TARGET_EVAL_NS
+        "  eval_into p50: {med} ns  (target ≤ {TARGET_EVAL_NS} ns)"
     );
 
     let passed = med <= TARGET_EVAL_NS;
@@ -289,8 +286,7 @@ fn gate_g4_eval_latency() -> GateResult {
 
 fn gate_g4_batch_latency() -> GateResult {
     println!(
-        "\n--- G4: eval_batch_into latency (N_batch={}, P={}, D={}) ---",
-        N_BATCH, P, D
+        "\n--- G4: eval_batch_into latency (N_batch={N_BATCH}, P={P}, D={D}) ---"
     );
 
     let mut ensemble = build_ensemble();
@@ -350,8 +346,7 @@ fn gate_g4_batch_latency() -> GateResult {
     let med_dur = Duration::from_micros(med);
 
     println!(
-        "  eval_batch_into(N={}) p50: {:?}  (target ≤ {} ms)",
-        N_BATCH, med_dur, TARGET_BATCH_MS
+        "  eval_batch_into(N={N_BATCH}) p50: {med_dur:?}  (target ≤ {TARGET_BATCH_MS} ms)"
     );
 
     let passed = med <= TARGET_BATCH_MS * 1000;
@@ -415,13 +410,13 @@ fn gate_g3_zero_alloc() -> GateResult {
     }
     let delta = ALLOC_COUNT.load(Ordering::Relaxed) - before;
 
-    println!("  eval_into allocs/1000 calls: {}  (target: 0)", delta);
+    println!("  eval_into allocs/1000 calls: {delta}  (target: 0)");
 
     let passed = delta == 0;
     GateResult {
         name: "G3 zero-alloc eval_into",
         passed,
-        detail: format!("{} allocs in 1000 calls (target 0)", delta),
+        detail: format!("{delta} allocs in 1000 calls (target 0)"),
     }
 }
 

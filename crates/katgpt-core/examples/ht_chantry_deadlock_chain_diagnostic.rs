@@ -296,10 +296,7 @@ fn main() {
         let pct_mass = 100.0 * (count * size) as f64 / total_stuck_observations as f64;
         let pct_all = 100.0 * count as f64 / total_clusters as f64;
         let bar = "#".repeat((pct_all / 2.0).round() as usize);
-        println!(
-            " {:>3} | {:>7}   |   {:>6.2}%      |  {:>6.2}%  {}",
-            size, count, pct_mass, pct_all, bar
-        );
+        println!(" {size:>3} | {count:>7}   |   {pct_mass:>6.2}%      |  {pct_all:>6.2}%  {bar}");
     }
     println!();
 
@@ -320,10 +317,7 @@ fn main() {
         cumulative += count;
         let pct = 100.0 * count as f64 / total_stuck_ticks as f64;
         let pct_cum = 100.0 * cumulative as f64 / total_stuck_ticks as f64;
-        println!(
-            "   {:>4}  | {:>5}   | {:>5.2}% |  {:>6.2}%",
-            size, count, pct, pct_cum
-        );
+        println!("   {size:>4}  | {count:>5}   | {pct:>5.2}% |  {pct_cum:>6.2}%");
     }
     println!();
 

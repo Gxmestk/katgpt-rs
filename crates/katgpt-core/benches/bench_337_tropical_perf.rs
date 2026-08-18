@@ -164,7 +164,7 @@ fn main() {
             "  simd_matvec at the gate dims D=64 ({:.2}x) and D=128 ({:.2}x).",
             d64.1, d128.1
         );
-        println!("  {}", d8_note);
+        println!("  {d8_note}");
         println!("  NEON specialization (Plan 337 T3.4) closed the gap from the");
         println!("  auto-vectorized baseline (which was 4-9x slower). Default-on status holds.");
     } else {

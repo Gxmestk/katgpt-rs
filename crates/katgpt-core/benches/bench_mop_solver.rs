@@ -248,8 +248,7 @@ fn run() {
         });
         let _ = sol;
         println!(
-            "  allocations across 1 full solve + 1000 pi_star calls: {}",
-            allocs
+            "  allocations across 1 full solve + 1000 pi_star calls: {allocs}"
         );
         let g4_pass = allocs == 0;
         println!("  G4 verdict: {}", if g4_pass { "✅ PASS" } else { "❌ FAIL" });

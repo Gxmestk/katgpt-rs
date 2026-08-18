@@ -141,8 +141,7 @@ fn main() {
             gate_ns.as_nanos()
         );
         println!(
-            "  overhead: {:.2} ns/call ({:.1}% relative)",
-            overhead_per_call_ns, overhead_pct
+            "  overhead: {overhead_per_call_ns:.2} ns/call ({overhead_pct:.1}% relative)"
         );
         println!("  allocs:   {allocs}");
 
@@ -178,8 +177,7 @@ fn main() {
     );
     println!("G4 (0 allocs on hot path):           PASS ✅ (verified per-size above)");
     println!(
-        "Max relative overhead vs always-false baseline: {:.1}% (informational; absolute gate is the real bar)",
-        max_overhead_pct
+        "Max relative overhead vs always-false baseline: {max_overhead_pct:.1}% (informational; absolute gate is the real bar)"
     );
 
     if !all_pass_g3 {
