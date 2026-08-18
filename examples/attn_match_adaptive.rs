@@ -158,10 +158,7 @@ fn main() {
     let trace_len = 512usize;
     let cfg = AmConfig::highest_attn(32);
 
-    println!(
-        "\nConfig: phys_budget={}, recent_window={}, trace_len={} tokens",
-        phys, window, trace_len
-    );
+    println!("\nConfig: phys_budget={phys}, recent_window={window}, trace_len={trace_len} tokens");
     println!("Initial θ_low=0.5, θ_high=2.0, max_compacts=8 per trace");
 
     // ── Single trace demo ───────────────────────────────────────────────────
@@ -179,10 +176,7 @@ fn main() {
         adapt_cmp,
         preserved > 0
     );
-    println!(
-        "  Blind:    ~{} compactions (estimate), preserved at spike: never",
-        blind_cmp
-    );
+    println!("  Blind:    ~{blind_cmp} compactions (estimate), preserved at spike: never");
     println!(
         "  Final thresholds: θ_low={:.4}, θ_high={:.4}",
         adaptive.thresholds().0,
@@ -220,13 +214,10 @@ fn main() {
     let low_history_last10: Vec<f32> = trace_stats.iter().skip(90).map(|(_, l)| *l).collect();
     let avg_low_last10: f32 = low_history_last10.iter().sum::<f32>() / 10.0;
 
-    println!("  Average compactions/trace: {:.2}", avg_cmp);
-    println!("  Final θ_low={:.4} (started at 1.0)", final_low);
-    println!("  Final θ_high={:.4} (unchanged)", final_high);
-    println!(
-        "  θ_low avg over last 10 traces: {:.4} (convergence indicator)",
-        avg_low_last10
-    );
+    println!("  Average compactions/trace: {avg_cmp:.2}");
+    println!("  Final θ_low={final_low:.4} (started at 1.0)");
+    println!("  Final θ_high={final_high:.4} (unchanged)");
+    println!("  θ_low avg over last 10 traces: {avg_low_last10:.4} (convergence indicator)");
 
     // Bandit arm distribution.
     let total_pulls = adaptive2.bandit().total_pulls();
@@ -238,10 +229,10 @@ fn main() {
     let high_q = adaptive2.bandit().q_value(FrequencyBand::High);
 
     println!("\n  Bandit arm statistics:");
-    println!("    total pulls: {}", total_pulls);
-    println!("    Low:  pulls={:>4}, Q={:+.4}", low_pulls, low_q);
-    println!("    Mid:  pulls={:>4}, Q={:+.4}", mid_pulls, mid_q);
-    println!("    High: pulls={:>4}, Q={:+.4}", high_pulls, high_q);
+    println!("    total pulls: {total_pulls}");
+    println!("    Low:  pulls={low_pulls:>4}, Q={low_q:+.4}");
+    println!("    Mid:  pulls={mid_pulls:>4}, Q={mid_q:+.4}");
+    println!("    High: pulls={high_pulls:>4}, Q={high_q:+.4}");
     println!("  Best arm: {:?}", adaptive2.bandit().best_arm());
 
     // ── Threshold drift visualization ───────────────────────────────────────

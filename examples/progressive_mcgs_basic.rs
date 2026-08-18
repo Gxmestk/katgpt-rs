@@ -170,8 +170,8 @@ fn main() {
         println!("  t={t:.2}: H={h:.4}  exp(H)={effective:.2}  {bar}");
     }
 
-    let h_start = entropy_curve.first().map(|(_, h)| *h).unwrap_or(0.0);
-    let h_end = entropy_curve.last().map(|(_, h)| *h).unwrap_or(0.0);
+    let h_start = entropy_curve.first().map_or(0.0, |(_, h)| *h);
+    let h_end = entropy_curve.last().map_or(0.0, |(_, h)| *h);
     let decay_pct = if h_start > 0.0 {
         (1.0 - h_end / h_start) * 100.0
     } else {
@@ -180,8 +180,8 @@ fn main() {
     println!("\nEntropy decay: {h_start:.4} → {h_end:.4} ({decay_pct:.1}% reduction)");
     println!(
         "Effective branch count: {:.2} → {:.2}",
-        entropy_curve.first().map(|(_, h)| h.exp()).unwrap_or(0.0),
-        entropy_curve.last().map(|(_, h)| h.exp()).unwrap_or(0.0),
+        entropy_curve.first().map_or(0.0, |(_, h)| h.exp()),
+        entropy_curve.last().map_or(0.0, |(_, h)| h.exp()),
     );
 
     println!("\n--- GOAT Gate Summary (Phase 1 preconditions, Phase 3 full gate) ---");

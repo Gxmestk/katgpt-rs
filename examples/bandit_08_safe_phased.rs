@@ -83,7 +83,7 @@ fn main() {
         ),
     ];
 
-    let mut all_results = Vec::new();
+    let mut all_results = Vec::with_capacity(strategies.len());
 
     for (name, strategy) in &strategies {
         let env = BernoulliEnv::new(&probs);
@@ -182,7 +182,7 @@ fn main() {
 
     print!("{:<40}", "Episode");
     for label in &checkpoint_labels {
-        print!("{:>8}", label);
+        print!("{label:>8}");
     }
     println!();
     println!("{}", "─".repeat(40 + checkpoint_labels.len() * 8));
@@ -219,7 +219,7 @@ fn main() {
 
     print!("{:<40}", "Episode");
     for &cp in &bl_checkpoints {
-        print!("{:>8}", cp);
+        print!("{cp:>8}");
     }
     println!();
     println!("{}", "─".repeat(40 + bl_checkpoints.len() * 8));
@@ -231,7 +231,7 @@ fn main() {
             if idx < reward_curve.len() {
                 let baseline_total = baseline_reward_per_ep * cp as f32;
                 let baseline_regret = baseline_total - reward_curve[idx];
-                print!("{:>8.1}", baseline_regret);
+                print!("{baseline_regret:>8.1}");
             } else {
                 print!("{:>8}", "—");
             }
@@ -261,7 +261,7 @@ fn main() {
     #[allow(clippy::needless_range_loop)]
     for row in 0..height {
         let val = max_regret * (1.0 - row as f32 / (height - 1) as f32);
-        print!("{:>7.1} │", val);
+        print!("{val:>7.1} │");
         #[allow(clippy::needless_range_loop)]
         for col in 0..width {
             let episode = (col as f32 / (width - 1) as f32 * (EPISODES - 1) as f32) as usize;
@@ -288,7 +288,7 @@ fn main() {
     print!("         ");
     for i in 0..=4 {
         let ep = i * EPISODES / 4;
-        print!("{:<15}", ep);
+        print!("{ep:<15}");
     }
     println!("  episodes");
     println!();

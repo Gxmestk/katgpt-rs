@@ -48,10 +48,7 @@ fn main() {
             let reduction = 100.0 * (1.0 - (retained as f32 / n as f32));
             let ppl_sel = perplexity_proxy(&query, &segments, &selected);
             let delta = (ppl_sel - ppl_dense).abs();
-            println!(
-                "  {:>9}%  {:>10}  {:>11.1}%  {:>12.4}",
-                budget_pct, retained, reduction, delta
-            );
+            println!("  {budget_pct:>9}%  {retained:>10}  {reduction:>11.1}%  {delta:>12.4}");
         }
 
         // MCC against ground-truth task-0 segments at full budget.

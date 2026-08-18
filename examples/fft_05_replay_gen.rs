@@ -143,13 +143,11 @@ fn encode_sample_jsonl(state: &BattleState, action: &Action, unit_id: u8, qualit
 
     let target_id = action
         .target_id
-        .map(|t| t.to_string())
-        .unwrap_or_else(|| "null".to_string());
+        .map_or_else(|| "null".to_string(), |t| t.to_string());
     let move_to = action
         .move_to
         .map(|p| (p.y * 8 + p.x) as u8)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|| "null".to_string());
+        .map_or_else(|| "null".to_string(), |v| v.to_string());
 
     // Serialize the state array inline to avoid serde_json dep in the example.
     let state_str: String = state_tokens
@@ -185,8 +183,7 @@ fn run_instrumented_battle(
             battle
                 .units
                 .get(id as usize)
-                .map(|u| u.team)
-                .unwrap_or(Team::Party)
+                .map_or(Team::Party, |u| u.team)
         })
         .collect();
 
@@ -367,9 +364,7 @@ fn main() {
 
     drop(file);
 
-    let file_size = std::fs::metadata(&output_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let file_size = std::fs::metadata(&output_path).map_or(0, |m| m.len());
 
     eprintln!();
     eprintln!("=== Results ===");

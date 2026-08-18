@@ -103,9 +103,9 @@ fn print_row(label: &str, us_sum: u128, n: f64, total_us: u128) {
     };
     if label.starts_with("  (") {
         // Sub-label (architectural annotation, no value)
-        println!("   {:<26}", label);
+        println!("   {label:<26}");
     } else {
-        println!("   {:<26} {:>8.1} µs {:>7.1}%", label, avg_us, pct);
+        println!("   {label:<26} {avg_us:>8.1} µs {pct:>7.1}%");
     }
 }
 
@@ -164,7 +164,7 @@ fn main() {
     let load_ms = load_s * 1000.0;
     // Use the on-disk safetensors file size for the bandwidth calc — it's the
     // true cost of mmap'ing + deserializing the whole artifact.
-    let weight_bytes = std::fs::metadata(&model_p).map(|m| m.len() as usize).unwrap_or(0);
+    let weight_bytes = std::fs::metadata(&model_p).map_or(0, |m| m.len() as usize);
     println!(
         "{load_ms:.0} ms  ({:.2} GB, {:.1} GB/s)",
         weight_bytes as f64 / 1e9,

@@ -209,7 +209,7 @@ fn print_analysis(results: &[ScenarioResult]) {
     let bit_levels: Vec<u8> = [2, 4].to_vec();
 
     for &bits in &bit_levels {
-        println!("  {}-bit quantization:", bits);
+        println!("  {bits}-bit quantization:");
         println!();
 
         for &ctx_len in &ctx_lens {
@@ -242,10 +242,9 @@ fn print_analysis(results: &[ScenarioResult]) {
                 };
 
                 println!(
-                    "    ctx={:>4}: MSE ratio (T/R) = {:.3}  cosine Δ = {:+.6}  cumul. ratio = {:.3}",
-                    ctx_len, mse_ratio, cosine_diff, cumul_ratio,
+                    "    ctx={ctx_len:>4}: MSE ratio (T/R) = {mse_ratio:.3}  cosine Δ = {cosine_diff:+.6}  cumul. ratio = {cumul_ratio:.3}",
                 );
-                println!("             → {}", verdict,);
+                println!("             → {verdict}",);
             }
         }
         println!();
@@ -280,7 +279,7 @@ fn main() {
 
     for &ctx_len in &context_lengths {
         for &bits in &bit_levels {
-            println!("  Running: Thinking  ctx={:>5}, {}-bit ...", ctx_len, bits);
+            println!("  Running: Thinking  ctx={ctx_len:>5}, {bits}-bit ...");
             results.push(run_scenario(
                 "Thinking",
                 gen_thinking_vector,
@@ -291,7 +290,7 @@ fn main() {
                 seed,
             ));
 
-            println!("  Running: Regular   ctx={:>5}, {}-bit ...", ctx_len, bits);
+            println!("  Running: Regular   ctx={ctx_len:>5}, {bits}-bit ...");
             results.push(run_scenario(
                 "Regular",
                 gen_regular_vector,

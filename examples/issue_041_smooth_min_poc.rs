@@ -358,7 +358,7 @@ fn beta_sensitivity(catalog: &[Item], queries: &[Query], emb: &Embeddings) {
         } else {
             ""
         };
-        println!("  {:>10.0e} {:.4}{}", beta, recall, marker);
+        println!("  {beta:>10.0e} {recall:.4}{marker}");
     }
 }
 
@@ -386,14 +386,8 @@ fn main() {
     let same_cluster_cosine = dot(&emb.words[0], &emb.words[1]); // cluster 0, different words
     let diff_cluster_cosine = dot(&emb.words[0], &emb.words[WORDS_PER_CLUSTER]); // cluster 0 vs cluster 1
     println!("── Embedding structure check ──");
-    println!(
-        "  Same cluster, different word:  {:.4}  (expect 0.5-0.8)",
-        same_cluster_cosine
-    );
-    println!(
-        "  Different cluster:             {:.4}  (expect 0.0-0.2)",
-        diff_cluster_cosine
-    );
+    println!("  Same cluster, different word:  {same_cluster_cosine:.4}  (expect 0.5-0.8)");
+    println!("  Different cluster:             {diff_cluster_cosine:.4}  (expect 0.0-0.2)");
     println!();
 
     // Show a sample query's cosines against the correct item vs a distractor
@@ -422,13 +416,10 @@ fn main() {
         "  Correct item [{}]: cosines = {:?}",
         sample_q.correct_item_idx, correct_cosines
     );
-    println!(
-        "    plain={:.4}  smooth_min={:.4}",
-        correct_plain, correct_smooth
-    );
+    println!("    plain={correct_plain:.4}  smooth_min={correct_smooth:.4}");
     if let Some((idx, cosines, plain, smooth)) = best_distractor {
-        println!("  Top distractor [{}]: cosines = {:?}", idx, cosines);
-        println!("    plain={:.4}  smooth_min={:.4}", plain, smooth);
+        println!("  Top distractor [{idx}]: cosines = {cosines:?}");
+        println!("    plain={plain:.4}  smooth_min={smooth:.4}");
         println!(
             "  → Plain margin:    {:.4} (correct - distractor)",
             correct_plain - plain
@@ -478,9 +469,9 @@ fn main() {
     println!("── G2: Latency gate (<100ns overhead) ──");
     let (plain_ns, smooth_ns) = measure_latency(1e4);
     let overhead = smooth_ns - plain_ns;
-    println!("  Plain cosine (mean):  {:.1} ns/call", plain_ns);
-    println!("  Smooth-min (β=10⁴):   {:.1} ns/call", smooth_ns);
-    println!("  Overhead:             {:.1} ns/call", overhead);
+    println!("  Plain cosine (mean):  {plain_ns:.1} ns/call");
+    println!("  Smooth-min (β=10⁴):   {smooth_ns:.1} ns/call");
+    println!("  Overhead:             {overhead:.1} ns/call");
     if overhead < 100.0 {
         println!("  ✅ G2 PASS: overhead < 100 ns");
     } else {

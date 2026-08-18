@@ -58,10 +58,7 @@ fn main() {
 
     println!("Distribution       H_1       β      Notes");
     println!("------------------|---------|-------|-----------------------------");
-    println!(
-        "p_A = (½,½,0,0,0,0)        {:.4}   {:.4}   two-outcome coin flip",
-        h1_a, beta_a
-    );
+    println!("p_A = (½,½,0,0,0,0)        {h1_a:.4}   {beta_a:.4}   two-outcome coin flip");
     println!(
         "p_B = ({:.3},{:.3},{:.3},0,0,0)     {:.4}   {:.4}   three-outcome, same H_1",
         p_b[0], p_b[1], p_b[2], h1_b, beta_b
@@ -90,7 +87,7 @@ fn main() {
     let labels = ["p_A", "p_B"];
     for tick_idx in 0..=10 {
         let y = 0.85 - tick_idx as f32 * 0.07; // 0.85 down to 0.15
-        let mut line = format!("{:.2} |", y);
+        let mut line = format!("{y:.2} |");
         for col in 0..=60 {
             let x = col as f32 * 0.01;
             let mut ch = ' ';

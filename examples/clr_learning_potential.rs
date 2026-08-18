@@ -50,8 +50,8 @@ fn main() {
     println!("  log π     = {log_probs_a:?}");
     println!("  |y|       = {}", log_probs_a.len());
     println!("  Σ log π   = {:.4}", log_probs_a.iter().sum::<f32>());
-    println!("  S_LP      = {:.6}", s_lp_a);
-    println!("  r_k       = {:.2}", reliability_a);
+    println!("  S_LP      = {s_lp_a:.6}");
+    println!("  r_k       = {reliability_a:.2}");
     println!("  write?    = {write_a}");
     assert!(
         !write_a,
@@ -72,8 +72,8 @@ fn main() {
     println!("  log π     = {log_probs_b:?}");
     println!("  |y|       = {}", log_probs_b.len());
     println!("  Σ log π   = {:.4}", log_probs_b.iter().sum::<f32>());
-    println!("  S_LP      = {:.6}", s_lp_b);
-    println!("  r_k       = {:.2}", reliability_b);
+    println!("  S_LP      = {s_lp_b:.6}");
+    println!("  r_k       = {reliability_b:.2}");
     println!("  write?    = {write_b}");
     assert!(
         !write_b,
@@ -94,8 +94,8 @@ fn main() {
     println!("  log π     = {log_probs_c:?}");
     println!("  |y|       = {}", log_probs_c.len());
     println!("  Σ log π   = {:.4}", log_probs_c.iter().sum::<f32>());
-    println!("  S_LP      = {:.6}", s_lp_c);
-    println!("  r_k       = {:.2}", reliability_c);
+    println!("  S_LP      = {s_lp_c:.6}");
+    println!("  r_k       = {reliability_c:.2}");
     println!("  write?    = {write_c}");
     assert!(
         write_c,
@@ -109,8 +109,8 @@ fn main() {
     println!("── Boundary check: S_LP scales with surprise ───────────────────");
     let s_lp_small = learning_potential(4, |_| -0.5);
     let s_lp_big = learning_potential(4, |_| -5.0);
-    println!("  S_LP([-0.5; 4])   = {:.4}", s_lp_small);
-    println!("  S_LP([-5.0; 4])   = {:.4}", s_lp_big);
+    println!("  S_LP([-0.5; 4])   = {s_lp_small:.4}");
+    println!("  S_LP([-5.0; 4])   = {s_lp_big:.4}");
     assert!(s_lp_big > s_lp_small);
     assert!(
         (s_lp_big / s_lp_small - 10.0).abs() < 1e-3,

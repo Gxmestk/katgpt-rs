@@ -1181,8 +1181,7 @@ fn main() {
         .iter()
         .enumerate()
         .max_by_key(|(_, k)| *k)
-        .map(|(i, _)| i)
-        .unwrap_or(0);
+        .map_or(0, |(i, _)| i);
     let desc = &UNIT_DESCS[mvp];
     let mvp_strat = players[mvp].name();
     println!();

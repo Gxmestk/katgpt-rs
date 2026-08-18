@@ -18,10 +18,7 @@ fn main() {
         for (name, entropy, depth) in scenarios {
             let conf = llmexec_confidence(entropy, depth, &config);
             let tier = verify_tier(entropy, depth, &config);
-            println!(
-                "  {}: entropy={}, depth={}, conf={:.4}, tier={:?}",
-                name, entropy, depth, conf, tier
-            );
+            println!("  {name}: entropy={entropy}, depth={depth}, conf={conf:.4}, tier={tier:?}");
         }
 
         println!("\nDone.");

@@ -100,10 +100,7 @@ fn main() {
         } else {
             "moderate"
         };
-        println!(
-            "  {:<40} {:>8.2} {:>12.2} {:>8.4}  ({})",
-            label, entropy, coincidence, gate_val, action
-        );
+        println!("  {label:<40} {entropy:>8.2} {coincidence:>12.2} {gate_val:>8.4}  ({action})");
     }
 
     println!();
@@ -122,7 +119,7 @@ fn main() {
         let inner = gate.voltage_sensitivity * (entropy - gate.threshold);
         let sig = dendritic_sigmoid(inner);
         let gate_val = gate.compute_gate(entropy, 1.0);
-        println!("  {:>8.1} {:>10.4} {:>15.4}", entropy, sig, gate_val);
+        println!("  {entropy:>8.1} {sig:>10.4} {gate_val:>15.4}");
     }
 
     println!();
@@ -158,7 +155,7 @@ fn main() {
         } else {
             "uncertain"
         };
-        println!("  {:>8} {:>10.4} {:>15}", i, h, char);
+        println!("  {i:>8} {h:>10.4} {char:>15}");
     }
 
     println!();
@@ -244,7 +241,7 @@ fn main() {
     separator("Section 5: Determinism — Zero Randomness Verification");
 
     let gate = DendriticGate::new();
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(10);
     for _ in 0..10 {
         let tree = build_dd_tree_dendritic(&marginals_refs, &config, &NoPruner, true, &gate);
         results.push(tree.len());

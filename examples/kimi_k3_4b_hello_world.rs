@@ -115,9 +115,9 @@ fn print_row(label: &str, us_sum: u128, n: f64, total_us: u128) {
         0.0
     };
     if label.starts_with("  (") {
-        println!("   {:<26}", label);
+        println!("   {label:<26}");
     } else {
-        println!("   {:<26} {:>8.1} µs {:>7.1}%", label, avg_us, pct);
+        println!("   {label:<26} {avg_us:>8.1} µs {pct:>7.1}%");
     }
 }
 

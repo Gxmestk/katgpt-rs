@@ -300,7 +300,7 @@ fn main() {
     let strategies = Strategy::all();
     let n = strategies.len();
 
-    let mut stats: HashMap<Strategy, StrategyStats> = HashMap::new();
+    let mut stats: HashMap<Strategy, StrategyStats> = HashMap::with_capacity(strategies.len());
     for &s in strategies {
         stats.insert(s, StrategyStats::new(elo_calc.base));
     }

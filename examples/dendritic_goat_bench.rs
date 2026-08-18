@@ -146,14 +146,7 @@ fn bench_scenario(name: &str, marginals: Vec<Vec<f32>>, config: &Config) -> Benc
     let reduction_pct = (1.0 - dendritic_nodes as f32 / baseline_nodes.max(1) as f32) * 100.0;
 
     println!(
-        "    baseline: {} nodes, path={}, {:.0}ns | dendritic: {} nodes, path={}, {:.0}ns | reduction={:.1}%",
-        baseline_nodes,
-        baseline_path_len,
-        baseline_ns,
-        dendritic_nodes,
-        dendritic_path_len,
-        dendritic_ns,
-        reduction_pct,
+        "    baseline: {baseline_nodes} nodes, path={baseline_path_len}, {baseline_ns:.0}ns | dendritic: {dendritic_nodes} nodes, path={dendritic_path_len}, {dendritic_ns:.0}ns | reduction={reduction_pct:.1}%",
     );
 
     BenchResult {
@@ -210,8 +203,7 @@ fn main() {
     // Timing overhead: dendritic should not be much slower per-node
     let overhead = (mixed.dendritic_ns / mixed.baseline_ns - 1.0) * 100.0;
     println!(
-        "  Dendritic overhead vs baseline: {:.1}% (includes gate computation per node)",
-        overhead
+        "  Dendritic overhead vs baseline: {overhead:.1}% (includes gate computation per node)"
     );
 
     println!("\nZero parameters: PASS (DendriticGate is stack-only, #[repr(C)])");

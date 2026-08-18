@@ -352,65 +352,62 @@ fn solve_map(name: &str, map_str: &str) -> Option<MapResult> {
     let solution = solve_hierarchical(&pruner);
     let elapsed = start.elapsed();
 
-    match solution {
-        Some(actions) => {
-            // Replay to get final state
-            let mut state = pruner.initial_state();
-            for &action in &actions {
-                state = pruner.apply_action(&state, action).unwrap();
-            }
-
-            let movement_steps = actions.iter().filter(|&&a| a < 4).count();
-            let attack_steps = actions.iter().filter(|&&a| a == 4).count();
-
-            println!("🎉 Solution found!");
-            println!(
-                "   Steps: {} ({} movement + {} attack)",
-                actions.len(),
-                movement_steps,
-                attack_steps,
-            );
-            println!("   Total cost (terrain-weighted): {}", state.total_cost);
-            println!("   Time: {:.2?}", elapsed);
-
-            // Print action sequence with arrows
-            print!("   Path: ");
-            for &action in &actions {
-                let symbol = match action {
-                    0 => "↑",
-                    1 => "↓",
-                    2 => "←",
-                    3 => "→",
-                    4 => "⚔",
-                    _ => "?",
-                };
-                print!("{symbol}");
-            }
-            println!();
-            println!();
-
-            // Show final state
-            print_grid(&pruner, &state);
-            println!();
-
-            // Assertions
-            assert_eq!((state.r, state.c), pruner.goal, "Must be at goal");
-            let all_treasures = (1 << pruner.treasures.len()) - 1;
-            assert_eq!(
-                state.collected_treasures, all_treasures,
-                "All treasures collected"
-            );
-            println!("✅ Verified: at goal, all treasures collected.");
-
-            Some(MapResult {
-                actions,
-                final_state: state,
-            })
+    if let Some(actions) = solution {
+        // Replay to get final state
+        let mut state = pruner.initial_state();
+        for &action in &actions {
+            state = pruner.apply_action(&state, action).unwrap();
         }
-        None => {
-            println!("❌ No solution found.");
-            None
+
+        let movement_steps = actions.iter().filter(|&&a| a < 4).count();
+        let attack_steps = actions.iter().filter(|&&a| a == 4).count();
+
+        println!("🎉 Solution found!");
+        println!(
+            "   Steps: {} ({} movement + {} attack)",
+            actions.len(),
+            movement_steps,
+            attack_steps,
+        );
+        println!("   Total cost (terrain-weighted): {}", state.total_cost);
+        println!("   Time: {elapsed:.2?}");
+
+        // Print action sequence with arrows
+        print!("   Path: ");
+        for &action in &actions {
+            let symbol = match action {
+                0 => "↑",
+                1 => "↓",
+                2 => "←",
+                3 => "→",
+                4 => "⚔",
+                _ => "?",
+            };
+            print!("{symbol}");
         }
+        println!();
+        println!();
+
+        // Show final state
+        print_grid(&pruner, &state);
+        println!();
+
+        // Assertions
+        assert_eq!((state.r, state.c), pruner.goal, "Must be at goal");
+        let all_treasures = (1 << pruner.treasures.len()) - 1;
+        assert_eq!(
+            state.collected_treasures, all_treasures,
+            "All treasures collected"
+        );
+        println!("✅ Verified: at goal, all treasures collected.");
+
+        Some(MapResult {
+            actions,
+            final_state: state,
+        })
+    } else {
+        println!("❌ No solution found.");
+        None
     }
 }
 
@@ -499,10 +496,7 @@ fn main() {
 
     for (name, steps, cost, route) in results {
         let surcharge = cost - steps;
-        println!(
-            "║ {:<13} ║ {:>8} ║ {:>9} ║ {:>+9} ║ {:<12} ║",
-            name, steps, cost, surcharge, route,
-        );
+        println!("║ {name:<13} ║ {steps:>8} ║ {cost:>9} ║ {surcharge:>+9} ║ {route:<12} ║",);
     }
 
     println!("╚═══════════════╩══════════╩═══════════╩═══════════╩══════════════╝");

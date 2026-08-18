@@ -71,10 +71,7 @@ fn main() {
     let overlap: usize = 64;
     let compact_per_chunk: usize = 256; // 8× per chunk
 
-    println!(
-        "\nConfig: T = {} tokens, d = {}, n = {} reference queries",
-        t_len, d, n
-    );
+    println!("\nConfig: T = {t_len} tokens, d = {d}, n = {n} reference queries");
     println!(
         "Chunking: chunk_size = {}, overlap = {}, compact_per_chunk = {} ({:.1}× per chunk)",
         chunk_size,
@@ -91,7 +88,7 @@ fn main() {
 
     // ── KV-based ────────────────────────────────────────────────────────────
     print_separator();
-    println!("[1] KV-based chunked compaction (overlap = {})", overlap);
+    println!("[1] KV-based chunked compaction (overlap = {overlap})");
     let compactor_kv = ChunkedCompactor::new(chunk_size, overlap);
     let start = std::time::Instant::now();
     let out_kv = compactor_kv
@@ -99,7 +96,7 @@ fn main() {
         .expect("kv-based compact");
     let elapsed_kv = start.elapsed();
 
-    println!("  Wall-clock: {:?}", elapsed_kv);
+    println!("  Wall-clock: {elapsed_kv:?}");
     println!("  Chunks processed: {}", out_kv.per_chunk.len());
     println!(
         "  Total compact length: {} (compression {:.1}×)",
@@ -161,7 +158,7 @@ fn main() {
         .expect("text-based compact");
     let elapsed_txt = start.elapsed();
 
-    println!("  Wall-clock: {:?}", elapsed_txt);
+    println!("  Wall-clock: {elapsed_txt:?}");
     println!("  Chunks processed: {}", out_txt.per_chunk.len());
     println!(
         "  Total compact length: {} (compression {:.1}×)",

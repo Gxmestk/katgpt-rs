@@ -70,8 +70,7 @@ fn simulate_episodes(
                     let qb = if b.0 > 0 { b.1 / b.0 as f32 } else { 0.0 };
                     qa.partial_cmp(&qb).unwrap_or(std::cmp::Ordering::Equal)
                 })
-                .map(|(i, _)| i)
-                .unwrap_or(0)
+                .map_or(0, |(i, _)| i)
         };
 
         let reward = env.pull(arm, rng);
@@ -111,19 +110,13 @@ fn main() {
 
     // ── Phase 1: Learn ───────────────────────────────────────────
     println!("Phase 1: Learn — BanditPruner accumulates experiences");
-    println!(
-        "  Running {} episodes with {} arms...",
-        PHASE1_EPISODES, NUM_ARMS
-    );
+    println!("  Running {PHASE1_EPISODES} episodes with {NUM_ARMS} arms...");
 
     let memory = PrunerMemory::new(256, "bomber_bandit_v1");
     simulate_episodes(&env, &memory, PHASE1_EPISODES, &mut rng, 0.3);
 
     let (total, edge_cases, failures) = count_flags(&memory);
-    println!(
-        "  Memory: {} entries, {} edge cases, {} failures",
-        total, edge_cases, failures
-    );
+    println!("  Memory: {total} entries, {edge_cases} edge cases, {failures} failures");
     println!();
 
     // ── Phase 2: Validate — BomberTestGate checks pruner ─────────
@@ -169,8 +162,7 @@ fn main() {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     };
 
     let mut descriptor =
@@ -179,8 +171,7 @@ fn main() {
 
     catalog.register(descriptor);
     println!(
-        "  Registered skill \"bomber_bandit_v1\" (arm {}, status: {:?})",
-        best_arm, validation_status
+        "  Registered skill \"bomber_bandit_v1\" (arm {best_arm}, status: {validation_status:?})"
     );
     println!("  Catalog: {} skill registered", catalog.len());
     println!();
@@ -194,8 +185,7 @@ fn main() {
 
     let (total2, edge_cases2, failures2) = count_flags(&memory);
     println!(
-        "  Memory: {} entries, {} edge cases, {} failures (improved)",
-        total2, edge_cases2, failures2
+        "  Memory: {total2} entries, {edge_cases2} edge cases, {failures2} failures (improved)"
     );
 
     // Re-validate
@@ -244,8 +234,7 @@ fn main() {
         .iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(0);
+        .map_or(0, |(i, _)| i);
     let final_q = if arm_counts[final_best] > 0 {
         arm_rewards[final_best] / arm_counts[final_best] as f32
     } else {
@@ -255,10 +244,10 @@ fn main() {
     let skill = catalog.get(best_arm).unwrap();
     println!("  Skill: {}", skill.name);
     println!("  Status: {:?}", skill.test_status);
-    println!("  Episodes: {}", total2);
-    println!("  Edge cases learned: {}", edge_cases2);
-    println!("  Failures remaining: {}", failures2);
-    println!("  Best arm: {} (Q={:.2})", final_best, final_q);
+    println!("  Episodes: {total2}");
+    println!("  Edge cases learned: {edge_cases2}");
+    println!("  Failures remaining: {failures2}");
+    println!("  Best arm: {final_best} (Q={final_q:.2})");
     println!();
 
     // ── Verification ─────────────────────────────────────────────

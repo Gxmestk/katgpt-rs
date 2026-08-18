@@ -196,7 +196,7 @@ fn section2_primal_dual_convergence() {
         if checkpoints.contains(&n) {
             let gamma0_avg = cumsum / n as f64;
             let gap = (gamma0_avg - gamma0_lp as f64).abs();
-            println!("  {:>10}  {:>12.6}  {:>12.6}", n, gamma0_avg, gap);
+            println!("  {n:>10}  {gamma0_avg:>12.6}  {gap:>12.6}");
         }
     }
     println!();
@@ -293,12 +293,10 @@ fn section3_designer_steering() {
     // --- Verdict ---
     println!("Designer steering verdict:");
     println!(
-        "  Selfish moderator → welfare {:.2}, player 1 reward {:.2}.",
-        welfare_a, player1_reward_a
+        "  Selfish moderator → welfare {welfare_a:.2}, player 1 reward {player1_reward_a:.2}."
     );
     println!(
-        "  Welfare moderator → welfare {:.2}, player 1 reward {:.2}.",
-        welfare_b, player1_reward_b
+        "  Welfare moderator → welfare {welfare_b:.2}, player 1 reward {player1_reward_b:.2}."
     );
     if welfare_b > welfare_a {
         println!(

@@ -52,10 +52,7 @@ fn main() {
         println!("  CoT depth:        fixed={fixed_depth} → adaptive={adaptive_depth}");
         println!("  depth reduction:  {reduction:.1}%");
         println!("  progress:         {adaptive_progress:.3}");
-        println!(
-            "  uncertainty:      fixed={:.4} → adaptive={:.4}",
-            fixed_unc, adaptive_unc
-        );
+        println!("  uncertainty:      fixed={fixed_unc:.4} → adaptive={adaptive_unc:.4}");
 
         if reduction >= 30.0 {
             println!("\n✓ Adaptive CoT achieves ≥ 30% depth reduction (GOAT G10).");

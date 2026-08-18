@@ -139,10 +139,7 @@ fn main() {
             ThinkingMode::CpuResample => "CpuResample",
             ThinkingMode::Dendritic => "Dendritic",
         };
-        println!(
-            "  {:<20} {:<12} {:<12} {reward:.4}",
-            label, tokens, mode_str
-        );
+        println!("  {label:<20} {tokens:<12} {mode_str:<12} {reward:.4}");
     }
 
     // ── Section 4: ThinkingBudget Defaults ───────────────────────
@@ -217,7 +214,7 @@ fn main() {
 
     // Freeze
     detector_freeze.freeze(&freeze_path).expect("freeze");
-    println!("  ✓ Frozen to {:?}", freeze_path);
+    println!("  ✓ Frozen to {freeze_path:?}");
 
     // Thaw into a fresh detector
     let mut detector_thaw = make_detector(vec![5, 10, 15], 1);

@@ -20,10 +20,7 @@ use katgpt_core::compaction::{Backstop, ClosedUnitCompactionGate, FireRule, Rubr
 fn main() {
     println!("═══ CUCG × can_freeze Isomorphism (G7, Plan 333) ═══");
     println!();
-    println!(
-        "can_freeze = (n >= d) && (flatness < {})",
-        SHARD_FREEZE_FLATNESS_THRESHOLD
-    );
+    println!("can_freeze = (n >= d) && (flatness < {SHARD_FREEZE_FLATNESS_THRESHOLD})");
     println!();
 
     let gate = ClosedUnitCompactionGate::builder(ShardFreezeRubric::new())

@@ -59,7 +59,7 @@ fn main() {
     let mut writer = BufWriter::new(out_file);
 
     // Get file size for progress reporting.
-    let file_size = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let file_size = file.metadata().map_or(0, |m| m.len());
     let mut bytes_read = 0u64;
     let mut samples_written = 0u64;
     let mut samples_skipped = 0u64;

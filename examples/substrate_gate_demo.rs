@@ -59,8 +59,8 @@ fn main() {
     let score_python = substrate_branch_score(-1.2, 0.85, 1.0);
     let score_async = substrate_branch_score(-1.5, 0.72, 1.0);
     println!("\nBranch scores:");
-    println!("  Python stdlib: {:.4}", score_python);
-    println!("  Async patterns: {:.4}", score_async);
+    println!("  Python stdlib: {score_python:.4}");
+    println!("  Async patterns: {score_async:.4}");
     println!(
         "  Best: {}",
         if score_python > score_async {

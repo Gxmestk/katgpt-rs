@@ -91,12 +91,9 @@ fn main() {
     let ideal = (m as f32) * (k as f32) / (n as f32);
 
     println!("── Baseline (no bias) ──────────────────────────────────────");
-    println!("expert selection counts: {:?}", counts_before);
-    println!(
-        "ideal count per expert:  {:.1} (m·k/n = {}·{}/{})",
-        ideal, m, k, n
-    );
-    println!("MaxVio (max relative deviation): {:.4}", maxvio_before);
+    println!("expert selection counts: {counts_before:?}");
+    println!("ideal count per expert:  {ideal:.1} (m·k/n = {m}·{k}/{n})");
+    println!("MaxVio (max relative deviation): {maxvio_before:.4}");
     println!();
 
     // Run QB.
@@ -114,7 +111,7 @@ fn main() {
         "α (per-token, first 8):  {:?}…",
         &result.alpha[..8.min(result.alpha.len())]
     );
-    println!("expert selection counts: {:?}", counts_after);
+    println!("expert selection counts: {counts_after:?}");
     println!(
         "MaxVio (max relative deviation): {:.4}  (was {:.4}, reduction {:.1}×)",
         maxvio_after,
@@ -126,10 +123,7 @@ fn main() {
         }
     );
     println!("converged iterations:    {}", result.converged_iter);
-    println!(
-        "β compute time:          {:.1} µs  (target: < 1000 µs for game scale)",
-        elapsed_us
-    );
+    println!("β compute time:          {elapsed_us:.1} µs  (target: < 1000 µs for game scale)");
     println!();
 
     // Route a sample token with the computed bias.
@@ -137,12 +131,9 @@ fn main() {
     let sample_row = &s[0..n]; // first calibration token
     let mut biased_scores = vec![0.0f32; n];
     let selected = route_with_bias(sample_row, &result.beta, k, &mut biased_scores);
-    println!("raw scores:    {:?}", sample_row);
-    println!("biased scores: {:?}", biased_scores);
-    println!(
-        "selected top-{} experts (by biased score): {:?}",
-        k, selected
-    );
+    println!("raw scores:    {sample_row:?}");
+    println!("biased scores: {biased_scores:?}");
+    println!("selected top-{k} experts (by biased score): {selected:?}");
     println!();
 
     // Honest summary.
@@ -153,23 +144,14 @@ fn main() {
         f32::INFINITY
     };
     if reduction >= 2.0 {
-        println!("✓ QB reduced MaxVio by {:.1}× (≥2× gate PASS)", reduction);
+        println!("✓ QB reduced MaxVio by {reduction:.1}× (≥2× gate PASS)");
     } else {
-        println!(
-            "△ QB reduced MaxVio by {:.1}× (<2× — check calibration batch size)",
-            reduction
-        );
+        println!("△ QB reduced MaxVio by {reduction:.1}× (<2× — check calibration batch size)");
     }
     if elapsed_us < 1000.0 {
-        println!(
-            "✓ β compute time {:.1} µs < 1ms (G4 sub-ms gate PASS)",
-            elapsed_us
-        );
+        println!("✓ β compute time {elapsed_us:.1} µs < 1ms (G4 sub-ms gate PASS)");
     } else {
-        println!(
-            "✗ β compute time {:.1} µs ≥ 1ms (G4 sub-ms gate FAIL)",
-            elapsed_us
-        );
+        println!("✗ β compute time {elapsed_us:.1} µs ≥ 1ms (G4 sub-ms gate FAIL)");
     }
     println!();
     println!("Note: on small batches (m·k/n near integer constraints), MaxVio");

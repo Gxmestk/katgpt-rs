@@ -348,54 +348,51 @@ fn main() {
     let solution = solve_hierarchical(&pruner);
     let elapsed = start.elapsed();
 
-    match solution {
-        Some(actions) => {
-            println!(
-                "🎉 Hierarchical solution found in {} steps ({:.2?})",
-                actions.len(),
-                elapsed
-            );
+    if let Some(actions) = solution {
+        println!(
+            "🎉 Hierarchical solution found in {} steps ({:.2?})",
+            actions.len(),
+            elapsed
+        );
 
-            // Verify by replaying through TacticalPruner
-            let mut state = pruner.initial_state();
-            for (i, &action) in actions.iter().enumerate() {
-                state = pruner.apply_action(&state, action).unwrap();
-                if i < 5 || i >= actions.len() - 3 {
-                    println!(
-                        "Step {:>3}: {} | pos=({},{}) inv={} killed={:03b} collected={:03b}",
-                        i + 1,
-                        TacticalPruner::action_name(action),
-                        state.r,
-                        state.c,
-                        state.inventory,
-                        state.killed_monsters,
-                        state.collected_treasures,
-                    );
-                } else if i == 5 {
-                    println!("  ... ({} more steps) ...", actions.len() - 8);
-                }
+        // Verify by replaying through TacticalPruner
+        let mut state = pruner.initial_state();
+        for (i, &action) in actions.iter().enumerate() {
+            state = pruner.apply_action(&state, action).unwrap();
+            if i < 5 || i >= actions.len() - 3 {
+                println!(
+                    "Step {:>3}: {} | pos=({},{}) inv={} killed={:03b} collected={:03b}",
+                    i + 1,
+                    TacticalPruner::action_name(action),
+                    state.r,
+                    state.c,
+                    state.inventory,
+                    state.killed_monsters,
+                    state.collected_treasures,
+                );
+            } else if i == 5 {
+                println!("  ... ({} more steps) ...", actions.len() - 8);
             }
-
-            println!();
-            print_grid(&pruner, &state);
-            println!();
-
-            // Assertions
-            assert_eq!((state.r, state.c), pruner.goal, "Bear must be at goal");
-            let all_treasures = (1 << pruner.treasures.len()) - 1;
-            assert_eq!(
-                state.collected_treasures, all_treasures,
-                "All treasures collected"
-            );
-            assert_eq!(
-                state.killed_monsters,
-                (1 << pruner.monsters.len()) - 1,
-                "All monsters killed"
-            );
-            println!("✅ Solution verified: at goal, all treasures, all monsters killed.");
         }
-        None => {
-            println!("❌ No solution found.");
-        }
+
+        println!();
+        print_grid(&pruner, &state);
+        println!();
+
+        // Assertions
+        assert_eq!((state.r, state.c), pruner.goal, "Bear must be at goal");
+        let all_treasures = (1 << pruner.treasures.len()) - 1;
+        assert_eq!(
+            state.collected_treasures, all_treasures,
+            "All treasures collected"
+        );
+        assert_eq!(
+            state.killed_monsters,
+            (1 << pruner.monsters.len()) - 1,
+            "All monsters killed"
+        );
+        println!("✅ Solution verified: at goal, all treasures, all monsters killed.");
+    } else {
+        println!("❌ No solution found.");
     }
 }

@@ -147,12 +147,10 @@ impl<'a> MultiFloorStrategicPruner<'a> {
         // Block goal unless all treasures collected or targeting goal
         let all_treasures = (1 << self.pruner.map.treasures.len()) - 1;
         if state.collected_treasures != all_treasures {
-            match target {
-                MultiFloorTarget::Goal => {}
-                _ => {
-                    let (floor, r, c) = self.pruner.map.goal;
-                    blocked.entry(floor).or_default().insert((r, c));
-                }
+            if let MultiFloorTarget::Goal = target {
+            } else {
+                let (floor, r, c) = self.pruner.map.goal;
+                blocked.entry(floor).or_default().insert((r, c));
             }
         }
 
@@ -537,37 +535,34 @@ fn main() {
     let solution1 = solve_multifloor(&pruner1);
     let elapsed1 = start.elapsed();
 
-    match solution1 {
-        Some(actions) => {
-            println!(
-                "🎉 Dungeon 1 solved in {} steps ({:.2?})",
-                actions.len(),
-                elapsed1,
-            );
-            println!();
-            print_solution(&pruner1, &actions);
-            println!();
+    if let Some(actions) = solution1 {
+        println!(
+            "🎉 Dungeon 1 solved in {} steps ({:.2?})",
+            actions.len(),
+            elapsed1,
+        );
+        println!();
+        print_solution(&pruner1, &actions);
+        println!();
 
-            let state = pruner1.replay_state(&actions).unwrap();
-            print_all_floors(&pruner1, &state);
-            println!();
+        let state = pruner1.replay_state(&actions).unwrap();
+        print_all_floors(&pruner1, &state);
+        println!();
 
-            // Assertions
-            assert_eq!(
-                (state.floor, state.r, state.c),
-                pruner1.map.goal,
-                "Player must be at goal",
-            );
-            let all_treasures = (1 << pruner1.map.treasures.len()) - 1;
-            assert_eq!(
-                state.collected_treasures, all_treasures,
-                "All treasures collected",
-            );
-            println!("✅ Dungeon 1 verified: at goal, all treasures collected.");
-        }
-        None => {
-            println!("❌ Dungeon 1: No solution found.");
-        }
+        // Assertions
+        assert_eq!(
+            (state.floor, state.r, state.c),
+            pruner1.map.goal,
+            "Player must be at goal",
+        );
+        let all_treasures = (1 << pruner1.map.treasures.len()) - 1;
+        assert_eq!(
+            state.collected_treasures, all_treasures,
+            "All treasures collected",
+        );
+        println!("✅ Dungeon 1 verified: at goal, all treasures collected.");
+    } else {
+        println!("❌ Dungeon 1: No solution found.");
     }
 
     println!();
@@ -606,35 +601,32 @@ fn main() {
     let solution2 = solve_multifloor(&pruner2);
     let elapsed2 = start.elapsed();
 
-    match solution2 {
-        Some(actions) => {
-            println!(
-                "🎉 Dungeon 2 solved in {} steps ({:.2?})",
-                actions.len(),
-                elapsed2,
-            );
-            println!();
-            print_solution(&pruner2, &actions);
-            println!();
+    if let Some(actions) = solution2 {
+        println!(
+            "🎉 Dungeon 2 solved in {} steps ({:.2?})",
+            actions.len(),
+            elapsed2,
+        );
+        println!();
+        print_solution(&pruner2, &actions);
+        println!();
 
-            let state = pruner2.replay_state(&actions).unwrap();
-            print_all_floors(&pruner2, &state);
-            println!();
+        let state = pruner2.replay_state(&actions).unwrap();
+        print_all_floors(&pruner2, &state);
+        println!();
 
-            assert_eq!(
-                (state.floor, state.r, state.c),
-                pruner2.map.goal,
-                "Player must be at goal",
-            );
-            let all_treasures = (1 << pruner2.map.treasures.len()) - 1;
-            assert_eq!(
-                state.collected_treasures, all_treasures,
-                "All treasures collected",
-            );
-            println!("✅ Dungeon 2 verified: at goal, all treasures collected.");
-        }
-        None => {
-            println!("❌ Dungeon 2: No solution found.");
-        }
+        assert_eq!(
+            (state.floor, state.r, state.c),
+            pruner2.map.goal,
+            "Player must be at goal",
+        );
+        let all_treasures = (1 << pruner2.map.treasures.len()) - 1;
+        assert_eq!(
+            state.collected_treasures, all_treasures,
+            "All treasures collected",
+        );
+        println!("✅ Dungeon 2 verified: at goal, all treasures collected.");
+    } else {
+        println!("❌ Dungeon 2: No solution found.");
     }
 }

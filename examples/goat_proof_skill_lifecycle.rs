@@ -168,8 +168,7 @@ fn print_arm_details(player: &SkillLifecyclePlayer) {
         let cat_status = player
             .catalog()
             .get(arm)
-            .map(|d| format!("{:?}", d.test_status))
-            .unwrap_or_else(|| "None".into());
+            .map_or_else(|| "None".into(), |d| format!("{:?}", d.test_status));
         println!(
             "  │ {action:>8} Q={q:>7.3} V={visits:>3} C={compressed:<5} Bonus={bonus:>6.2} [{cat_status}]"
         );
@@ -255,8 +254,9 @@ fn main() {
     let (lifecycle_stats, lifecycle_episodes) = lifecycle_players_back[0]
         .as_any()
         .downcast_ref::<SkillLifecyclePlayer>()
-        .map(|p| (p.stats().clone(), p.episode_count()))
-        .unwrap_or((LifecycleStats::default(), 0));
+        .map_or((LifecycleStats::default(), 0), |p| {
+            (p.stats().clone(), p.episode_count())
+        });
 
     print_lifecycle_stats(&lifecycle_stats, lifecycle_episodes);
 
@@ -286,10 +286,10 @@ fn main() {
     let all_outs = [&lifecycle_out, &hl_out, &wasm_out];
 
     // Initialize ELO
-    let mut elos: HashMap<String, f64> = HashMap::new();
-    let mut win_counts: HashMap<String, usize> = HashMap::new();
-    let mut loss_counts: HashMap<String, usize> = HashMap::new();
-    let mut direct_win_rates: HashMap<String, f64> = HashMap::new();
+    let mut elos: HashMap<String, f64> = HashMap::with_capacity(all_outs.len());
+    let mut win_counts: HashMap<String, usize> = HashMap::with_capacity(all_outs.len());
+    let mut loss_counts: HashMap<String, usize> = HashMap::with_capacity(all_outs.len());
+    let mut direct_win_rates: HashMap<String, f64> = HashMap::with_capacity(all_outs.len());
 
     for out in &all_outs {
         elos.insert(out.label.to_string(), calc.base);
@@ -419,32 +419,27 @@ fn main() {
     println!("  HL baseline ELO:  {hl_elo:.0}");
     println!();
 
-    match is_goat {
-        true => {
-            let delta = lifecycle_elo - hl_elo;
-            if significant {
-                println!("  🏆 GOAT ✅  SkillLifecycle beats HL baseline by {delta:.0} ELO");
-                println!(
-                    "     Statistically significant (z={z:.2}). Lifecycle adds measurable value."
-                );
-                println!("     RECOMMENDATION: Promote `skill_lifecycle` to default feature.");
-            } else {
-                println!("  🤔 MARGINAL GOAT ⚠️  SkillLifecycle leads by {delta:.0} ELO");
-                println!("     But NOT statistically significant (z={z:.2} < 1.96).");
-                println!("     RECOMMENDATION: Run more games or keep behind feature flag.");
-            }
+    if is_goat {
+        let delta = lifecycle_elo - hl_elo;
+        if significant {
+            println!("  🏆 GOAT ✅  SkillLifecycle beats HL baseline by {delta:.0} ELO");
+            println!("     Statistically significant (z={z:.2}). Lifecycle adds measurable value.");
+            println!("     RECOMMENDATION: Promote `skill_lifecycle` to default feature.");
+        } else {
+            println!("  🤔 MARGINAL GOAT ⚠️  SkillLifecycle leads by {delta:.0} ELO");
+            println!("     But NOT statistically significant (z={z:.2} < 1.96).");
+            println!("     RECOMMENDATION: Run more games or keep behind feature flag.");
         }
-        false => {
-            let delta = hl_elo - lifecycle_elo;
-            if delta < 10.0 {
-                println!("  🤔 NEUTRAL ⚠️  HL baseline leads by only {delta:.0} ELO");
-                println!("     Within noise margin. Lifecycle adds no measurable overhead.");
-                println!("     RECOMMENDATION: Keep behind `skill_lifecycle` feature flag.");
-            } else {
-                println!("  💀 NOT GOAT ❌  HL baseline beats SkillLifecycle by {delta:.0} ELO");
-                println!("     Lifecycle overhead not justified.");
-                println!("     RECOMMENDATION: Keep behind `skill_lifecycle` feature flag.");
-            }
+    } else {
+        let delta = hl_elo - lifecycle_elo;
+        if delta < 10.0 {
+            println!("  🤔 NEUTRAL ⚠️  HL baseline leads by only {delta:.0} ELO");
+            println!("     Within noise margin. Lifecycle adds no measurable overhead.");
+            println!("     RECOMMENDATION: Keep behind `skill_lifecycle` feature flag.");
+        } else {
+            println!("  💀 NOT GOAT ❌  HL baseline beats SkillLifecycle by {delta:.0} ELO");
+            println!("     Lifecycle overhead not justified.");
+            println!("     RECOMMENDATION: Keep behind `skill_lifecycle` feature flag.");
         }
     }
 

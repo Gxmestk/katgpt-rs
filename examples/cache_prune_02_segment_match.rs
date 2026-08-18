@@ -120,7 +120,7 @@ fn segment_matching_latency() {
     println!("  Request length: 10,000 tokens");
     println!("  Candidates: {}", matches.len());
     println!("  Verified: {}", verified.len());
-    println!("  Latency: {:?}", elapsed);
+    println!("  Latency: {elapsed:?}");
     println!("  Result: {status}");
     println!();
 }

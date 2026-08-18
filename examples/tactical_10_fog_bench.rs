@@ -1389,7 +1389,7 @@ fn bench_seed(seed: u64) -> BenchResult {
 
 fn main() {
     let seeds: Vec<u64> = (42..=71).collect();
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(seeds.len());
 
     println!(
         "╔═════════════════════════════════════════════════════════════════════════════════════════════════════════╗"

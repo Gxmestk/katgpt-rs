@@ -228,17 +228,14 @@ fn summarize(name: &str, decisions: &[RoutingDecision]) {
             .filter(|d| d.tier == Tier::CpuGpuAne)
             .count()
     );
-    println!(
-        "    cot mode:      {} direct / {} thinking",
-        direct, thinking
-    );
+    println!("    cot mode:      {direct} direct / {thinking} thinking");
     println!(
         "    accuracy:      {:.1}% ({}/{})",
         correct as f32 / n * 100.0,
         correct,
         decisions.len()
     );
-    println!("    total tokens:  {}", tokens);
+    println!("    total tokens:  {tokens}");
 }
 
 fn main() {
@@ -294,8 +291,7 @@ fn main() {
         tvp.len()
     );
     println!(
-        "  GPU promotions:      baseline used GPU on {} queries; TVP on {}",
-        baseline_gpu, tvp_gpu
+        "  GPU promotions:      baseline used GPU on {baseline_gpu} queries; TVP on {tvp_gpu}"
     );
     println!(
         "  Adapter thresholds:  promote_at={:.3}, demote_at={:.3} (after {} obs)",

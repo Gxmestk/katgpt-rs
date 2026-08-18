@@ -113,7 +113,7 @@ fn main() {
     // Also demonstrate shape_path convenience
     let flat_path: Vec<(usize, f32)> = vec![(0, 1.0), (1, 1.0), (2, 0.0), (3, 1.0), (4, 1.0)];
     let shaped_flat = shape_path(&flat_path, lambda);
-    println!("  shape_path convenience: {:?}", shaped_flat);
+    println!("  shape_path convenience: {shaped_flat:?}");
     println!();
 
     // ── Section 2: Flat Rewards Baseline ──────────────────────────
@@ -264,7 +264,7 @@ fn main() {
         let rewards_str = if rewards.is_empty() {
             "[]".to_string()
         } else {
-            format!("{:?}", rewards)
+            format!("{rewards:?}")
         };
         println!("  {rewards_str:<28} │ {consistency:>11.2} │ {desc}");
     }

@@ -37,7 +37,7 @@ fn main() {
         config.block_size,
         config.lora_rank,
     );
-    println!("Prompt: {} tokens {:?}", prompt_len, prompt_tokens);
+    println!("Prompt: {prompt_len} tokens {prompt_tokens:?}");
     println!();
 
     // ======================================================================
@@ -115,8 +115,8 @@ fn main() {
         "  Bidirectional logits (2L):[{:.4}, {:.4}, {:.4}, {:.4}...]",
         logits_bi[0], logits_bi[1], logits_bi[2], logits_bi[3]
     );
-    println!("  Max logit diff:      {:.6}", max_diff);
-    println!("  Mean logit diff:     {:.6}", mean_diff);
+    println!("  Max logit diff:      {max_diff:.6}");
+    println!("  Mean logit diff:     {mean_diff:.6}");
 
     if max_diff > 1e-4 {
         println!("  ✅ PROVEN: Bidirectional ≠ causal (model sees whole prompt at once)");
@@ -218,9 +218,9 @@ fn main() {
         logits_writer[0], logits_writer[1], logits_writer[2], logits_writer[3]
     );
     println!();
-    println!("  Reader vs No-LoRA:   max diff = {:.6}", max_r_vs_n);
-    println!("  Writer vs No-LORA:   max diff = {:.6}", max_w_vs_n);
-    println!("  Reader vs Writer:    max diff = {:.6}", max_r_vs_w);
+    println!("  Reader vs No-LoRA:   max diff = {max_r_vs_n:.6}");
+    println!("  Writer vs No-LORA:   max diff = {max_w_vs_n:.6}");
+    println!("  Reader vs Writer:    max diff = {max_r_vs_w:.6}");
 
     if max_r_vs_n > 1e-6 && max_w_vs_n > 1e-6 && max_r_vs_w > 1e-6 {
         println!("  ✅ PROVEN: LoRA changes model output");
@@ -280,7 +280,7 @@ fn main() {
 
     let all_valid = generated.iter().all(|&t| t < config.vocab_size);
 
-    println!("  Prompt:    {:?} ({} tokens)", prompt_tokens, prompt_len);
+    println!("  Prompt:    {prompt_tokens:?} ({prompt_len} tokens)");
     println!("  Generated: {:?} ({} tokens)", generated, generated.len());
 
     // Show token flow: reader LoRA for prefill, writer LoRA for decode
@@ -356,11 +356,8 @@ fn main() {
     );
     let decode2_finite = logits2.iter().all(|l| l.is_finite());
 
-    println!(
-        "  Cache populated: {}/{} prompt positions",
-        populated_count, prompt_len
-    );
-    println!("  Decode pos {}: finite = {}", decode_pos, decode_finite);
+    println!("  Cache populated: {populated_count}/{prompt_len} prompt positions");
+    println!("  Decode pos {decode_pos}: finite = {decode_finite}");
     println!(
         "  Decode pos {}: finite = {}",
         decode_pos + 1,
@@ -453,16 +450,13 @@ fn main() {
     let decode_us = decode_dur.as_secs_f64() * 1e6 / (bench_iters * bench_prompt_len) as f64;
     let overhead_ratio = prefill_us / causal_us;
 
-    println!("  Prompt length:     {} tokens", bench_prompt_len);
-    println!("  Iterations:        {}", bench_iters);
+    println!("  Prompt length:     {bench_prompt_len} tokens");
+    println!("  Iterations:        {bench_iters}");
     println!();
-    println!("  Sequential causal: {:>8.1} µs/request", causal_us);
-    println!("  Bidirectional:     {:>8.1} µs/request", prefill_us);
-    println!("  Decode (1 token):  {:>8.1} µs/step", decode_us);
-    println!(
-        "  Overhead ratio:    {:.2}× (expected ~2× from two-phase per layer)",
-        overhead_ratio
-    );
+    println!("  Sequential causal: {causal_us:>8.1} µs/request");
+    println!("  Bidirectional:     {prefill_us:>8.1} µs/request");
+    println!("  Decode (1 token):  {decode_us:>8.1} µs/step");
+    println!("  Overhead ratio:    {overhead_ratio:.2}× (expected ~2× from two-phase per layer)");
     println!();
 
     // Amortized analysis
@@ -471,22 +465,12 @@ fn main() {
     let total_decode_us = decode_us * typical_gen_tokens as f64;
     let amortized_pct = (prefill_overhead_us / (prefill_us + total_decode_us)) * 100.0;
 
+    println!("  ── Amortized Analysis ({typical_gen_tokens} gen tokens) ──");
+    println!("  Prefill overhead:  {prefill_overhead_us:.1} µs (one-time)");
     println!(
-        "  ── Amortized Analysis ({} gen tokens) ──",
-        typical_gen_tokens
+        "  Total decode:      {total_decode_us:.1} µs ({typical_gen_tokens} steps × {decode_us:.1} µs)"
     );
-    println!(
-        "  Prefill overhead:  {:.1} µs (one-time)",
-        prefill_overhead_us
-    );
-    println!(
-        "  Total decode:      {:.1} µs ({} steps × {:.1} µs)",
-        total_decode_us, typical_gen_tokens, decode_us
-    );
-    println!(
-        "  Prefill overhead:  {:.2}% of total request time",
-        amortized_pct
-    );
+    println!("  Prefill overhead:  {amortized_pct:.2}% of total request time");
     println!("  → Bidirectional prefill cost is negligible for real workloads");
     println!();
 
@@ -503,8 +487,7 @@ fn main() {
     println!("║  ✅ Shared KV cache — prefill + decode seamless                  ║");
     println!("║  ✅ Zero-copy — all buffers pre-allocated, no Vec::new() in path ║");
     println!(
-        "║  ✅ Overhead ~{:.1}× prefill, ~{:.1}% amortized — negligible at prod scale   ║",
-        overhead_ratio, amortized_pct
+        "║  ✅ Overhead ~{overhead_ratio:.1}× prefill, ~{amortized_pct:.1}% amortized — negligible at prod scale   ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════╝");
 }

@@ -91,14 +91,14 @@ fn main() {
         .collect();
 
     let fpr = gate.validate_fpr(&tracker, &stable_windows, &eigenvectors, 0.90);
-    println!("  FPR on stable windows: {:.3}", fpr);
+    println!("  FPR on stable windows: {fpr:.3}");
 
     println!("\n  Anomalous window detection:");
     for (i, w) in anomalous_windows.iter().enumerate() {
         let z_scores = tracker.eigenspace_zscore(w);
         let min_z = z_scores.iter().cloned().reduce(f32::min).unwrap_or(0.0);
         let result = gate.evaluate(&tracker, w, &eigenvectors, &[1.0; 6], 0.90);
-        println!("    Window {i}: z_min={:.2} -> {result:?}", min_z);
+        println!("    Window {i}: z_min={min_z:.2} -> {result:?}");
     }
 
     // Step 4: Jaccard stability
@@ -114,8 +114,8 @@ fn main() {
     let anomaly_j =
         EigenvalueTracker::eigenvalue_jaccard(&stable_windows[49], &anomalous_windows[0], 3);
 
-    println!("  Stable window Jaccard (top-3): mean={:.3}", stable_mean);
-    println!("  Last stable -> first anomalous Jaccard: {:.3}", anomaly_j);
+    println!("  Stable window Jaccard (top-3): mean={stable_mean:.3}");
+    println!("  Last stable -> first anomalous Jaccard: {anomaly_j:.3}");
 
     // Decomposition demo
     println!("\n  Stiff/soft decomposition of base spectrum:");
@@ -144,8 +144,8 @@ fn main() {
     let alpha_stiff = soft_alignment_ratio(&decomp, &delta_stiff);
     let alpha_soft = soft_alignment_ratio(&decomp, &delta_soft);
     println!("\n  Soft alignment ratio:");
-    println!("    delta_x along stiff axis: alpha = {:.3}", alpha_stiff);
-    println!("    delta_x along soft axis:  alpha = {:.3}", alpha_soft);
+    println!("    delta_x along stiff axis: alpha = {alpha_stiff:.3}");
+    println!("    delta_x along soft axis:  alpha = {alpha_soft:.3}");
 
     // Monte Carlo null test
     println!("\n  Monte Carlo null test:");

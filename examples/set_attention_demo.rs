@@ -159,10 +159,10 @@ fn main() {
         );
     }
     println!();
-    println!("  mean L2 error before: {:.4}", err_before);
-    println!("  mean L2 error after:  {:.4}", err_after);
+    println!("  mean L2 error before: {err_before:.4}");
+    println!("  mean L2 error after:  {err_after:.4}");
     let overall = (1.0 - err_after / err_before) * 100.0;
-    println!("  overall noise reduction: {:.1}%", overall);
+    println!("  overall noise reduction: {overall:.1}%");
 
     // ── Verdict: the modelless floor denoises by within-cluster averaging.
     //    A meaningful reduction (> 10%) confirms the primitive adds value as a
@@ -171,8 +171,7 @@ fn main() {
     if overall > 10.0 {
         println!();
         println!(
-            "  PASS: set attention denoises sensor readings modellessly ({:.1}% reduction).",
-            overall
+            "  PASS: set attention denoises sensor readings modellessly ({overall:.1}% reduction)."
         );
         println!("  The open primitive is useful beyond NPC AI — no training required.");
     } else {

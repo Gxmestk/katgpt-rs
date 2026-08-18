@@ -48,13 +48,14 @@ impl VrVerifier for ReferenceVerifier {
             }
         }
 
-        match rejected_positions.is_empty() {
-            true => Ok(()),
-            false => Err(VrRoundFeedback {
+        if rejected_positions.is_empty() {
+            Ok(())
+        } else {
+            Err(VrRoundFeedback {
                 rejected_positions,
                 rejected_tokens,
                 failure_description: "mismatch with reference".into(),
-            }),
+            })
         }
     }
 }
@@ -209,7 +210,7 @@ fn main() {
     println!("    Accepted: {} candidate(s)", result.accepted.len());
     println!("    Rejection log: {} round(s)", result.rejection_log.len());
     println!("    Constraints accumulated: {}", vr.constraint_count());
-    println!("    Latency: {:.2?}", elapsed);
+    println!("    Latency: {elapsed:.2?}");
 
     if let Some(accepted) = result.accepted.first() {
         let matches = accepted == &reference;

@@ -246,15 +246,15 @@ fn print_divergence_matrix(q_values: &[f32], visits: &[u32], subset: usize) {
 
     print!("     ");
     for j in 0..n {
-        print!("{:>6}", j);
+        print!("{j:>6}");
     }
     println!();
 
     for i in 0..n {
-        print!("{:>4}", i);
+        print!("{i:>4}");
         for j in 0..n {
             let d = IdeaDivergence::divergence(&score_vecs[i], &score_vecs[j]);
-            print!("{:>6.2}", d);
+            print!("{d:>6.2}");
         }
         println!();
     }

@@ -132,7 +132,7 @@ fn demo_reachability() {
     let alpha = dp.exploitation_probability();
     println!("  After {TOTAL} cycles (all E-pool successes):");
     println!("    w_E               : {:.4}", dp.w_e());
-    println!("    α = sigmoid(w_E−w_X): {:.6}", alpha);
+    println!("    α = sigmoid(w_E−w_X): {alpha:.6}");
     println!(
         "    is_reachable()    : {}  (X-pool floor > 0)",
         dp.is_reachable()
@@ -216,9 +216,7 @@ fn demo_epool_growth() {
     let uniform_4 = 1.0 / 4.0;
     assert!(
         max_e_prio > uniform_4,
-        "G3 FAIL: promoted arm should have elevated priority (max={:.4}, uniform_4={:.4})",
-        max_e_prio,
-        uniform_4
+        "G3 FAIL: promoted arm should have elevated priority (max={max_e_prio:.4}, uniform_4={uniform_4:.4})"
     );
     println!();
     println!("  ✓ E-pool grew by 1 — optimal direction (X-pool arm 7) promoted.");

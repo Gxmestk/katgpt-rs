@@ -195,7 +195,7 @@ fn main() {
         RaceState::GOAL
     );
     println!("Baseline       : always Stall");
-    println!("Candidates     : {:?}", candidate_names);
+    println!("Candidates     : {candidate_names:?}");
     println!("MCTS budget    : 24 iterations/move");
     println!("Games per match: 4 per (candidate, role) vs baseline; 4 per head-to-head pair");
     println!();
@@ -228,11 +228,11 @@ fn main() {
     println!("Head-to-head win-rate matrix (rows = candidate, cols = opponent):");
     print!("            ");
     for name in &candidate_names {
-        print!("{:>10} ", name);
+        print!("{name:>10} ");
     }
     println!();
     for (i, name) in candidate_names.iter().enumerate() {
-        print!("  {:<10} ", name);
+        print!("  {name:<10} ");
         for (j, _opp_name) in candidate_names.iter().enumerate() {
             if i == j {
                 print!("       --- ");

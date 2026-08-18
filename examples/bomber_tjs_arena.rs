@@ -587,8 +587,8 @@ fn main() {
     println!("  GOAT GATE: T1.11 — TJS (P4 ✨) vs Dense (P3 🧠) ELO ratio");
     println!("═══════════════════════════════════════════════════════════════");
     println!();
-    println!("  P3 🧠 Dense ELO: {:>9.1}", dense_elo);
-    println!("  P4 ✨ TJS   ELO: {:>9.1}", tjs_elo);
+    println!("  P3 🧠 Dense ELO: {dense_elo:>9.1}");
+    println!("  P4 ✨ TJS   ELO: {tjs_elo:>9.1}");
     println!();
 
     let tjs_ratio = if dense_elo > 0.0 {
@@ -600,7 +600,7 @@ fn main() {
 
     println!("  ELO ratio (TJS / Dense): {tjs_ratio:.4}");
     println!("  ELO delta  (TJS - Dense): {tjs_delta:+.1}");
-    println!("  Target ratio:            ≥ {:.2}", TJS_ELO_RATIO_TARGET);
+    println!("  Target ratio:            ≥ {TJS_ELO_RATIO_TARGET:.2}");
     println!();
 
     if tjs_ratio >= TJS_ELO_RATIO_TARGET {
@@ -661,8 +661,8 @@ fn main() {
         println!("                     TJS-alone      (Arena A P4 ✨) ELO ratio");
         println!("═══════════════════════════════════════════════════════════════");
         println!();
-        println!("  Arena A P4 ✨ TJS            ELO: {:>9.1}", tjs_elo);
-        println!("  Arena B P4 🌀 TJS+Manifold   ELO: {:>9.1}", manifold_elo);
+        println!("  Arena A P4 ✨ TJS            ELO: {tjs_elo:>9.1}");
+        println!("  Arena B P4 🌀 TJS+Manifold   ELO: {manifold_elo:>9.1}");
         println!();
 
         let manifold_ratio = if tjs_elo > 0.0 {
@@ -674,10 +674,7 @@ fn main() {
 
         println!("  ELO ratio (Manifold / TJS):  {manifold_ratio:.4}");
         println!("  ELO delta  (Manifold - TJS): {manifold_delta:+.1}");
-        println!(
-            "  Target ratio:                ≥ {:.2}",
-            MANIFOLD_ELO_RATIO_TARGET
-        );
+        println!("  Target ratio:                ≥ {MANIFOLD_ELO_RATIO_TARGET:.2}");
         println!();
 
         if manifold_ratio >= MANIFOLD_ELO_RATIO_TARGET {

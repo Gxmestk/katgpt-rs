@@ -49,15 +49,9 @@ fn print_header(
     initial_komi: f32,
 ) {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!(
-        "║       G-Zero Self-Play — {board_size}×{board_size}                          ║",
-        board_size = board_size
-    );
+    println!("║       G-Zero Self-Play — {board_size}×{board_size}                          ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!(
-        "║  Episodes          : {num_episodes:<6}                              ║",
-        num_episodes = num_episodes
-    );
+    println!("║  Episodes          : {num_episodes:<6}                              ║");
     println!(
         "║  Delta-gating      : {delta_gating:<6}                              ║",
         delta_gating = if delta_gating { "YES" } else { "NO" }
@@ -94,7 +88,7 @@ fn fmt_duration(d: std::time::Duration) -> String {
     if secs < 1.0 {
         format!("{:.0}ms", d.as_millis())
     } else if secs < 60.0 {
-        format!("{:.1}s", secs)
+        format!("{secs:.1}s")
     } else {
         format!("{:.1}m", secs / 60.0)
     }
@@ -235,18 +229,12 @@ fn section_full_selfplay(num_episodes: usize, board_size: usize, delta_gating: b
     println!("  ┌────────────────────────────────────────────┐");
     println!("  │  SELF-PLAY RESULTS                         │");
     println!("  ├────────────────────────────────────────────┤");
-    println!(
-        "  │  Total episodes : {total_games:<24} │",
-        total_games = total_games
-    );
+    println!("  │  Total episodes : {total_games:<24} │");
     println!(
         "  │  Duration       : {:<24} │",
         fmt_duration(results.duration)
     );
-    println!(
-        "  │  Episodes/sec   : {episodes_per_sec:<24.1} │",
-        episodes_per_sec = episodes_per_sec
-    );
+    println!("  │  Episodes/sec   : {episodes_per_sec:<24.1} │");
     println!(
         "  │  Black wins     : {} ({black_wr:.1}%)              │",
         results.black_wins
@@ -260,10 +248,7 @@ fn section_full_selfplay(num_episodes: usize, board_size: usize, delta_gating: b
         results.draws
     );
     println!("  │  Final komi     : {:<24.1} │", results.final_komi);
-    println!(
-        "  │  Avg moves/game : {avg_moves:<24.1} │",
-        avg_moves = avg_moves
-    );
+    println!("  │  Avg moves/game : {avg_moves:<24.1} │");
     println!(
         "  │  Total δ        : {total_delta:<+24.4} │",
         total_delta = results.total_delta
@@ -371,7 +356,7 @@ fn section_delta_evolution(num_episodes: usize, board_size: usize) {
         .iter()
         .enumerate()
         .map(|(idx, history)| {
-            let mean = history.last().map(|(_, d)| *d).unwrap_or(0.0);
+            let mean = history.last().map_or(0.0, |(_, d)| *d);
             (idx, mean)
         })
         .collect();

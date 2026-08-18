@@ -36,8 +36,8 @@ fn main() {
     let candidates: Vec<[u8; 2]> = (0..N).map(|i| (i as u16).to_le_bytes()).collect();
     let candidates_ref: Vec<&[u8]> = candidates.iter().map(|c| c.as_slice()).collect();
 
-    println!("Action space:    |X| = {} (16-bit)", N);
-    println!("Optimum:         x* = 0x{:04X} (score = 0)", OPTIMUM);
+    println!("Action space:    |X| = {N} (16-bit)");
+    println!("Optimum:         x* = 0x{OPTIMUM:04X} (score = 0)");
     println!("Objective:       f(x) = -popcount(x XOR 0xFFFF)  [low-K]");
     println!();
 
@@ -54,10 +54,7 @@ fn main() {
     }
     let uniform_expected = N / 2;
     println!("── Uniform baseline ─────────────────────────────────");
-    println!(
-        "Theoretical E[time-to-optimum] ≈ |X|/2 = {}",
-        uniform_expected
-    );
+    println!("Theoretical E[time-to-optimum] ≈ |X|/2 = {uniform_expected}");
     println!(
         "Hit in first N draws? {}",
         if uniform_hits > 0 { "yes" } else { "no" }
@@ -88,7 +85,7 @@ fn main() {
         }
     }
     match l1_hits_at {
-        Some(t) => println!("✅ L1-prior sampler hit optimum at trial {}", t),
+        Some(t) => println!("✅ L1-prior sampler hit optimum at trial {t}"),
         None => println!("⚠️  L1-prior sampler did not hit optimum in 1000 trials"),
     }
     println!();
@@ -115,16 +112,15 @@ fn main() {
     // ── Honest verdict ──────────────────────────────────────────
     println!("── Honest verdict ───────────────────────────────────");
     println!("On this 16-bit 'all-ones optimum' synthetic:");
-    println!("  • Uniform E[time-to-optimum] = {}", uniform_expected);
-    match l1_hits_at {
-        Some(t) => println!(
+    println!("  • Uniform E[time-to-optimum] = {uniform_expected}");
+    if let Some(t) = l1_hits_at {
+        println!(
             "  • L1-prior (α=-2.0): hit at trial {} ({:.1}× speedup)",
             t,
             uniform_expected as f64 / (t as f64 + 1.0)
-        ),
-        None => {
-            println!("  • L1-prior (α=-2.0): did NOT hit in 1000 trials on this 2-byte encoding")
-        }
+        );
+    } else {
+        println!("  • L1-prior (α=-2.0): did NOT hit in 1000 trials on this 2-byte encoding");
     }
     println!();
     println!("Note: RLE proxy at 2-byte encoding has limited discriminative");

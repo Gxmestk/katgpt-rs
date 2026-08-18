@@ -35,8 +35,7 @@ fn argmax(probs: &[f32]) -> usize {
         .iter()
         .enumerate()
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .map_or(0, |(i, _)| i)
 }
 
 fn main() {
@@ -86,10 +85,7 @@ fn main() {
             w if w > 1.0 => "  (extrapolation)",
             _ => "",
         };
-        println!(
-            "│ {:<8.2} │ {:<12} │ {:<13.4} │ {:<16.3} │{}",
-            w, top, max_p, h, label
-        );
+        println!("│ {w:<8.2} │ {top:<12} │ {max_p:<13.4} │ {h:<16.3} │{label}");
     }
     println!("└──────────┴──────────────┴───────────────┴──────────────────┘");
     println!();
@@ -100,7 +96,7 @@ fn main() {
         let sharpener = ProductPolicySharpen::new(w);
         let mut probs = vec![0.0_f32; VOCAB];
         sharpener.sharpen_normalized(&pre, &post, &mut probs);
-        print!("   w={:>4.1}: ", w);
+        print!("   w={w:>4.1}: ");
         for (i, &p) in probs.iter().enumerate() {
             let bars = (p * 50.0) as usize;
             if i == 3 {

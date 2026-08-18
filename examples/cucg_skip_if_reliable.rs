@@ -65,7 +65,7 @@ fn main() {
         };
         let suppressed = d_plain.is_compress() && !d_skip.is_compress();
 
-        println!("CLR vote = {} ({label}):", vote);
+        println!("CLR vote = {vote} ({label}):");
         println!("  plain gate:  {plain_str}");
         println!("  skip gate:   {skip_str}");
         if suppressed {

@@ -40,9 +40,10 @@ fn mcts_player(
 /// Play one random action.
 fn random_player(state: &BomberState, player_id: u8, rng: &mut fastrand::Rng) -> BomberAction {
     let actions = state.available_actions(player_id);
-    match actions.is_empty() {
-        true => BomberAction::Wait,
-        false => actions[rng.usize(0..actions.len())],
+    if actions.is_empty() {
+        BomberAction::Wait
+    } else {
+        actions[rng.usize(0..actions.len())]
     }
 }
 

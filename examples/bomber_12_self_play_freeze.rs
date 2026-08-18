@@ -298,12 +298,11 @@ fn main() {
     }
 
     // Freeze knowledge
-    let frozen = match players[HL_INDEX].as_any().downcast_ref::<HLPlayer>() {
-        Some(hl) => hl.freeze(),
-        None => {
-            eprintln!("ERROR: Could not downcast HL player for freeze");
-            std::process::exit(1);
-        }
+    let frozen = if let Some(hl) = players[HL_INDEX].as_any().downcast_ref::<HLPlayer>() {
+        hl.freeze()
+    } else {
+        eprintln!("ERROR: Could not downcast HL player for freeze");
+        std::process::exit(1);
     };
 
     match save_frozen(output_path, &frozen) {

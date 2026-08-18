@@ -74,9 +74,10 @@ fn bench_dirty_check() {
     println!("│  Grid: 64×64, iterations: {iterations}");
     println!("│  Per-call: {per_call_ns:.3} ns");
     println!("│  Target: < 1 ns");
-    match per_call_ns < 1.0 {
-        true => println!("│  ✅ PASS"),
-        false => println!("│  ⚠️  SLOW (but functional)"),
+    if per_call_ns < 1.0 {
+        println!("│  ✅ PASS")
+    } else {
+        println!("│  ⚠️  SLOW (but functional)")
     }
     println!("└──────────────────────────────────────────────────────────────");
 }

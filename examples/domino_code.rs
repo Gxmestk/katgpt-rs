@@ -97,10 +97,7 @@ fn main() {
     println!("  prefix_strength reflects confidence in the sampled path:");
     for strength in [1.0, 0.9, 0.7, 0.5] {
         let score = domino_score(-2.0, 3, strength);
-        println!(
-            "  depth=3, strength={:.1} → score={:.4} (base=-2.0)",
-            strength, score
-        );
+        println!("  depth=3, strength={strength:.1} → score={score:.4} (base=-2.0)");
     }
 
     println!("\n✅ Domino code correction is modelless — pure pattern extraction, no training.");

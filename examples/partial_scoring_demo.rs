@@ -102,7 +102,7 @@ fn main() {
     println!("║  Partial Scoring Demo — Plan 191 T4.1                                ║");
     println!("╚════════════════════════════════════════════════════════════════════════╝");
     println!();
-    println!("  {} arms, {} episodes, UCB1 strategy", NUM_ARMS, EPISODES);
+    println!("  {NUM_ARMS} arms, {EPISODES} episodes, UCB1 strategy");
     println!("  Arm profiles (mean_survival, mean_kills, win_rate):");
     for (i, (surv, kills, wr)) in ARM_PROFILES.iter().enumerate() {
         println!("    Arm {i}: ({surv:.0}, {kills:.1}, {wr:.2})");
@@ -154,18 +154,13 @@ fn main() {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         let partial_best = pq
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        println!(
-            "  {:>8} | {:<26} | {:<26} | {} / {}",
-            ep, bq_str, pq_str, binary_best, partial_best
-        );
+            .map_or(0, |(i, _)| i);
+        println!("  {ep:>8} | {bq_str:<26} | {pq_str:<26} | {binary_best} / {partial_best}");
     }
     println!();
 

@@ -276,8 +276,7 @@ fn main() {
         };
 
         println!(
-            "│ {:>10}   │ {:>10.6} │ {:>12.6} │ {:>12.6} │ {:>12.4} │",
-            ctx_len, avg_mse, cum_mse, avg_cos, accum_ratio,
+            "│ {ctx_len:>10}   │ {avg_mse:>10.6} │ {cum_mse:>12.6} │ {avg_cos:>12.6} │ {accum_ratio:>12.4} │",
         );
     }
 
@@ -513,15 +512,9 @@ fn main() {
         full_per_tok.as_secs_f64() * 1e6
     );
     println!();
-    println!("  Quality comparison ({}-bit):", bench_bits);
-    println!(
-        "    KVarN no-Hadamard: cosine={:.4}  MSE={:.6}",
-        had_cosine, had_mse
-    );
-    println!(
-        "    KVarN + Hadamard:  cosine={:.4}  MSE={:.6}",
-        nohad_avg_cosine, nohad_avg_mse
-    );
+    println!("  Quality comparison ({bench_bits}-bit):");
+    println!("    KVarN no-Hadamard: cosine={had_cosine:.4}  MSE={had_mse:.6}");
+    println!("    KVarN + Hadamard:  cosine={nohad_avg_cosine:.4}  MSE={nohad_avg_mse:.6}");
     println!();
     println!("  ┌────────────────────────────────────────────┬────────────┬──────────┐");
     println!("  │ GOAT Criterion                            │ Measured   │ Target   │");

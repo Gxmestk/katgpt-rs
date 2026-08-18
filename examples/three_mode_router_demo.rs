@@ -60,10 +60,7 @@ fn main() {
     let pruned = vec![0.5, 0.3, 0.15, 0.05];
     let unpruned = vec![0.25, 0.25, 0.25, 0.25];
     let gq = grounding_quality(&pruned, &unpruned);
-    println!(
-        "  Pruned {:?} vs Uniform {:?} → quality = {gq:.4}",
-        pruned, unpruned
-    );
+    println!("  Pruned {pruned:?} vs Uniform {unpruned:?} → quality = {gq:.4}");
 
     let identical = vec![0.25; 4];
     let gq_ident = grounding_quality(&identical, &identical);

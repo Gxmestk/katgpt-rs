@@ -28,12 +28,12 @@ fn main() {
         // Query with a test vector
         let query = vec![0.5, 0.3];
         let gates = compute_gates(&query, &store.summaries());
-        println!("\nGate values: {:?}", gates);
+        println!("\nGate values: {gates:?}");
 
         // Top-k selection via gating module
         let top_gates =
             katgpt_kv::segment_checkpoint::gating::top_k_gates(&query, &store.summaries(), 3);
-        println!("Top-3 gates: {:?}", top_gates);
+        println!("Top-3 gates: {top_gates:?}");
 
         #[cfg(feature = "ssc_spec_draft")]
         {
@@ -51,7 +51,7 @@ fn main() {
                 .map(|(id, s)| (*id, s.as_slice()))
                 .collect();
             let top = compute_and_select_top_k(&query, &summary_refs, 3);
-            println!("SSC Top-3 segments: {:?}", top);
+            println!("SSC Top-3 segments: {top:?}");
 
             // SSC-enhanced speculative drafting
             let mut drafter = SscDrafter::new(3);
@@ -64,8 +64,8 @@ fn main() {
             let mut logits = vec![0.3, 0.5, -0.1, 0.8];
             let before = logits.clone();
             drafter.enhance_draft(&mut logits);
-            println!("Logits before: {:?}", before);
-            println!("Logits after:  {:?}", logits);
+            println!("Logits before: {before:?}");
+            println!("Logits after:  {logits:?}");
         }
 
         println!("\nDone.");

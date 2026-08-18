@@ -88,26 +88,23 @@ fn main() {
     let mut draws = 0usize;
 
     for r in &results {
-        let outcome = match &r.result {
-            Some(score) => {
-                let we_play_black = r.our_color == "black";
-                let we_won = (we_play_black && score.starts_with('B'))
-                    || (!we_play_black && score.starts_with('W'));
-                if we_won {
-                    wins += 1;
-                    "WIN "
-                } else if score.contains('+') {
-                    losses += 1;
-                    "LOSS"
-                } else {
-                    draws += 1;
-                    "DRAW"
-                }
-            }
-            None => {
+        let outcome = if let Some(score) = &r.result {
+            let we_play_black = r.our_color == "black";
+            let we_won = (we_play_black && score.starts_with('B'))
+                || (!we_play_black && score.starts_with('W'));
+            if we_won {
+                wins += 1;
+                "WIN "
+            } else if score.contains('+') {
+                losses += 1;
+                "LOSS"
+            } else {
                 draws += 1;
-                "????"
+                "DRAW"
             }
+        } else {
+            draws += 1;
+            "????"
         };
         println!(
             "  [{outcome}] {our_color:>5} vs random — {moves:>3} moves — {id}",

@@ -45,14 +45,8 @@ fn main() {
 
     println!("Case                                    H_1 (curiosity_H1)  β (curiosity_β)");
     println!("--------------------------------------- ------------------  ---------------");
-    println!(
-        "A: focused   (0.7, 0.1, 0.05, ...)        {:.4}            {:.4}",
-        h1_a, beta_a
-    );
-    println!(
-        "B: long-tail (0.18, 0.16, 0.14, ...)      {:.4}            {:.4}",
-        h1_b, beta_b
-    );
+    println!("A: focused   (0.7, 0.1, 0.05, ...)        {h1_a:.4}            {beta_a:.4}");
+    println!("B: long-tail (0.18, 0.16, 0.14, ...)      {h1_b:.4}            {beta_b:.4}");
 
     println!("\nH_1 reports ~equal curiosity in both cases (it can't tell focused");
     println!("relevance from long-tail noise). β reports A is highly concentrated");

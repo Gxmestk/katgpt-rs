@@ -155,7 +155,7 @@ fn main() {
 
     if median.as_secs_f64() < their_time_secs {
         let ratio = their_time_secs / median.as_secs_f64();
-        println!("  🏆 We are {:.0}× FASTER", ratio);
+        println!("  🏆 We are {ratio:.0}× FASTER");
     } else {
         println!(
             "  ⚠️  They beat us (different algorithm — they're executing WASM in a transformer)"

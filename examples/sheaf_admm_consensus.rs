@@ -66,13 +66,9 @@ fn main() {
     let k_iters = 50;
 
     println!("=== Sheaf-ADMM Consensus Demo (Plan 407 T3.4) ===");
+    println!("{n} agents on a 4×4 grid, d_v={d_v}, d_e={d_e} (identity maps)");
     println!(
-        "{} agents on a 4×4 grid, d_v={}, d_e={} (identity maps)",
-        n, d_v, d_e
-    );
-    println!(
-        "ADMM: rho={}, eta={}, diffusion_steps={}, iterations={}\n",
-        rho, eta, diffusion_steps, k_iters
+        "ADMM: rho={rho}, eta={eta}, diffusion_steps={diffusion_steps}, iterations={k_iters}\n"
     );
 
     // Print initial state.
@@ -99,12 +95,9 @@ fn main() {
 
     // Final summary: max edge disagreement (the consensus metric).
     let max_disagree = max_edge_disagreement(&cx, &primal_x, d_v);
-    println!(
-        "\n=== Final: max edge disagreement ‖F_i x_i − F_j x_j‖_∞ = {:.2e} ===",
-        max_disagree
-    );
+    println!("\n=== Final: max edge disagreement ‖F_i x_i − F_j x_j‖_∞ = {max_disagree:.2e} ===");
     if max_disagree < 1e-3 {
-        println!("✅ Consensus reached (agents aligned on all {} dims).", d_e);
+        println!("✅ Consensus reached (agents aligned on all {d_e} dims).");
     } else {
         println!("⚠ Consensus not yet reached (run more iterations).");
     }
@@ -134,8 +127,7 @@ fn print_iteration(
             .sqrt()
     };
     println!(
-        "iter {:>3}: max_edge_disagree={:.4e}, ‖u‖₂={:.4e}, ‖x−z‖₂={:.4e}",
-        k, max_disagree, dual_norm, primal_spread
+        "iter {k:>3}: max_edge_disagree={max_disagree:.4e}, ‖u‖₂={dual_norm:.4e}, ‖x−z‖₂={primal_spread:.4e}"
     );
 }
 

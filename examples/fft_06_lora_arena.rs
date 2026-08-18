@@ -76,10 +76,7 @@ fn parse_args() -> Cli {
                 eprintln!("FFT SON-LT Arena (Plan 296 T7.3)");
                 eprintln!();
                 eprintln!("Options:");
-                eprintln!(
-                    "  --lora-path PATH  LoRA adapter file (default: {})",
-                    DEFAULT_LORA_REL
-                );
+                eprintln!("  --lora-path PATH  LoRA adapter file (default: {DEFAULT_LORA_REL})");
                 eprintln!("  --games N         Battles to run (default: {DEFAULT_GAMES})");
                 std::process::exit(0);
             }

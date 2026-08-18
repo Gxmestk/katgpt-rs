@@ -79,14 +79,8 @@ fn print_header(config: &AutoResearchConfig, max_mcts: Option<usize>) {
         "║  Games/Eval        : {:<6}                              ║",
         config.games_per_eval
     );
-    println!(
-        "║  Baseline          : {:<10}                          ║",
-        baseline_label
-    );
-    println!(
-        "║  Player Mode       : {:<10}                          ║",
-        mcts_label
-    );
+    println!("║  Baseline          : {baseline_label:<10}                          ║");
+    println!("║  Player Mode       : {mcts_label:<10}                          ║");
     println!(
         "║  Early Stopping    : {:<6}                              ║",
         if config.enable_pruning { "YES" } else { "NO" }
@@ -269,13 +263,14 @@ fn main() {
     // Check for quick mode
     let quick = env_bool("GO_SET_QUICK") || env::var("GO_SET").as_deref() == Ok("quick");
 
-    let (num_arms, total_evals, games_per_eval) = match quick {
-        true => (QUICK_ARMS, QUICK_EVALS, QUICK_GAMES),
-        false => (
+    let (num_arms, total_evals, games_per_eval) = if quick {
+        (QUICK_ARMS, QUICK_EVALS, QUICK_GAMES)
+    } else {
+        (
             env_usize("GO_ARMS", DEFAULT_ARMS),
             env_usize("GO_EVALS", DEFAULT_EVALS),
             env_usize("GO_GAMES", DEFAULT_GAMES),
-        ),
+        )
     };
 
     let board_size = env_usize("GO_BOARD", DEFAULT_BOARD_SIZE);
@@ -284,10 +279,7 @@ fn main() {
     let baseline = env_baseline();
 
     // Cap MCTS budget: greedy only unless GO_MCTS=1
-    let max_mcts_budget = match enable_mcts {
-        true => None,          // Full range
-        false => Some(0usize), // Greedy only
-    };
+    let max_mcts_budget = if enable_mcts { None } else { Some(0usize) };
 
     let config = AutoResearchConfig {
         num_arms,

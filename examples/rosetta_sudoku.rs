@@ -145,10 +145,9 @@ fn main() {
         .iter()
         .enumerate()
         .find_map(|(r, row): (usize, &[u8; 9])| {
-            row.iter().enumerate().find_map(|(c, &v)| match v == 0 {
-                true => Some((r, c)),
-                false => None,
-            })
+            row.iter()
+                .enumerate()
+                .find_map(|(c, &v)| if v == 0 { Some((r, c)) } else { None })
         })
         .unwrap_or((0, 0));
 

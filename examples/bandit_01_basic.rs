@@ -125,8 +125,8 @@ fn run_strategy(
     let name = format!("{strategy}");
 
     // Extract regret curve from EpisodeComplete events
-    let mut regret_curve = Vec::new();
-    let mut reward_curve = Vec::new();
+    let mut regret_curve = Vec::with_capacity(events.len());
+    let mut reward_curve = Vec::with_capacity(events.len());
     for event in &events {
         if let katgpt_rs::pruners::BanditEvent::EpisodeComplete {
             cumulative_reward,
@@ -196,7 +196,7 @@ fn print_regret_comparison(results: &[(String, Vec<f32>, Vec<f32>)]) {
     // Header
     print!("{:<20}", "Episode");
     for label in &checkpoint_labels {
-        print!("{:>10}", label);
+        print!("{label:>10}");
     }
     println!();
     println!("{}", "─".repeat(20 + checkpoint_labels.len() * 10));
@@ -227,7 +227,7 @@ fn print_reward_comparison(results: &[(String, Vec<f32>, Vec<f32>)]) {
 
     print!("{:<20}", "Episode");
     for label in &checkpoint_labels {
-        print!("{:>10}", label);
+        print!("{label:>10}");
     }
     println!();
     println!("{}", "─".repeat(20 + checkpoint_labels.len() * 10));
@@ -238,7 +238,7 @@ fn print_reward_comparison(results: &[(String, Vec<f32>, Vec<f32>)]) {
             let idx = cp.saturating_sub(1);
             if idx < reward_curve.len() && cp > 0 {
                 let avg = reward_curve[idx] / cp as f32;
-                print!("{:>10.4}", avg);
+                print!("{avg:>10.4}");
             } else {
                 print!("{:>10}", "—");
             }
@@ -272,7 +272,7 @@ fn print_ascii_regret_plot(results: &[(String, Vec<f32>, Vec<f32>)]) {
     #[allow(clippy::needless_range_loop)]
     for row in 0..height {
         let val = max_regret * (1.0 - row as f32 / (height - 1) as f32);
-        print!("{:>7.1} │", val);
+        print!("{val:>7.1} │");
         #[allow(clippy::needless_range_loop)]
         for col in 0..width {
             let episode = (col as f32 / (width - 1) as f32 * (EPISODES - 1) as f32) as usize;
@@ -299,7 +299,7 @@ fn print_ascii_regret_plot(results: &[(String, Vec<f32>, Vec<f32>)]) {
     print!("         ");
     for i in 0..=4 {
         let ep = i * EPISODES / 4;
-        print!("{:<15}", ep);
+        print!("{ep:<15}");
     }
     println!("  episodes");
     println!();

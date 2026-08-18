@@ -82,7 +82,7 @@ fn main() {
 
     // ── Baseline: no gate ────────────────────────────────────────
     let baseline_steps = run_without_gate(&initial, &target, max_steps);
-    println!("📋 Baseline (no gate): {} forward passes", baseline_steps);
+    println!("📋 Baseline (no gate): {baseline_steps} forward passes");
     println!();
 
     // ── With gate at different thresholds ────────────────────────
@@ -99,10 +99,7 @@ fn main() {
         } else {
             f32::INFINITY
         };
-        println!(
-            "│ {:<12.2} │ {:<16} │ {:<16} │ {:>10.2}×    │",
-            threshold, gated_steps, saved, speedup
-        );
+        println!("│ {threshold:<12.2} │ {gated_steps:<16} │ {saved:<16} │ {speedup:>10.2}×    │");
     }
     println!("└──────────────┴──────────────────┴──────────────────┴───────────────┘");
     println!();
@@ -135,25 +132,16 @@ fn main() {
 
     if let Some(steps) = stopped_at {
         println!();
-        println!(
-            "✅ Gate stopped after {} steps (dead compute detected).",
-            steps
-        );
+        println!("✅ Gate stopped after {steps} steps (dead compute detected).");
         println!(
             "   Baseline would have done {} steps. Saved {} forward passes.",
             max_steps,
             max_steps - steps
         );
         let speedup = max_steps as f32 / steps as f32;
-        println!(
-            "   Speedup: {:.2}× (matching paper's claim of ~18× at scale).",
-            speedup
-        );
+        println!("   Speedup: {speedup:.2}× (matching paper's claim of ~18× at scale).");
     } else {
         println!();
-        println!(
-            "⚠ Gate did not stop — all {} steps had margin >= threshold.",
-            max_steps
-        );
+        println!("⚠ Gate did not stop — all {max_steps} steps had margin >= threshold.");
     }
 }

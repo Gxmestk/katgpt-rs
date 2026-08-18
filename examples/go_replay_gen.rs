@@ -347,9 +347,7 @@ fn main() {
     writer.flush().unwrap();
 
     let elapsed = start.elapsed();
-    let file_size = std::fs::metadata(&output_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let file_size = std::fs::metadata(&output_path).map_or(0, |m| m.len());
 
     eprintln!();
     eprintln!("=== Results ===");

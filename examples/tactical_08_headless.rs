@@ -923,7 +923,7 @@ fn bench_seed(seed: u64) -> Option<BenchResult> {
 
 fn main() {
     let seeds: Vec<u64> = (42..=71).collect();
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(seeds.len());
     let mut skipped = 0;
 
     println!(
@@ -939,28 +939,25 @@ fn main() {
 
     for &seed in &seeds {
         eprint!("seed={seed:>3}...");
-        match bench_seed(seed) {
-            Some(r) => {
-                eprintln!(
-                    " BF:{}steps/{}nodes/{:>4}ms  AI:{}steps/{}nodes/{:>4}ms{}  HY:{}steps/{}nodes/{:>4}ms{}",
-                    r.bf_steps,
-                    r.bf_nodes,
-                    r.bf_ms,
-                    r.ai_steps,
-                    r.ai_nodes,
-                    r.ai_ms,
-                    if r.ai_fallback { " [FB]" } else { "" },
-                    r.hy_steps,
-                    r.hy_nodes,
-                    r.hy_ms,
-                    if r.hy_fallback { " [FB]" } else { "" },
-                );
-                results.push(r);
-            }
-            None => {
-                eprintln!(" unsolvable");
-                skipped += 1;
-            }
+        if let Some(r) = bench_seed(seed) {
+            eprintln!(
+                " BF:{}steps/{}nodes/{:>4}ms  AI:{}steps/{}nodes/{:>4}ms{}  HY:{}steps/{}nodes/{:>4}ms{}",
+                r.bf_steps,
+                r.bf_nodes,
+                r.bf_ms,
+                r.ai_steps,
+                r.ai_nodes,
+                r.ai_ms,
+                if r.ai_fallback { " [FB]" } else { "" },
+                r.hy_steps,
+                r.hy_nodes,
+                r.hy_ms,
+                if r.hy_fallback { " [FB]" } else { "" },
+            );
+            results.push(r);
+        } else {
+            eprintln!(" unsolvable");
+            skipped += 1;
         }
     }
 
@@ -1113,12 +1110,10 @@ fn main() {
 
     println!("🔍 Verdict:");
     println!(
-        "   🐰 AI:    {node_red_ai:.0}% fewer nodes, {:.1}x speedup vs BF, {ai_fallbacks} fallbacks",
-        speed_ai
+        "   🐰 AI:    {node_red_ai:.0}% fewer nodes, {speed_ai:.1}x speedup vs BF, {ai_fallbacks} fallbacks"
     );
     println!(
-        "   🦊 Hybrid: {node_red_hy:.0}% fewer nodes, {:.1}x speedup vs BF, {hy_fallbacks} fallbacks",
-        speed_hy
+        "   🦊 Hybrid: {node_red_hy:.0}% fewer nodes, {speed_hy:.1}x speedup vs BF, {hy_fallbacks} fallbacks"
     );
 
     if hy_beats_ai > ai_beats_hy {

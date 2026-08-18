@@ -93,7 +93,7 @@ fn print_rule(idx: usize, rule: &ExtractedRule) {
     let conds: Vec<String> = rule
         .conditions
         .iter()
-        .map(|(d, t)| format!("(d={},t={})", d, t))
+        .map(|(d, t)| format!("(d={d},t={t})"))
         .collect();
     println!(
         "  Rule {}: {} → action {} | score={:.4} support={}",

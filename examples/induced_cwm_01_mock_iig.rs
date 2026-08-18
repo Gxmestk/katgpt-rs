@@ -355,7 +355,7 @@ fn main() {
     );
 
     println!("ISMCTS search (budget={budget}, seed={seed}, player_id={player_id}):");
-    println!("  chosen action  = {:?}", chosen);
+    println!("  chosen action  = {chosen:?}");
     println!();
 
     // 4. Print the root information-set statistics.
@@ -372,7 +372,7 @@ fn main() {
         .iter()
         .map(|(k, v)| (hash_to_action.get(k).cloned().unwrap(), *v))
         .collect();
-    entries.sort_by_key(|(a, _)| format!("{:?}", a));
+    entries.sort_by_key(|(a, _)| format!("{a:?}"));
 
     for (action, stats) in &entries {
         println!(

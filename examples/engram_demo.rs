@@ -172,7 +172,7 @@ fn main() {
             .unwrap(),
     ];
     let keys = multi_head_hash(&suffix, &heads);
-    println!("  multi_head_hash → {} slot keys (first 4 shown):", K_MAX);
+    println!("  multi_head_hash → {K_MAX} slot keys (first 4 shown):");
     for (k, key) in keys.iter().enumerate().take(4) {
         println!(
             "    head {k:2}: hash = {} → slot {}",
@@ -228,7 +228,7 @@ fn main() {
     for k in 0..4 {
         let slot = &scratch_lookup[k * d..(k + 1) * d];
         let l2 = slot.iter().map(|v| v * v).sum::<f32>().sqrt();
-        let first4: Vec<String> = slot.iter().take(4).map(|v| format!("{:+.3}", v)).collect();
+        let first4: Vec<String> = slot.iter().take(4).map(|v| format!("{v:+.3}")).collect();
         let hit = if l2 > 0.0 { "HIT" } else { "miss" };
         println!("  head {k}: [{first4:?}] L2={l2:.3}  ({hit})");
     }
@@ -237,7 +237,7 @@ fn main() {
     // ── Show the table identity ─────────────────────────────────────────
     use katgpt_core::engram::EngramTableId;
     let id = EngramTableId::from_table(&table);
-    let id_hex: String = id.0.iter().take(8).map(|b| format!("{:02x}", b)).collect();
+    let id_hex: String = id.0.iter().take(8).map(|b| format!("{b:02x}")).collect();
     println!("Table identity (EngramTableId, BLAKE3 Merkle root):");
     println!("  first 8 bytes: 0x{id_hex}");
     println!("  verify:        {}", id.verify(&table));

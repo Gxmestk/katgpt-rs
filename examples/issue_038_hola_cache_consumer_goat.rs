@@ -462,9 +462,9 @@ fn gate_g2_latency() -> bool {
     let pass = overhead_ns < 1000.0; // < 1µs target
 
     println!("  === G2: Latency ===");
-    println!("  bare GDN2 step:       {:>8.1} ns", bare_ns);
-    println!("  GDN2 + cache (obs+rd):{:>8.1} ns", cache_ns);
-    println!("  overhead:             {:>8.1} ns", overhead_ns);
+    println!("  bare GDN2 step:       {bare_ns:>8.1} ns");
+    println!("  GDN2 + cache (obs+rd):{cache_ns:>8.1} ns");
+    println!("  overhead:             {overhead_ns:>8.1} ns");
     println!("  target:               < 1000 ns");
     println!(
         "  result:               {}",

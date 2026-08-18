@@ -167,10 +167,10 @@ fn main() {
         let static_set = token_set_at_depth(&tree_static, depth);
         let aware_set = token_set_at_depth(&tree_aware, depth);
 
-        let pos = pruner
-            .position_at(depth)
-            .map(|(r, c)| format!("({},{})", r + 1, c + 1))
-            .unwrap_or_else(|| "—".to_string());
+        let pos = pruner.position_at(depth).map_or_else(
+            || "—".to_string(),
+            |(r, c)| format!("({},{})", r + 1, c + 1),
+        );
 
         println!(
             "  {depth:<6} {:<14} {:<14} {:<14} {pos}",

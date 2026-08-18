@@ -31,13 +31,14 @@ fn main() {
                     _ => "wait".to_string(),
                 }),
                 outcome_description: match i % 4 {
-                    0 => Some(format!("explosion at ({x},{y})", x = x, y = y)),
+                    0 => Some(format!("explosion at ({x},{y})")),
                     _ if i == 99 => Some("victory".to_string()),
                     _ => None,
                 },
-                score: match i > 80 {
-                    true => 0.9,
-                    false => 0.3 + (i as f32 / 100.0),
+                score: if i > 80 {
+                    0.9
+                } else {
+                    0.3 + (i as f32 / 100.0)
                 },
             }
         })

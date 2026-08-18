@@ -21,7 +21,7 @@ fn main() {
         "sage seeks potion",
     ];
     let corpus: Vec<u8> = (0..4)
-        .flat_map(|_| quest_templates.iter().map(|q| format!("{}\n", q)))
+        .flat_map(|_| quest_templates.iter().map(|q| format!("{q}\n")))
         .collect::<String>()
         .into_bytes();
     let mut drafter = Lz4FlexDrafter::new(corpus);
@@ -61,7 +61,7 @@ fn main() {
         let display = String::from_utf8_lossy(cand)
             .trim_end_matches(['\n', '\0'])
             .to_string();
-        println!("  {:>20}  →  {:>4}  ({})", display, score, label);
+        println!("  {display:>20}  →  {score:>4}  ({label})");
     }
 
     // 3. Argmax pick — the candidate the compressor "remembers" best.
@@ -69,7 +69,7 @@ fn main() {
     let best_display = String::from_utf8_lossy(candidates[best_idx])
         .trim_end_matches(['\n', '\0'])
         .to_string();
-    println!("\nArgmax: '{}' (score {})", best_display, best_score);
+    println!("\nArgmax: '{best_display}' (score {best_score})");
 
     // 4. Online learning: append the chosen candidate to the corpus.
     drafter.append(candidates[best_idx]);

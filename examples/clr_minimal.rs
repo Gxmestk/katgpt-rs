@@ -293,5 +293,5 @@ fn build_traj(
 }
 
 fn label_str(o: u8) -> String {
-    format!("answer-{}", o)
+    format!("answer-{o}")
 }

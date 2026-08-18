@@ -25,7 +25,7 @@ const N_ADAPTERS: usize = 8;
 
 fn main() {
     println!("=== Plan 264 Phase 2 — Off-Principal Retrieval Demo ===\n");
-    println!("Synthetic setup: d={}, {} adapters", D, N_ADAPTERS);
+    println!("Synthetic setup: d={D}, {N_ADAPTERS} adapters");
     println!("Each adapter: principal on axis 0 (varying magnitude) +");
     println!("             unique off-principal signal on axis 1+i\n");
 
@@ -104,19 +104,19 @@ fn main() {
     let op_acc = off_principal_correct as f32 / n_trials as f32;
     let gain = (op_acc - cosine_acc) * 100.0;
 
-    println!("Results over {} trials:", n_trials);
+    println!("Results over {n_trials} trials:");
     println!(
         "  Raw cosine top-1 accuracy:     {:.1}%",
         cosine_acc * 100.0
     );
     println!("  Off-principal top-1 accuracy: {:.1}%", op_acc * 100.0);
-    println!("  Gain:                         {:+.1} pp", gain);
+    println!("  Gain:                         {gain:+.1} pp");
     println!();
 
     if gain >= 5.0 {
         println!("✅ GOAT G4 PASS: off-principal beats cosine by ≥5pp");
     } else {
-        println!("❌ GOAT G4 FAIL: gain {:.1}pp < 5pp", gain);
+        println!("❌ GOAT G4 FAIL: gain {gain:.1}pp < 5pp");
         std::process::exit(1);
     }
 }
@@ -136,7 +136,7 @@ fn make_rng(seed: u64) -> impl FnMut() -> f32 {
 fn hex_hash(hash: &[u8; 32]) -> String {
     let mut s = String::with_capacity(16);
     for &b in &hash[..8] {
-        s.push_str(&format!("{:02x}", b));
+        s.push_str(&format!("{b:02x}"));
     }
     s.push('…');
     s

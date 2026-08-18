@@ -106,45 +106,42 @@ fn update_elo_after_game(
     winner: Option<usize>,
     calc: &EloCalculator,
 ) {
-    match winner {
-        Some(w) => {
-            let w_name = player_names[w].clone();
-            let w_rating = elos[&w_name];
-            let mut loser_deltas: Vec<(String, f64)> = Vec::with_capacity(3);
-            let mut w_delta = 0.0;
+    if let Some(w) = winner {
+        let w_name = player_names[w].clone();
+        let w_rating = elos[&w_name];
+        let mut loser_deltas: Vec<(String, f64)> = Vec::with_capacity(3);
+        let mut w_delta = 0.0;
 
-            for (i, name) in player_names.iter().enumerate() {
-                if i == w {
-                    continue;
-                }
-                let l_rating = elos[name];
-                let expected_w = calc.expected(w_rating, l_rating);
-                w_delta += calc.k * (1.0 - expected_w);
-                loser_deltas.push((name.clone(), -calc.k * expected_w));
+        for (i, name) in player_names.iter().enumerate() {
+            if i == w {
+                continue;
             }
+            let l_rating = elos[name];
+            let expected_w = calc.expected(w_rating, l_rating);
+            w_delta += calc.k * (1.0 - expected_w);
+            loser_deltas.push((name.clone(), -calc.k * expected_w));
+        }
 
-            *elos.get_mut(&w_name).unwrap() += w_delta;
-            for (name, delta) in loser_deltas {
-                *elos.get_mut(&name).unwrap() += delta;
+        *elos.get_mut(&w_name).unwrap() += w_delta;
+        for (name, delta) in loser_deltas {
+            *elos.get_mut(&name).unwrap() += delta;
+        }
+    } else {
+        // Draw: pairwise 0.5 score adjustments
+        let n = player_names.len();
+        let mut all_deltas = vec![0.0f64; n];
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let ri = elos[&player_names[i]];
+                let rj = elos[&player_names[j]];
+                let expected_i = calc.expected(ri, rj);
+                let delta = calc.k * (0.5 - expected_i);
+                all_deltas[i] += delta;
+                all_deltas[j] -= delta;
             }
         }
-        None => {
-            // Draw: pairwise 0.5 score adjustments
-            let n = player_names.len();
-            let mut all_deltas = vec![0.0f64; n];
-            for i in 0..n {
-                for j in (i + 1)..n {
-                    let ri = elos[&player_names[i]];
-                    let rj = elos[&player_names[j]];
-                    let expected_i = calc.expected(ri, rj);
-                    let delta = calc.k * (0.5 - expected_i);
-                    all_deltas[i] += delta;
-                    all_deltas[j] -= delta;
-                }
-            }
-            for (i, name) in player_names.iter().enumerate() {
-                *elos.get_mut(name).unwrap() += all_deltas[i];
-            }
+        for (i, name) in player_names.iter().enumerate() {
+            *elos.get_mut(name).unwrap() += all_deltas[i];
         }
     }
 }
@@ -283,9 +280,9 @@ fn main() {
         base: ELO_BASE,
     };
 
-    let mut elos: HashMap<String, f64> = HashMap::new();
-    let mut win_counts: HashMap<String, usize> = HashMap::new();
-    let mut game_counts: HashMap<String, usize> = HashMap::new();
+    let mut elos: HashMap<String, f64> = HashMap::with_capacity(ALL_PLAYERS.len());
+    let mut win_counts: HashMap<String, usize> = HashMap::with_capacity(ALL_PLAYERS.len());
+    let mut game_counts: HashMap<String, usize> = HashMap::with_capacity(ALL_PLAYERS.len());
 
     // Initialize all player types at base ELO
     for name in ALL_PLAYERS {

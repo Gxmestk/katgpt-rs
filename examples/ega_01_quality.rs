@@ -249,7 +249,7 @@ fn main() {
     let mut best_tau = taus[0];
 
     for &alpha in &alphas {
-        let mut row_str = format!("  | {:>5.1}  ", alpha);
+        let mut row_str = format!("  | {alpha:>5.1}  ");
         for &tau in &taus {
             let gv = compute_energy_gate(&energy, alpha, tau);
             let mut ga = uniform_attn.clone();
@@ -263,7 +263,7 @@ fn main() {
             let out = matmul_attn_values(&ga, &v, SEQ_LEN, HEAD_DIM);
             let dist = l2_dist(&out, &signal_mean);
 
-            row_str.push_str(&format!("| {:>9.4}  ", dist));
+            row_str.push_str(&format!("| {dist:>9.4}  "));
 
             if dist < best_l2 {
                 best_l2 = dist;
