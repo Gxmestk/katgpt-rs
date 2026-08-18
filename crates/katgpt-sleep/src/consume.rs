@@ -420,9 +420,7 @@ mod tests {
             let (_, gate) = consume_gate(q, &artifact, 0.5, 4.0);
             assert!(
                 (0.0..=1.0).contains(&gate),
-                "gate {} out of [0,1] for q={:?}",
-                gate,
-                q
+                "gate {gate} out of [0,1] for q={q:?}"
             );
         }
     }
@@ -615,10 +613,7 @@ mod tests {
                 let (_, gate) = consume_gate_with_match_mode(q, &artifact, 0.5, 4.0, mode);
                 assert!(
                     (0.0..=1.0).contains(&gate),
-                    "gate {} out of [0,1] for q={:?} mode={:?}",
-                    gate,
-                    q,
-                    mode
+                    "gate {gate} out of [0,1] for q={q:?} mode={mode:?}"
                 );
             }
         }

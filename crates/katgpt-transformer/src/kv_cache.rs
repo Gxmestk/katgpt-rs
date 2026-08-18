@@ -458,19 +458,16 @@ impl PagedKVCache {
 
     /// Allocate a new page. Reuse from free list or grow the pool.
     fn alloc_page(&mut self) -> usize {
-        let idx = match self.free_pages.pop() {
-            Some(idx) => {
+        let idx = if let Some(idx) = self.free_pages.pop() {
                 self.pages[idx].fill(0.0);
                 idx
-            }
-            None => {
+            } else {
                 self.pages.push(vec![0.0; PAGE_SIZE * self.kv_dim * 2]);
                 let idx = self.total_pages;
                 self.total_pages += 1;
                 self.page_ref_counts.push(0);
                 idx
-            }
-        };
+            };
         self.page_ref_counts[idx] += 1;
         idx
     }

@@ -109,8 +109,7 @@ mod tests {
         let w_one = mgpo_sampling_weight(1.0, gamma);
         assert!(
             (w_peak - 1.0).abs() < 1e-6,
-            "peak should be 1.0, got {}",
-            w_peak
+            "peak should be 1.0, got {w_peak}"
         );
         assert!(w_zero < w_peak);
         assert!(w_one < w_peak);
@@ -121,7 +120,7 @@ mod tests {
     fn known_value_at_p_zero_gamma_two() {
         // w(0) = exp(-2 * |-1|) = exp(-2) ≈ 0.1353.
         let w = mgpo_sampling_weight(0.0, 2.0);
-        assert!((w - (-2.0f32).exp()).abs() < 1e-6, "got {}", w);
+        assert!((w - (-2.0f32).exp()).abs() < 1e-6, "got {w}");
     }
 
     #[test]

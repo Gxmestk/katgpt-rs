@@ -419,8 +419,7 @@ mod tests {
 
         assert!(
             per_call.as_micros() < 1000,
-            "gate overhead should be <1ms per call, got {:?}",
-            per_call
+            "gate overhead should be <1ms per call, got {per_call:?}"
         );
     }
 

@@ -190,8 +190,7 @@ mod tests {
         assert_eq!(budget.len(), 2);
         assert!(
             budget[0] > budget[1],
-            "Higher score should get more budget: {:?}",
-            budget
+            "Higher score should get more budget: {budget:?}"
         );
         assert_eq!(budget.iter().sum::<usize>(), 10);
     }
@@ -204,8 +203,7 @@ mod tests {
         // Equal scores → equal allocation
         assert!(
             budget.iter().all(|&b| b == budget[0]),
-            "Equal scores should get equal budget: {:?}",
-            budget
+            "Equal scores should get equal budget: {budget:?}"
         );
         assert_eq!(budget.iter().sum::<usize>(), 12);
     }
@@ -225,8 +223,7 @@ mod tests {
             let sum: usize = budget.iter().sum();
             assert_eq!(
                 sum, total,
-                "Budget should sum to {total}, got {sum}: {:?}",
-                budget
+                "Budget should sum to {total}, got {sum}: {budget:?}"
             );
         }
     }
@@ -236,7 +233,7 @@ mod tests {
         let scores = [0.0, 0.0, 0.0, 10.0]; // one dominant branch
         let budget = allocate_budget(&scores, 20);
         for (i, &b) in budget.iter().enumerate() {
-            assert!(b >= 1, "Branch {} should get at least 1, got {}", i, b);
+            assert!(b >= 1, "Branch {i} should get at least 1, got {b}");
         }
         assert_eq!(budget.iter().sum::<usize>(), 20);
     }
@@ -259,8 +256,7 @@ mod tests {
         let eq = budget_ratios(&[1.0, 1.0]);
         assert!(
             (eq[0] - 0.5).abs() < 1e-6 && (eq[1] - 0.5).abs() < 1e-6,
-            "Equal scores should both be 0.5: {:?}",
-            eq
+            "Equal scores should both be 0.5: {eq:?}"
         );
     }
 
@@ -288,7 +284,7 @@ mod tests {
         alloc.set_min_budget(2);
         let budget2 = alloc.allocate(&scores, 15);
         for &b in &budget2 {
-            assert!(b >= 2, "Each branch should get at least 2: {}", b);
+            assert!(b >= 2, "Each branch should get at least 2: {b}");
         }
     }
 
@@ -301,12 +297,11 @@ mod tests {
         // Generally increasing with score
         assert!(
             budget[9] > budget[0],
-            "Highest score should get more than lowest: {:?}",
-            budget
+            "Highest score should get more than lowest: {budget:?}"
         );
         // All ≥ 1
         for (i, &b) in budget.iter().enumerate() {
-            assert!(b >= 1, "Branch {} should get at least 1", i);
+            assert!(b >= 1, "Branch {i} should get at least 1");
         }
     }
 

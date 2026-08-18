@@ -485,8 +485,7 @@ mod benches {
         let per_call = elapsed / iterations;
         assert!(
             per_call.as_nanos() < 100,
-            "should_think took {:?} per call, expected < 100ns",
-            per_call
+            "should_think took {per_call:?} per call, expected < 100ns"
         );
     }
 
@@ -503,8 +502,7 @@ mod benches {
         let per_call = elapsed / iterations;
         assert!(
             per_call.as_nanos() < 200,
-            "observe took {:?} per call, expected < 200ns",
-            per_call
+            "observe took {per_call:?} per call, expected < 200ns"
         );
     }
 
@@ -518,7 +516,7 @@ mod benches {
         let data = std::hint::black_box(router.serialize());
         let elapsed = start.elapsed();
         assert!(!data.is_empty(), "serialized data should be non-empty");
-        eprintln!("serialize 1K positions: {:?}", elapsed);
+        eprintln!("serialize 1K positions: {elapsed:?}");
     }
 
     #[test]
@@ -531,7 +529,7 @@ mod benches {
         let data = std::hint::black_box(router.serialize());
         let elapsed = start.elapsed();
         assert!(!data.is_empty());
-        eprintln!("serialize 10K positions: {:?}", elapsed);
+        eprintln!("serialize 10K positions: {elapsed:?}");
     }
 
     #[test]
@@ -544,7 +542,7 @@ mod benches {
         let data = std::hint::black_box(router.serialize());
         let elapsed = start.elapsed();
         assert!(!data.is_empty());
-        eprintln!("serialize 100K positions: {:?}", elapsed);
+        eprintln!("serialize 100K positions: {elapsed:?}");
     }
 
     #[test]
@@ -557,7 +555,7 @@ mod benches {
         let start = Instant::now();
         let _restored = std::hint::black_box(SelectivityRouter::deserialize(&data).unwrap());
         let elapsed = start.elapsed();
-        eprintln!("deserialize 1K positions: {:?}", elapsed);
+        eprintln!("deserialize 1K positions: {elapsed:?}");
     }
 
     #[test]
@@ -570,7 +568,7 @@ mod benches {
         let start = Instant::now();
         let _restored = std::hint::black_box(SelectivityRouter::deserialize(&data).unwrap());
         let elapsed = start.elapsed();
-        eprintln!("deserialize 10K positions: {:?}", elapsed);
+        eprintln!("deserialize 10K positions: {elapsed:?}");
     }
 
     #[test]
@@ -583,7 +581,7 @@ mod benches {
         let start = Instant::now();
         let _restored = std::hint::black_box(SelectivityRouter::deserialize(&data).unwrap());
         let elapsed = start.elapsed();
-        eprintln!("deserialize 100K positions: {:?}", elapsed);
+        eprintln!("deserialize 100K positions: {elapsed:?}");
     }
 }
 

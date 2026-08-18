@@ -344,9 +344,7 @@ impl SpeculativeVerifier for D2fDrafterVerifier<'_> {
 fn argmax_total_cmp(p: &[f32]) -> usize {
     p.iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.total_cmp(b))
-        .map(|(idx, _)| idx)
-        .unwrap_or(0)
+        .max_by(|(_, a), (_, b)| a.total_cmp(b)).map_or(0, |(idx, _)| idx)
 }
 
 /// Argmax excluding one index (correction fallbacks).
@@ -649,9 +647,7 @@ mod tests {
         // argmax points elsewhere — a point-mass proposal at this token).
         p.iter()
             .enumerate()
-            .min_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .min_by(|(_, a), (_, b)| a.total_cmp(b)).map_or(0, |(i, _)| i)
     }
 
     fn tv_distance(counts: &[usize], p: &[f32], n: usize) -> f64 {

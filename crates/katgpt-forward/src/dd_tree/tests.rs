@@ -2303,9 +2303,7 @@ mod domino_tree {
         let max_depth = tree.iter().map(|n| n.depth).max().unwrap_or(0);
         assert!(
             max_depth <= max_steps,
-            "tree depth {} should not exceed max_draft_steps {}",
-            max_depth,
-            max_steps
+            "tree depth {max_depth} should not exceed max_draft_steps {max_steps}"
         );
     }
 
@@ -2361,8 +2359,7 @@ mod domino_tree {
             let total = confidence + residual * (vs - 1) as f32;
             assert!(
                 (total - 1.0).abs() < 1e-5,
-                "marginal should sum to ~1.0, got {}",
-                total
+                "marginal should sum to ~1.0, got {total}"
             );
         }
     }

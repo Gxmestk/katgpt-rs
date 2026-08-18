@@ -94,14 +94,13 @@ impl ConvexToToastBridge {
         let mut id_to_vocab: Vec<Vec<u8>> = Vec::with_capacity(cap);
 
         let mut add_token = |bytes: Vec<u8>| -> usize {
-            match vocab_to_id.get(&bytes) {
-                Some(&id) => id,
-                None => {
-                    let id = id_to_vocab.len();
-                    vocab_to_id.insert(bytes.clone(), id);
-                    id_to_vocab.push(bytes);
-                    id
-                }
+            if let Some(&id) = vocab_to_id.get(&bytes) {
+                id
+            } else {
+                let id = id_to_vocab.len();
+                vocab_to_id.insert(bytes.clone(), id);
+                id_to_vocab.push(bytes);
+                id
             }
         };
 

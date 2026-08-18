@@ -255,8 +255,8 @@ impl LayerwiseTopology {
         use rayon::prelude::*;
 
         // Size per-worker scratch from the predecessor hidden shape.
-        let seq_len = current.first().map(|h| h.seq_len).unwrap_or(1);
-        let hidden_dim = current.first().map(|h| h.hidden_dim).unwrap_or(1);
+        let seq_len = current.first().map_or(1, |h| h.seq_len);
+        let hidden_dim = current.first().map_or(1, |h| h.hidden_dim);
 
         // Pre-allocate output slots and per-worker scratch. Both are moved into
         // parallel iterators below; rayon splits them into disjoint `&mut`
@@ -350,8 +350,8 @@ impl LayerwiseTopology {
     ) -> Vec<DenseHidden> {
         use rayon::prelude::*;
 
-        let seq_len = current.first().map(|h| h.seq_len).unwrap_or(1);
-        let hidden_dim = current.first().map(|h| h.hidden_dim).unwrap_or(1);
+        let seq_len = current.first().map_or(1, |h| h.seq_len);
+        let hidden_dim = current.first().map_or(1, |h| h.hidden_dim);
 
         // Drain pooled scratch + output. Grown on first call (or width bump),
         // then stable — no allocator traffic in steady state.

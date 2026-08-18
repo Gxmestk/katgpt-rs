@@ -96,48 +96,42 @@ impl VortexFlow for ValueEnergyRouter {
         let centroid = &mut cache.centroids[start..start + head_dim];
         centroid.fill(0.0);
 
-        match block_size {
-            0 => {
-                cache.v_energy[block_idx] = 0.0;
-            }
-            _ => {
-                // Fused single pass over tokens: accumulate centroid (from keys)
-                // and value energy (from values) together. Halves loop overhead
-                // and improves locality versus two separate passes over the
-                // same token count.
-                let mut energy = 0.0f32;
-                let inv = 1.0 / block_size as f32;
-                for t in 0..block_size {
-                    let k_start = t * head_dim;
-                    let v_start = t * head_dim;
-                    // Centroid accumulation via SIMD add
-                    katgpt_core::simd::simd_add_inplace(
-                        centroid,
-                        &keys[k_start..k_start + head_dim],
-                    );
-                    // Value ‖v‖ via 4-way unrolled sum-of-squares (auto-vectorizes).
-                    let mut n0 = 0.0f32;
-                    let mut n1 = 0.0f32;
-                    let mut n2 = 0.0f32;
-                    let mut n3 = 0.0f32;
-                    let chunks = head_dim / 4;
-                    for c in 0..chunks {
-                        let base = v_start + c * 4;
-                        n0 += values[base] * values[base];
-                        n1 += values[base + 1] * values[base + 1];
-                        n2 += values[base + 2] * values[base + 2];
-                        n3 += values[base + 3] * values[base + 3];
-                    }
-                    let mut norm_sq = n0 + n1 + n2 + n3;
-                    let rem = head_dim % 4;
-                    for d in (head_dim - rem)..head_dim {
-                        norm_sq += values[v_start + d] * values[v_start + d];
-                    }
-                    energy += norm_sq.sqrt();
+        if block_size == 0 {
+            cache.v_energy[block_idx] = 0.0;
+        } else {
+            // Fused single pass over tokens: accumulate centroid (from keys)
+            // and value energy (from values) together. Halves loop overhead
+            // and improves locality versus two separate passes over the
+            // same token count.
+            let mut energy = 0.0f32;
+            let inv = 1.0 / block_size as f32;
+            for t in 0..block_size {
+                let k_start = t * head_dim;
+                let v_start = t * head_dim;
+                // Centroid accumulation via SIMD add
+                katgpt_core::simd::simd_add_inplace(centroid, &keys[k_start..k_start + head_dim]);
+                // Value ‖v‖ via 4-way unrolled sum-of-squares (auto-vectorizes).
+                let mut n0 = 0.0f32;
+                let mut n1 = 0.0f32;
+                let mut n2 = 0.0f32;
+                let mut n3 = 0.0f32;
+                let chunks = head_dim / 4;
+                for c in 0..chunks {
+                    let base = v_start + c * 4;
+                    n0 += values[base] * values[base];
+                    n1 += values[base + 1] * values[base + 1];
+                    n2 += values[base + 2] * values[base + 2];
+                    n3 += values[base + 3] * values[base + 3];
                 }
-                katgpt_core::simd::simd_scale_inplace(centroid, inv);
-                cache.v_energy[block_idx] = energy * inv;
+                let mut norm_sq = n0 + n1 + n2 + n3;
+                let rem = head_dim % 4;
+                for d in (head_dim - rem)..head_dim {
+                    norm_sq += values[v_start + d] * values[v_start + d];
+                }
+                energy += norm_sq.sqrt();
             }
+            katgpt_core::simd::simd_scale_inplace(centroid, inv);
+            cache.v_energy[block_idx] = energy * inv;
         }
 
         cache.n_blocks = cache.n_blocks.max(block_idx + 1);
@@ -156,9 +150,10 @@ impl VortexFlow for ValueEnergyRouter {
         }
 
         let hd = query.len();
-        let scale = match self.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         scratch.ensure_capacity(n_blocks);

@@ -1096,13 +1096,13 @@ mod tests {
         kda_backward_token(&config, &weights, &saved, &d_output, &mut dh, &mut grads, &ds_next, &mut ds_prev);
 
         for &g in &dh {
-            assert!(g.is_finite(), "non-finite dh: {}", g);
+            assert!(g.is_finite(), "non-finite dh: {g}");
         }
         for &g in &grads.a_log {
-            assert!(g.is_finite(), "non-finite a_log grad: {}", g);
+            assert!(g.is_finite(), "non-finite a_log grad: {g}");
         }
         for &g in grads.q_proj.iter().take(20) {
-            assert!(g.is_finite(), "non-finite q_proj grad: {}", g);
+            assert!(g.is_finite(), "non-finite q_proj grad: {g}");
         }
     }
 
@@ -1126,8 +1126,7 @@ mod tests {
                     let actual = ha.s_post[i * dk + j];
                     assert!(
                         (reconstructed - actual).abs() < 1e-4,
-                        "head {} S'' mismatch at [{},{}]: reconstructed {} vs actual {}",
-                        head, i, j, reconstructed, actual
+                        "head {head} S'' mismatch at [{i},{j}]: reconstructed {reconstructed} vs actual {actual}"
                     );
                 }
             }

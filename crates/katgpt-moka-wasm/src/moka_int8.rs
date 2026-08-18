@@ -892,8 +892,7 @@ mod tests {
 
         assert_eq!(
             cap_before, cap_after,
-            "scratch capacities grew during steady-state ({} → {}) — forward path is allocating",
-            cap_before, cap_after
+            "scratch capacities grew during steady-state ({cap_before} → {cap_after}) — forward path is allocating"
         );
         eprintln!("g4_int8: PASS — all scratch capacities stable across 100 steady-state calls");
     }

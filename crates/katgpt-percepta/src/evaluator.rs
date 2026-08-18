@@ -137,7 +137,7 @@ impl GraphEvaluator {
         dim_order.sort_unstable();
 
         // Initialize cumsum accumulators for all CumSum dimensions
-        let mut cumsum_accum = HashMap::new();
+        let mut cumsum_accum = HashMap::with_capacity(dim_order.len());
         for &dim_id in &dim_order {
             if let Some(dim) = graph.all_dims.get(&dim_id)
                 && matches!(dim.kind, DimensionKind::CumSum { .. })
@@ -475,7 +475,7 @@ impl GraphEvaluator {
         let predicted = self.evaluate(prefix, max_steps);
 
         // Extract output characters from hex bytes after "OUT" token
-        let mut output_chars = Vec::new();
+        let mut output_chars = Vec::with_capacity(predicted.len());
         let mut draining = false;
 
         for tok in &predicted {
@@ -540,8 +540,8 @@ impl GraphEvaluator {
         // Log first mismatch
         let max_len = predicted.len().max(reference.len());
         for i in 0..max_len {
-            let p = predicted.get(i).map(|s| s.as_str()).unwrap_or("<END>");
-            let r = reference.get(i).map(|s| s.as_str()).unwrap_or("<END>");
+            let p = predicted.get(i).map_or("<END>", |s| s.as_str());
+            let r = reference.get(i).map_or("<END>", |s| s.as_str());
             if p != r {
                 log::warn!("MISMATCH at position {i}: predicted={p}, expected={r}");
                 break;
@@ -710,11 +710,7 @@ mod tests {
 
         // Should be sorted highest first
         for window in scores.windows(2) {
-            assert!(
-                window[0].1 >= window[1].1,
-                "scores not sorted: {:?}",
-                scores
-            );
+            assert!(window[0].1 >= window[1].1, "scores not sorted: {scores:?}");
         }
     }
 

@@ -223,9 +223,7 @@ pub fn sigmoid_surprise_gate(derivative: &[f32], beta: f32) -> f32 {
 fn validate_alphas(alpha_fast: f32, alpha_slow: f32) {
     debug_assert!(
         alpha_slow > 0.0 && alpha_fast > alpha_slow && alpha_fast <= 1.0,
-        "TemporalDerivativeKernel: require 0 < alpha_slow < alpha_fast <= 1, got fast={}, slow={}",
-        alpha_fast,
-        alpha_slow
+        "TemporalDerivativeKernel: require 0 < alpha_slow < alpha_fast <= 1, got fast={alpha_fast}, slow={alpha_slow}"
     );
     // No-op in release: caller is responsible. Documented in rustdoc.
     let _ = (alpha_fast, alpha_slow);

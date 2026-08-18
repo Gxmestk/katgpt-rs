@@ -209,10 +209,7 @@ pub fn check_budget(budget: &mut ExplorationBudget, tier: VerificationTier) -> b
     if budget.verify(tier).is_some() {
         true
     } else {
-        log::warn!(
-            "Exploration budget exhausted for {:?} — entering conservative mode",
-            tier
-        );
+        log::warn!("Exploration budget exhausted for {tier:?} — entering conservative mode");
         false
     }
 }

@@ -341,17 +341,16 @@ fn assign_clusters<T>(
                 break;
             }
         }
-        cluster_id[k] = match assigned {
-            Some(id) => id,
-            None => {
-                let id = next_id;
-                next_id = next_id.wrapping_add(1);
-                debug_assert!(
-                    next_id != 0 || k_count <= 256,
-                    "clr_vote: more than 256 clusters — u8 cluster_id overflowed"
-                );
-                id
-            }
+        cluster_id[k] = if let Some(id) = assigned {
+            id
+        } else {
+            let id = next_id;
+            next_id = next_id.wrapping_add(1);
+            debug_assert!(
+                next_id != 0 || k_count <= 256,
+                "clr_vote: more than 256 clusters — u8 cluster_id overflowed"
+            );
+            id
         };
     }
 }
@@ -371,8 +370,7 @@ fn build_clusters<T: Clone>(
         .iter()
         .copied()
         .max()
-        .map(|m| m as usize + 1)
-        .unwrap_or(0);
+        .map_or(0, |m| m as usize + 1);
     let mut clusters: Vec<Cluster<T>> = (0..n_clusters)
         .map(|_| Cluster {
             outcome: trajectories[0].outcome.clone(), // overwritten below
@@ -529,9 +527,7 @@ mod tests {
         let r_clean = result.per_trajectory_reliability[1];
         assert!(
             r_flawed < r_clean,
-            "flawed trajectory reliability {} should be < clean {}",
-            r_flawed,
-            r_clean
+            "flawed trajectory reliability {r_flawed} should be < clean {r_clean}"
         );
         // Spot-check the math: clean reliability ≈ 0.9^5 = 0.59049.
         assert!((r_clean - 0.59049_f32).abs() < 1e-4);
@@ -702,14 +698,12 @@ mod tests {
         );
         assert!(
             reliability > 0.0,
-            "reliability must be positive, got {}",
-            reliability
+            "reliability must be positive, got {reliability}"
         );
         // 5 trajectories × 0.9^5 ≈ 0.59049 each → total ≈ 2.95.
         assert!(
             reliability > 1.0,
-            "5-member cluster reliability should be > 1.0, got {}",
-            reliability
+            "5-member cluster reliability should be > 1.0, got {reliability}"
         );
     }
 }

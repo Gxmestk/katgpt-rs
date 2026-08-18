@@ -140,10 +140,7 @@ pub fn peak_bandwidth_gbps() -> f64 {
 
 /// Formats a single benchmark result line.
 pub fn fmt_benchmark_line(label: &str, tok_s: f64, ms_tok: f64, mbu_pct: f64) -> String {
-    format!(
-        "{:<20} {:>8.1} tok/s  {:>7.2} ms/tok  MBU {:>5.1}%",
-        label, tok_s, ms_tok, mbu_pct
-    )
+    format!("{label:<20} {tok_s:>8.1} tok/s  {ms_tok:>7.2} ms/tok  MBU {mbu_pct:>5.1}%")
 }
 
 // ---------------------------------------------------------------------------

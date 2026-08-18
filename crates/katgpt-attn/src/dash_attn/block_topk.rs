@@ -115,9 +115,10 @@ impl VortexFlow for BlockTopKRouter {
         }
 
         let hd = query.len();
-        let scale = match self.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         scratch.ensure_capacity(n_blocks);
@@ -717,9 +718,10 @@ impl VortexFlow for PerGroupTopKRouter {
         }
 
         let hd = query.len();
-        let scale = match self.inner.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.inner.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         // Budget: distribute top_k across groups, ensuring each gets at least 1

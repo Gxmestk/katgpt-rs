@@ -470,15 +470,13 @@ mod tests {
                 .sum();
             assert!(
                 mass_without_last < threshold,
-                "Mass without last token ({}) should be < {}",
-                mass_without_last,
-                threshold
+                "Mass without last token ({mass_without_last}) should be < {threshold}"
             );
         }
 
         // Verify all indices are valid
         for &idx in &result.selected_indices {
-            assert!(idx < scores.len(), "Index {} out of range", idx);
+            assert!(idx < scores.len(), "Index {idx} out of range");
         }
     }
 
@@ -537,10 +535,10 @@ mod tests {
 
         // All indices must be valid
         for &idx in &fine.selected_indices {
-            assert!(idx < scores.len(), "Fine index {} out of range", idx);
+            assert!(idx < scores.len(), "Fine index {idx} out of range");
         }
         for &idx in &block.selected_indices {
-            assert!(idx < scores.len(), "Block index {} out of range", idx);
+            assert!(idx < scores.len(), "Block index {idx} out of range");
         }
 
         // Both should include the highest-scored position (index 3, score=3.0)
@@ -574,7 +572,7 @@ mod tests {
         );
 
         for &idx in &block.selected_indices {
-            assert!(idx < scores.len(), "Index {} out of range", idx);
+            assert!(idx < scores.len(), "Index {idx} out of range");
         }
     }
 
@@ -607,8 +605,7 @@ mod tests {
         for &prob in &result.selected_probs {
             assert!(
                 prob.is_finite() && prob >= 0.0,
-                "Probability should be finite and non-negative, got {}",
-                prob
+                "Probability should be finite and non-negative, got {prob}"
             );
         }
 

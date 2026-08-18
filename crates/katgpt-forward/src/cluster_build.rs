@@ -149,9 +149,7 @@ fn kmeanspp_init(data: &[f32], count: usize, k: usize, dim: usize) -> Vec<f32> {
         // All remaining points coincide with a chosen centre — nothing left to
         // separate, so fall back to a deterministic index rather than sampling
         // from an all-zero distribution.
-        let chosen = match total > 0.0 {
-            false => c % count,
-            true => {
+        let chosen = if total > 0.0 {
                 let target = total * (next_u64(&mut stream) >> 11) as f64 / (1u64 << 53) as f64;
                 let mut acc = 0.0f64;
                 let mut pick = count - 1;
@@ -163,8 +161,7 @@ fn kmeanspp_init(data: &[f32], count: usize, k: usize, dim: usize) -> Vec<f32> {
                     }
                 }
                 pick
-            }
-        };
+            } else { c % count };
         centers[c * dim..(c + 1) * dim].copy_from_slice(&data[chosen * dim..(chosen + 1) * dim]);
     }
     centers

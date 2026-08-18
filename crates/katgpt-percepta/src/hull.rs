@@ -72,9 +72,10 @@ impl HullHalf {
     pub fn insert(&mut self, kx: f64, ky: f64, val: [f64; 2], seq: i32) {
         let mut meta = HullMeta::new();
         meta.add(val, seq);
-        match self.is_upper {
-            true => self.cht.add_line(kx, ky, meta),
-            false => self.cht.add_line(-kx, -ky, meta),
+        if self.is_upper {
+            self.cht.add_line(kx, ky, meta)
+        } else {
+            self.cht.add_line(-kx, -ky, meta)
         }
     }
 
@@ -303,9 +304,10 @@ impl HardAttentionHead {
         }
 
         // Route to the appropriate hull half
-        match qy > 0.0 {
-            true => self.upper.query(qx, qy, tb).map(|r| r.value),
-            false => self.lower.query(qx, qy, tb).map(|r| r.value),
+        if qy > 0.0 {
+            self.upper.query(qx, qy, tb).map(|r| r.value)
+        } else {
+            self.lower.query(qx, qy, tb).map(|r| r.value)
         }
     }
 }

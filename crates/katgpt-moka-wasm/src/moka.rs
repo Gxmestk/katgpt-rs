@@ -609,12 +609,10 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
         if history.len() < offset {
             continue;
         }
-        match history[history.len() - offset] {
-            Some((r, c)) => {
+        if let Some((r, c)) = history[history.len() - offset] {
                 let plane = if offset == 1 { 7 } else { 8 };
                 feats[idx(r, c, plane)] = 1.0;
-            }
-            None => {
+            } else {
                 let plane = 8 + offset;
                 for row in 0..size {
                     for col in 0..size {
@@ -622,7 +620,6 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
                     }
                 }
             }
-        }
     }
 
     let next_color: f32 = if board.to_play == Cell::Black { 1.0 } else { -1.0 };

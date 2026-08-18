@@ -1540,7 +1540,7 @@ mod tests {
         let scale = config.attn_scale();
 
         // Steps 0-9 (10 decode steps, refresh_period=5 → should refresh at steps 0 and 5).
-        let mut refreshes_at = Vec::new();
+        let mut refreshes_at = Vec::with_capacity(10);
         for step in 0..10 {
             selector.select(&q_c, &block_cache, scale, step);
             if selector.refresh_count() > refreshes_at.len() {
@@ -1659,11 +1659,7 @@ mod tests {
         assert!(
             sets_differ || total_b != total_c,
             "q_high and q_neg should produce different selections: \
-             b={:?} (total={}), c={:?} (total={})",
-            blocks_b_head0,
-            total_b,
-            blocks_c_head0,
-            total_c
+             b={blocks_b_head0:?} (total={total_b}), c={blocks_c_head0:?} (total={total_c})"
         );
     }
 
@@ -1708,9 +1704,7 @@ mod tests {
 
         assert!(
             n_low >= n_high,
-            "lower threshold should select ≥ blocks: low={} high={}",
-            n_low,
-            n_high
+            "lower threshold should select ≥ blocks: low={n_low} high={n_high}"
         );
     }
 
@@ -1785,8 +1779,7 @@ mod tests {
             // Should not panic, should produce finite output.
             assert!(
                 out.iter().all(|&v| v.is_finite()),
-                "fallback output contains non-finite values at step {}",
-                step
+                "fallback output contains non-finite values at step {step}"
             );
         }
     }
@@ -1816,8 +1809,7 @@ mod tests {
             assert_eq!(out.len(), config.hidden_size);
             assert!(
                 out.iter().all(|&v| v.is_finite()),
-                "non-finite output at step {}",
-                step
+                "non-finite output at step {step}"
             );
         }
 
@@ -1912,8 +1904,7 @@ mod tests {
 
         assert!(
             n_low >= n_high,
-            "lower threshold should select >= blocks: low={} high={}",
-            n_low, n_high
+            "lower threshold should select >= blocks: low={n_low} high={n_high}"
         );
     }
 
@@ -1947,7 +1938,7 @@ mod tests {
         let q_c = vec![0.5; config.n_heads * d_h];
 
         // Steps 0-9, refresh_period=5 → refresh at steps 0 and 5.
-        let mut refreshes_at = Vec::new();
+        let mut refreshes_at = Vec::with_capacity(10);
         for step in 0..10 {
             indexer.select(&q_c, &block_cache, step);
             if indexer.refresh_count() > refreshes_at.len() {
@@ -2260,7 +2251,7 @@ mod tests {
         let mut sel = GqaFlashMemorySelector::new(fm, 1, 4, 8);
         let query = vec![1.0; 4];
 
-        let mut refreshes_at = Vec::new();
+        let mut refreshes_at = Vec::with_capacity(10);
         for step in 0..10 {
             sel.select(&query, &cache, 1.0, step);
             if sel.refresh_count() > refreshes_at.len() {

@@ -624,8 +624,7 @@ mod tests {
         // sort to the front and get admitted before low-survival ones.
         assert!(
             out[0] >= out[1],
-            "high-survival r0 should get >= prefix vs r1: out = {:?}",
-            out
+            "high-survival r0 should get >= prefix vs r1: out = {out:?}"
         );
         assert!(out[0] > 0, "r0 should get at least 1");
     }
@@ -659,10 +658,7 @@ mod tests {
 
         assert!(
             scheduled_theta >= uniform_theta,
-            "scheduled Θ ({:.4}) should >= uniform Θ ({:.4}); out = {:?}",
-            scheduled_theta,
-            uniform_theta,
-            scheduled
+            "scheduled Θ ({scheduled_theta:.4}) should >= uniform Θ ({uniform_theta:.4}); out = {scheduled:?}"
         );
     }
 

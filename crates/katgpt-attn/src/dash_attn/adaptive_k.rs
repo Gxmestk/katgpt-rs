@@ -180,7 +180,7 @@ impl<R: VortexFlow> VortexFlow for AdaptiveKRouter<R> {
         head_dim: usize,
     ) {
         self.inner
-            .forward_cache(cache, keys, values, block_idx, head_dim)
+            .forward_cache(cache, keys, values, block_idx, head_dim);
     }
 
     fn forward_indexer(

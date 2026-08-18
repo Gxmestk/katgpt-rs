@@ -841,8 +841,7 @@ mod tests {
         let sum: f32 = scratch.topk_weights.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-5,
-            "renormalized weights must sum to 1, got {}",
-            sum
+            "renormalized weights must sum to 1, got {sum}"
         );
     }
 }

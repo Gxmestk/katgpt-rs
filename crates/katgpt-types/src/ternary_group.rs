@@ -289,10 +289,7 @@ impl TernaryGroupWeights {
                 // scale = mean(|group|); guard the all-zero group so the
                 // threshold stays finite and quantization yields all zeros.
                 let abs_sum: f32 = group.iter().map(|v| v.abs()).sum();
-                let scale = match abs_sum > 0.0 {
-                    true => abs_sum / group.len() as f32,
-                    false => 1.0,
-                };
+                let scale = if abs_sum > 0.0 { abs_sum / group.len() as f32 } else { 1.0 };
                 out.group_scale[group_base + g] = f16::from_f32(scale);
                 // Quantize against the f16-rounded scale the kernel will
                 // actually apply, not the f32 ideal — otherwise the carry

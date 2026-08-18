@@ -90,14 +90,13 @@ impl GraphBuilder {
                     let to = VertexId(base_vertex + end as u32);
                     let substring = &pretoken[start..end];
 
-                    let colour_id = match colour_map.get(substring) {
-                        Some(&cid) => cid,
-                        None => {
-                            let cid = ColourId(colour_bytes.len() as u32);
-                            colour_map.insert(substring, cid);
-                            colour_bytes.push(substring.to_vec());
-                            cid
-                        }
+                    let colour_id = if let Some(&cid) = colour_map.get(substring) {
+                        cid
+                    } else {
+                        let cid = ColourId(colour_bytes.len() as u32);
+                        colour_map.insert(substring, cid);
+                        colour_bytes.push(substring.to_vec());
+                        cid
                     };
 
                     priced_edges.push((from, to, colour_id));

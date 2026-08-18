@@ -1821,8 +1821,7 @@ mod tests {
         };
 
         eprintln!(
-            "Tier-up latency (compile + first forward): {} ms",
-            tier_up_ms
+            "Tier-up latency (compile + first forward): {tier_up_ms} ms"
         );
     }
 }

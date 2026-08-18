@@ -1175,9 +1175,7 @@ pub fn load_cached_pruner(
     }
     if header.vocab_size != expected_vocab_size || header.layer_count != expected_layer_count {
         log::info!(
-            "[vocab_channel] Cache dimension mismatch (expected vocab={}, layers={}), skipping",
-            expected_vocab_size,
-            expected_layer_count,
+            "[vocab_channel] Cache dimension mismatch (expected vocab={expected_vocab_size}, layers={expected_layer_count}), skipping",
         );
         return None;
     }

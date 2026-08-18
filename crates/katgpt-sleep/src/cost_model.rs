@@ -175,10 +175,7 @@ mod tests {
             let c = m.total_cost(sleep_cost, n, e);
             assert!(
                 c <= prev + 1e-6,
-                "total_cost not monotone decreasing in e_gate: e={} cost={} prev={}",
-                e,
-                c,
-                prev
+                "total_cost not monotone decreasing in e_gate: e={e} cost={c} prev={prev}"
             );
             prev = c;
             e += 0.1;
@@ -211,11 +208,10 @@ mod tests {
         let factor = m.amortization_factor(sleep_cost, 10, 0.5);
         assert!(
             factor < 1.0,
-            "pre-compute should win at e_gate=0.5, N=10, got factor {}",
-            factor
+            "pre-compute should win at e_gate=0.5, N=10, got factor {factor}"
         );
         // And it should be much less than 1 (paper's whole point).
-        assert!(factor < 0.7, "expected substantial gain, got {}", factor);
+        assert!(factor < 0.7, "expected substantial gain, got {factor}");
     }
 
     #[test]
@@ -240,10 +236,7 @@ mod tests {
         let below_pays_off = m.should_pre_compute(sleep_cost, n_below, e_gate);
         assert!(
             above_pays_off || !below_pays_off,
-            "break-even boundary inconsistent: n_be={} below={} above={}",
-            n_be,
-            below_pays_off,
-            above_pays_off
+            "break-even boundary inconsistent: n_be={n_be} below={below_pays_off} above={above_pays_off}"
         );
     }
 

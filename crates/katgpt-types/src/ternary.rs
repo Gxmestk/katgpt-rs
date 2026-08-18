@@ -225,15 +225,12 @@ impl TernaryWeights {
     ///
     /// On error, `self` is left unmodified.
     pub fn overwrite_from_i8(&mut self, src: &[i8]) -> Result<(), TernaryPackError> {
-        match src.len() == self.rows * self.cols {
-            true => {}
-            false => {
+        if src.len() == self.rows * self.cols {} else {
                 return Err(TernaryPackError::LengthMismatch {
                     got: src.len(),
                     want: self.rows * self.cols,
                 });
             }
-        }
         // Validate before writing so a rejected buffer cannot leave `self`
         // half-updated.
         if let Some(pos) = src.iter().position(|&v| !(-1..=1).contains(&v)) {

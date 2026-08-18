@@ -166,10 +166,7 @@ unsafe fn neon_row_range(w: &TernaryGroupWeights, x: &[f32], y: &mut [f32], row_
                     let neg_word = w.neg_bits[idx];
 
                     let base_col = b * 64;
-                    let remaining = match base_col + 64 <= w.cols {
-                        true => 64,
-                        false => w.cols - base_col,
-                    };
+                    let remaining = if base_col + 64 <= w.cols { 64 } else { w.cols - base_col };
 
                     // 32-element unroll: 4 × 8-element chunks, one per accumulator.
                     let mut col = 0usize;
@@ -399,10 +396,7 @@ unsafe fn neon_row_range_hoisted(
                     let neg_word = w.neg_bits[idx];
 
                     let base_col = b * 64;
-                    let remaining = match base_col + 64 <= w.cols {
-                        true => 64,
-                        false => w.cols - base_col,
-                    };
+                    let remaining = if base_col + 64 <= w.cols { 64 } else { w.cols - base_col };
 
                     let mut col = 0usize;
                     while col + 32 <= remaining {
@@ -1124,10 +1118,7 @@ mod tests {
         let cols = 256;
         let src: Vec<f32> = (0..cols)
             .map(|i| {
-                let amp = match i < 128 {
-                    true => 0.1,
-                    false => 1.0,
-                };
+                let amp = if i < 128 { 0.1 } else { 1.0 };
                 amp * (i as f32 / 8.0).sin()
             })
             .collect();

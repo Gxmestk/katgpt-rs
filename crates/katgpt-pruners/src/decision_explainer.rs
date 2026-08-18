@@ -484,8 +484,7 @@ impl PerturbationExplainer {
         mappings
             .iter()
             .find(|m| m.variable == format!("pruner_{name}_score"))
-            .map(|m| m.semantic.clone())
-            .unwrap_or_else(|| name.to_string())
+            .map_or_else(|| name.to_string(), |m| m.semantic.clone())
     }
 
     /// Compute sensitivity for a single pruner at a single trace node.

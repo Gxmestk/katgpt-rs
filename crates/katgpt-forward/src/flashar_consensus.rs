@@ -790,7 +790,7 @@ mod tests {
         let tv_eq21 = tv(&run_arm(DraftAcceptPolicy::SoftmaxArgmax));
         let tv_prefix = tv(&run_arm(DraftAcceptPolicy::PrefixMatch));
 
-        println!("eq21 TV = {:.4}, prefix-match TV = {:.4}", tv_eq21, tv_prefix);
+        println!("eq21 TV = {tv_eq21:.4}, prefix-match TV = {tv_prefix:.4}");
         // Eq 21: exact up to sampling noise (n=8000, vocab 64 → expected
         // TV noise ≈ 0.02-0.04; 0.06 is the honest gate).
         assert!(

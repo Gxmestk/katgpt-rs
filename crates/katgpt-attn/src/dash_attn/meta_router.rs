@@ -46,7 +46,7 @@ impl DynRoutingCache {
             Self::Entmax(c) => c.n_blocks(),
             Self::ValueEnergy(c) => c.n_blocks,
             Self::ChannelAware(c) => c.n_blocks,
-            Self::Meta(caches) => caches.first().map(|c| c.n_blocks()).unwrap_or(0),
+            Self::Meta(caches) => caches.first().map_or(0, |c| c.n_blocks()),
         }
     }
 }
@@ -277,17 +277,13 @@ impl MetaRouter {
 /// Reward ∈ [0, 2.0]: `acceptance_rate * (1.0 + latency_bonus)`
 #[inline]
 pub fn compute_reward(accepted: bool, baseline_latency_ns: u64, actual_latency_ns: u64) -> f32 {
-    let acceptance = match accepted {
-        true => 1.0f32,
-        false => 0.0f32,
-    };
-    let latency_bonus = match baseline_latency_ns {
-        0 => 0.0f32,
-        _ => {
-            let improvement = baseline_latency_ns.saturating_sub(actual_latency_ns) as f32
-                / baseline_latency_ns as f32;
-            improvement.clamp(0.0, 1.0)
-        }
+    let acceptance = if accepted { 1.0f32 } else { 0.0f32 };
+    let latency_bonus = if baseline_latency_ns == 0 {
+        0.0f32
+    } else {
+        let improvement = baseline_latency_ns.saturating_sub(actual_latency_ns) as f32
+            / baseline_latency_ns as f32;
+        improvement.clamp(0.0, 1.0)
     };
     acceptance * (1.0 + latency_bonus)
 }

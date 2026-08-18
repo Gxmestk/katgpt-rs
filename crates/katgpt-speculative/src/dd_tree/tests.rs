@@ -715,8 +715,7 @@ fn test_deep_argmax_restricts_deep_branching() {
         .collect();
     assert!(
         d0.len() > 1,
-        "depth 0 should have multiple tokens, got {:?}",
-        d0
+        "depth 0 should have multiple tokens, got {d0:?}"
     );
 
     // Depth 1 (> 0): only argmax token 0.
@@ -780,8 +779,7 @@ fn test_deep_argmax_threshold_2_only_restricts_deep() {
         .collect();
     assert!(
         d2.len() > 1,
-        "depth 2 (≤ threshold) should have multiple tokens, got {:?}",
-        d2
+        "depth 2 (≤ threshold) should have multiple tokens, got {d2:?}"
     );
 
     // Depth 3 (> 2): only argmax token 2.

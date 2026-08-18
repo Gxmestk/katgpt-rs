@@ -95,9 +95,7 @@ mod tests {
             let p = s.predictability(&c, &dir);
             assert!(
                 (0.0..=1.0).contains(&p),
-                "p={} out of [0,1] at scale {}",
-                p,
-                scale
+                "p={p} out of [0,1] at scale {scale}"
             );
         }
     }
@@ -115,15 +113,11 @@ mod tests {
         // sigmoid monotone in dot product → aligned > orthogonal > opposite.
         assert!(
             p_aligned > p_ortho,
-            "aligned ({}) should beat orthogonal ({})",
-            p_aligned,
-            p_ortho
+            "aligned ({p_aligned}) should beat orthogonal ({p_ortho})"
         );
         assert!(
             p_ortho > p_opp,
-            "orthogonal ({}) should beat opposite ({})",
-            p_ortho,
-            p_opp
+            "orthogonal ({p_ortho}) should beat opposite ({p_opp})"
         );
     }
 

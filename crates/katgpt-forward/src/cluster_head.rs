@@ -283,18 +283,15 @@ pub fn clustered_lm_head_bounded(
             let off = t * n_embd;
             simd_dot_f32(&lm_head[off..off + n_embd], &hidden[..n_embd], n_embd)
         };
-        match scratch.gathered.len() >= PARALLEL_MIN_TOKENS {
-            true => scratch
+        if scratch.gathered.len() >= PARALLEL_MIN_TOKENS { scratch
                 .gathered
                 .par_iter()
                 .zip(scratch.dots.par_iter_mut())
-                .for_each(|(&t, d)| *d = row(t)),
-            false => {
+                .for_each(|(&t, d)| *d = row(t)) } else {
                 for (&t, d) in scratch.gathered.iter().zip(scratch.dots.iter_mut()) {
                     *d = row(t);
                 }
             }
-        }
 
         // Scatter is serial and memory-bound only — the dots are already
         // computed. Token IDs are unique across clusters, so no write races
@@ -450,9 +447,7 @@ mod tests {
     fn argmax(v: &[f32]) -> usize {
         v.iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .max_by(|(_, a), (_, b)| a.total_cmp(b)).map_or(0, |(i, _)| i)
     }
 
     /// Planted-group LM head, the same geometry Benchmark 657 uses.

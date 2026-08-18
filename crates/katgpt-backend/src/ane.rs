@@ -1238,7 +1238,7 @@ mod tests {
         let pairs: [(usize, usize); 5] = [(0, 0), (1, 1), (3, 2), (7, 4), (5, 9)];
 
         // CPU reference: run forward for each (token, pos) pair
-        let mut cpu_logits_all = Vec::new();
+        let mut cpu_logits_all = Vec::with_capacity(pairs.len());
         for &(token, pos) in &pairs {
             let mut ctx = ForwardContext::new(&config);
             let mut cache = MultiLayerKVCache::new(&config);
@@ -1252,7 +1252,7 @@ mod tests {
         let mut backend = AneBackend::new();
         backend.compile(&weights, &config).unwrap();
 
-        let mut ane_logits_all = Vec::new();
+        let mut ane_logits_all = Vec::with_capacity(pairs.len());
         for &(token, pos) in &pairs {
             let mut ctx = ForwardContext::new(&config);
             let mut cache = MultiLayerKVCache::new(&config);

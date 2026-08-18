@@ -167,8 +167,7 @@ mod tests {
         let stab = tracker.stability();
         assert!(
             stab > 0.4 && stab < 0.8,
-            "partial overlap stability should be mid-range, got {}",
-            stab
+            "partial overlap stability should be mid-range, got {stab}"
         );
     }
 }

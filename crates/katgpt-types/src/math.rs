@@ -311,7 +311,7 @@ pub fn situ(
 ///   `x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)`
 #[inline(always)]
 pub fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32]) {
-    rmsnorm_with_gamma_eps(x, gamma, 1e-5)
+    rmsnorm_with_gamma_eps(x, gamma, 1e-5);
 }
 
 /// RMSNorm with learnable gamma and configurable epsilon.

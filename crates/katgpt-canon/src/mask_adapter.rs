@@ -271,8 +271,7 @@ mod tests {
             let expected = if i % 2 == 0 { 1.0 } else { 0.0 };
             assert!(
                 (out_i - expected).abs() < 1e-6,
-                "i={i}: expected {expected}, got {}",
-                out_i
+                "i={i}: expected {expected}, got {out_i}"
             );
         }
     }

@@ -565,7 +565,8 @@ fn build_attention_layer_weights(
     let mut head_idx: usize = 0;
 
     // ── 1) LookUp heads ─────────────────────────────────────
-    let mut lookup_dim_to_head: HashMap<DimId, (usize, usize)> = HashMap::new();
+    let mut lookup_dim_to_head: HashMap<DimId, (usize, usize)> =
+        HashMap::with_capacity(layer.attention.len());
 
     for &lu_id in &layer.attention {
         let Some(lu) = pg.all_lookups.get(&lu_id) else {
@@ -751,7 +752,7 @@ fn build_ffn_layer_weights(
     let mut j: usize = 0;
 
     // ── 1) ReGLU neurons ────────────────────────────────────
-    let mut reglu_to_gate: HashMap<DimId, usize> = HashMap::new();
+    let mut reglu_to_gate: HashMap<DimId, usize> = HashMap::with_capacity(layer.ffn.len());
     let same_rg: HashSet<DimId> = layer.ffn.iter().copied().collect();
 
     for &rg_id in &layer.ffn {

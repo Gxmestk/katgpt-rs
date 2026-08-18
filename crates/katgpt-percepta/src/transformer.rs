@@ -494,20 +494,17 @@ impl VanillaTransformer {
         let total = self.config.n_layers * self.config.n_heads;
         let mut table = Vec::with_capacity(total);
         for layer_idx in 0..self.config.n_layers {
-            match self.weights.head_tiebreak.get(layer_idx) {
-                Some(row) => {
-                    for head in 0..self.config.n_heads {
-                        let tb = match row.get(head) {
-                            Some(true) => TieBreak::Latest,
-                            _ => TieBreak::Average,
-                        };
-                        table.push(tb);
-                    }
+            if let Some(row) = self.weights.head_tiebreak.get(layer_idx) {
+                for head in 0..self.config.n_heads {
+                    let tb = match row.get(head) {
+                        Some(true) => TieBreak::Latest,
+                        _ => TieBreak::Average,
+                    };
+                    table.push(tb);
                 }
-                None => {
-                    for _ in 0..self.config.n_heads {
-                        table.push(TieBreak::Average);
-                    }
+            } else {
+                for _ in 0..self.config.n_heads {
+                    table.push(TieBreak::Average);
                 }
             }
         }
@@ -607,9 +604,10 @@ pub fn decode_trace(tokens: &[String]) -> Vec<f64> {
 /// assert_eq!(encode_output_byte(0x0A), "out(0a)");
 /// ```
 pub fn encode_output_byte(byte: u8) -> String {
-    match (0x20..=0x7E).contains(&byte) {
-        true => format!("out({})", byte as char),
-        false => format!("out({byte:02x})"),
+    if (0x20..=0x7E).contains(&byte) {
+        format!("out({})", byte as char)
+    } else {
+        format!("out({byte:02x})")
     }
 }
 

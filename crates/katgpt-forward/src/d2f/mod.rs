@@ -2007,9 +2007,7 @@ pub fn d2f_decode_block_soft(
                 .iter()
                 .copied()
                 .enumerate()
-                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1)).map_or(0, |(i, _)| i);
             tokens[pos] = best;
         }
     }

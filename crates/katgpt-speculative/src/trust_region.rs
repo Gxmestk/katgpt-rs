@@ -504,11 +504,7 @@ mod tests {
         tracker.record(0.0);
         tracker.record(1.0);
         let avg = tracker.trust_metric();
-        assert!(
-            (avg - 0.625).abs() < 1e-5,
-            "avg should be 0.625, got {}",
-            avg
-        );
+        assert!((avg - 0.625).abs() < 1e-5, "avg should be 0.625, got {avg}");
     }
 
     #[test]
@@ -529,7 +525,7 @@ mod tests {
     fn test_adaptive_window_expands_on_high_trust() {
         let config = TrustRegionConfig::default();
         let window = adaptive_window(0.9, 5, &config);
-        assert_eq!(window, 8, "high trust should expand window: got {}", window);
+        assert_eq!(window, 8, "high trust should expand window: got {window}");
     }
 
     #[test]
@@ -562,8 +558,7 @@ mod tests {
         }
         assert!(
             teacher_count > 500,
-            "high β should favor teacher: got {} teacher tokens",
-            teacher_count
+            "high β should favor teacher: got {teacher_count} teacher tokens"
         );
     }
 
@@ -573,7 +568,7 @@ mod tests {
         let q = vec![0.3, 0.4, 0.3];
         let mut rng = Rng::new(42);
         let tok = blend_sample(&p, &q, 0.5, &mut rng);
-        assert!(tok < 3, "token should be in range [0, 3), got {}", tok);
+        assert!(tok < 3, "token should be in range [0, 3), got {tok}");
     }
 
     #[test]
@@ -588,9 +583,7 @@ mod tests {
         let beta_loose = find_blend_beta(&p, &q, 2.0, 10); // loose → low β
         assert!(
             beta_tight > beta_loose,
-            "tight KL target should give higher β: tight={} vs loose={}",
-            beta_tight,
-            beta_loose
+            "tight KL target should give higher β: tight={beta_tight} vs loose={beta_loose}"
         );
     }
 
@@ -739,8 +732,7 @@ mod tests {
         // Blend should still heavily favor token 0 (same as teacher and student)
         assert!(
             tok0_count > 500,
-            "blend should maintain quality when teacher/student agree: got {} token-0 out of 1000",
-            tok0_count
+            "blend should maintain quality when teacher/student agree: got {tok0_count} token-0 out of 1000"
         );
     }
 }

@@ -626,7 +626,7 @@ pub extern "C" fn wasmi_arena_legal_count() -> u32 {
 pub extern "C" fn wasmi_arena_legal_move(n: u32) -> u32 {
     with_arena(|s| {
         let moves = s.board.legal_moves();
-        moves.get(n as usize).map(|&i| i as u32).unwrap_or(255)
+        moves.get(n as usize).map_or(255, |&i| i as u32)
     })
 }
 
@@ -640,18 +640,15 @@ pub extern "C" fn wasmi_arena_legal_move(n: u32) -> u32 {
 pub extern "C" fn wasmi_arena_search_puct() -> u8 {
     with_arena(|s| {
         let mv = s.puct.select_move(&s.board);
-        match mv {
-            Some(idx) => {
+        if let Some(idx) = mv {
                 s.board.play(idx);
                 s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
                 idx as u8
-            }
-            None => {
+            } else {
                 s.board.pass();
                 s.history.push(None);
                 255
             }
-        }
     })
 }
 
@@ -680,18 +677,15 @@ pub extern "C" fn wasmi_arena_search_greedy() -> u8 {
             }
         }
 
-        match best_move {
-            Some(idx) => {
+        if let Some(idx) = best_move {
                 s.board.play(idx);
                 s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
                 idx as u8
-            }
-            None => {
+            } else {
                 s.board.pass();
                 s.history.push(None);
                 255
             }
-        }
     })
 }
 

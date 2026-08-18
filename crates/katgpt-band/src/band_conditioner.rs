@@ -749,9 +749,7 @@ mod tests {
         // ≥ 90% power means ≥ 18/20 rejections.
         assert!(
             rejections >= 18,
-            "expected ≥ 18/20 rejections (90% power), got {}/{}",
-            rejections,
-            trials,
+            "expected ≥ 18/20 rejections (90% power), got {rejections}/{trials}",
         );
     }
 
@@ -773,9 +771,7 @@ mod tests {
         // Expected ~5% false positives → ≤ 8/50 is generous.
         assert!(
             false_positives <= 8,
-            "expected ≤ 8/50 false positives, got {}/{}",
-            false_positives,
-            trials,
+            "expected ≤ 8/50 false positives, got {false_positives}/{trials}",
         );
     }
 
@@ -849,9 +845,7 @@ mod tests {
 
         assert!(
             score_similar > score_dissimilar,
-            "similar pair score {} should exceed dissimilar {}",
-            score_similar,
-            score_dissimilar,
+            "similar pair score {score_similar} should exceed dissimilar {score_dissimilar}",
         );
     }
 
@@ -899,8 +893,7 @@ mod tests {
         // Generous bound — 1ms per call. Real perf will be much lower.
         assert!(
             per_call_us < 1000.0,
-            "CI test took {:.2}μs/call (expected < 1000μs)",
-            per_call_us,
+            "CI test took {per_call_us:.2}μs/call (expected < 1000μs)",
         );
     }
 }

@@ -1904,8 +1904,7 @@ mod gram_tests {
         for (i, &g) in gram.iter().enumerate() {
             assert!(
                 (g - d_h as f32).abs() < 1e-4,
-                "gram[{i}]={g}, expected={}",
-                d_h
+                "gram[{i}]={g}, expected={d_h}"
             );
         }
     }

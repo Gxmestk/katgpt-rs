@@ -227,9 +227,7 @@ mod tests {
         assert_eq!(allocation.len(), 2);
         assert!(
             total <= budget + 2,
-            "total {} should be close to budget {}",
-            total,
-            budget
+            "total {total} should be close to budget {budget}"
         );
         // Depth 0 should get MORE budget than depth 1
         assert!(
@@ -258,8 +256,7 @@ mod tests {
         for &a in &allocation {
             assert!(
                 a >= 1,
-                "each depth should get at least min_budget_per_depth, got {}",
-                a
+                "each depth should get at least min_budget_per_depth, got {a}"
             );
         }
     }
@@ -273,8 +270,7 @@ mod tests {
         let rate_after_1 = alloc.agreement_rate(0);
         assert!(
             (rate_after_1 - 0.65).abs() < 0.01,
-            "warmup rate should be 0.65, got {}",
-            rate_after_1
+            "warmup rate should be 0.65, got {rate_after_1}"
         );
     }
 

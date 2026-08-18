@@ -381,13 +381,12 @@ pub fn build_vortex_router(
     n_blocks_capacity: usize,
     head_dim: usize,
 ) -> Option<(VortexRouter, VortexRouterCache)> {
-    match config {
-        VortexFlowConfig::DashAttn => None,
-        _ => {
-            let router = VortexRouter::from_config(config);
-            let cache = router.cache_new(n_blocks_capacity, head_dim);
-            Some((router, cache))
-        }
+    if let VortexFlowConfig::DashAttn = config {
+        None
+    } else {
+        let router = VortexRouter::from_config(config);
+        let cache = router.cache_new(n_blocks_capacity, head_dim);
+        Some((router, cache))
     }
 }
 

@@ -315,7 +315,7 @@ pub fn build_dep_graph(pg: &ProgramGraph) -> DepGraph {
         .copied()
         .collect();
 
-    let mut tight_to: HashMap<OpKey, HashSet<OpKey>> = HashMap::new();
+    let mut tight_to: HashMap<OpKey, HashSet<OpKey>> = HashMap::with_capacity(ops.len());
     for &op in &ops {
         match op {
             OpKey::ReGLU(_) | OpKey::Persist(_) => {
@@ -392,13 +392,12 @@ pub fn min_layers(ops: &[OpKey], op_deps: &HashMap<OpKey, HashSet<OpKey>>) -> us
         ready.clear();
         let mut progress = false;
         for &op in &remaining {
-            let deps = match op_deps.get(&op) {
-                Some(d) => d,
-                None => {
-                    // No deps — always ready.
-                    ready.push(op);
-                    continue;
-                }
+            let deps = if let Some(d) = op_deps.get(&op) {
+                d
+            } else {
+                // No deps — always ready.
+                ready.push(op);
+                continue;
             };
             if deps.iter().all(|p| phase.contains_key(p)) {
                 ready.push(op);
@@ -507,7 +506,7 @@ pub fn milp_schedule(
     let d_half = vars.add(variable().min(0).integer());
 
     // k[op]: layer assignment (integer, 0..n-1)
-    let mut k = HashMap::new();
+    let mut k = HashMap::with_capacity(graph.ops.len());
     for &op in &graph.ops {
         k.insert(
             op,
@@ -516,7 +515,7 @@ pub fn milp_schedule(
     }
 
     // z[dim_id]: persist1 (z=0) vs persist2 (z=1) — binary
-    let mut z = HashMap::new();
+    let mut z = HashMap::with_capacity(graph.ops.len());
     for &op in &graph.ops {
         if let OpKey::Persist(dim_id) = op {
             z.insert(dim_id, vars.add(variable().binary()));
@@ -524,7 +523,7 @@ pub fn milp_schedule(
     }
 
     // Death variables: one per non-output, non-protected dim with consumers
-    let mut death = HashMap::new();
+    let mut death = HashMap::with_capacity(dims_vec.len());
     for &d in &dims_vec {
         if out_or_prot.contains(&d) {
             continue;
@@ -532,8 +531,7 @@ pub fn milp_schedule(
         let has_cons = graph
             .consumers
             .get(&d)
-            .map(|s| s.iter().any(|op| k.contains_key(op)))
-            .unwrap_or(false);
+            .is_some_and(|s| s.iter().any(|op| k.contains_key(op)));
         if !has_cons && d != pg.position {
             continue;
         }
@@ -555,8 +553,7 @@ pub fn milp_schedule(
         let has_producer = graph
             .dim_to_op
             .get(&d)
-            .map(|&op| k.contains_key(&op))
-            .unwrap_or(false);
+            .is_some_and(|&op| k.contains_key(&op));
 
         for &c in &boundaries {
             if is_out_or_prot {
@@ -711,7 +708,7 @@ pub fn milp_schedule(
 
     // Width = max(MILP optimal d_model, actual slots needed by interval coloring)
     // MILP gives a lower bound; interval coloring may need slightly more in practice.
-    let actual_max_slot = slot_of.values().copied().max().map(|s| s + 1).unwrap_or(0);
+    let actual_max_slot = slot_of.values().copied().max().map_or(0, |s| s + 1);
     let width = opt_d.max(actual_max_slot);
 
     Ok(Schedule {
@@ -752,7 +749,7 @@ fn extract_phase_assignments(
     z: &HashMap<DimId, Variable>,
     solution: &impl Solution,
 ) -> HashMap<OpKey, i32> {
-    let mut pa = HashMap::new();
+    let mut pa = HashMap::with_capacity(graph.ops.len());
     for &op in &graph.ops {
         let layer = solution.value(k[&op]).round() as i32;
         let phase = match op {
@@ -800,7 +797,7 @@ fn compute_birth_death(
     let last_boundary = 4 * num_layers - 1;
 
     // Birth
-    let mut dim_birth = HashMap::new();
+    let mut dim_birth = HashMap::with_capacity(dims_vec.len());
     for &d in dims_vec {
         if input_set.contains(&d) {
             dim_birth.insert(d, -1);
@@ -812,7 +809,7 @@ fn compute_birth_death(
     }
 
     // Death
-    let mut dim_death = HashMap::new();
+    let mut dim_death = HashMap::with_capacity(dims_vec.len());
     for &d in dims_vec {
         if output_dims.contains(&d) || protected.contains(&d) {
             dim_death.insert(d, last_boundary + 1);
@@ -923,7 +920,7 @@ pub fn interval_coloring(
 
     // Min-heap of (death_phase, slot) for freed slots
     let mut free: BinaryHeap<Reverse<(i32, usize)>> = BinaryHeap::new();
-    let mut next_slot = fixed.values().max().map(|&m| m + 1).unwrap_or(0);
+    let mut next_slot = fixed.values().max().map_or(0, |&m| m + 1);
 
     // Seed free heap with fixed slots whose dims have died
     for (&d, &slot) in fixed {
@@ -948,21 +945,18 @@ pub fn interval_coloring(
             }
         }
 
-        let slot = match available.iter().min() {
-            Some(&s) => {
-                // Re-insert unused slots
-                for &s2 in &available {
-                    if s2 != s {
-                        free.push(Reverse((death, s2)));
-                    }
+        let slot = if let Some(&s) = available.iter().min() {
+            // Re-insert unused slots
+            for &s2 in &available {
+                if s2 != s {
+                    free.push(Reverse((death, s2)));
                 }
-                s
             }
-            None => {
-                let s = next_slot;
-                next_slot += 1;
-                s
-            }
+            s
+        } else {
+            let s = next_slot;
+            next_slot += 1;
+            s
         };
 
         slot_of.insert(d, slot);
@@ -1058,8 +1052,7 @@ mod tests {
             let produced = graph.produced.get(&op).cloned().unwrap_or_default();
             assert!(
                 !produced.is_empty(),
-                "Op {:?} should produce at least one dim",
-                op
+                "Op {op:?} should produce at least one dim"
             );
         }
 
@@ -1140,9 +1133,7 @@ mod tests {
                     if let Some(&dep_phase) = schedule.phase_assign.get(&dep) {
                         assert!(
                             phase > dep_phase,
-                            "Dependency violation: {:?} (phase {phase}) should be after {:?} (phase {dep_phase})",
-                            op,
-                            dep
+                            "Dependency violation: {op:?} (phase {phase}) should be after {dep:?} (phase {dep_phase})"
                         );
                     }
                 }

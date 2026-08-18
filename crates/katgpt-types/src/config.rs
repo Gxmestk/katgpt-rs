@@ -1715,9 +1715,10 @@ impl Config {
         // Gemma 2 intentionally has q_dim != n_embd (e.g., 8*256=2048 != 2304)
         // LLaMA with GQA may also have q_dim != n_embd
         // QwenDeltaNet also has q_dim == n_embd but is excluded for forward compat
-        let arch_exempt = match self.model_arch {
-            ModelArchitecture::Gemma2 | ModelArchitecture::Llama => true,
-            _ => {
+        let arch_exempt =
+            if let ModelArchitecture::Gemma2 | ModelArchitecture::Llama = self.model_arch {
+                true
+            } else {
                 #[cfg(feature = "deltanet_inference")]
                 if self.model_arch == ModelArchitecture::QwenDeltaNet {
                     // layer_types length must match n_layer when non-empty
@@ -1742,8 +1743,7 @@ impl Config {
                 }
                 #[cfg(not(feature = "deltanet_inference"))]
                 false
-            }
-        };
+            };
         if !arch_exempt && self.n_head * self.head_dim != self.n_embd {
             return Err(format!(
                 "n_head ({}) * head_dim ({}) must equal n_embd ({})",

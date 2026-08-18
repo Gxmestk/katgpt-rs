@@ -108,14 +108,16 @@ impl SpeculativeVerifier for SimulatedVerifier {
             let start = last_step * vocab_size;
             let end = start + vocab_size;
             let marginals_flat = &self.sctx.marginals_flat;
-            let last_marginal: &[f32] = match end <= marginals_flat.len() {
-                true => &marginals_flat[start..end],
-                false => &[],
+            let last_marginal: &[f32] = if end <= marginals_flat.len() {
+                &marginals_flat[start..end]
+            } else {
+                &[]
             };
             let bonus = sample_from_distribution(
-                match last_marginal.is_empty() {
-                    true => &[1.0],
-                    false => last_marginal,
+                if last_marginal.is_empty() {
+                    &[1.0]
+                } else {
+                    last_marginal
                 },
                 rng,
             );

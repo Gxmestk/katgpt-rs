@@ -614,8 +614,7 @@ mod tests {
 
         assert_eq!(
             dense_argmax, splat_argmax,
-            "SPLAT argmax {} ≠ dense argmax {} at 50% density",
-            splat_argmax, dense_argmax
+            "SPLAT argmax {splat_argmax} ≠ dense argmax {dense_argmax} at 50% density"
         );
 
         // Score quality: relative L2 of score vectors.
@@ -727,7 +726,7 @@ mod tests {
         );
         assert!(sup.len() <= d);
         for w in sup.windows(2) {
-            assert!(w[0] < w[1], "support not strictly sorted: {:?}", sup);
+            assert!(w[0] < w[1], "support not strictly sorted: {sup:?}");
         }
     }
 }

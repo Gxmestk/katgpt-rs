@@ -158,8 +158,7 @@ impl<P: ScreeningPruner> ExpressionPruner<P> {
                 mappings
                     .iter()
                     .find(|m| m.variable == raw)
-                    .map(|m| m.semantic.clone())
-                    .unwrap_or_else(|| raw.to_string())
+                    .map_or_else(|| raw.to_string(), |m| m.semantic.clone())
             })
             .collect();
 

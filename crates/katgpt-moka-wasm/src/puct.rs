@@ -913,8 +913,7 @@ mod tests {
 
             assert_eq!(
                 f32_mv, i8_mv,
-                "int8 PUCT move {:?} != f32 PUCT move {:?} on position after {:?}",
-                i8_mv, f32_mv, moves
+                "int8 PUCT move {i8_mv:?} != f32 PUCT move {f32_mv:?} on position after {moves:?}"
             );
         }
     }

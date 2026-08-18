@@ -944,9 +944,7 @@ mod tests {
 
         assert!(
             score_good > score_bad,
-            "Good branch should score higher: {} vs {}",
-            score_good,
-            score_bad
+            "Good branch should score higher: {score_good} vs {score_bad}"
         );
     }
 
@@ -1024,8 +1022,7 @@ mod tests {
         assert_eq!(pulls_1step, 1, "1-step arm should have been pulled once");
         assert!(
             (mean_1step - (-0.5f32)).abs() < 1e-6,
-            "Reward should be exactly -0.5, got {}",
-            mean_1step
+            "Reward should be exactly -0.5, got {mean_1step}"
         );
     }
 
@@ -1057,8 +1054,7 @@ mod tests {
         for &tok in &compacted {
             assert!(
                 prefix.contains(&tok),
-                "Compacted token {} must exist in original prefix",
-                tok
+                "Compacted token {tok} must exist in original prefix"
             );
         }
 
@@ -1075,8 +1071,7 @@ mod tests {
             let count_5 = compacted.iter().filter(|&&t| t == 5).count();
             assert!(
                 count_5 < 7,
-                "Redundant token 5 should be partially folded: {} remaining of 7",
-                count_5
+                "Redundant token 5 should be partially folded: {count_5} remaining of 7"
             );
         }
 

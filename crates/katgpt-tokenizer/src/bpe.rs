@@ -297,18 +297,15 @@ impl<'tok> FastBpeEncoder<'tok> {
             return;
         }
 
-        match &self.pair_ranks {
-            Some(table) => {
+        if let Some(table) = &self.pair_ranks {
                 crate::fast_bpe::bpe_merge_symbols_by_rank(table, &mut self.symbols, &mut self.scratch);
-            }
-            None => {
+            } else {
                 crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
                     &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
                     &mut self.symbols,
                     &mut self.scratch,
                 );
             }
-        }
 
         out.extend(self.symbols.iter().map(|t| t.0 as usize));
     }
@@ -519,22 +516,19 @@ impl<'tok> FastBpeEncoder<'tok> {
             let id = self.tokenizer.vocab_to_id.get(cs).copied().unwrap_or(unk);
             self.symbols.push(crate::fast_bpe::TokenId(id as u32));
         }
-        match &self.pair_ranks {
-            Some(table) => {
+        if let Some(table) = &self.pair_ranks {
                 crate::fast_bpe::bpe_merge_symbols_by_rank(
                     table,
                     &mut self.symbols,
                     &mut self.scratch,
                 );
-            }
-            None => {
+            } else {
                 crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
                     &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
                     &mut self.symbols,
                     &mut self.scratch,
                 );
             }
-        }
         // Same element order as the previous `.collect()`; writes into the
         // reused scratch instead of a fresh allocation.
         self.pretok_tokens.clear();
