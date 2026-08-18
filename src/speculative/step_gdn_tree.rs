@@ -23,7 +23,7 @@ use katgpt_core::gdn_tree_verify::{GdnTreeVerifier, TreeTopology, build_topology
 use katgpt_core::speculative::sampling::{
     sample_from_distribution, sample_residual_distribution_into,
 };
-use katgpt_core::speculative::types::{TokenPath, TreeNode};
+use katgpt_core::speculative::types::{TreeNode, TreePath};
 use katgpt_core::traits::NoPruner;
 use katgpt_forward::dflash::dflash_predict_with;
 #[cfg(feature = "weaver_runtime")]
@@ -125,10 +125,10 @@ pub fn gdn_tree_post_verify(
         let mut accepted = Vec::with_capacity(path.len());
         let mut all_accepted = true;
 
-        let mut current_path_prefix = TokenPath::empty();
+        let mut current_path_prefix = TreePath::default();
 
         for (depth, &draft_tok) in path.iter().enumerate() {
-            current_path_prefix = current_path_prefix.extend(depth, draft_tok);
+            current_path_prefix = current_path_prefix.push(draft_tok as u32, depth);
 
             // Find the topo node matching (depth, current_path_prefix).
             // Resolve the slot index only — the logits row is copied into the
@@ -169,11 +169,9 @@ pub fn gdn_tree_post_verify(
         // Bonus token if all accepted.
         if all_accepted && !accepted.is_empty() {
             let last_depth = path.len() - 1;
-            let last_prefix = path
-                .iter()
-                .take(last_depth + 1)
-                .enumerate()
-                .fold(TokenPath::empty(), |acc, (d, &tok)| acc.extend(d, tok));
+            let last_prefix = path.iter().enumerate().fold(TreePath::default(), |acc, (d, &tok)| {
+                acc.push(tok as u32, d)
+            });
             let bonus_slot = (0..t).find(|&k| {
                 let node = &tree[topo.topo_order[k]];
                 node.depth == last_depth && node.parent_path == last_prefix

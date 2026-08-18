@@ -933,15 +933,16 @@ and in what order the agents took their turns upon the ground.";
     /// speculative decoder realises, because the verifier checks every path
     /// in one batched forward and commits the longest match.
     ///
-    /// A node's `parent_path` packs its whole ancestor chain including itself,
-    /// one token per level, depth 0 at level 0 (root first).
+    /// A node's `parent_path` holds its whole ancestor chain including
+    /// itself, one `u32` token per level, root at slot 0
+    /// (`tree_builder`: `node_path = parent_path.push(token, depth)`).
     fn tree_acceptance(tree: &[TreeNode], target: &[u32]) -> usize {
         let mut best = 0usize;
         for n in tree {
             if n.depth + 1 > target.len() || n.depth < best {
                 continue;
             }
-            let matches = (0..=n.depth).all(|k| n.parent_path.token_at(k) as u32 == target[k]);
+            let matches = (0..=n.depth).all(|k| n.parent_path.token_at(k) == target[k]);
             if matches {
                 best = n.depth + 1;
             }

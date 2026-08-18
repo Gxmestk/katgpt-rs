@@ -534,19 +534,19 @@ mod tests {
             katgpt_core::speculative::types::TreeNode {
                 depth: 0,
                 token_idx: 1,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1]),
+                parent_path: TreePath::from_tokens(&[0x1]),
                 score: -1.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 1,
                 token_idx: 2,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 2]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x2]),
                 score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 2,
                 token_idx: 3,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 2, 3]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x2, 0x3]),
                 score: -3.0,
             },
         ];
@@ -596,7 +596,7 @@ mod tests {
         let nodes = vec![katgpt_core::speculative::types::TreeNode {
             depth: 0,
             token_idx: 1,
-            parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1]),
+            parent_path: TreePath::from_tokens(&[0x1]),
             score: -1.0,
         }];
 
@@ -644,13 +644,13 @@ mod tests {
             katgpt_core::speculative::types::TreeNode {
                 depth: 0,
                 token_idx: 1,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1]),
+                parent_path: TreePath::from_tokens(&[0x1]),
                 score: -1.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 1,
                 token_idx: 2,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 2]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x2]),
                 score: -2.0,
             },
         ];
@@ -752,9 +752,9 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &tok)| {
-                let mut path = katgpt_core::speculative::types::TokenPath::empty();
+                let mut path = katgpt_core::speculative::types::TreePath::default();
                 for (j, &t_j) in tokens.iter().enumerate().take(i + 1) {
-                    path = path.extend(j, t_j);
+                    path = path.push(t_j as u32, j);
                 }
                 katgpt_core::speculative::types::TreeNode {
                     depth: i,
@@ -852,9 +852,9 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(i, &tok)| {
-                let mut path = katgpt_core::speculative::types::TokenPath::empty();
+                let mut path = katgpt_core::speculative::types::TreePath::default();
                 for (j, &t_j) in tokens.iter().enumerate().take(i + 1) {
-                    path = path.extend(j, t_j);
+                    path = path.push(t_j as u32, j);
                 }
                 katgpt_core::speculative::types::TreeNode {
                     depth: i,
@@ -947,33 +947,33 @@ mod tests {
 
         // ── Tree forward: branching topology ──
         // DDTree nodes: A(root), B, C, D
-        //   A: depth 0, token 1, path [1]
-        //   B: depth 1, token 2, path [1, 2]
-        //   C: depth 1, token 4, path [1, 4]
-        //   D: depth 2, token 3, path [1, 2, 3]
+        //   A: depth 0, token 1, path 0x0001
+        //   B: depth 1, token 2, path 0x0001_0002
+        //   C: depth 1, token 4, path 0x0001_0004
+        //   D: depth 2, token 3, path 0x0001_0002_0003
         let nodes = vec![
             katgpt_core::speculative::types::TreeNode {
                 depth: 0,
                 token_idx: 1,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1]),
+                parent_path: TreePath::from_tokens(&[0x1]),
                 score: -1.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 1,
                 token_idx: 2,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 2]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x2]),
                 score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 1,
                 token_idx: 4,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 4]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x4]),
                 score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
                 depth: 2,
                 token_idx: 3,
-                parent_path: katgpt_core::speculative::types::TokenPath::from_levels(&[1, 2, 3]),
+                parent_path: TreePath::from_tokens(&[0x1, 0x2, 0x3]),
                 score: -3.0,
             },
         ];
@@ -1002,10 +1002,10 @@ mod tests {
         );
 
         // Map DDTree nodes to topology indices. The topology sorts by (depth, parent_path):
-        //   topo[0] = A (depth 0, path [1])
-        //   topo[1] = B (depth 1, path [1, 2])
-        //   topo[2] = C (depth 1, path [1, 4])
-        //   topo[3] = D (depth 2, path [1, 2, 3])
+        //   topo[0] = A (depth 0, path 0x0001)
+        //   topo[1] = B (depth 1, path 0x0001_0002)
+        //   topo[2] = C (depth 1, path 0x0001_0004)
+        //   topo[3] = D (depth 2, path 0x0001_0002_0003)
         // Verify this mapping.
         assert_eq!(topo_token_ids[0], 1, "topo[0] should be token 1 (A)");
         assert_eq!(topo_token_ids[1], 2, "topo[1] should be token 2 (B)");

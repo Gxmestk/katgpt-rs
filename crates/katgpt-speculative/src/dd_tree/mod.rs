@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // it doesn't read as unused when all those features are off.
 #[cfg(feature = "and_or_dtree")]
 use katgpt_core::AndOrNode;
-use katgpt_core::speculative::types::{SdeConfig, TokenPath, TreeNode};
+use katgpt_core::speculative::types::{SdeConfig, TreeNode, TreePath};
 #[cfg(feature = "domino_correction")]
 use katgpt_core::traits::DominoPruner;
 #[cfg(any(
@@ -38,15 +38,16 @@ pub use tree_builder::TreeBuilder;
 /// Below this, serial iteration is faster (~5μs rayon overhead vs ~0.1μs per element).
 const RAYON_CANDIDATE_THRESHOLD: usize = 512;
 
-/// Extract tokens from a node's [`TokenPath`] for path-aware pruning.
+/// Extract tokens from a [`TreePath`] for path-aware pruning.
 ///
-/// `parent_path` holds one `u32` token per level, root first (level `k` =
-/// depth-`k` token; levels beyond the node's `depth` are zero).
+/// `parent_path` holds one `u32` token per level, root at slot 0 (Issue 670
+/// widened this from the `u128` 16-bit-per-level packing, which corrupted
+/// paths at vocab > 65,536).
 ///
 /// Returns `Vec<usize>` where `result[k]` = token at depth `k`.
-/// Callers pass `num_tokens = node.depth + 1` for the full root→node path.
-pub fn extract_parent_tokens(parent_path: TokenPath, num_tokens: usize) -> Vec<usize> {
-    (0..num_tokens).map(|k| parent_path.token_at(k)).collect()
+/// Max depth: [`TreePath::MAX_TOKENS`] = 8 (sufficient for lookahead of 5–8).
+pub fn extract_parent_tokens(parent_path: TreePath, num_tokens: usize) -> Vec<usize> {
+    (0..num_tokens).map(|k| parent_path.token_at(k) as usize).collect()
 }
 
 /// Zero-alloc variant of [`extract_parent_tokens`].
@@ -54,12 +55,12 @@ pub fn extract_parent_tokens(parent_path: TokenPath, num_tokens: usize) -> Vec<u
 /// Returns the slice `&buf[..num_tokens]`.
 #[inline]
 pub fn extract_parent_tokens_into(
-    parent_path: TokenPath,
+    parent_path: TreePath,
     num_tokens: usize,
     buf: &mut [usize],
 ) -> &[usize] {
     for (k, slot) in buf.iter_mut().enumerate().take(num_tokens) {
-        *slot = parent_path.token_at(k);
+        *slot = parent_path.token_at(k) as usize;
     }
     &buf[..num_tokens]
 }
@@ -328,9 +329,9 @@ pub fn merge_retrieved_branches(
 
         let sim_ln = similarity.ln();
 
-        // Incrementally reconstruct parent_path: one level per depth.
+        // Incrementally reconstruct parent_path: one u32 slot per depth.
         // Avoids per-depth O(depth) fold over seq[..=depth] (was O(D²) per sequence).
-        let mut parent_path = TokenPath::empty();
+        let mut parent_path = TreePath::default();
         for (depth, &token_idx) in seq.iter().enumerate() {
             if depth >= marginals.len() {
                 break;
@@ -343,13 +344,13 @@ pub fn merge_retrieved_branches(
             if base_prob <= 0.0 {
                 // Still advance parent_path so deeper tokens reconstruct the
                 // same path the original fold would have produced.
-                parent_path = parent_path.extend(depth, token_idx);
+                parent_path = parent_path.push(token_idx as u32, depth);
                 continue;
             }
 
             let blended = (base_prob.ln() * inv_weight) + (sim_ln * rest_weight);
 
-            parent_path = parent_path.extend(depth, token_idx);
+            parent_path = parent_path.push(token_idx as u32, depth);
 
             tree.push(TreeNode {
                 score: blended,
@@ -1133,7 +1134,7 @@ pub fn build_dd_tree_dendritic(
 
     // Optional: seed greedy chain backbone first
     if chain_seed {
-        let mut chain_path = TokenPath::empty();
+        let mut chain_path = TreePath::default();
         let mut chain_score = 0.0f32;
         for depth in 0..seq_len {
             let parent_tokens = extract_parent_tokens_into(chain_path, depth, &mut parent_buf);
@@ -1147,7 +1148,7 @@ pub fn build_dd_tree_dendritic(
             }
             if best_prob > 0.0 {
                 chain_score += best_prob.ln();
-                chain_path = chain_path.extend(depth, best_idx);
+                chain_path = chain_path.push(best_idx as u32, depth);
                 tree.push(TreeNode {
                     score: chain_score,
                     depth,
@@ -1168,7 +1169,7 @@ pub fn build_dd_tree_dendritic(
                     score: prob.ln(),
                     depth: 0,
                     token_idx: i,
-                    parent_path: TokenPath::from_token(i),
+                    parent_path: TreePath::root(i as u32),
                 });
             }
         }
@@ -1217,7 +1218,7 @@ pub fn build_dd_tree_dendritic(
                         score,
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: best.parent_path.extend(next_depth, i),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }
@@ -1835,18 +1836,11 @@ fn path_to_tree_nodes(path: &[Vec<usize>]) -> Vec<TreeNode> {
     }
 
     let mut nodes = Vec::with_capacity(flat.len());
+    let mut parent_path = TreePath::default();
 
-    // Legacy LSB-first convention (Issue 670 note): this builder historically
-    // packed the FIRST token into the LOW bits (`path |= token << (16*depth)`),
-    // opposite to TreeBuilder's root-first push. Levels are stored reversed to
-    // preserve that behavior exactly — including `extract_parent_tokens`
-    // returning the sequence in reverse and `parent_of` dropping the FIRST
-    // token (both pre-widening quirks of the LSB-first packing).
     for (depth, &token_idx) in flat.iter().enumerate() {
-        let mut parent_path = TokenPath::empty();
-        for j in 0..=depth {
-            parent_path = parent_path.extend(j, flat[depth - j]);
-        }
+        // One u32 slot per level (Issue 670 widened from 16-bit packing).
+        parent_path = parent_path.push(token_idx as u32, depth);
 
         nodes.push(TreeNode {
             parent_path,

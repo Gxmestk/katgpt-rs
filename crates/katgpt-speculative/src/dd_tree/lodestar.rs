@@ -7,7 +7,7 @@
 
 use std::collections::BinaryHeap;
 
-use katgpt_core::speculative::types::{TokenPath, TreeNode};
+use katgpt_core::speculative::types::{TreeNode, TreePath};
 use katgpt_core::traits::CompletionHorizon;
 
 use super::extract_parent_tokens_into;
@@ -123,7 +123,7 @@ pub fn build_dd_tree_lodestar(
                     score: a_star_score(score, lambda, d),
                     depth: 0,
                     token_idx: i,
-                    parent_path: TokenPath::from_token(i),
+                    parent_path: TreePath::root(i as u32),
                 });
             }
         }
@@ -144,8 +144,7 @@ pub fn build_dd_tree_lodestar(
             // (B) Jump-ahead: if the horizon reports a singular span, collapse it.
             if jump_ahead {
                 let span = horizon.singular_span_len(start_depth, parent_tokens);
-                // Cap span to the path capacity (one level per token, 8 levels
-                // total — Issue 670's TokenPath::MAX_LEVELS).
+                // Cap span to fit the 8-slot TreePath (one token per level).
                 let max_span = 8usize.saturating_sub(best.depth + 1);
                 let span = span.min(max_span as u32);
                 if span > 0 {
@@ -183,7 +182,7 @@ pub fn build_dd_tree_lodestar(
                                         break;
                                     }
                                     span_score += prob.ln();
-                                    span_path = span_path.extend(span_depth, token);
+                                    span_path = span_path.push(token as u32, span_depth);
                                     span_parents_buf.push(token);
                                     span_depth += 1;
                                 } else {
@@ -206,7 +205,7 @@ pub fn build_dd_tree_lodestar(
                             heap.push(TreeNode {
                                 score: a_star_score(span_score, lambda, d),
                                 depth: span_depth - 1,
-                                token_idx: span_path.token_at(span_depth - 1),
+                                token_idx: span_path.token_at(span_depth - 1) as usize,
                                 parent_path: span_path,
                             });
                         }
@@ -236,7 +235,7 @@ pub fn build_dd_tree_lodestar(
                             score: a_star_score(score, lambda, d),
                             depth: start_depth,
                             token_idx: i,
-                            parent_path: best.parent_path.extend(start_depth, i),
+                            parent_path: best.parent_path.push(i as u32, start_depth),
                         });
                     }
                 }
