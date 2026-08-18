@@ -33,8 +33,8 @@ impl std::fmt::Display for CompactError {
     #[cold]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidConfig(s) => write!(f, "invalid config: {}", s),
-            Self::DimensionMismatch(s) => write!(f, "dimension mismatch: {}", s),
+            Self::InvalidConfig(s) => write!(f, "invalid config: {s}"),
+            Self::DimensionMismatch(s) => write!(f, "dimension mismatch: {s}"),
         }
     }
 }
@@ -578,8 +578,7 @@ mod tests {
         for j in 0..r_no_router.compact_values.len() {
             assert!(
                 (r_no_router.compact_values[j] - r_with_router.compact_values[j]).abs() < 1e-4,
-                "compact_values[{}] differs",
-                j
+                "compact_values[{j}] differs"
             );
         }
         // Trace should be populated.
@@ -691,8 +690,7 @@ mod tests {
 
         assert!(
             trace.blocked_cholesky_eligible,
-            "blocked Cholesky should be eligible for t={} (block size {})",
-            t, CHOLESKY_BLOCK_SIZE
+            "blocked Cholesky should be eligible for t={t} (block size {CHOLESKY_BLOCK_SIZE})"
         );
     }
 }

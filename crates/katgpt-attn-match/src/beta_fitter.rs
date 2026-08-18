@@ -99,7 +99,7 @@ pub fn fit_beta_nnls(
         }
         for j in 0..t {
             let row_j = row[j];
-            let ata_row = &mut ata[j * t..j * t + j + 1];
+            let ata_row = &mut ata[j * t..=j * t + j];
             for (acc, &r_k) in ata_row.iter_mut().zip(row.iter()) {
                 *acc += row_j * r_k;
             }
@@ -118,34 +118,31 @@ pub fn fit_beta_nnls(
     let mut jitter = 0.0f32;
     let l_mat;
     loop {
-        match cholesky_decompose(&ata, t) {
-            Some(l) => {
-                l_mat = l;
-                break;
-            }
-            None => {
-                // Remove previous jitter before adding the new one.
-                if jitter > 0.0 {
-                    for j in 0..t {
-                        ata[j * t + j] -= jitter;
-                    }
-                }
-                jitter = if jitter == 0.0 { 1e-6 } else { jitter * 10.0 };
+        if let Some(l) = cholesky_decompose(&ata, t) {
+            l_mat = l;
+            break;
+        } else {
+            // Remove previous jitter before adding the new one.
+            if jitter > 0.0 {
                 for j in 0..t {
-                    ata[j * t + j] += jitter;
+                    ata[j * t + j] -= jitter;
                 }
-                if jitter > 1e3 {
-                    // Fall back to a diagonal-only "solution": w = atm[j] / ata[j,j]
-                    for j in 0..t {
-                        let diag = ata[j * t + j];
-                        w[j] = if diag > STABILITY_EPS {
-                            atm[j] / diag
-                        } else {
-                            config.w_lower
-                        };
-                    }
-                    return finalize(w, a, m, n, t, config);
+            }
+            jitter = if jitter == 0.0 { 1e-6 } else { jitter * 10.0 };
+            for j in 0..t {
+                ata[j * t + j] += jitter;
+            }
+            if jitter > 1e3 {
+                // Fall back to a diagonal-only "solution": w = atm[j] / ata[j,j]
+                for j in 0..t {
+                    let diag = ata[j * t + j];
+                    w[j] = if diag > STABILITY_EPS {
+                        atm[j] / diag
+                    } else {
+                        config.w_lower
+                    };
                 }
+                return finalize(w, a, m, n, t, config);
             }
         }
     }

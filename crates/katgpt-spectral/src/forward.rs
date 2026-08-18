@@ -526,7 +526,7 @@ mod tests {
             layer_state.tail_codebook.centroids
         );
         if let Some(ref bits) = layer_state.semantic_bits_per_dim {
-            eprintln!("  semantic_bits_per_dim  : {:?}", bits);
+            eprintln!("  semantic_bits_per_dim  : {bits:?}");
         }
 
         // Compare SQ maxsim vs uncompressed

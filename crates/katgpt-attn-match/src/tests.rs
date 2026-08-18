@@ -93,8 +93,7 @@ fn goat_g1_beta_recovery_synthetic() {
     }
     assert!(
         max_err < 0.2, // slight relaxation for f32 precision
-        "GOAT G1 failed: max β error {} > 0.2",
-        max_err
+        "GOAT G1 failed: max β error {max_err} > 0.2"
     );
 }
 
@@ -207,8 +206,7 @@ fn goat_g3_omp_mass_coverage() {
     // GOAT G3: coverage > 0.95 (residual < 5% of initial)
     assert!(
         coverage > 0.90, // slight relaxation for synthetic block data
-        "GOAT G3 failed: OMP mass coverage {} < 0.90",
-        coverage
+        "GOAT G3 failed: OMP mass coverage {coverage} < 0.90"
     );
 }
 
@@ -259,8 +257,7 @@ fn goat_g4_highest_attn_rms_coverage() {
     // this should easily pass; relax slightly for synthetic data.
     assert!(
         coverage > 0.5,
-        "GOAT G4 failed: selected RMS coverage {} < 0.5",
-        coverage
+        "GOAT G4 failed: selected RMS coverage {coverage} < 0.5"
     );
 }
 
@@ -287,8 +284,7 @@ fn goat_determinism_full_pipeline() {
         let r2 = compact(&keys, &values, &queries, 32, 8, 4, &cfg).expect("compact r2");
         assert_eq!(
             r1.selected_indices, r2.selected_indices,
-            "determinism failed for {:?}",
-            selector
+            "determinism failed for {selector:?}"
         );
         for j in 0..r1.beta.len() {
             assert!((r1.beta[j] - r2.beta[j]).abs() < 1e-6);
@@ -322,11 +318,11 @@ fn e2e_compact_block_data_all_selectors() {
         assert!((result.compression_ratio() - 4.0).abs() < 1e-6);
         // All β finite.
         for &b in &result.beta {
-            assert!(b.is_finite(), "non-finite β for {:?}", selector);
+            assert!(b.is_finite(), "non-finite β for {selector:?}");
         }
         // All Cv finite.
         for &v in &result.compact_values {
-            assert!(v.is_finite(), "non-finite Cv for {:?}", selector);
+            assert!(v.is_finite(), "non-finite Cv for {selector:?}");
         }
         // Report should be populated.
         let report = result.report.as_ref().expect("report should exist");
@@ -363,9 +359,7 @@ fn test_compact_attention_with_beta() {
         let row_sum: f32 = x[i * t..(i + 1) * t].iter().sum();
         assert!(
             (row_sum - 1.0).abs() < 1e-5,
-            "compact attention row {} should sum to 1, got {}",
-            i,
-            row_sum
+            "compact attention row {i} should sum to 1, got {row_sum}"
         );
     }
 }

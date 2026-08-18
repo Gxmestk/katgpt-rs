@@ -808,8 +808,7 @@ mod tests {
                 .fold(0.0f32, f32::max);
             assert!(
                 max_val < 1e-4,
-                "div(curl(grad(f))) should be ~0, got max {}",
-                max_val
+                "div(curl(grad(f))) should be ~0, got max {max_val}"
             );
         }
     }

@@ -102,8 +102,7 @@ pub fn se2_lift_into(
     );
     debug_assert!(
         kernel_size <= 64,
-        "se2_lift_into: kernel_size={} > 64 (stack-scratch cap)",
-        kernel_size
+        "se2_lift_into: kernel_size={kernel_size} > 64 (stack-scratch cap)"
     );
     debug_assert!(
         n_orientations > 0,
@@ -344,7 +343,7 @@ mod tests {
         let mut out = vec![0.0f32; 16 * 16 * 8];
         se2_lift_into(&field, 16, 16, &kernel, 5, 8, &mut out);
         for v in &out {
-            assert!(v.abs() < 1e-6, "expected zero, got {}", v);
+            assert!(v.abs() < 1e-6, "expected zero, got {v}");
         }
     }
 
@@ -420,9 +419,7 @@ mod tests {
         }
         assert!(
             mismatches == 0,
-            "G1 π/2 equivariance FAILED: {} mismatches, max abs diff {}",
-            mismatches,
-            max_abs_diff
+            "G1 π/2 equivariance FAILED: {mismatches} mismatches, max abs diff {max_abs_diff}"
         );
     }
 
@@ -521,15 +518,11 @@ mod tests {
         // (loose — well below the field's max value of 1.0).
         assert!(
             mean_abs_diff < 0.1,
-            "G1 π/4 equivariance mean abs diff {} > 0.1 tolerance (max {})",
-            mean_abs_diff,
-            max_abs_diff
+            "G1 π/4 equivariance mean abs diff {mean_abs_diff} > 0.1 tolerance (max {max_abs_diff})"
         );
         assert!(
             max_abs_diff < 1.0,
-            "G1 π/4 equivariance max abs diff {} > 1.0 tolerance (mean {})",
-            max_abs_diff,
-            mean_abs_diff
+            "G1 π/4 equivariance max abs diff {max_abs_diff} > 1.0 tolerance (mean {mean_abs_diff})"
         );
     }
 
@@ -594,7 +587,7 @@ mod tests {
         for cell in 0..w * h {
             let got = lifted[cell * 4];
             let want = field[cell];
-            assert!((got - want).abs() < 1e-5, "cell {}: got {} want {}", cell, got, want);
+            assert!((got - want).abs() < 1e-5, "cell {cell}: got {got} want {want}");
         }
     }
 }

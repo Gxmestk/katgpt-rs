@@ -419,7 +419,7 @@ fn whiten_into(
                 out_k[i * d_dim + j] = inv_sqrt_lambda * eigvecs_buf[j * d_dim + i];
             }
         }
-    })
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -808,9 +808,7 @@ pub fn fastica_into<'a>(
 ) -> FastIcaResult<'a> {
     assert!(
         t_dim > 0 && d_dim > 0,
-        "fastica_into: t_dim and d_dim must be positive, got T={}, D={}",
-        t_dim,
-        d_dim
+        "fastica_into: t_dim and d_dim must be positive, got T={t_dim}, D={d_dim}"
     );
     assert_eq!(
         window.len(),
@@ -824,9 +822,7 @@ pub fn fastica_into<'a>(
     let m_req = config.n_components;
     assert!(
         m_req >= 1 && m_req <= d_dim,
-        "fastica_into: n_components must be in [1, D]=[1, {}], got {}",
-        d_dim,
-        m_req
+        "fastica_into: n_components must be in [1, D]=[1, {d_dim}], got {m_req}"
     );
     assert_eq!(
         out_reading_map.len(),
@@ -1424,16 +1420,13 @@ mod tests {
         let max_kurt = kurt.iter().copied().fold(0.0_f32, f32::max);
         assert!(
             max_kurt > 1.5,
-            "expected max component kurtosis > 1.5 (Laplace sources have kurt≈3), got max={:.4}, kurt={:?}",
-            max_kurt,
-            kurt
+            "expected max component kurtosis > 1.5 (Laplace sources have kurt≈3), got max={max_kurt:.4}, kurt={kurt:?}"
         );
         // Sanity: at least some directions should have positive excess kurtosis.
         let n_positive = kurt.iter().filter(|&&k| k > 0.5).count();
         assert!(
             n_positive >= 1,
-            "expected ≥1 direction with kurtosis > 0.5, got {:?}",
-            kurt
+            "expected ≥1 direction with kurtosis > 0.5, got {kurt:?}"
         );
     }
 
@@ -1468,11 +1461,10 @@ mod tests {
             &mut scores, &mut kurt, &mut lim,
         );
         let mean_kurt: f32 = kurt.iter().sum::<f32>() / d as f32;
-        println!("t1_9b: mean kurtosis on Gaussian = {:.4}", mean_kurt);
+        println!("t1_9b: mean kurtosis on Gaussian = {mean_kurt:.4}");
         assert!(
             mean_kurt.abs() < 1.0,
-            "Gaussian source should have near-zero mean kurtosis, got {:.4}",
-            mean_kurt
+            "Gaussian source should have near-zero mean kurtosis, got {mean_kurt:.4}"
         );
     }
 
@@ -1520,8 +1512,7 @@ mod tests {
         let k = excess_kurtosis(&vals);
         assert!(
             (k - 3.0).abs() < 0.3,
-            "Laplace excess kurtosis ≈ 3.0, got {:.4}",
-            k
+            "Laplace excess kurtosis ≈ 3.0, got {k:.4}"
         );
     }
 
@@ -1539,8 +1530,7 @@ mod tests {
         let k = excess_kurtosis(&vals);
         assert!(
             k.abs() < 0.1,
-            "Gaussian excess kurtosis ≈ 0, got {:.4}",
-            k
+            "Gaussian excess kurtosis ≈ 0, got {k:.4}"
         );
     }
 
@@ -1553,8 +1543,8 @@ mod tests {
         jacobi_eig_symmetric_into(&a, 2, 30, &mut eigvals, &mut eigvecs, &mut scratch);
         let mut sorted = eigvals.clone();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        assert!((sorted[0] - 1.0).abs() < 1e-4, "smaller eigval: {:?}", sorted);
-        assert!((sorted[1] - 3.0).abs() < 1e-4, "larger eigval: {:?}", sorted);
+        assert!((sorted[0] - 1.0).abs() < 1e-4, "smaller eigval: {sorted:?}");
+        assert!((sorted[1] - 3.0).abs() < 1e-4, "larger eigval: {sorted:?}");
     }
 
     #[test]
@@ -1566,7 +1556,7 @@ mod tests {
         let mut scratch = vec![0.0_f32; n * n];
         jacobi_eig_symmetric_into(&a, n, 30, &mut eigvals, &mut eigvecs, &mut scratch);
         for &ev in &eigvals {
-            assert!((ev - 1.0).abs() < 1e-5, "eigval should be 1, got {}", ev);
+            assert!((ev - 1.0).abs() < 1e-5, "eigval should be 1, got {ev}");
         }
     }
 
@@ -1630,8 +1620,7 @@ mod tests {
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
                     (dot - expected).abs() < 1e-3,
-                    "R·R^T[{},{}] = {}, expected {}",
-                    i, j, dot, expected
+                    "R·R^T[{i},{j}] = {dot}, expected {expected}"
                 );
             }
         }
@@ -1661,8 +1650,7 @@ mod tests {
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
                     (acc - expected).abs() < 1e-3,
-                    "R·R^†[{},{}] = {}, expected {}",
-                    i, j, acc, expected
+                    "R·R^†[{i},{j}] = {acc}, expected {expected}"
                 );
             }
         }

@@ -77,37 +77,34 @@ fn cg_solve(
     // Scratch buffers (b, r, p, ap) are hoisted out of `cg_solve_scalar` and reused
     // across all channels — eliminates 4·dim heap allocations per call on the
     // multi-channel path (e.g. dim=4 ⇒ 16 allocs → 0). Grown only when n grows.
-    match dim {
-        1 => {
-            let mut scratch = CgScratch::new(n);
-            cg_solve_scalar(
-                cx,
-                &rhs.data,
-                rank,
-                tol,
-                max_iter,
-                &mut x.data,
-                &mut scratch,
-            );
-        }
-        _ => {
-            // Per-channel solve
-            let mut rhs_ch = vec![0.0f32; n];
-            let mut x_ch = vec![0.0f32; n];
-            let mut scratch = CgScratch::new(n);
-            for d in 0..dim {
-                // Strided read: channel `d` lives at indices `d, dim+d, 2*dim+d, ...`
-                for (slot, &r) in rhs_ch
-                    .iter_mut()
-                    .zip(rhs.data.iter().skip(d).step_by(dim))
-                    .take(n)
-                {
-                    *slot = r;
-                }
-                cg_solve_scalar(cx, &rhs_ch, rank, tol, max_iter, &mut x_ch, &mut scratch);
-                for (i, &v) in x_ch.iter().enumerate().take(n) {
-                    x.data[i * dim + d] = v;
-                }
+    if dim == 1 {
+        let mut scratch = CgScratch::new(n);
+        cg_solve_scalar(
+            cx,
+            &rhs.data,
+            rank,
+            tol,
+            max_iter,
+            &mut x.data,
+            &mut scratch,
+        );
+    } else {
+        // Per-channel solve
+        let mut rhs_ch = vec![0.0f32; n];
+        let mut x_ch = vec![0.0f32; n];
+        let mut scratch = CgScratch::new(n);
+        for d in 0..dim {
+            // Strided read: channel `d` lives at indices `d, dim+d, 2*dim+d, ...`
+            for (slot, &r) in rhs_ch
+                .iter_mut()
+                .zip(rhs.data.iter().skip(d).step_by(dim))
+                .take(n)
+            {
+                *slot = r;
+            }
+            cg_solve_scalar(cx, &rhs_ch, rank, tol, max_iter, &mut x_ch, &mut scratch);
+            for (i, &v) in x_ch.iter().enumerate().take(n) {
+                x.data[i * dim + d] = v;
             }
         }
     }
@@ -337,38 +334,38 @@ pub fn hodge_decompose(cx: &CellComplex, input: &CochainField) -> HodgeComponent
     // Coexact component: δₖ₊₁(Δₖ₊₁⁻¹(dₖ(ω)))
     // -----------------------------------------------------------------------
     // If k+1 cells exist, compute dₖ(ω), solve Δₖ₊₁·β = dₖ(ω), then coexact = δₖ₊₁(β)
-    let coexact = match k < MAX_RANK && cx.n_cells(k + 1) > 0 {
-        true => {
-            let dk_omega = exterior_derivative(cx, input);
-            // Solve Δ_{k+1}·β = dₖ(ω)
-            let beta = cg_solve(cx, &dk_omega, k + 1, CG_TOL, CG_MAX_ITER);
-            // coexact = δ_{k+2}(β)
-            // Note: δ_{k+1} requires rank > 0, which (k+1) always is here since k >= 0
-            match k + 1 > 0 && cx.n_cells(k) > 0 {
-                true => codifferential(cx, &beta),
-                false => CochainField::zeros(k, n, dim),
-            }
+    let coexact = if k < MAX_RANK && cx.n_cells(k + 1) > 0 {
+        let dk_omega = exterior_derivative(cx, input);
+        // Solve Δ_{k+1}·β = dₖ(ω)
+        let beta = cg_solve(cx, &dk_omega, k + 1, CG_TOL, CG_MAX_ITER);
+        // coexact = δ_{k+2}(β)
+        // Note: δ_{k+1} requires rank > 0, which (k+1) always is here since k >= 0
+        if k + 1 > 0 && cx.n_cells(k) > 0 {
+            codifferential(cx, &beta)
+        } else {
+            CochainField::zeros(k, n, dim)
         }
-        false => CochainField::zeros(k, n, dim),
+    } else {
+        CochainField::zeros(k, n, dim)
     };
 
     // -----------------------------------------------------------------------
     // Exact component: dₖ₋₁(Δₖ₋₁⁻¹(δₖ(ω)))
     // -----------------------------------------------------------------------
     // Only for rank ≥ 1: need dₖ₋₁ and Δₖ₋₁
-    let exact = match k > 0 {
-        true => {
-            // δₖ(ω) requires rank > 0
-            let delta_k_omega = codifferential(cx, input);
-            // Solve Δ_{k-1}·α = δₖ(ω)
-            let alpha = cg_solve(cx, &delta_k_omega, k - 1, CG_TOL, CG_MAX_ITER);
-            // exact = dₖ₋₁(α)
-            match cx.n_cells(k) > 0 {
-                true => exterior_derivative(cx, &alpha),
-                false => CochainField::zeros(k, n, dim),
-            }
+    let exact = if k > 0 {
+        // δₖ(ω) requires rank > 0
+        let delta_k_omega = codifferential(cx, input);
+        // Solve Δ_{k-1}·α = δₖ(ω)
+        let alpha = cg_solve(cx, &delta_k_omega, k - 1, CG_TOL, CG_MAX_ITER);
+        // exact = dₖ₋₁(α)
+        if cx.n_cells(k) > 0 {
+            exterior_derivative(cx, &alpha)
+        } else {
+            CochainField::zeros(k, n, dim)
         }
-        false => CochainField::zeros(k, n, dim),
+    } else {
+        CochainField::zeros(k, n, dim)
     };
 
     // -----------------------------------------------------------------------
@@ -538,23 +535,20 @@ pub fn harmonic_projector(cx: &CellComplex, input: &CochainField) -> CochainFiel
     let n = input.n_cells();
     let dim = input.dim;
 
-    match k {
-        0 => {
-            // For rank 0 on a connected complex, harmonic = mean · 𝟙
-            let mut result = CochainField::zeros(k, n, dim);
-            for d in 0..dim {
-                let mean: f32 = (0..n).map(|i| input.data[i * dim + d]).sum::<f32>() / (n as f32);
-                for i in 0..n {
-                    result.data[i * dim + d] = mean;
-                }
+    if k == 0 {
+        // For rank 0 on a connected complex, harmonic = mean · 𝟙
+        let mut result = CochainField::zeros(k, n, dim);
+        for d in 0..dim {
+            let mean: f32 = (0..n).map(|i| input.data[i * dim + d]).sum::<f32>() / (n as f32);
+            for i in 0..n {
+                result.data[i * dim + d] = mean;
             }
-            result
         }
-        _ => {
-            // For higher ranks, use full Hodge decomposition and return harmonic component
-            let components = hodge_decompose(cx, input);
-            components.harmonic
-        }
+        result
+    } else {
+        // For higher ranks, use full Hodge decomposition and return harmonic component
+        let components = hodge_decompose(cx, input);
+        components.harmonic
     }
 }
 
@@ -1270,13 +1264,12 @@ mod tests {
         for i in 1..eigs.len() {
             assert!(
                 eigs[i] <= eigs[i - 1] + 1e-3,
-                "eigenvalues not sorted: {:?}",
-                eigs
+                "eigenvalues not sorted: {eigs:?}"
             );
         }
         // All eigenvalues of the Laplacian should be >= 0 (PSD)
         for &e in &eigs {
-            assert!(e >= -1e-3, "negative eigenvalue: {}", e);
+            assert!(e >= -1e-3, "negative eigenvalue: {e}");
         }
     }
 
@@ -1304,11 +1297,10 @@ mod tests {
         let start = std::time::Instant::now();
         let _components = hodge_decompose(&cx, &potential);
         let elapsed = start.elapsed();
-        println!("Hodge decomposition 256×256: {:?}", elapsed);
+        println!("Hodge decomposition 256×256: {elapsed:?}");
         assert!(
             elapsed.as_secs() < 120,
-            "Hodge decomposition too slow: {:?}",
-            elapsed
+            "Hodge decomposition too slow: {elapsed:?}"
         );
     }
 }

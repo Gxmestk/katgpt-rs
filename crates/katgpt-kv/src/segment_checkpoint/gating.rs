@@ -62,7 +62,7 @@ mod tests {
     fn test_sigmoid_range() {
         for x in [-10.0, -1.0, 0.0, 1.0, 10.0] {
             let s = sigmoid(x);
-            assert!(s > 0.0 && s < 1.0, "sigmoid({}) = {} not in (0,1)", x, s);
+            assert!(s > 0.0 && s < 1.0, "sigmoid({x}) = {s} not in (0,1)");
         }
     }
 
@@ -103,21 +103,19 @@ mod tests {
         // With softmax, they'd each be 1/3 ≈ 0.333. With sigmoid, they're all ~0.731.
         assert!(
             gates.iter().all(|&g| g > 0.5),
-            "sigmoid gates for aligned summaries should all be > 0.5, got {:?}",
-            gates
+            "sigmoid gates for aligned summaries should all be > 0.5, got {gates:?}"
         );
 
         // Gates do NOT sum to 1.0 (definitively NOT softmax)
         let sum: f32 = gates.iter().sum();
         assert!(
             sum > 1.5,
-            "sigmoid gates should sum to > 1.5 for 3 aligned summaries (not 1.0 like softmax), got {}",
-            sum
+            "sigmoid gates should sum to > 1.5 for 3 aligned summaries (not 1.0 like softmax), got {sum}"
         );
 
         // Each gate independently in (0, 1)
         for &g in &gates {
-            assert!(g > 0.0 && g < 1.0, "gate {} not in (0,1)", g);
+            assert!(g > 0.0 && g < 1.0, "gate {g} not in (0,1)");
         }
     }
 }

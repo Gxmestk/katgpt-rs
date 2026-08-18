@@ -699,8 +699,7 @@ mod tests {
         let is_high_var = (first[0] - first[1]).abs() > 0.5;
         assert!(
             is_high_var,
-            "SpectralQueryBank should prefer high-variance token, got {:?}",
-            first
+            "SpectralQueryBank should prefer high-variance token, got {first:?}"
         );
     }
 

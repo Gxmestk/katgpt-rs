@@ -240,10 +240,7 @@ pub fn ndcg_at_into(
         .map(|i| (2.0f64.powf(ideal_rels_buf[i]) - 1.0) / (i as f64 + 2.0).log2())
         .sum();
 
-    match idcg > 0.0 {
-        true => (dcg / idcg) as f32,
-        false => 0.0,
-    }
+    if idcg > 0.0 { (dcg / idcg) as f32 } else { 0.0 }
 }
 
 /// Compute NDCG@k (Normalized Discounted Cumulative Gain at position k).

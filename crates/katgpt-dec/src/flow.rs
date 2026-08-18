@@ -704,8 +704,7 @@ mod tests {
         // Soft constraint: should complete in reasonable time (< 5 seconds per iter)
         assert!(
             per_iter.as_secs() < 5,
-            "DecFlowField 64×64 took {:?} per iteration — too slow",
-            per_iter
+            "DecFlowField 64×64 took {per_iter:?} per iteration — too slow"
         );
     }
 

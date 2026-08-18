@@ -90,7 +90,7 @@ pub fn fit_cv_least_squares(
                 *acc += x_ij * y_k;
             }
             // X^T X: lower triangle only (k <= j).
-            let xtx_row = &mut xtx[j * t..j * t + j + 1];
+            let xtx_row = &mut xtx[j * t..=j * t + j];
             for (acc, &x_k) in xtx_row.iter_mut().zip(x_row.iter()) {
                 *acc += x_ij * x_k;
             }
@@ -121,52 +121,49 @@ pub fn fit_cv_least_squares(
                 xtx[j * t + j] += jitter;
             }
         }
-        match cholesky_decompose(&xtx, t) {
-            Some(l) => {
-                // Solve L Z = X^T Y (forward), then L^T Cv = Z (back), per RHS column.
-                let cv = solve_cholesky_multi_rhs(&l, &xty, t, d);
-                let rel_err = compute_relative_error(&cv, x, y, n, t, d);
-                return ValueFitResult {
-                    compact_values: cv,
-                    relative_error: rel_err,
-                    solver_succeeded,
-                    jitter_used: jitter,
-                };
-            }
-            None => {
-                solver_succeeded = false;
-                let next_jitter = if jitter == 0.0 {
-                    config.cholesky_jitter
-                } else {
-                    jitter * 10.0
-                };
-                if next_jitter > 1.0 {
-                    // Final fallback: pseudoinverse via normal equations diagonal-loading.
-                    // Add large diagonal and bail.
-                    for j in 0..t {
-                        xtx[j * t + j] += 1.0;
-                    }
-                    // Try one more time with the heavy loading.
-                    if let Some(l) = cholesky_decompose(&xtx, t) {
-                        let cv = solve_cholesky_multi_rhs(&l, &xty, t, d);
-                        let rel_err = compute_relative_error(&cv, x, y, n, t, d);
-                        return ValueFitResult {
-                            compact_values: cv,
-                            relative_error: rel_err,
-                            solver_succeeded: false,
-                            jitter_used: 1.0,
-                        };
-                    }
-                    // Give up — return zeros. This indicates a severely degenerate input.
+        if let Some(l) = cholesky_decompose(&xtx, t) {
+            // Solve L Z = X^T Y (forward), then L^T Cv = Z (back), per RHS column.
+            let cv = solve_cholesky_multi_rhs(&l, &xty, t, d);
+            let rel_err = compute_relative_error(&cv, x, y, n, t, d);
+            return ValueFitResult {
+                compact_values: cv,
+                relative_error: rel_err,
+                solver_succeeded,
+                jitter_used: jitter,
+            };
+        } else {
+            solver_succeeded = false;
+            let next_jitter = if jitter == 0.0 {
+                config.cholesky_jitter
+            } else {
+                jitter * 10.0
+            };
+            if next_jitter > 1.0 {
+                // Final fallback: pseudoinverse via normal equations diagonal-loading.
+                // Add large diagonal and bail.
+                for j in 0..t {
+                    xtx[j * t + j] += 1.0;
+                }
+                // Try one more time with the heavy loading.
+                if let Some(l) = cholesky_decompose(&xtx, t) {
+                    let cv = solve_cholesky_multi_rhs(&l, &xty, t, d);
+                    let rel_err = compute_relative_error(&cv, x, y, n, t, d);
                     return ValueFitResult {
-                        compact_values: vec![0.0; t * d],
-                        relative_error: 1.0,
+                        compact_values: cv,
+                        relative_error: rel_err,
                         solver_succeeded: false,
                         jitter_used: 1.0,
                     };
                 }
-                jitter = next_jitter;
+                // Give up — return zeros. This indicates a severely degenerate input.
+                return ValueFitResult {
+                    compact_values: vec![0.0; t * d],
+                    relative_error: 1.0,
+                    solver_succeeded: false,
+                    jitter_used: 1.0,
+                };
             }
+            jitter = next_jitter;
         }
     }
 }
@@ -363,8 +360,8 @@ fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
         let diag_l = cholesky_decompose_unblocked(&diag_block[..bk * bk], bk)?;
         // Write lower-triangular result into L (row `i` holds `i+1` live cells).
         for i in 0..bk {
-            let src = &diag_l[i * bk..i * bk + i + 1];
-            l[(k + i) * t + k..(k + i) * t + k + i + 1].copy_from_slice(src);
+            let src = &diag_l[i * bk..=i * bk + i];
+            l[(k + i) * t + k..=(k + i) * t + k + i].copy_from_slice(src);
         }
 
         // 2. Off-diagonal strip L[k+bk:, k:k+bk] via forward substitution.
@@ -520,11 +517,7 @@ mod tests {
                 let exp = cv_true[j * d + k];
                 assert!(
                     (got - exp).abs() < 1e-3,
-                    "cv[{},{}] should be {}, got {}",
-                    j,
-                    k,
-                    exp,
-                    got
+                    "cv[{j},{k}] should be {exp}, got {got}"
                 );
             }
         }
@@ -582,8 +575,7 @@ mod tests {
         let sum: f32 = x.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-6,
-            "softmax should sum to 1, got {}",
-            sum
+            "softmax should sum to 1, got {sum}"
         );
         for &v in &x {
             assert!((v - 0.25).abs() < 1e-6);
@@ -630,11 +622,7 @@ mod tests {
                 let a_ij = a[i * t + j];
                 assert!(
                     (s - a_ij).abs() < 1e-3 * a_ij.abs().max(1.0),
-                    "L·L^T mismatch at ({},{}): got {} want {}",
-                    i,
-                    j,
-                    s,
-                    a_ij
+                    "L·L^T mismatch at ({i},{j}): got {s} want {a_ij}"
                 );
             }
         }
@@ -668,11 +656,7 @@ mod tests {
         for i in 0..t * t {
             max_diff = max_diff.max((l_blocked[i] - l_unblocked[i]).abs());
         }
-        assert!(
-            max_diff < 1e-4,
-            "blocked/unblocked L max diff: {}",
-            max_diff
-        );
+        assert!(max_diff < 1e-4, "blocked/unblocked L max diff: {max_diff}");
     }
 
     /// Regression test for the Cholesky numerical cliff-edge (commit `f978a20b`).

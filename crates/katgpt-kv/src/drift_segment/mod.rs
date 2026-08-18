@@ -502,8 +502,7 @@ mod tests {
         }
         assert!(
             nearest <= 40,
-            "no boundary within 40 tokens of the change point (nearest {})",
-            nearest
+            "no boundary within 40 tokens of the change point (nearest {nearest})"
         );
     }
 

@@ -130,7 +130,7 @@ impl fmt::Display for OutlierGuardReport {
             self.total_scanned, self.total_flagged, self.max_ks_d
         )?;
         for layer in &self.layers {
-            writeln!(f, "  {}", layer)?;
+            writeln!(f, "  {layer}")?;
         }
         Ok(())
     }
@@ -180,20 +180,12 @@ impl OutlierGuard {
         if flagged {
             match self.config.on_detection {
                 OutlierAction::Warn => {
-                    log::warn!(
-                        "OutlierGuard: layer {} ({}) flagged with D={:.4}",
-                        layer_idx,
-                        name,
-                        ks_d
-                    );
+                    log::warn!("OutlierGuard: layer {layer_idx} ({name}) flagged with D={ks_d:.4}");
                 }
                 OutlierAction::Silent => {}
                 OutlierAction::Reject => {
                     log::error!(
-                        "OutlierGuard: layer {} ({}) flagged with D={:.4} — REJECT requested",
-                        layer_idx,
-                        name,
-                        ks_d
+                        "OutlierGuard: layer {layer_idx} ({name}) flagged with D={ks_d:.4} — REJECT requested"
                     );
                 }
             }
@@ -306,18 +298,16 @@ impl StiffSoftCrossCheck {
             ConfidenceLevel::Medium => {
                 if self.ks_flagged {
                     format!(
-                        "MEDIUM CONFIDENCE — weight distribution anomaly at layer {} ({}): KS flagged, eigenvalue clean",
-                        layer_idx, weight_name
+                        "MEDIUM CONFIDENCE — weight distribution anomaly at layer {layer_idx} ({weight_name}): KS flagged, eigenvalue clean"
                     )
                 } else {
                     format!(
-                        "MEDIUM CONFIDENCE — eigenvalue anomaly at layer {} ({}): KS clean, eigenvalue flagged",
-                        layer_idx, weight_name
+                        "MEDIUM CONFIDENCE — eigenvalue anomaly at layer {layer_idx} ({weight_name}): KS clean, eigenvalue flagged"
                     )
                 }
             }
             ConfidenceLevel::Clean => {
-                format!("Layer {} ({}) clean", layer_idx, weight_name)
+                format!("Layer {layer_idx} ({weight_name}) clean")
             }
         }
     }
@@ -342,7 +332,7 @@ mod tests {
             weights.push(z1 * 0.3);
         }
         let d = guard.scan_layer(&weights, 0, "test.weight");
-        assert!(d < 0.15, "normal weights should have D < 0.15, got {}", d);
+        assert!(d < 0.15, "normal weights should have D < 0.15, got {d}");
     }
 
     #[test]
@@ -355,7 +345,7 @@ mod tests {
             weights[i] = 512.0; // outlier per paper's attack pattern
         }
         let d = guard.scan_layer(&weights, 0, "test.attacked");
-        assert!(d > 0.15, "attacked weights should have D > 0.15, got {}", d);
+        assert!(d > 0.15, "attacked weights should have D > 0.15, got {d}");
     }
 
     #[test]

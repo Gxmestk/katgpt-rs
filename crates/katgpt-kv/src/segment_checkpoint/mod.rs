@@ -368,14 +368,12 @@ mod tests {
             assert_eq!(
                 cp.pos_start % segment_size,
                 0,
-                "segment {} pos_start must be segment-aligned",
-                id
+                "segment {id} pos_start must be segment-aligned"
             );
             assert_eq!(
                 (cp.pos_end + 1) % segment_size,
                 0,
-                "segment {} pos_end+1 must be segment-aligned",
-                id
+                "segment {id} pos_end+1 must be segment-aligned"
             );
         }
     }
@@ -442,9 +440,7 @@ mod tests {
             assert_eq!(
                 seg_size % tile_size,
                 0,
-                "segment_size {} must be tile-aligned (tile_size={})",
-                seg_size,
-                tile_size
+                "segment_size {seg_size} must be tile-aligned (tile_size={tile_size})"
             );
         }
 
@@ -457,8 +453,7 @@ mod tests {
             assert_ne!(
                 bad % tile_size,
                 0,
-                "segment_size {} should NOT be tile-aligned",
-                bad
+                "segment_size {bad} should NOT be tile-aligned"
             );
         }
     }

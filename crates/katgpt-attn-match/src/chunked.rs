@@ -194,9 +194,7 @@ impl ChunkedCompactor {
 
             let recon = result
                 .report
-                .as_ref()
-                .map(|r| r.relative_attn_output_error)
-                .unwrap_or(0.0);
+                .as_ref().map_or(0.0, |r| r.relative_attn_output_error);
 
             out.compact_keys.extend_from_slice(&result.compact_keys);
             out.beta.extend_from_slice(&result.beta);
@@ -303,9 +301,7 @@ impl ChunkedCompactor {
                 let rerotated = pf.re_rotate_f32(&result.compact_keys, new_pos);
                 let recon = result
                     .report
-                    .as_ref()
-                    .map(|r| r.relative_attn_output_error)
-                    .unwrap_or(0.0);
+                    .as_ref().map_or(0.0, |r| r.relative_attn_output_error);
                 out.compact_keys.extend_from_slice(&rerotated);
                 out.beta.extend_from_slice(&result.beta);
                 out.compact_values.extend_from_slice(&result.compact_values);
@@ -333,9 +329,7 @@ impl ChunkedCompactor {
                 )?;
                 let recon = result
                     .report
-                    .as_ref()
-                    .map(|r| r.relative_attn_output_error)
-                    .unwrap_or(0.0);
+                    .as_ref().map_or(0.0, |r| r.relative_attn_output_error);
                 out.compact_keys.extend_from_slice(&result.compact_keys);
                 out.beta.extend_from_slice(&result.beta);
                 out.compact_values.extend_from_slice(&result.compact_values);

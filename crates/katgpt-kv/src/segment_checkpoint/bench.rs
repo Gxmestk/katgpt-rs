@@ -31,11 +31,10 @@ fn bench_segment_store_insert_throughput() {
         store.insert(checkpoint);
     }
     let elapsed = start.elapsed();
-    println!("Insert 1000 segments: {:.2?}", elapsed);
+    println!("Insert 1000 segments: {elapsed:.2?}");
     assert!(
         elapsed < std::time::Duration::from_secs(5),
-        "insert throughput too slow: {:.2?}",
-        elapsed
+        "insert throughput too slow: {elapsed:.2?}"
     );
 }
 
@@ -57,16 +56,11 @@ fn bench_insert_throughput_varying_segment_size() {
             store.insert(checkpoint);
         }
         let elapsed = start.elapsed();
-        println!(
-            "Insert {} segments (segment_size={}): {:.2?}",
-            max_segments, seg_size, elapsed
-        );
+        println!("Insert {max_segments} segments (segment_size={seg_size}): {elapsed:.2?}");
         // SSC at k=8 should add <5% overhead — insert itself should be fast
         assert!(
             elapsed < std::time::Duration::from_secs(5),
-            "insert too slow for segment_size={}: {:.2?}",
-            seg_size,
-            elapsed
+            "insert too slow for segment_size={seg_size}: {elapsed:.2?}"
         );
     }
 }
@@ -87,14 +81,10 @@ fn bench_gate_computation() {
     }
     let elapsed = start.elapsed();
     let per_call = elapsed / 10000;
-    println!(
-        "Gate computation (100 segments, 10k iterations): {:.2?} per call",
-        per_call
-    );
+    println!("Gate computation (100 segments, 10k iterations): {per_call:.2?} per call");
     assert!(
         per_call < std::time::Duration::from_millis(1),
-        "gate computation too slow: {:.2?} per call",
-        per_call
+        "gate computation too slow: {per_call:.2?} per call"
     );
 }
 
@@ -116,16 +106,11 @@ fn bench_gate_computation_scaling() {
         }
         let elapsed = start.elapsed();
         let per_call = elapsed / iterations;
-        println!(
-            "Gate computation ({} segments, dim={}): {:.2?} per call",
-            num_segments, dim, per_call
-        );
+        println!("Gate computation ({num_segments} segments, dim={dim}): {per_call:.2?} per call");
         // Should scale linearly — even at 500 segments, keep under 2ms
         assert!(
             per_call < std::time::Duration::from_millis(2),
-            "gate computation too slow for {} segments: {:.2?}",
-            num_segments,
-            per_call
+            "gate computation too slow for {num_segments} segments: {per_call:.2?}"
         );
     }
 }
@@ -149,7 +134,7 @@ fn test_memory_usage_estimation() {
         total,
         total as f64 / 1024.0
     );
-    assert!(total < 10_000_000, "memory exceeds 10MB: {} bytes", total);
+    assert!(total < 10_000_000, "memory exceeds 10MB: {total} bytes");
 }
 
 #[test]
@@ -172,8 +157,7 @@ fn bench_memory_usage_varying_max_segments() {
         // Linear growth: O(max_segments × tile_size × 2)
         assert!(
             total < 100_000_000,
-            "memory for {} segments exceeds 100MB",
-            max_segments
+            "memory for {max_segments} segments exceeds 100MB"
         );
 
         // Verify linear relationship
@@ -278,13 +262,11 @@ fn bench_niah_retrieval_synthetic() {
     // With sigmoid gating, needle should have highest gate
     let needle_gate = gates[top_idx];
     println!(
-        "NIAH synthetic: needle gate = {:.4}, retrieved segment = {:?}",
-        needle_gate, retrieved_id
+        "NIAH synthetic: needle gate = {needle_gate:.4}, retrieved segment = {retrieved_id:?}"
     );
     assert!(
         needle_gate > 0.5,
-        "needle gate should be > 0.5 with matching query, got {}",
-        needle_gate
+        "needle gate should be > 0.5 with matching query, got {needle_gate}"
     );
 
     // All haystack gates should be lower
@@ -296,9 +278,7 @@ fn bench_niah_retrieval_synthetic() {
         .fold(f32::NEG_INFINITY, f32::max);
     assert!(
         needle_gate > haystack_max,
-        "needle gate ({}) should exceed haystack max ({})",
-        needle_gate,
-        haystack_max
+        "needle gate ({needle_gate}) should exceed haystack max ({haystack_max})"
     );
 }
 
@@ -346,13 +326,11 @@ fn bench_ssc_drafter_enhancement_synthetic() {
     let elapsed = start.elapsed();
     let per_iteration = elapsed / 1000;
     println!(
-        "SSC drafter enhancement (20 segments, k=8, 1k iterations): {:.2?} per iteration",
-        per_iteration
+        "SSC drafter enhancement (20 segments, k=8, 1k iterations): {per_iteration:.2?} per iteration"
     );
     assert!(
         per_iteration < std::time::Duration::from_millis(1),
-        "SSC drafter too slow: {:.2?} per iteration",
-        per_iteration
+        "SSC drafter too slow: {per_iteration:.2?} per iteration"
     );
 }
 
@@ -404,12 +382,9 @@ fn bench_gate_computation_profile() {
     let gate_per_call = gate_elapsed / gate_iterations;
 
     println!("=== Gate Computation Profile ===");
-    println!("  dot_product (dim={}): {:.2?} per call", dim, dot_per_call);
-    println!("  sigmoid: {:.2?} per call", sigmoid_per_call);
-    println!(
-        "  compute_gates ({} segments, dim={}): {:.2?} per call",
-        num_segments, dim, gate_per_call
-    );
+    println!("  dot_product (dim={dim}): {dot_per_call:.2?} per call");
+    println!("  sigmoid: {sigmoid_per_call:.2?} per call");
+    println!("  compute_gates ({num_segments} segments, dim={dim}): {gate_per_call:.2?} per call");
     println!(
         "  → should be ≈ {} × (dot + sigmoid) = {:.2?}",
         num_segments,
@@ -419,14 +394,10 @@ fn bench_gate_computation_profile() {
     // Gate computation should be dominated by dot products, not overhead
     let expected = (dot_per_call + sigmoid_per_call) * num_segments as u32;
     let overhead_ratio = gate_per_call.as_secs_f64() / expected.as_secs_f64();
-    println!(
-        "  overhead ratio: {:.2}x (1.0 = zero overhead)",
-        overhead_ratio
-    );
+    println!("  overhead ratio: {overhead_ratio:.2}x (1.0 = zero overhead)");
     assert!(
         overhead_ratio < 5.0,
-        "gate computation has excessive overhead: {:.2}x",
-        overhead_ratio
+        "gate computation has excessive overhead: {overhead_ratio:.2}x"
     );
 }
 
@@ -476,12 +447,9 @@ fn bench_ssc_overhead_vs_full_retrieval() {
         * 100.0;
 
     println!("=== SSC Overhead vs Full GRM ===");
-    println!("  GRM (all gates): {:.2?} per call", grm_per_call);
-    println!(
-        "  SSC (top-8 from {}): {:.2?} per call",
-        num_segments, ssc_per_call
-    );
-    println!("  Overhead: {:.1}%", overhead_pct);
+    println!("  GRM (all gates): {grm_per_call:.2?} per call");
+    println!("  SSC (top-8 from {num_segments}): {ssc_per_call:.2?} per call");
+    println!("  Overhead: {overhead_pct:.1}%");
 
     // SSC computes gates + select_nth_unstable + sort top-k, so it's naturally
     // ~2x of GRM which only computes gates. The 5% target is for end-to-end inference
@@ -490,8 +458,7 @@ fn bench_ssc_overhead_vs_full_retrieval() {
     // Target: SSC gate overhead < 150% of GRM (i.e. <3% of total inference).
     assert!(
         overhead_pct < 200.0,
-        "SSC gate overhead too high: {:.1}% (target <200% at gate level, <3% at inference level)",
-        overhead_pct
+        "SSC gate overhead too high: {overhead_pct:.1}% (target <200% at gate level, <3% at inference level)"
     );
 }
 
@@ -531,11 +498,7 @@ fn bench_memory_linear_growth_verification() {
             let half_total = half_n * per_segment;
             assert!(
                 total == 2 * half_total,
-                "memory growth not linear: {} segments = {} bytes, {} segments = {} bytes",
-                half_n,
-                half_total,
-                n,
-                total
+                "memory growth not linear: {half_n} segments = {half_total} bytes, {n} segments = {total} bytes"
             );
         }
     }

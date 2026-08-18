@@ -745,10 +745,7 @@ mod tests {
         // First-order predictor + quadrature: expect a few percent error.
         assert!(
             rel_err < 0.15,
-            "nonlinear heat kernel should match fine Euler at t={t}: rel_err = {:.4} ({:.3e}/{:.3e})",
-            rel_err,
-            dist,
-            norm
+            "nonlinear heat kernel should match fine Euler at t={t}: rel_err = {rel_err:.4} ({dist:.3e}/{norm:.3e})"
         );
     }
 
@@ -799,9 +796,7 @@ mod tests {
         assert!(
             hk_err < coarse_err,
             "nonlinear heat kernel should beat coarse Euler at t={t}: \
-             hk_err = {:.3e} vs coarse_err = {:.3e}",
-            hk_err,
-            coarse_err
+             hk_err = {hk_err:.3e} vs coarse_err = {coarse_err:.3e}"
         );
     }
 
@@ -850,8 +845,7 @@ mod tests {
             .fold(0.0_f32, f32::max);
         assert!(
             max_diff < 1e-6,
-            "into variant should match allocating: max_diff = {:.3e}",
-            max_diff
+            "into variant should match allocating: max_diff = {max_diff:.3e}"
         );
     }
 
@@ -880,8 +874,7 @@ mod tests {
         let dist = l2_dist(&linear, &nq0);
         assert!(
             dist < 1e-6,
-            "n_quad=0 should reduce to linear: dist = {:.3e}",
-            dist
+            "n_quad=0 should reduce to linear: dist = {dist:.3e}"
         );
     }
 
@@ -949,9 +942,7 @@ mod tests {
         assert!(
             err_n6 <= err_n2 * 1.05,
             "more quadrature points should improve (or at least not worsen) accuracy: \
-             err(n=2)={:.3e}, err(n=6)={:.3e}",
-            err_n2,
-            err_n6
+             err(n=2)={err_n2:.3e}, err(n=6)={err_n6:.3e}"
         );
     }
 

@@ -215,13 +215,11 @@ pub fn gauge_rebalance(
     assert_eq!(b.len(), b_rows * b_cols, "B size mismatch");
     assert_eq!(
         a_cols, b_cols,
-        "rank mismatch: a_cols={} b_cols={}",
-        a_cols, b_cols
+        "rank mismatch: a_cols={a_cols} b_cols={b_cols}"
     );
     assert!(
         alpha > 0.0 && alpha <= 1.0,
-        "alpha must be in (0, 1], got {}",
-        alpha
+        "alpha must be in (0, 1], got {alpha}"
     );
 
     let r = a_cols;
@@ -345,11 +343,11 @@ pub fn gauge_invariant_compose(pairs: &[GaugePair<'_>], out_a: &mut [f32], out_b
 
     // Validate all pairs have consistent shape.
     for (i, p) in pairs.iter().enumerate() {
-        assert_eq!(p.a_rows, a_rows, "pair {} a_rows mismatch", i);
-        assert_eq!(p.b_rows, b_rows, "pair {} b_rows mismatch", i);
-        assert_eq!(p.rank, r, "pair {} rank mismatch", i);
-        assert_eq!(p.a.len(), a_rows * r, "pair {} A size mismatch", i);
-        assert_eq!(p.b.len(), b_rows * r, "pair {} B size mismatch", i);
+        assert_eq!(p.a_rows, a_rows, "pair {i} a_rows mismatch");
+        assert_eq!(p.b_rows, b_rows, "pair {i} b_rows mismatch");
+        assert_eq!(p.rank, r, "pair {i} rank mismatch");
+        assert_eq!(p.a.len(), a_rows * r, "pair {i} A size mismatch");
+        assert_eq!(p.b.len(), b_rows * r, "pair {i} B size mismatch");
     }
 
     // For each pair: rebalance into a local buffer, then write scaled copy to output.
@@ -499,8 +497,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "Rebalance changed A·B^T by {} (should be ≈ 0)",
-            max_diff
+            "Rebalance changed A·B^T by {max_diff} (should be ≈ 0)"
         );
     }
 
@@ -540,8 +537,7 @@ mod tests {
         let ratio_before = (sigma_a_before / sigma_b_before).abs();
         assert!(
             ratio_before > 5.0,
-            "Pre-condition: ratio should be >> 1, got {}",
-            ratio_before
+            "Pre-condition: ratio should be >> 1, got {ratio_before}"
         );
 
         gauge_rebalance(&mut a, &mut b, m, r, n, r, 1.0, &mut scratch);
@@ -565,11 +561,7 @@ mod tests {
         let ratio_after = (sigma_a_after / sigma_b_after).abs();
         assert!(
             ratio_after < 1.5,
-            "Post-condition: ratio should be ≈ 1, got {} (before={}, after a={}, b={})",
-            ratio_after,
-            ratio_before,
-            sigma_a_after,
-            sigma_b_after
+            "Post-condition: ratio should be ≈ 1, got {ratio_after} (before={ratio_before}, after a={sigma_a_after}, b={sigma_b_after})"
         );
     }
 
@@ -585,7 +577,7 @@ mod tests {
         gauge_rebalance(&mut a, &mut b, m, r, n, r, 1.0, &mut scratch);
         // All still zero.
         for v in a.iter().chain(b.iter()) {
-            assert!((*v).abs() < 1e-20, "Expected zero, got {}", v);
+            assert!((*v).abs() < 1e-20, "Expected zero, got {v}");
         }
     }
 
@@ -656,10 +648,7 @@ mod tests {
         let rel_err = (sigma_est - true_sigma).abs() / true_sigma;
         assert!(
             rel_err < 0.05,
-            "σ_max estimate {} vs true {} → rel err {} > 5%",
-            sigma_est,
-            true_sigma,
-            rel_err
+            "σ_max estimate {sigma_est} vs true {true_sigma} → rel err {rel_err} > 5%"
         );
     }
 
@@ -709,8 +698,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "Compose should match naive sum within ε, max diff = {}",
-            max_diff
+            "Compose should match naive sum within ε, max diff = {max_diff}"
         );
     }
 
@@ -739,8 +727,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "α=0 should match pair 1 only, max diff = {}",
-            max_diff
+            "α=0 should match pair 1 only, max diff = {max_diff}"
         );
 
         // α = 1 → only pair 2 contributes.
@@ -752,8 +739,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "α=1 should match pair 2 only, max diff = {}",
-            max_diff
+            "α=1 should match pair 2 only, max diff = {max_diff}"
         );
     }
 
@@ -830,8 +816,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "Gauge-equivalent inputs should give same merged W, max diff = {}",
-            max_diff
+            "Gauge-equivalent inputs should give same merged W, max diff = {max_diff}"
         );
     }
 
@@ -908,9 +893,7 @@ mod tests {
         let gauge_norm = fro_norm(&w_gauge);
         assert!(
             (gauge_norm - true_norm).abs() / true_norm < 0.05,
-            "Gauge-invariant should match true sum norm within 5%, got gauge={} vs true={}",
-            gauge_norm,
-            true_norm
+            "Gauge-invariant should match true sum norm within 5%, got gauge={gauge_norm} vs true={true_norm}"
         );
     }
 
@@ -936,8 +919,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-3,
-            "Small α rebalance should still preserve A·B^T, max diff = {}",
-            max_diff
+            "Small α rebalance should still preserve A·B^T, max diff = {max_diff}"
         );
     }
 }

@@ -184,15 +184,16 @@ mod tests {
         let top_k_groups: std::collections::HashSet<usize> =
             expected.iter().take(k).map(|(g, _)| *g).collect();
         for (g, &b) in out.iter().enumerate() {
-            match b.is_finite() {
-                true => assert!(
+            if b.is_finite() {
+                assert!(
                     top_k_groups.contains(&g),
                     "group {g} finite but not in top-{k}"
-                ),
-                false => assert!(
+                )
+            } else {
+                assert!(
                     !top_k_groups.contains(&g),
                     "group {g} pruned but in top-{k}"
-                ),
+                )
             }
         }
     }

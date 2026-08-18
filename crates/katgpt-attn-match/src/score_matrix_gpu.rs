@@ -54,7 +54,7 @@ impl std::fmt::Display for GpuDispatchError {
                 "AM score-matrix GPU shader not bundled in this build \
                  (T2.8 stub); caller should fall back to rayon"
             ),
-            Self::DispatchFailed(s) => write!(f, "GPU dispatch failed: {}", s),
+            Self::DispatchFailed(s) => write!(f, "GPU dispatch failed: {s}"),
         }
     }
 }
