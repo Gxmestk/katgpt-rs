@@ -136,9 +136,9 @@ fn median_ns(warmup: usize, iters: usize, mut f: impl FnMut()) -> u128 {
 fn fmt_ns(ns: u128) -> String {
     let us = ns as f64 / 1000.0;
     if us < 1.0 {
-        format!("{:.0} ns", ns)
+        format!("{ns:.0} ns")
     } else if us < 1000.0 {
-        format!("{:.2} µs", us)
+        format!("{us:.2} µs")
     } else {
         format!("{:.3} ms", us / 1000.0)
     }

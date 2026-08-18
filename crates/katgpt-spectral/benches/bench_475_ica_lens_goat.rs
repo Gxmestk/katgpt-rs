@@ -162,11 +162,11 @@ impl PassFail {
         }
     }
     fn pass(&mut self, msg: &str) {
-        println!("  ✅ PASS: {}", msg);
+        println!("  ✅ PASS: {msg}");
         self.passed += 1;
     }
     fn fail(&mut self, msg: &str) {
-        println!("  ❌ FAIL: {}", msg);
+        println!("  ❌ FAIL: {msg}");
         self.failed += 1;
     }
     fn check(&mut self, cond: bool, msg: &str) {
@@ -229,7 +229,7 @@ fn g1_latency(pf: &mut PassFail) {
     }
     let elapsed = start.elapsed();
     let per_call_us = elapsed.as_micros() as f64 / iters as f64;
-    println!("    T=512, D=8, m=8: {:.1} µs/call (target ≤ 1000 µs)", per_call_us);
+    println!("    T=512, D=8, m=8: {per_call_us:.1} µs/call (target ≤ 1000 µs)");
     pf.check(per_call_us <= 1000.0, "G1: T=512/D=8/m=8 ≤ 1000µs (offline corpus fit)");
 }
 
@@ -274,9 +274,9 @@ fn g2_quality_synthetic(pf: &mut PassFail) {
     let pca_mean_abs: f32 = pca_kurt.iter().map(|k| k.abs()).sum::<f32>() / m as f32;
     let ratio = ica_mean_abs / pca_mean_abs.max(1e-10);
 
-    println!("    ICA mean |kurtosis|: {:.4}", ica_mean_abs);
-    println!("    PCA mean |kurtosis|: {:.4}", pca_mean_abs);
-    println!("    Ratio (ICA/PCA):    {:.3}x (target ≥ 2.0x)", ratio);
+    println!("    ICA mean |kurtosis|: {ica_mean_abs:.4}");
+    println!("    PCA mean |kurtosis|: {pca_mean_abs:.4}");
+    println!("    Ratio (ICA/PCA):    {ratio:.3}x (target ≥ 2.0x)");
 
     pf.check(ratio >= 2.0, "G2(a): ICA/PCA kurtosis ratio ≥ 2.0x on synthetic Laplace+Uniform");
 }
@@ -321,10 +321,10 @@ fn g2_quality_high_dim(pf: &mut PassFail) {
     let pca_mean_abs: f32 = pca_kurt.iter().map(|k| k.abs()).sum::<f32>() / m as f32;
     let ratio = ica_mean_abs / pca_mean_abs.max(1e-10);
 
-    println!("    ICA status: {:?}, m_eff: {}", ica_result_status, ica_result_m_eff);
-    println!("    ICA mean |kurtosis|: {:.4}", ica_mean_abs);
-    println!("    PCA mean |kurtosis|: {:.4}", pca_mean_abs);
-    println!("    Ratio (ICA/PCA):    {:.3}x (target ≥ 1.5x)", ratio);
+    println!("    ICA status: {ica_result_status:?}, m_eff: {ica_result_m_eff}");
+    println!("    ICA mean |kurtosis|: {ica_mean_abs:.4}");
+    println!("    PCA mean |kurtosis|: {pca_mean_abs:.4}");
+    println!("    Ratio (ICA/PCA):    {ratio:.3}x (target ≥ 1.5x)");
 
     pf.check(ratio >= 1.5, "G2(b): ICA/PCA kurtosis ratio ≥ 1.5x on d=64 substrate");
 }
@@ -368,7 +368,7 @@ fn g4_alloc_free(pf: &mut PassFail) {
         &mut scores, &mut kurt, &mut lim,
     );
     let bytes = alloc_bytes();
-    println!("    Steady-state allocation: {} bytes (target 0)", bytes);
+    println!("    Steady-state allocation: {bytes} bytes (target 0)");
     pf.check(
         bytes == 0,
         "G4: 0 bytes allocated in steady state",
@@ -411,7 +411,7 @@ fn g5_determinism(pf: &mut PassFail) {
     let r1 = run_once();
     let r2 = run_once();
     let identical = r1 == r2;
-    println!("    Bit-identical across runs: {}", identical);
+    println!("    Bit-identical across runs: {identical}");
     pf.check(identical, "G5: reading_map bit-identical across two runs");
 }
 

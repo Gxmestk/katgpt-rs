@@ -127,8 +127,7 @@ fn main() {
                 });
 
                 println!(
-                    "{:>5} {:>5} {:>3} {:>9.2}us {:>9.2}us {:>12.4} {:>12.4}",
-                    n, m, k, qb_us, route_us, maxvio_pre, maxvio_post
+                    "{n:>5} {m:>5} {k:>3} {qb_us:>9.2}us {route_us:>9.2}us {maxvio_pre:>12.4} {maxvio_post:>12.4}"
                 );
             }
         }
@@ -145,7 +144,7 @@ fn main() {
     let t0 = Instant::now();
     let res = quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
     let dt = t0.elapsed();
-    println!("  β compute time = {:?}", dt);
+    println!("  β compute time = {dt:?}");
     println!("  converged_iter = {}", res.converged_iter);
     println!(
         "  MaxVio pre  (no bias)  = {:.4}",

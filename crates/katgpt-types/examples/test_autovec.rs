@@ -32,5 +32,5 @@ fn main() {
     let w: Vec<f16> = (0..1024).map(|i| f16::from_f32(i as f32 * 0.001)).collect();
     let x: Vec<f16> = (0..1024).map(|i| f16::from_f32((i as f32).sin())).collect();
     let result = unsafe { dot_f16_f16_autovec(w.as_ptr(), x.as_ptr(), 1024) };
-    println!("result = {}", result);
+    println!("result = {result}");
 }
