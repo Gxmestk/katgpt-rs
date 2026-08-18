@@ -73,9 +73,9 @@ impl HullHalf {
         let mut meta = HullMeta::new();
         meta.add(val, seq);
         if self.is_upper {
-            self.cht.add_line(kx, ky, meta)
+            self.cht.add_line(kx, ky, meta);
         } else {
-            self.cht.add_line(-kx, -ky, meta)
+            self.cht.add_line(-kx, -ky, meta);
         }
     }
 

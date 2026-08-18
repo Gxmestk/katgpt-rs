@@ -278,7 +278,7 @@ impl<P: ConstraintPruner> ConstraintPruner for IntervalPruner<P> {
             let intervals = valid_intervals_from_slice(&results[..len]);
             if let 0 | 1 = intervals.len() {
             } else {
-                close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold)
+                close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold);
             }
         }
     }

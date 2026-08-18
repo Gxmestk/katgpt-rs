@@ -125,10 +125,7 @@ fn sample_different_value(
     } else {
         // All mass was on original — sample uniformly from non-original tokens
         let fallback = (rng.next() as usize) % len;
-        match fallback == original_token && len > 1 {
-            true => (fallback + 1) % len,
-            false => fallback,
-        }
+        if fallback == original_token && len > 1 { (fallback + 1) % len } else { fallback }
     }
 }
 

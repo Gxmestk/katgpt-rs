@@ -559,9 +559,7 @@ impl BomberPlayer for GZeroPlayer {
             final_scores
                 .iter()
                 .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
-                .map(|(i, _)| ALL_ACTIONS[i])
-                .unwrap_or(BomberAction::Wait)
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal)).map_or(BomberAction::Wait, |(i, _)| ALL_ACTIONS[i])
         };
 
         // Track bomb placement (prevents walking back into own bomb)

@@ -153,7 +153,7 @@ pub fn speculative_step_rollback(
 
     if paths.is_empty() {
         let fallback = sample_from_distribution(
-            marginals.first().map(|m| m.as_slice()).unwrap_or(&[1.0]),
+            marginals.first().map_or(&[1.0], |m| m.as_slice()),
             rng,
         );
         #[cfg(feature = "stability_metrics")]

@@ -474,7 +474,7 @@ impl FrequencyBandit {
         let mut variances = [0.0; 3];
         for (i, &q) in self.arm_q_values.iter().enumerate() {
             if let 0 | 1 = self.arm_counts[i] {
-                variances[i] = 0.0
+                variances[i] = 0.0;
             } else {
                 let delta = q - q_mean;
                 variances[i] = delta * delta;
@@ -569,7 +569,7 @@ impl FreqTierAdapter {
     pub fn update_reward(&mut self, reward: f32) {
         let band = self.bandit.last_selected();
         if let Some(b) = band {
-            self.bandit.update(b, reward as f64)
+            self.bandit.update(b, reward as f64);
         }
     }
 }

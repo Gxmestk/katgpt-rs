@@ -279,9 +279,9 @@ mod tests {
         let guard = ParallelismGuard::new();
         let display = format!("{guard}");
         if guard.population_enabled() {
-            assert!(display.contains("population=enabled"))
+            assert!(display.contains("population=enabled"));
         } else {
-            assert!(display.contains("population=disabled"))
+            assert!(display.contains("population=disabled"));
         }
     }
 
@@ -291,9 +291,9 @@ mod tests {
     fn fallback_reason_none_when_population_enabled() {
         let guard = ParallelismGuard::new();
         if guard.population_enabled() {
-            assert!(guard.fallback_reason().is_none())
+            assert!(guard.fallback_reason().is_none());
         } else {
-            assert!(guard.fallback_reason().is_some())
+            assert!(guard.fallback_reason().is_some());
         }
     }
 
@@ -328,9 +328,9 @@ mod tests {
         let guard = ParallelismGuard::new();
         let strategy = select_strategy(&guard);
         if guard.population_enabled() {
-            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb)
+            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb);
         } else {
-            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb)
+            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb);
         }
     }
 

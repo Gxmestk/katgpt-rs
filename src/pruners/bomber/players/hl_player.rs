@@ -1000,9 +1000,7 @@ impl BomberPlayer for HLPlayer {
         // Pick best action
         let best = scores
             .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(a, _)| *a)
-            .unwrap_or(BomberAction::Wait);
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map_or(BomberAction::Wait, |(a, _)| *a);
 
         // Track own bomb placement (critical: prevents walking back into own bomb)
         if best == BomberAction::Bomb {

@@ -188,12 +188,12 @@ mod tests {
                 assert!(
                     top_k_groups.contains(&g),
                     "group {g} finite but not in top-{k}"
-                )
+                );
             } else {
                 assert!(
                     !top_k_groups.contains(&g),
                     "group {g} pruned but in top-{k}"
-                )
+                );
             }
         }
     }

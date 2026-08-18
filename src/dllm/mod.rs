@@ -1644,8 +1644,7 @@ pub fn train_mini_set_causal(
                 &mut fwd_ctx,
             );
             eprintln!(
-                "Epoch {:>4}/{}: train_nelbo={:.4} test_nelbo={:.4}",
-                epoch, n_epochs, avg_loss, test_nelbo,
+                "Epoch {epoch:>4}/{n_epochs}: train_nelbo={avg_loss:.4} test_nelbo={test_nelbo:.4}",
             );
         }
     }

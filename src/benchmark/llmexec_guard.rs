@@ -71,7 +71,7 @@ pub fn print_llmexec_guard_bench(iters: usize) {
     let overhead_ns = ns_guard - ns_noop;
 
     println!("═══ LLMExecGuard Benchmark ═══");
-    println!("Iterations:     {}", iters);
+    println!("Iterations:     {iters}");
     println!("ns/call (guard): {ns_guard:.2}");
     println!("ns/call (noop):  {ns_noop:.2}");
     println!("Overhead:        {overhead_ns:+.2} ns/call");

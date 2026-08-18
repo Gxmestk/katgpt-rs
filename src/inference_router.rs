@@ -330,31 +330,25 @@ impl InferenceRouter {
         // Trust-triggered tier adjustment (Plan 182)
         let tier_after_trust = if self.trust_signal < 0.4 && tier == ComputeTier::CpuOnly {
             // Low trust on CPU → tier up to GPU if available
-            match self.gpu.is_some() {
-                true => {
+            if self.gpu.is_some() {
                     log::info!(
                         "Router trust-triggered tier-up: trust={:.2}, CPU→CPU+GPU",
                         self.trust_signal
                     );
                     ComputeTier::CpuGpu
-                }
-                false => tier,
-            }
+                } else { tier }
         } else if self.trust_signal > 0.8 && tier == ComputeTier::CpuGpu {
             // High trust on GPU → allow tier down to CPU.
             // Snapshot gate config once to avoid repeated method calls.
             let cfg = self.gate.config();
             let low_load = self.gate.estimated_qps() < cfg.gpu_activate_qps * cfg.hysteresis_factor;
-            match low_load {
-                true => {
+            if low_load {
                     log::info!(
                         "Router trust-triggered tier-down: trust={:.2}, CPU+GPU→CPU",
                         self.trust_signal
                     );
                     ComputeTier::CpuOnly
-                }
-                false => tier,
-            }
+                } else { tier }
         } else {
             tier
         };
@@ -363,7 +357,7 @@ impl InferenceRouter {
         // Overrides trust/QPS routing when RV signal is available.
         #[cfg(feature = "rv_gated_routing")]
         let tier_after_rv = {
-            let rv_signal = self.rv_tracker.as_ref().map(|t| t.rv()).unwrap_or(-1.0);
+            let rv_signal = self.rv_tracker.as_ref().map_or(-1.0, |t| t.rv());
             match self.gate.rv_tier_boost(rv_signal, &self.rv_thresholds) {
                 Some(rv_tier) => {
                     if rv_tier != tier_after_trust {
@@ -510,7 +504,7 @@ impl InferenceRouter {
     #[cfg(feature = "rv_gated_routing")]
     #[inline]
     pub fn rv_signal(&self) -> f64 {
-        self.rv_tracker.as_ref().map(|t| t.rv()).unwrap_or(-1.0)
+        self.rv_tracker.as_ref().map_or(-1.0, |t| t.rv())
     }
 
     /// Reset the RV tracker (call at query boundaries).

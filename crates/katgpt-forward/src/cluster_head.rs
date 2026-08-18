@@ -287,7 +287,7 @@ pub fn clustered_lm_head_bounded(
                 .gathered
                 .par_iter()
                 .zip(scratch.dots.par_iter_mut())
-                .for_each(|(&t, d)| *d = row(t)) } else {
+                .for_each(|(&t, d)| *d = row(t)); } else {
                 for (&t, d) in scratch.gathered.iter().zip(scratch.dots.iter_mut()) {
                     *d = row(t);
                 }

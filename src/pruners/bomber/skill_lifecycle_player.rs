@@ -297,8 +297,7 @@ impl SkillLifecyclePlayer {
                 let descriptor = crate::pruners::skill_catalog::SkillDescriptor::new(
                     action_name,
                     format!(
-                        "Bomber arm {} (q={:.3}, visits={})",
-                        action_name, arm_q, visits
+                        "Bomber arm {action_name} (q={arm_q:.3}, visits={visits})"
                     ),
                     arm_idx,
                 );
@@ -403,12 +402,9 @@ impl SkillLifecyclePlayer {
         // allocations per tick to 8 (or 0 before episode FAILURE_RECENT_K).
         let need_trend = self.episode_count >= MEMORY_RECENT_K;
         let need_failure = self.episode_count >= FAILURE_RECENT_K;
-        let recent = match need_trend || need_failure {
-            true => self
+        let recent = if need_trend || need_failure { self
                 .memory
-                .recent(MEMORY_RECENT_K.max(FAILURE_RECENT_K)),
-            false => Vec::new(),
-        };
+                .recent(MEMORY_RECENT_K.max(FAILURE_RECENT_K)) } else { Vec::new() };
 
         // Memory trend bonus: compute slope of recent rewards for this arm
         let trend_bonus = if need_trend {
@@ -423,10 +419,7 @@ impl SkillLifecyclePlayer {
                 let mut first_sum = 0.0f32;
                 let mut second_sum = 0.0f32;
                 for (i, e) in matches.enumerate() {
-                    match i < mid {
-                        true => first_sum += e.reward,
-                        false => second_sum += e.reward,
-                    }
+                    if i < mid { first_sum += e.reward } else { second_sum += e.reward }
                 }
                 let first_half_mean: f32 = first_sum / mid as f32;
                 let second_half_mean: f32 = second_sum / (n - mid) as f32;

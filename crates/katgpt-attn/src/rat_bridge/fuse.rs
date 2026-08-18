@@ -139,7 +139,7 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
         // Allow: intentional uninit-then-fill to skip the memset.
         #[allow(clippy::uninit_vec)]
         unsafe {
-            weights.set_len(n_kv)
+            weights.set_len(n_kv);
         };
         for (i, k) in kv_keys_dilated.iter().enumerate() {
             let w = sigmoid(katgpt_core::simd::simd_dot_f32(k.as_ref(), query, dim));

@@ -583,7 +583,7 @@ impl PrunerTestGate for WasmTestGate {
         for tc in test_cases {
             let (ok, _verdict, reason) = self.sandbox_check(tc);
             if ok {
-                passed_count += 1
+                passed_count += 1;
             } else {
                 match reason {
                     Some(msg) => failures.push(msg),

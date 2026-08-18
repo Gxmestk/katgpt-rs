@@ -274,31 +274,31 @@ impl VortexFlow for VortexRouter {
     ) {
         match (self, cache) {
             (Self::BlockTopK(r), VortexRouterCache::BlockTopK(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::Entmax(r), VortexRouterCache::Entmax(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::ValueEnergy(r), VortexRouterCache::ValueEnergy(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::ChannelAware(r), VortexRouterCache::ChannelAware(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::Meta(r), VortexRouterCache::Meta(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             #[cfg(feature = "msa_sparse")]
             (Self::MsaMaxPool(r), VortexRouterCache::MsaMaxPool(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             #[cfg(feature = "msa_sparse")]
             (Self::MsaMaxStdDev(r), VortexRouterCache::MsaMaxStdDev(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             #[cfg(feature = "msa_per_group")]
             (Self::MsaPerGroup(r), VortexRouterCache::MsaPerGroup(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             _ => panic!("VortexRouter/Cache variant mismatch"),
         }

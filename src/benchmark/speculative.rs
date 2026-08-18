@@ -1175,8 +1175,7 @@ pub fn bench_dflash_ar_domino_vs_baseline(
     let dom_tps = total_steps_dom as f64 / elapsed_dom.as_secs_f64();
     let overhead_pct = (elapsed_dom.as_secs_f64() / elapsed_base.as_secs_f64() - 1.0) * 100.0;
     println!(
-        "  Domino LoRA overhead: {:.1}% ({:.0} vs {:.0} steps/s, rank={}, gru_hidden={})",
-        overhead_pct, dom_tps, base_tps, rank, gru_hidden,
+        "  Domino LoRA overhead: {overhead_pct:.1}% ({dom_tps:.0} vs {base_tps:.0} steps/s, rank={rank}, gru_hidden={gru_hidden})",
     );
 
     let dom_br = BenchResult {

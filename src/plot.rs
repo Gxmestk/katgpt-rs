@@ -310,10 +310,7 @@ pub fn plot_timeseries(
 
         let y_max = max_tp * 1.15;
 
-        let latest_features = cat_rows
-            .last()
-            .map(|r| r.features.as_str())
-            .unwrap_or("unknown");
+        let latest_features = cat_rows.last().map_or("unknown", |r| r.features.as_str());
 
         let title = format!("{cat} — Time Series [{latest_features}]");
         let mut chart = ChartBuilder::on(&root)
@@ -409,7 +406,7 @@ pub fn plot_feature_grouped(
     results: &[BenchResult],
     bench_dir: &str,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut written = Vec::new();
+    let mut written = Vec::with_capacity(FEATURE_DIMS.len());
 
     // ── Feature-dimension charts ──
     for feat_cat in &FEATURE_DIMS {

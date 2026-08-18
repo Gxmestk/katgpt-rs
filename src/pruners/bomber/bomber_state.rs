@@ -368,7 +368,7 @@ impl BomberState {
         // Phase 2: Apply effects using to_explode set.
         for &pos in &to_explode {
             let bomb = self.bombs.iter().find(|b| b.pos == pos);
-            let range = bomb.map(|b| b.range).unwrap_or(DEFAULT_BLAST_RANGE);
+            let range = bomb.map_or(DEFAULT_BLAST_RANGE, |b| b.range);
             let owner = bomb.map(|b| b.owner);
 
             // Decrement owner's active bomb count

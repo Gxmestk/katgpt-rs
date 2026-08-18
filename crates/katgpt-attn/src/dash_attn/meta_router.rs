@@ -81,13 +81,13 @@ impl DynPolicy {
     ) {
         match (self, cache) {
             (Self::BlockTopK(r), DynRoutingCache::BlockTopK(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::Entmax(r), DynRoutingCache::Entmax(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             (Self::ValueEnergy(r), DynRoutingCache::ValueEnergy(c)) => {
-                r.forward_cache(c, keys, values, block_idx, head_dim)
+                r.forward_cache(c, keys, values, block_idx, head_dim);
             }
             _ => panic!("DynPolicy/Cache variant mismatch in forward_cache"),
         }

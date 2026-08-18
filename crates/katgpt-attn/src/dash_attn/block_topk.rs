@@ -489,7 +489,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
                                 k,
                                 vals_arr[lane],
                                 pos + lane,
-                            )
+                            );
                         };
                     }
                 }
@@ -517,7 +517,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
                                 k,
                                 vals_arr[lane],
                                 pos + lane,
-                            )
+                            );
                         };
                     }
                 }

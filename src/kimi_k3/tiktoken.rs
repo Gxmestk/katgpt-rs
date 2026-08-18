@@ -97,9 +97,7 @@ pub fn load_tiktoken_bpe(data: &[u8]) -> Result<TiktokenRanks, TiktokenLoadError
         .collect();
 
     let format_a = lines
-        .first()
-        .map(|first_line| first_line.iter().any(|&b| b == b' ' || b == b'\t'))
-        .unwrap_or(true);
+        .first().is_none_or(|first_line| first_line.iter().any(|&b| b == b' ' || b == b'\t'));
 
     if format_a {
         // Format A: each line is "<base64> <rank>"
@@ -235,7 +233,7 @@ impl TiktokenTokenizer {
             .collect();
         entries.sort_by_key(|(_, rank)| *rank);
 
-        let mut token_to_id = HashMap::new();
+        let mut token_to_id = HashMap::with_capacity(entries.len());
         let mut id_to_token: Vec<Vec<u8>> = Vec::with_capacity(entries.len());
 
         // First pass: assign IDs to all single-byte tokens (length 1).

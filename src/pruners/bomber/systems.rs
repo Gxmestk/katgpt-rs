@@ -53,10 +53,7 @@ struct CellSet {
 impl CellSet {
     #[inline]
     fn index(x: i32, y: i32) -> Option<usize> {
-        match x >= 0 && y >= 0 && (x as usize) < ARENA_W && (y as usize) < ARENA_H {
-            true => Some(y as usize * ARENA_W + x as usize),
-            false => None,
-        }
+        if x >= 0 && y >= 0 && (x as usize) < ARENA_W && (y as usize) < ARENA_H { Some(y as usize * ARENA_W + x as usize) } else { None }
     }
 
     /// Insert `(x, y)`; returns `true` if it was not already present
@@ -71,13 +68,10 @@ impl CellSet {
                 *word |= mask;
                 fresh
             }
-            None => match self.oob.contains(&(x, y)) {
-                true => false,
-                false => {
+            None => if self.oob.contains(&(x, y)) { false } else {
                     self.oob.push((x, y));
                     true
-                }
-            },
+                },
         }
     }
 
@@ -644,7 +638,7 @@ fn place_bombs(world: &mut World, actions: [Option<BomberAction>; 4]) {
         if let Some(mut c) = world.get_mut::<BombCount>(owner) {
             c.active += 1;
         }
-        let pid = world.get::<Player>(owner).map(|p| p.id).unwrap_or(0);
+        let pid = world.get::<Player>(owner).map_or(0, |p| p.id);
         world.send_event(GameEvent::BombPlaced {
             player: pid,
             pos: (x, y),
@@ -709,17 +703,13 @@ fn collect_powerups(world: &mut World) {
             }
         }
         let pid = world
-            .get::<Player>(player_entity)
-            .map(|p| p.id)
-            .unwrap_or(0);
+            .get::<Player>(player_entity).map_or(0, |p| p.id);
 
         // Only first player to reach this entity emits event and despawns
         if !collected_entities.contains(&pu_entity) {
             collected_entities.push(pu_entity);
             let pu_pos = world
-                .get::<GridPos>(pu_entity)
-                .map(|g| (g.x, g.y))
-                .unwrap_or((0, 0));
+                .get::<GridPos>(pu_entity).map_or((0, 0), |g| (g.x, g.y));
             world.send_event(GameEvent::PowerUpCollected {
                 player: pid,
                 kind,

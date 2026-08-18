@@ -843,10 +843,7 @@ fn simulate_cascade(
     let tier_after_trust = ComputeTier::CpuOnly;
 
     // RV gate (Plan 202).
-    let tier_after_rv = match gate.rv_tier_boost(rv, rv_thresholds) {
-        Some(rv_tier) => rv_tier,
-        None => tier_after_trust,
-    };
+    let tier_after_rv = gate.rv_tier_boost(rv, rv_thresholds).unwrap_or(tier_after_trust);
 
     // Critical-interval gate skipped (orthogonal — entropy-driven).
     let tier_after_critical = tier_after_rv;
@@ -966,35 +963,26 @@ fn g4_tvp_plus_rv_strictly_dominates_either_alone() {
     // Cascade is a superset: catches everything either signal catches.
     assert!(
         correct_cascade >= correct_rv_only,
-        "Cascade ({}) must be ≥ RV-only ({})",
-        correct_cascade,
-        correct_rv_only
+        "Cascade ({correct_cascade}) must be ≥ RV-only ({correct_rv_only})"
     );
     assert!(
         correct_cascade >= correct_tvp_only,
-        "Cascade ({}) must be ≥ TVP-only ({})",
-        correct_cascade,
-        correct_tvp_only
+        "Cascade ({correct_cascade}) must be ≥ TVP-only ({correct_tvp_only})"
     );
     // Strict dominance: the cascade must catch at least one case each
     // signal alone misses. (Class A and Class B above.)
     assert!(
         correct_cascade > correct_rv_only,
-        "G4 FAIL: cascade ({}) is not strictly > RV-only ({}) — TVP is redundant",
-        correct_cascade,
-        correct_rv_only
+        "G4 FAIL: cascade ({correct_cascade}) is not strictly > RV-only ({correct_rv_only}) — TVP is redundant"
     );
     assert!(
         correct_cascade > correct_tvp_only,
-        "G4 FAIL: cascade ({}) is not strictly > TVP-only ({}) — RV is redundant",
-        correct_cascade,
-        correct_tvp_only
+        "G4 FAIL: cascade ({correct_cascade}) is not strictly > TVP-only ({correct_tvp_only}) — RV is redundant"
     );
     // Sanity: cascade should catch all hard queries and skip all easy ones.
     assert_eq!(
         correct_cascade, n,
-        "Cascade should be perfect on this synthetic set, got {}/{}",
-        correct_cascade, n
+        "Cascade should be perfect on this synthetic set, got {correct_cascade}/{n}"
     );
     // Sanity: each signal alone misses at least one query.
     assert!(

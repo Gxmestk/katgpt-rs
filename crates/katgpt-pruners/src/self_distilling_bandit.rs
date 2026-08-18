@@ -199,7 +199,7 @@ impl DomainQTable {
         self.domains
             .iter()
             .filter(|d| {
-                d.as_ref().map_or(false, |s| {
+                d.as_ref().is_some_and(|s| {
                     u64::from(s.total_pulls()) >= self.min_domain_samples as u64
                 })
             })

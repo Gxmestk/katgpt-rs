@@ -256,7 +256,7 @@ impl AdaptiveTraceCompactor {
     /// No-op if the bandit has not yet selected an arm this trace.
     pub fn update_reward(&mut self, reward: f32) {
         if let Some(band) = self.bandit.last_selected() {
-            self.bandit.update(band, reward as f64)
+            self.bandit.update(band, reward as f64);
         }
     }
 
@@ -572,9 +572,7 @@ mod tests {
         let (low1, high1) = c.thresholds();
         assert!(
             low1 < low0,
-            "theta_low should have dropped after 5 Low adjustments: {} -> {}",
-            low0,
-            low1
+            "theta_low should have dropped after 5 Low adjustments: {low0} -> {low1}"
         );
         // theta_high is never touched by the bandit.
         assert!((high1 - high0).abs() < 1e-6);
@@ -587,9 +585,7 @@ mod tests {
         let low_after_high = c.thresholds().0;
         assert!(
             low_after_high > low_before_high,
-            "theta_low should rise after 3 High adjustments: {} -> {}",
-            low_before_high,
-            low_after_high
+            "theta_low should rise after 3 High adjustments: {low_before_high} -> {low_after_high}"
         );
     }
 

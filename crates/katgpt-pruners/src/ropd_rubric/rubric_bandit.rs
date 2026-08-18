@@ -251,7 +251,7 @@ impl<P: ScreeningPruner> RubricBanditPruner<P> {
         });
 
         if let Some(reference) = best_ref {
-            self.observe_rubric(arm, student_rubric, reference)
+            self.observe_rubric(arm, student_rubric, reference);
         } else {
             // No references — store observation but don't update bandit
             if let Some(history) = self.rubric_history.get_mut(arm) {

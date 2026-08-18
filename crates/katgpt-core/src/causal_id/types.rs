@@ -234,7 +234,7 @@ impl AdmgSignature {
         let mut heap: Option<Vec<NodeId>> = None;
         for n in iter {
             if let Some(h) = &mut heap {
-                h.push(n)
+                h.push(n);
             } else if inline.is_full() {
                 let mut h = Vec::with_capacity(inline.len() + 1);
                 h.extend(inline.drain(..));

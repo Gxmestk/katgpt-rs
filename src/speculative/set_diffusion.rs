@@ -238,38 +238,32 @@ mod tests {
         assert_eq!(result.tokens.len(), 8);
         let t = &result.tokens;
         // Prompt preserved.
-        assert_eq!(&t[..2], prompt, "prompt must be preserved: {:?}", t);
+        assert_eq!(&t[..2], prompt, "prompt must be preserved: {t:?}");
         // Decode region inherits the prompt's alternating structure.
         // Expected: [5, 2, 5, 2, 5, 2, 5, 2].
         assert_eq!(
             t[2], prompt[0],
-            "position 2 must match prompt[0] (alternating): {:?}",
-            t
+            "position 2 must match prompt[0] (alternating): {t:?}"
         );
         assert_eq!(
             t[3], prompt[1],
-            "position 3 must match prompt[1] (alternating): {:?}",
-            t
+            "position 3 must match prompt[1] (alternating): {t:?}"
         );
         assert_eq!(
             t[4], prompt[0],
-            "position 4 must match prompt[0] (alternating): {:?}",
-            t
+            "position 4 must match prompt[0] (alternating): {t:?}"
         );
         assert_eq!(
             t[5], prompt[1],
-            "position 5 must match prompt[1] (alternating): {:?}",
-            t
+            "position 5 must match prompt[1] (alternating): {t:?}"
         );
         assert_eq!(
             t[6], prompt[0],
-            "position 6 must match prompt[0] (alternating): {:?}",
-            t
+            "position 6 must match prompt[0] (alternating): {t:?}"
         );
         assert_eq!(
             t[7], prompt[1],
-            "position 7 must match prompt[1] (alternating): {:?}",
-            t
+            "position 7 must match prompt[1] (alternating): {t:?}"
         );
     }
 
@@ -395,12 +389,10 @@ mod tests {
         // positions are masked.
         assert!(
             sc_nelbo < bidir_nelbo,
-            "GOAT gate FAILED: set-causal model ({:.4}) must beat bidirectional model ({:.4}) \
+            "GOAT gate FAILED: set-causal model ({sc_nelbo:.4}) must beat bidirectional model ({bidir_nelbo:.4}) \
              when evaluated under SW-SetDLM schedule (w=0.5). \
              This means the set-diffusion decoder requires a set-causal-trained model \
              to provide a gain — the substrate alone is not enough.",
-            sc_nelbo,
-            bidir_nelbo,
         );
     }
 

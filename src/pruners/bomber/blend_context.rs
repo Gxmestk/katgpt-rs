@@ -59,9 +59,7 @@ pub fn compute_phi(
     let blast_proximity = sigmoid(-(min_bomb_dist - 3.0));
 
     // 3. opponent_pressure — sigmoid of -(Manhattan dist to nearest opponent - 5).
-    let opp_dist = nearest_opponent
-        .map(|(ox, oy)| (pos.x - ox).abs() + (pos.y - oy).abs())
-        .unwrap_or(30) as f32;
+    let opp_dist = nearest_opponent.map_or(30, |(ox, oy)| (pos.x - ox).abs() + (pos.y - oy).abs()) as f32;
     let opponent_pressure = sigmoid(-(opp_dist - 5.0));
 
     // 4. wall_density_3x3 — count of Fixed/Destructible walls / 9.

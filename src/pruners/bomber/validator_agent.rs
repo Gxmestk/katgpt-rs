@@ -171,12 +171,9 @@ fn is_in_blast_range(pos: GridPos, grid: &ArenaGrid, bomb_pos: (i32, i32), range
             let step = dx.signum();
             let mut x = bx + step;
             while x != pos.x {
-                match grid.get(x, by) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) = grid.get(x, by) {
                         return false;
                     }
-                    _ => {}
-                }
                 x += step;
             }
             return true;
@@ -190,12 +187,9 @@ fn is_in_blast_range(pos: GridPos, grid: &ArenaGrid, bomb_pos: (i32, i32), range
             let step = dy.signum();
             let mut y = by + step;
             while y != pos.y {
-                match grid.get(bx, y) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) = grid.get(bx, y) {
                         return false;
                     }
-                    _ => {}
-                }
                 y += step;
             }
             return true;

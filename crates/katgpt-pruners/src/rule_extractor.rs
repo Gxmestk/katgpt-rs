@@ -274,7 +274,7 @@ fn hamming_distance(a: &[(usize, usize)], b: &[(usize, usize)]) -> usize {
     for k in 0..min_len {
         if a[k] == b[k] {
         } else {
-            dist += 1
+            dist += 1;
         }
     }
 
