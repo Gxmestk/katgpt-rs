@@ -472,7 +472,7 @@ fn main() {
     println!("  median time:     {}/solve", fmt_us(t_bt));
     let bt_us = t_bt.as_nanos() as f64 / 1000.0;
     let bt_per_step_us = bt_us / s_bt.steps.max(1) as f64;
-    println!("  per-step:        {:.2} µs", bt_per_step_us);
+    println!("  per-step:        {bt_per_step_us:.2} µs");
     println!();
 
     // ── Mode 4: solve_fast (MRV + constraint propagation) ──
@@ -490,7 +490,7 @@ fn main() {
     println!("  median time:     {}/solve", fmt_us(t_fast));
     let fast_us = t_fast.as_nanos() as f64 / 1000.0;
     let fast_per_step_us = fast_us / s_fast.steps.max(1) as f64;
-    println!("  per-step:        {:.2} µs", fast_per_step_us);
+    println!("  per-step:        {fast_per_step_us:.2} µs");
     let speedup = bt_us / fast_us.max(1e-9);
     let step_reduction = s_bt.steps as f64 / s_fast.steps.max(1) as f64;
     println!(

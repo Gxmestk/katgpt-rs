@@ -179,13 +179,12 @@ fn gate_g1_latency_tracker() -> (f64, bool) {
     let mops = 1e3 / med;
     let pass = med <= 2000.0;
     println!(
-        "  median = {:.1} ns/tick  ({:.2} M ticks/s)  [T={}, D={}, k={}, iters={}, path=tracker]",
-        med, mops, T_LATENCY, D, K_LATENCY, ITERS
+        "  median = {med:.1} ns/tick  ({mops:.2} M ticks/s)  [T={T_LATENCY}, D={D}, k={K_LATENCY}, iters={ITERS}, path=tracker]"
     );
     if pass {
         println!("  ✅ G1 PASS (tracker)");
     } else {
-        println!("  ❌ G1 FAIL ({:.1} ns > 2000 ns budget)", med);
+        println!("  ❌ G1 FAIL ({med:.1} ns > 2000 ns budget)");
     }
     (med, pass)
 }
@@ -267,7 +266,7 @@ fn latency_of(with_provenance: bool) -> (f64, bool) {
         println!("  ✅ G1 PASS");
         (med, true)
     } else {
-        println!("  ❌ G1 FAIL ({:.1} ns > 2000 ns budget)", med);
+        println!("  ❌ G1 FAIL ({med:.1} ns > 2000 ns budget)");
         (med, false)
     }
 }
@@ -344,18 +343,18 @@ fn gate_g3_quality() -> (f64, bool) {
     let ratio = energy_ratio(&eigvals, total);
     let recon_err = (1.0_f32 - ratio) as f64;
     let pass = recon_err < 0.10;
-    println!("  total energy (trace)  = {:.4}", total);
+    println!("  total energy (trace)  = {total:.4}");
     println!(
         "  top-{} energy captured = {:.4} ({:.2}%)",
         k,
         ratio,
         ratio * 100.0
     );
-    println!("  reconstruction error  = {:.4}", recon_err);
+    println!("  reconstruction error  = {recon_err:.4}");
     if pass {
-        println!("  ✅ G3 PASS (error {:.4} < 0.10)", recon_err);
+        println!("  ✅ G3 PASS (error {recon_err:.4} < 0.10)");
     } else {
-        println!("  ❌ G3 FAIL (error {:.4} ≥ 0.10)", recon_err);
+        println!("  ❌ G3 FAIL (error {recon_err:.4} ≥ 0.10)");
     }
     (recon_err, pass)
 }
@@ -448,7 +447,7 @@ fn gate_g4_divergence() -> (f64, bool) {
         frac_separated,
         frac_separated * 100.0
     );
-    println!("  mean |cos|           = {:.4}", mean_cos);
+    println!("  mean |cos|           = {mean_cos:.4}");
     if pass {
         println!("  ✅ G4 PASS ({:.1}% > 50%)", frac_separated * 100.0);
     } else {
@@ -469,7 +468,7 @@ fn gate_g5_memory() -> (usize, bool) {
     let pass = per_npc_bytes <= 256;
     println!("  eigvecs: {} × {} × 4 = {} bytes", D, k, D * k * 4);
     println!("  eigvals: {} × 4 = {} bytes", k, k * 4);
-    println!("  per-NPC total       = {} bytes", per_npc_bytes);
+    println!("  per-NPC total       = {per_npc_bytes} bytes");
     println!(
         "  (shared scratch: {} bytes, amortized across all NPCs)",
         (D * D + 2 * D) * std::mem::size_of::<f32>()
@@ -487,10 +486,7 @@ fn gate_g5_memory() -> (usize, bool) {
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Issue 001 — HLA Windowed Eigenbasis Recovery GOAT gate     ║");
-    println!(
-        "║  D={}, plasma-tier operating point                          ║",
-        D
-    );
+    println!("║  D={D}, plasma-tier operating point                          ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
 
     let (ns_fast, g1_fast) = gate_g1_latency_fast();
@@ -512,10 +508,7 @@ fn main() {
         verdict(g1_fast),
         ns_fast
     );
-    println!(
-        "  G1 Latency (full cold):    {:.1} ns (freeze/thaw, no budget)",
-        ns_full
-    );
+    println!("  G1 Latency (full cold):    {ns_full:.1} ns (freeze/thaw, no budget)");
     println!(
         "  G2 Determinism         : {} (same-machine; cross-platform via tests/)",
         verdict(g2)

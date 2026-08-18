@@ -216,16 +216,13 @@ struct G2Row {
 fn run_g2() -> (Vec<G2Row>, bool) {
     println!("┌─ G2 — Crowd-NPC compute savings (T2.4) ─────────────────────────┐");
     println!(
-        "│ Regime: geometric step_size decay, crowd-tier cost_floor={:.2}    │",
-        CROWD_COST_FLOOR
+        "│ Regime: geometric step_size decay, crowd-tier cost_floor={CROWD_COST_FLOOR:.2}    │"
     );
     println!(
-        "│ Halter: tau={}, patience={}, l_min={}                              │",
-        TAU, OSCILLATION_PATIENCE, L_MIN
+        "│ Halter: tau={TAU}, patience={OSCILLATION_PATIENCE}, l_min={L_MIN}                              │"
     );
     println!(
-        "│ Target: ≥75% loops saved vs L_max={}                              │",
-        L_MAX
+        "│ Target: ≥75% loops saved vs L_max={L_MAX}                              │"
     );
     println!();
 
@@ -281,7 +278,7 @@ fn run_g2() -> (Vec<G2Row>, bool) {
     let any_pass = rows.iter().any(|r| r.pass);
     let aggregate_pass = mean_savings >= 75.0 && any_pass;
 
-    println!("│ Mean savings across decay rates: {:.1}%", mean_savings);
+    println!("│ Mean savings across decay rates: {mean_savings:.1}%");
     println!(
         "│ Per-row pass: {}/{} | Aggregate (mean≥75% ∧ any≥75%): {}",
         rows.iter().filter(|r| r.pass).count(),
@@ -292,14 +289,12 @@ fn run_g2() -> (Vec<G2Row>, bool) {
     if aggregate_pass {
         println!("│");
         println!(
-            "│ G2 PASS: crowd-NPC regime saves {:.1}% on average (target ≥75%) ✓",
-            mean_savings
+            "│ G2 PASS: crowd-NPC regime saves {mean_savings:.1}% on average (target ≥75%) ✓"
         );
     } else {
         println!("│");
         println!(
-            "│ G2 FAIL: crowd-NPC regime saves only {:.1}% on average (target ≥75%) ✗",
-            mean_savings
+            "│ G2 FAIL: crowd-NPC regime saves only {mean_savings:.1}% on average (target ≥75%) ✗"
         );
         println!("│   → Fix: raise cost_floor (more aggressive halt) or lower tau.");
         let all_rows_pass = rows.iter().all(|r| r.pass);
@@ -334,16 +329,13 @@ fn run_g3() -> G3Result {
     println!("┌─ G3 — No-regression on important-NPC regime (T2.5) ──────────────┐");
     println!("│ Regime: slow decay (×0.95/loop), cos_theta=+1.0 (non-oscillatory) │");
     println!(
-        "│ Cost floor: {} (cheap drift — important tier refines long)        │",
-        IMPORTANT_COST_FLOOR
+        "│ Cost floor: {IMPORTANT_COST_FLOOR} (cheap drift — important tier refines long)        │"
     );
     println!(
-        "│ Halter: tau={}, patience={}, l_min={}                              │",
-        TAU, OSCILLATION_PATIENCE, L_MIN
+        "│ Halter: tau={TAU}, patience={OSCILLATION_PATIENCE}, l_min={L_MIN}                              │"
     );
     println!(
-        "│ Pass: waste ≤ 1 loop vs L_max={} AND no spurious halt              │",
-        L_MAX
+        "│ Pass: waste ≤ 1 loop vs L_max={L_MAX} AND no spurious halt              │"
     );
     println!();
 
@@ -358,15 +350,14 @@ fn run_g3() -> G3Result {
     let waste = L_MAX.saturating_sub(loops_used);
 
     println!(
-        "  Important-NPC trace: loops_used={}/{} (waste={})",
-        loops_used, L_MAX, waste
+        "  Important-NPC trace: loops_used={loops_used}/{L_MAX} (waste={waste})"
     );
     let reason_str = match outcome.halt_reason {
         Some(HaltReason::GainBelowCost) => "GainBelowCost",
         Some(HaltReason::Oscillation) => "Oscillation",
         None => "(ran to L_max — correct)",
     };
-    println!("  Halt reason: {}", reason_str);
+    println!("  Halt reason: {reason_str}");
 
     let spurious_gain_below_cost = matches!(outcome.halt_reason, Some(HaltReason::GainBelowCost));
     let spurious_oscillation = matches!(outcome.halt_reason, Some(HaltReason::Oscillation));
@@ -392,13 +383,11 @@ fn run_g3() -> G3Result {
     let pass = waste <= 1 && !spurious_gain_below_cost && !spurious_oscillation && contract_pass;
     if pass {
         println!(
-            "│ G3 PASS: important-NPC used {}/{} loops (waste={} ≤ 1), no spurious halt ✓",
-            loops_used, L_MAX, waste
+            "│ G3 PASS: important-NPC used {loops_used}/{L_MAX} loops (waste={waste} ≤ 1), no spurious halt ✓"
         );
     } else {
         println!(
-            "│ G3 FAIL: important-NPC used {}/{} loops (waste={} > 1) or spurious halt ✗",
-            loops_used, L_MAX, waste
+            "│ G3 FAIL: important-NPC used {loops_used}/{L_MAX} loops (waste={waste} > 1) or spurious halt ✗"
         );
         if spurious_gain_below_cost {
             println!("│   → Spurious GainBelowCost: cost floor too high for important tier.");
@@ -543,16 +532,14 @@ fn run_g4() -> G4Result {
                 HaltReason::GainBelowCost => "GainBelowCost",
             };
             println!(
-                "  GainCostLoopHalter: HALTED at loop {} ({}) — cos_theta was {:.3}",
-                tau, reason_str, cos_theta
+                "  GainCostLoopHalter: HALTED at loop {tau} ({reason_str}) — cos_theta was {cos_theta:.3}"
             );
             break;
         }
     }
     if halter_halt_loop.is_none() {
         println!(
-            "  GainCostLoopHalter: ran all {} loops without halting",
-            L_MAX
+            "  GainCostLoopHalter: ran all {L_MAX} loops without halting"
         );
     }
 
@@ -569,12 +556,10 @@ fn run_g4() -> G4Result {
         run_g4_pathway(&branches, loops_for_pathway);
     let (pathway_stability_full, pathway_converged_full) = run_g4_pathway(&branches, L_MAX);
     println!(
-        "  PathwayTracker ({} loops, parallel to halter): stability = {:.3}, is_converged(0.8) = {}",
-        loops_for_pathway, pathway_stability_2loop, pathway_converged_2loop
+        "  PathwayTracker ({loops_for_pathway} loops, parallel to halter): stability = {pathway_stability_2loop:.3}, is_converged(0.8) = {pathway_converged_2loop}"
     );
     println!(
-        "  PathwayTracker (full {} loops, if halter hadn't fired): stability = {:.3}, is_converged(0.8) = {}",
-        L_MAX, pathway_stability_full, pathway_converged_full
+        "  PathwayTracker (full {L_MAX} loops, if halter hadn't fired): stability = {pathway_stability_full:.3}, is_converged(0.8) = {pathway_converged_full}"
     );
     println!("    (constant branch input → PathwayTracker's stability signal stays high (≥0.8)");
     println!("     even after many oscillatory loops — it cannot detect the activation reversal)");
@@ -595,25 +580,21 @@ fn run_g4() -> G4Result {
     if pass {
         println!("│ G4 PASS: gain/cost halter caught oscillation at L=2 (cos θ = −1.0);");
         println!(
-            "│          PathwayTracker (stability-only) reported stability={:.3}",
-            pathway_stability_full
+            "│          PathwayTracker (stability-only) reported stability={pathway_stability_full:.3}"
         );
         println!(
-            "│          after {} oscillatory loops — structurally blind to activation reversal ✓",
-            L_MAX
+            "│          after {L_MAX} oscillatory loops — structurally blind to activation reversal ✓"
         );
     } else {
         println!("│ G4 FAIL:");
         if !halter_caught {
             println!(
-                "│   → GainCostLoopHalter did not halt at L=2 (got {:?})",
-                halter_halt_loop
+                "│   → GainCostLoopHalter did not halt at L=2 (got {halter_halt_loop:?})"
             );
         }
         if !pathway_missed {
             println!(
-                "│   → PathwayTracker full-run stability={:.3} (< 0.8) — controls mismatch",
-                pathway_stability_full
+                "│   → PathwayTracker full-run stability={pathway_stability_full:.3} (< 0.8) — controls mismatch"
             );
         }
     }
@@ -663,8 +644,7 @@ fn run_latency_sanity() {
     });
     let per_loop = ns / L_MAX as f64;
     println!(
-        "│ Full 10-loop trace: {:.1} ns ({:.2} ns/loop, harness-incl.)",
-        ns, per_loop
+        "│ Full 10-loop trace: {ns:.1} ns ({per_loop:.2} ns/loop, harness-incl.)"
     );
     println!("│ Note: includes Vec allocs in the harness, NOT kernel-only cost.");
     println!("│       Kernel `halt_decision` is ~5 float ops; real cost is in");
@@ -685,8 +665,7 @@ fn main() {
     println!();
     println!("Synthetic kernel-only harness. No `forward_looped`, no weights.");
     println!(
-        "L_max reference = {}. Halter defaults: tau={}, patience={}, l_min={}.",
-        L_MAX, TAU, OSCILLATION_PATIENCE, L_MIN
+        "L_max reference = {L_MAX}. Halter defaults: tau={TAU}, patience={OSCILLATION_PATIENCE}, l_min={L_MIN}."
     );
     println!();
 
