@@ -68,6 +68,19 @@ pub mod linking_fold;
 pub mod best_belief;
 #[cfg(feature = "best_belief")]
 pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief};
+// entropic_tilt — KL-budgeted max-seeking advantage tilt (TTT-Discover
+// arXiv:2601.16175; prior art RS-GRPO / RSPO). The max-seeking counterpart to
+// `best_belief` above: that scores a candidate from its OWN history counts,
+// this scores it from the SHAPE of the current group. Shared math with exactly
+// two consumers — riir-clippy `selection_entropic` (Issue 026, ranking) and
+// riir-train `loss_grpo` (Plan 341, gradient scaling) — hoisted here rather
+// than forked. Opt-in pending the Plan 341 Phase 2/3 GOAT.
+#[cfg(feature = "entropic_tilt")]
+pub mod entropic_tilt;
+#[cfg(feature = "entropic_tilt")]
+pub use entropic_tilt::{
+    KL_BUDGET_LN2, solve_beta, tilt_advantages_into, tilt_advantages_loo_into, tilted_weights,
+};
 // Conformal Predictive Intervals — modelless UQ overlay (Plan 340, Research
 // 322, arXiv:2605.03789 CSP + arXiv:2606.09473 "Report the Floor"). Wraps any
 // PointForecaster with a per-channel × per-horizon-bucket exp-recency-
