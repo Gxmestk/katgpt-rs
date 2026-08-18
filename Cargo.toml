@@ -2743,3 +2743,34 @@ codegen-units = 1
 [profile.bench]
 lto = "fat"
 codegen-units = 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Build profiles — dev debuginfo budget (riir-ai .issues/723 Phase 1)
+# ─────────────────────────────────────────────────────────────────────────────
+# macOS defaults to `split-debuginfo = "unpacked"`, so DWARF lands in the
+# per-CGU `.o` files under target/debug/deps — measured at 23.39 GB across
+# 143,294 files in riir-ai alone. Two dev-only levers, measured on a clean
+# `cargo build -p katgpt-core --lib` (57 packages):
+#
+#   stock                                   376.4 MB total / 80.6 MB .o / 16s
+#   dev.debug = "line-tables-only"          333.4 MB / 51.8 MB / 11s
+#   dev.package."*".debug = false           363.5 MB / 73.5 MB / 14s
+#   both (adopted here)                     324.9 MB / 47.1 MB / 10s
+#                                           => -13.7% total, -41.6% .o bytes
+#
+# Counterintuitive result, reproduced twice: setting package."*".debug to
+# "line-tables-only" instead of `false` measures WORSE than either lever alone
+# (366.1 MB / 75.8 MB). Re-measure before "improving" it that way.
+#
+# `release` and `bench` already default to debug = false (verified: the release
+# binary has an empty .debug_info), so they need no entry here.
+#
+# Tradeoff: dependencies — including sibling path deps such as katgpt-core when
+# built from riir-ai — carry no debuginfo, so backtraces through them lose
+# file:line. Delete the package."*" block for a debugger session that needs it.
+# `line-tables-only` keeps file:line for first-party code but drops locals.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
