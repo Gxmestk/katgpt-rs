@@ -129,6 +129,15 @@ pub struct TokenSavedActivations {
     /// Logits. `[vocab_size]`.
     pub logits: Vec<f32>,
     pub pos: usize,
+    /// True when this position's input hidden state was supplied by the caller
+    /// (`kimi_k3_forward_token_hidden_saved`) rather than looked up from the
+    /// embedding table.
+    ///
+    /// Plan 340: `token_id` is repurposed as an iteration index for such
+    /// positions, so the embedding backward MUST NOT use it as a row index —
+    /// doing so scatters the position's input gradient onto an unrelated
+    /// embedding row. See `kimi_k3_backward_sequence_with_input_grad`.
+    pub is_latent: bool,
 }
 
 impl TokenSavedActivations {
@@ -145,6 +154,7 @@ impl TokenSavedActivations {
             final_norm_inv_rms: 0.0,
             logits: Vec::new(),
             pos: 0,
+            is_latent: false,
         }
     }
 }
@@ -271,6 +281,7 @@ pub fn kimi_k3_forward_token_saved(
     saved.layers.clear();
     saved.pos = pos;
     saved.token_id = token_id;
+    saved.is_latent = false;
 
     // Embedding lookup
     let embed_start = (token_id as usize) * d;
@@ -398,6 +409,10 @@ pub fn kimi_k3_forward_token_hidden_saved(
     // token_id is meaningless for hidden-input iterations; store the iteration
     // index so downstream consumers can distinguish saved-activation sets.
     saved.token_id = iteration as u32;
+    // The input hidden state came from the caller, so `token_id` above is an
+    // iteration index and is NOT a valid embedding row. The embedding backward
+    // keys off this flag rather than the id.
+    saved.is_latent = true;
 
     // Step 1 (embedding) is SKIPPED — runtime.hidden is whatever the caller
     // set (the previous iteration's final hidden state, post-LM-head-pre-norm).
@@ -674,6 +689,39 @@ pub fn kimi_k3_backward_sequence(
     saved_tokens: &[TokenSavedActivations],
     d_logits: &[Vec<f32>],
     grads: &mut KimiK3ModelGradients,
+) {
+    kimi_k3_backward_sequence_with_input_grad(
+        config, weights, runtime, saved_tokens, d_logits, grads, None,
+    );
+}
+
+/// [`kimi_k3_backward_sequence`], additionally returning dL/d(input hidden).
+///
+/// `d_input_hidden`, when supplied, must have one `[d]`-wide slot per saved token
+/// and receives `d_prefix[t]` — the gradient at the decoder stack's *input*. Two
+/// consumers need it:
+///
+/// - **Prefix/latent tuning (Plan 340 LOPD):** the composer's parameters live
+///   upstream of the model, so its only gradient path is through the injected
+///   hidden state. Without this out-parameter a composer receives nothing.
+/// - **Looped training (Plan 324 Ouro):** iteration `k`'s input gradient is
+///   iteration `k+1`'s output gradient.
+///
+/// **Embedding scatter contract.** For a position with `is_latent == false` the
+/// gradient is accumulated into `grads.embed_weight[token_id * d ..]` as before.
+/// For `is_latent == true` that scatter is **skipped**: such a position's
+/// `token_id` is an iteration index, not an embedding row, so scattering there
+/// would corrupt an unrelated row of a table the caller believes is frozen —
+/// silently, since nothing about it is ill-formed. The gradient is delivered via
+/// `d_input_hidden` instead, which is the only correct destination for it.
+pub fn kimi_k3_backward_sequence_with_input_grad(
+    config: &KimiK3ModelConfig,
+    weights: &KimiK3ModelWeights,
+    runtime: &KimiK3Runtime,
+    saved_tokens: &[TokenSavedActivations],
+    d_logits: &[Vec<f32>],
+    grads: &mut KimiK3ModelGradients,
+    mut d_input_hidden: Option<&mut [Vec<f32>]>,
 ) {
     let d = config.hidden_size;
     let v = config.vocab_size;
@@ -958,8 +1006,23 @@ pub fn kimi_k3_backward_sequence(
     }
 
     // ── Step 3: Embedding backward ──
-    // d_prefix[t] = dL/d(embedding for token t)
+    // d_prefix[t] = dL/d(input hidden at the decoder stack's entry). For a token
+    // position that IS dL/d(embedding row token_id); for a latent position it is
+    // the gradient the caller must receive, and there is no embedding row to
+    // credit.
     for t in 0..l {
+        if let Some(out) = d_input_hidden.as_mut() {
+            if let Some(slot) = out.get_mut(t) {
+                slot.clear();
+                slot.extend_from_slice(&d_prefix[t][..d]);
+            }
+        }
+        if saved_tokens[t].is_latent {
+            // Skip the scatter: `token_id` is an iteration index here. Writing to
+            // `embed_weight[iteration * d ..]` would corrupt a row of a table the
+            // caller believes is frozen, and nothing would report it.
+            continue;
+        }
         let token_id = saved_tokens[t].token_id as usize;
         let base = token_id * d;
         // Elementwise SIMD add — same per-lane `a + b`, bit-identical.
