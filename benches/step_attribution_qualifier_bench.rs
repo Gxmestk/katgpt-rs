@@ -175,8 +175,7 @@ fn main() {
     println!("  Aggregator: SumAggregator (SIMD-friendly sum).");
     println!("  Mutation: AddConst(0.5) (single f32 add).");
     println!(
-        "  Measurement: median of {} outer × {} inner calls, warmup {}.",
-        OUTER, BATCH, WARMUP
+        "  Measurement: median of {OUTER} outer × {BATCH} inner calls, warmup {WARMUP}."
     );
     println!();
     println!("  G4 target: gate overhead (aggregate-only) < 1000 ns at W=64.");
@@ -191,8 +190,7 @@ fn main() {
         let (e2e, agg) = bench_qualify_latency(w);
         let misc = e2e - agg;
         println!(
-            "  │ {:>4} │ {:>16.1} │ {:>16.1} │ {:>16.1} │",
-            w, e2e, agg, misc
+            "  │ {w:>4} │ {e2e:>16.1} │ {agg:>16.1} │ {misc:>16.1} │"
         );
         if w == 64 {
             w64_agg = Some(agg);
@@ -210,8 +208,8 @@ fn main() {
 
     println!("  ── G4 verdict (gate overhead at W=64) ──");
     if let Some(agg) = w64_agg {
-        println!("    aggregate-only @ W=64 : {:>8.1} ns", agg);
-        println!("    target                : {:>8.1} ns", g4_target_ns);
+        println!("    aggregate-only @ W=64 : {agg:>8.1} ns");
+        println!("    target                : {g4_target_ns:>8.1} ns");
         println!(
             "    margin                : {:>8.1}× {}",
             g4_target_ns / agg.max(1e-9),

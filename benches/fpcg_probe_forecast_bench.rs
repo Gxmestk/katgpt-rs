@@ -131,8 +131,7 @@ fn main() {
         let ratio = probe_ns_per_it / proj_ns_per_it.max(1e-9);
 
         println!(
-            "{:>8} {:>16.2} {:>16.2} {:>14} {:>13.2}×",
-            d_model, probe_ns_per_it, proj_ns_per_it, verdict, ratio
+            "{d_model:>8} {probe_ns_per_it:>16.2} {proj_ns_per_it:>16.2} {verdict:>14} {ratio:>13.2}×"
         );
     }
 

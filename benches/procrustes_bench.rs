@@ -92,7 +92,7 @@ fn fmt_us(us: f64) -> String {
     if us < 1.0 {
         format!("{:.2} µs", us * 1000.0)
     } else if us < 1000.0 {
-        format!("{:.2} µs", us)
+        format!("{us:.2} µs")
     } else {
         format!("{:.3} ms", us / 1000.0)
     }
@@ -177,13 +177,13 @@ fn main() {
             }
         );
         if !latency_pass {
-            println!("     ⚠ latency {:.2} > gate {:.2}", us, gate_us);
+            println!("     ⚠ latency {us:.2} > gate {gate_us:.2}");
         }
         if !residual_pass {
-            println!("     ⚠ residual {:.4}% > 1.0%", residual_pct);
+            println!("     ⚠ residual {residual_pct:.4}% > 1.0%");
         }
         if !scratch_pass {
-            println!("     ⚠ scratch {} B > 64 KB", scratch_bytes);
+            println!("     ⚠ scratch {scratch_bytes} B > 64 KB");
         }
     }
 

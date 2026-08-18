@@ -450,40 +450,28 @@ fn gate_g3_accepted_output_quality(agg: AggregateStats) -> bool {
     let tolerant_fp = agg.tolerant.false_accept_rate();
     let strict_prec = agg.strict.precision();
     let tolerant_prec = agg.tolerant.precision();
+    println!("  Strict   false-pass rate: {strict_fp:.4}  (informational)");
     println!(
-        "  Strict   false-pass rate: {:.4}  (informational)",
-        strict_fp
+        "  Tolerant false-pass rate: {tolerant_fp:.4}  (informational — expected to rise under Table 7 cost asymmetry)"
     );
-    println!(
-        "  Tolerant false-pass rate: {:.4}  (informational — expected to rise under Table 7 cost asymmetry)",
-        tolerant_fp
-    );
-    println!(
-        "  Strict   precision:       {:.4}  (true accepts / all accepts)",
-        strict_prec
-    );
-    println!(
-        "  Tolerant precision:       {:.4}  (true accepts / all accepts)",
-        tolerant_prec
-    );
+    println!("  Strict   precision:       {strict_prec:.4}  (true accepts / all accepts)");
+    println!("  Tolerant precision:       {tolerant_prec:.4}  (true accepts / all accepts)");
     let ratio = if strict_prec > 0.0 {
         tolerant_prec / strict_prec
     } else {
         1.0
     };
-    println!("  Precision ratio (tolerant/strict): {:.4}", ratio);
+    println!("  Precision ratio (tolerant/strict): {ratio:.4}");
     // ±15% noise band — matches the plan's "unchanged (±noise)" wording.
     const PRECISION_RATIO_FLOOR: f64 = 0.85;
     if ratio >= PRECISION_RATIO_FLOOR {
         println!(
-            "  ✅ G3-T1.1 PASS: precision ratio >= {:.2} (within ±15% noise band)",
-            PRECISION_RATIO_FLOOR
+            "  ✅ G3-T1.1 PASS: precision ratio >= {PRECISION_RATIO_FLOOR:.2} (within ±15% noise band)"
         );
         true
     } else {
         println!(
-            "  ❌ G3-T1.1 FAIL: precision ratio < {:.2} (accepted-output quality collapsed)",
-            PRECISION_RATIO_FLOOR
+            "  ❌ G3-T1.1 FAIL: precision ratio < {PRECISION_RATIO_FLOOR:.2} (accepted-output quality collapsed)"
         );
         false
     }

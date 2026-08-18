@@ -112,15 +112,13 @@ const G1_MARGIN: f32 = 0.05;
 
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    match x >= 18.0 {
-        true => 1.0,
-        false => match x <= -18.0 {
-            true => 0.0,
-            false => {
-                let e = (-x).exp();
-                1.0 / (1.0 + e)
-            }
-        },
+    if x >= 18.0 {
+        1.0
+    } else if x <= -18.0 {
+        0.0
+    } else {
+        let e = (-x).exp();
+        1.0 / (1.0 + e)
     }
 }
 
@@ -343,8 +341,7 @@ fn main() {
     println!("Seeds        : {N_SEEDS} {SEEDS:?}");
     println!("G2 cap       : {G2_CAP} samples   | α sweep: {G2_ALPHAS:?}");
     println!(
-        "G2 gate      : speedup ≥ {:.0}× (stretch ≥ {:.0}×) vs uniform median",
-        G2_PASS_SPEEDUP, G2_STRETCH_SPEEDUP
+        "G2 gate      : speedup ≥ {G2_PASS_SPEEDUP:.0}× (stretch ≥ {G2_STRETCH_SPEEDUP:.0}×) vs uniform median"
     );
     println!(
         "G1 config    : {G1_N_LANDSCAPES} random landscapes × {G1_N_SAMPLES} samples, α={G1_ALPHA}, margin=−{:.0}%",
@@ -549,8 +546,7 @@ fn main() {
 
     println!();
     println!(
-        "  G1 pass count (of {G1_N_LANDSCAPES}):  RLE={:<2}  Entropy={:<2}  L1={:<2}",
-        g1_rle_pass_count, g1_ent_pass_count, g1_l1_pass_count,
+        "  G1 pass count (of {G1_N_LANDSCAPES}):  RLE={g1_rle_pass_count:<2}  Entropy={g1_ent_pass_count:<2}  L1={g1_l1_pass_count:<2}",
     );
     println!(
         "  worst Δ vs uniform:       RLE={:+.1}%  Entropy={:+.1}%  L1={:+.1}%",
@@ -583,7 +579,7 @@ fn main() {
     // ── Summary ──────────────────────────────────────────────────────────────
     let elapsed = t_start.elapsed();
     println!("═══════════════════════════════════════════════════════════════");
-    println!("  SUMMARY  (elapsed: {:.2?})", elapsed);
+    println!("  SUMMARY  (elapsed: {elapsed:.2?})");
     println!("═══════════════════════════════════════════════════════════════");
     println!(
         "  G2 (exponential speedup, best α): RLE {:.0}× {}  |  Entropy {:.0}× {}  |  L1 {:.0}× {}",
@@ -595,15 +591,7 @@ fn main() {
         if l1_pass { "✅" } else { "❌" },
     );
     println!(
-        "  G1 (safety, α={}, majority of {}): RLE {}/{}  |  Entropy {}/{}  |  L1 {}/{}",
-        G1_ALPHA,
-        G1_N_LANDSCAPES,
-        g1_rle_pass_count,
-        G1_N_LANDSCAPES,
-        g1_ent_pass_count,
-        G1_N_LANDSCAPES,
-        g1_l1_pass_count,
-        G1_N_LANDSCAPES,
+        "  G1 (safety, α={G1_ALPHA}, majority of {G1_N_LANDSCAPES}): RLE {g1_rle_pass_count}/{G1_N_LANDSCAPES}  |  Entropy {g1_ent_pass_count}/{G1_N_LANDSCAPES}  |  L1 {g1_l1_pass_count}/{G1_N_LANDSCAPES}",
     );
     println!();
     let promote = g2_majority_pass;

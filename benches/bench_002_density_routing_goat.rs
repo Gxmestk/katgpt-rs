@@ -368,8 +368,7 @@ fn g5b_compute_saved() -> (f64, f64, bool) {
 
     let pass = saving >= G5B_TARGET;
     eprintln!(
-        "   [G5b workload] dense={}/{}, trans={}/{}, sparse={}/{}",
-        n_dense, N_ZONES, n_trans, N_ZONES, n_sparse, N_ZONES
+        "   [G5b workload] dense={n_dense}/{N_ZONES}, trans={n_trans}/{N_ZONES}, sparse={n_sparse}/{N_ZONES}"
     );
     (saving, hit_rate, pass)
 }
@@ -547,10 +546,7 @@ fn main() {
     println!("│ G5a (entropy) + G5b (compute saved) + G5c (stampede correctness)│");
     println!("└──────────────────────────────────────────────────────────────────┘");
     println!();
-    println!(
-        "Sim: {} zones, {} NPCs, {} ticks (60s @ 20Hz)",
-        N_ZONES, N_NPCS, SIM_TICKS
-    );
+    println!("Sim: {N_ZONES} zones, {N_NPCS} NPCs, {SIM_TICKS} ticks (60s @ 20Hz)");
     println!();
 
     // ── G5a: Routing quality ──
@@ -590,10 +586,7 @@ fn main() {
     // ── G5c: Stampede correctness ──
     println!("── G5c: Stampede invalidation correctness ──");
     let (stale_reads, g5c_pass) = g5c_stampede_correctness();
-    println!(
-        "   Stale reads during tier transition: {} (target: 0)",
-        stale_reads
-    );
+    println!("   Stale reads during tier transition: {stale_reads} (target: 0)");
     println!("   Verdict: {}", pass_str(g5c_pass));
     println!();
 
@@ -629,10 +622,7 @@ fn main() {
         println!("│ ✅ ALL 3 GATES PASS — PROMOTE zone_density_routing to default.   │");
         println!("│    The gain is modelless (no training required).                │");
     } else {
-        println!(
-            "│ ❌ {} of 3 gates passed — do NOT promote.                       │",
-            n_pass
-        );
+        println!("│ ❌ {n_pass} of 3 gates passed — do NOT promote.                       │");
         if !g5a_pass {
             println!("│    G5a miss: routing quality not improved (keep for compute).   │");
         }

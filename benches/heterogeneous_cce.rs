@@ -189,10 +189,7 @@ fn main() {
         } else {
             "CEILING"
         };
-        println!(
-            "{:>12}  {:>14.1}  {:>14.1}  {:>10}",
-            n, bfs_med, pd_med, status
-        );
+        println!("{n:>12}  {bfs_med:>14.1}  {pd_med:>14.1}  {status:>10}");
     }
 
     println!();

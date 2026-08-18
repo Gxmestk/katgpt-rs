@@ -406,7 +406,7 @@ fn gate_g1_regret(baseline: &PolicyStats, trace: &PolicyStats) -> bool {
         "  trace    regret   = {:.1}  (missed={}, wasted={})",
         trace.total_regret, trace.missed_weight_updates, trace.wasted_weight_updates
     );
-    println!("  Δ regret           = {:+.1}", delta);
+    println!("  Δ regret           = {delta:+.1}");
     if pass {
         println!("  ✅ G1-T2 PASS: trace-informed regret strictly < baseline");
     } else {
@@ -423,7 +423,7 @@ fn gate_g2_accuracy(baseline: &PolicyStats, trace: &PolicyStats, n: usize) -> bo
     let pass = t_acc >= b_acc;
     println!("  baseline accuracy = {:.4} ({:.2}%)", b_acc, b_acc * 100.0);
     println!("  trace    accuracy = {:.4} ({:.2}%)", t_acc, t_acc * 100.0);
-    println!("  Δ accuracy        = {:+.2}pp", delta_pp);
+    println!("  Δ accuracy        = {delta_pp:+.2}pp");
     if pass {
         println!("  ✅ G2-T2 PASS: trace-informed accuracy >= baseline");
     } else {

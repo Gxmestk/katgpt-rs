@@ -149,7 +149,7 @@ fn main() {
     let mut scratch = PowerRetractScratch::new(d);
     let _res = manifold_power_iter_router(&mut r_work, &grams_ref, n, d, 1.0, 1, &mut scratch);
     let total = t0.elapsed();
-    println!("  total (gram + MPI) = {:?}", total);
+    println!("  total (gram + MPI) = {total:?}");
     println!(
         "  G4 (sub-ms): {}",
         if total.as_secs_f64() < 1e-3 {

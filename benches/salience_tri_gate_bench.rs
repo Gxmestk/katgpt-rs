@@ -339,13 +339,11 @@ fn main() {
     let latency_d8_pass = latency_results
         .iter()
         .find(|&&(d, _, _)| d == 8)
-        .map(|&(_, _, p)| p)
-        .unwrap_or(false);
+        .is_some_and(|&(_, _, p)| p);
     let batch_d8_n1000_pass = throughput_results
         .iter()
         .find(|&&(d, n, _, _)| d == 8 && n == 1_000)
-        .map(|&(_, _, _, p)| p)
-        .unwrap_or(false);
+        .is_some_and(|&(_, _, _, p)| p);
 
     println!("=== GOAT Gate Verdict ===");
     println!("  G1 determinism:       {}", pass_str(g1_pass));
@@ -368,8 +366,8 @@ fn main() {
         );
     }
     println!();
-    println!("  Raw latency: {:?}", latency_results);
-    println!("  Raw throughput (M/s): {:?}", throughput_results);
+    println!("  Raw latency: {latency_results:?}");
+    println!("  Raw throughput (M/s): {throughput_results:?}");
 }
 
 fn pass_str(p: bool) -> &'static str {
