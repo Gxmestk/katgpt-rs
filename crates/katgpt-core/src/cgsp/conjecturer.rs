@@ -122,7 +122,7 @@ impl CuriosityConjecturer for PoolConjecturer {
         let total = Self::build_cdf(priorities, cdf_scratch);
         // Defensive: if priority table is empty, write zeros.
         if cdf_scratch.is_empty() || total <= 0.0 || self.pool.is_empty() {
-            let dim = self.pool.first().map(|d| d.dim()).unwrap_or(0);
+            let dim = self.pool.first().map_or(0, |d| d.dim());
             for slot in out.iter_mut() {
                 // Resize in place to avoid per-slot allocation.
                 slot.direction.coords.resize(dim, 0.0);

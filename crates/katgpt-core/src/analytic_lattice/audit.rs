@@ -429,8 +429,7 @@ mod tests {
         let cross = dot(phi_0, phi_1, k);
         assert!(
             cross.abs() < 1e-5,
-            "DCT-II basis not orthogonal: ⟨φ_0, φ_1⟩ = {}",
-            cross
+            "DCT-II basis not orthogonal: ⟨φ_0, φ_1⟩ = {cross}"
         );
     }
 

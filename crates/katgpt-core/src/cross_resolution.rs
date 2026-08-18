@@ -502,7 +502,7 @@ mod tests {
             );
         }
         for (i, d) in dst.iter().enumerate().take(d_dst).skip(k) {
-            assert!(d.abs() < 1e-6, "dst[{i}] = {} expected 0", d);
+            assert!(d.abs() < 1e-6, "dst[{i}] = {d} expected 0");
         }
     }
 

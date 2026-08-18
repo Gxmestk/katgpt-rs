@@ -374,10 +374,13 @@ impl<G, S> AndOrNode<G, S> {
                 }
                 (solved, unsolved)
             }
-            Self::Leaf { solution, .. } => match solution.is_some() {
-                true => (1, 0),
-                false => (0, 1),
-            },
+            Self::Leaf { solution, .. } => {
+                if solution.is_some() {
+                    (1, 0)
+                } else {
+                    (0, 1)
+                }
+            }
         }
     }
 }

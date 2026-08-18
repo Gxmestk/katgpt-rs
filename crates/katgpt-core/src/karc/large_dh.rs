@@ -123,9 +123,7 @@ pub fn low_rank_fit_jacobi_bstep(
     assert!(r > 0, "low_rank_fit_jacobi_bstep: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit_jacobi_bstep: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit_jacobi_bstep: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(
         lambda > 0.0,
@@ -468,8 +466,7 @@ mod tests {
         }
         assert!(
             max_err < 1e-12,
-            "jacobi_eigen sign bug regression: A·V ≠ Λ·V, max_err = {:e}",
-            max_err
+            "jacobi_eigen sign bug regression: A·V ≠ Λ·V, max_err = {max_err:e}"
         );
     }
 
@@ -540,8 +537,7 @@ mod tests {
         }
         assert!(
             max_diff < 1e-9,
-            "Jacobi vs Kronecker B-step disagree: max_diff = {:e}",
-            max_diff
+            "Jacobi vs Kronecker B-step disagree: max_diff = {max_diff:e}"
         );
     }
 }

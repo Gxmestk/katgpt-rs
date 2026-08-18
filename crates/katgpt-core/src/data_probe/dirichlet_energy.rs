@@ -108,8 +108,7 @@ mod tests {
         for window in energies.windows(2) {
             assert!(
                 window[1] >= window[0] || (window[1] - window[0]).abs() < 1.0,
-                "energy should trend upward with noise: {:?}",
-                energies
+                "energy should trend upward with noise: {energies:?}"
             );
         }
     }

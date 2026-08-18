@@ -573,7 +573,7 @@ pub fn classify_all_sinks(
     // Issue 001 T3: reuse `scratch.col_sums` instead of allocating per call.
     // The first call for a new `n` pays one resize; subsequent calls are
     // allocation-free.
-    scratch.ensure_capacity_dn(values.first().map(|r| r.len()).unwrap_or(0), n);
+    scratch.ensure_capacity_dn(values.first().map_or(0, |r| r.len()), n);
     let col_sums = &mut scratch.col_sums;
     col_sums[..n].fill(0.0);
     for row in attn.iter() {
@@ -968,9 +968,7 @@ pub fn stable_rank_update_into_flat(
     debug_assert_eq!(
         o.len(),
         n * d,
-        "flat stable_rank: o must be (n={}, d={}) flat",
-        n,
-        d
+        "flat stable_rank: o must be (n={n}, d={d}) flat"
     );
     scratch.ensure_capacity_dn(d, n);
     let v = &mut scratch.v[..d];
@@ -1113,9 +1111,7 @@ fn classify_sink_at_flat_with_sum_sq(
     debug_assert_eq!(
         values.len(),
         n * d,
-        "flat classify_sink_at: values must be (n={}, d={}) flat",
-        n,
-        d
+        "flat classify_sink_at: values must be (n={n}, d={d}) flat"
     );
 
     // ── Strength ───────────────────────────────────────────────

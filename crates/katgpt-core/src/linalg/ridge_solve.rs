@@ -82,9 +82,7 @@ pub fn cholesky_f64(l: &mut [f64], a: &[f64], k: usize) {
         if diag <= 0.0 {
             assert!(
                 diag > -tol,
-                "matrix not positive definite in cholesky_f64 (pivot {} < -{})",
-                diag,
-                tol
+                "matrix not positive definite in cholesky_f64 (pivot {diag} < -{tol})"
             );
             diag = floor;
         }
@@ -215,9 +213,7 @@ pub fn cholesky_f32(l: &mut [f32], a: &[f32], k: usize) {
         if diag <= 0.0 {
             assert!(
                 diag > -tol,
-                "matrix not positive definite in cholesky_f32 (pivot {} < -{})",
-                diag,
-                tol
+                "matrix not positive definite in cholesky_f32 (pivot {diag} < -{tol})"
             );
             diag = floor; // clamp near-singular pivot
         }

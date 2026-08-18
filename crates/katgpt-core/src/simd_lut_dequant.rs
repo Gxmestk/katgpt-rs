@@ -1150,14 +1150,13 @@ mod tests {
         let lut = Int4Lut::build(1.0, 0.0);
         // Codes 0..7 map to 0.0..7.0; codes 8..15 map to -8.0..-1.0.
         for i in 0..8u8 {
-            assert_eq!(lut.0[i as usize], i as f32, "Int4Lut unsigned region {}", i);
+            assert_eq!(lut.0[i as usize], i as f32, "Int4Lut unsigned region {i}");
         }
         for i in 8..16u8 {
             let signed = i as i8 - 16; // 8→-8, 9→-7, ..., 15→-1
             assert_eq!(
                 lut.0[i as usize], signed as f32,
-                "Int4Lut signed region {}",
-                i
+                "Int4Lut signed region {i}"
             );
         }
     }
@@ -1166,14 +1165,13 @@ mod tests {
     fn test_int8_lut_build_sign_extension() {
         let lut = Int8Lut::build(1.0, 0.0);
         for i in 0..128u8 {
-            assert_eq!(lut.0[i as usize], i as f32, "Int8Lut unsigned region {}", i);
+            assert_eq!(lut.0[i as usize], i as f32, "Int8Lut unsigned region {i}");
         }
         for i in 128..=255u8 {
             let signed = i as i8; // 128→-128, ..., 255→-1
             assert_eq!(
                 lut.0[i as usize], signed as f32,
-                "Int8Lut signed region {}",
-                i
+                "Int8Lut signed region {i}"
             );
         }
     }
@@ -1355,8 +1353,8 @@ mod tests {
         for i in 0..32 {
             let low = d_sc0 * (qs[i] & 0x0F) as f32 - m0_val;
             let high = d_sc0 * (qs[i] >> 4) as f32 - m0_val;
-            assert_eq!(dst_low[i], low, "low nibble {} mismatch", i);
-            assert_eq!(dst_high[i], high, "high nibble {} mismatch", i);
+            assert_eq!(dst_low[i], low, "low nibble {i} mismatch");
+            assert_eq!(dst_high[i], high, "high nibble {i} mismatch");
         }
     }
 
@@ -1424,7 +1422,7 @@ mod tests {
             let mut out_scalar = vec![0.0_f32; n];
             dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out_simd);
             dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut out_scalar);
-            assert_eq!(out_simd, out_scalar, "mismatch at n={}", n);
+            assert_eq!(out_simd, out_scalar, "mismatch at n={n}");
         }
     }
 
@@ -1481,10 +1479,7 @@ mod tests {
         let rel_diff = (fused - two_step).abs() / two_step.abs().max(1e-10);
         assert!(
             rel_diff < 1e-5,
-            "fused={} two_step={} rel_diff={}",
-            fused,
-            two_step,
-            rel_diff
+            "fused={fused} two_step={two_step} rel_diff={rel_diff}"
         );
     }
 
@@ -1503,10 +1498,7 @@ mod tests {
         let rel_diff = (simd - scalar).abs() / scalar.abs().max(1e-10);
         assert!(
             rel_diff < 1e-5,
-            "simd={} scalar={} rel_diff={}",
-            simd,
-            scalar,
-            rel_diff
+            "simd={simd} scalar={scalar} rel_diff={rel_diff}"
         );
     }
 
@@ -1523,11 +1515,7 @@ mod tests {
             let rel_diff = (simd - scalar).abs() / scalar.abs().max(1e-10);
             assert!(
                 rel_diff < 1e-5 || simd.abs() < 1e-10,
-                "n={}: simd={} scalar={} rel_diff={}",
-                n,
-                simd,
-                scalar,
-                rel_diff
+                "n={n}: simd={simd} scalar={scalar} rel_diff={rel_diff}"
             );
         }
     }
@@ -1555,9 +1543,7 @@ mod tests {
         let result = dequant_dot_via_lut_multi_stage_slice(&codes, &luts, &x);
         assert!(
             (result - ref_dot).abs() < 1e-4,
-            "result={} ref={}",
-            result,
-            ref_dot
+            "result={result} ref={ref_dot}"
         );
     }
 
@@ -1577,7 +1563,7 @@ mod tests {
         let multi = dequant_dot_via_lut_multi_stage(&codes_ref, &luts, &x);
 
         let rel = (multi - single).abs() / single.abs().max(1e-10);
-        assert!(rel < 1e-5, "multi={} single={} rel={}", multi, single, rel);
+        assert!(rel < 1e-5, "multi={multi} single={single} rel={rel}");
     }
 
     /// G1: zero stages → 0.0 (degenerate case, no panic).
@@ -1622,11 +1608,7 @@ mod tests {
             let rel = (result - ref_dot).abs() / ref_dot.abs().max(1e-10);
             assert!(
                 rel < 1e-3 || result.abs() < 1e-10,
-                "n={}: result={} ref={} rel={}",
-                n,
-                result,
-                ref_dot,
-                rel
+                "n={n}: result={result} ref={ref_dot} rel={rel}"
             );
         }
     }

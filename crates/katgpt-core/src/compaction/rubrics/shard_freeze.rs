@@ -419,7 +419,7 @@ mod tests {
             .build();
         let mut scratch = RubricScratch::new();
 
-        let mut decisions = Vec::new();
+        let mut decisions = Vec::with_capacity(10);
         for _ in 0..10 {
             scratch.clear();
             scratch.usize_buf.push(10);

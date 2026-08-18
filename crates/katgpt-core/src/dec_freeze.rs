@@ -105,17 +105,12 @@ impl CochainFreezeEnvelope {
         let n_floats = data_bytes / 4;
         // dim=0 with non-empty data is a malformation; non-zero dim requires
         // data length divisible by dim for a well-formed cochain.
-        match dim {
-            0 => {
-                if n_floats != 0 {
-                    return None;
-                }
+        if dim == 0 {
+            if n_floats != 0 {
+                return None;
             }
-            _ => {
-                if !n_floats.is_multiple_of(dim) {
-                    return None;
-                }
-            }
+        } else if !n_floats.is_multiple_of(dim) {
+            return None;
         }
         let mut data = Vec::with_capacity(n_floats);
         for chunk in payload[5..].chunks_exact(4) {

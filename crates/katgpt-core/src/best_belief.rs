@@ -773,12 +773,7 @@ mod tests {
                     assert_eq!(
                         via_lut.to_bits(),
                         via_cf.to_bits(),
-                        "LUT mismatch at S={}, F={}, eps={}: lut={}, cf={}",
-                        s,
-                        f,
-                        eps,
-                        via_lut,
-                        via_cf
+                        "LUT mismatch at S={s}, F={f}, eps={eps}: lut={via_lut}, cf={via_cf}"
                     );
                 }
             }
@@ -810,12 +805,7 @@ mod tests {
         let e10 = best_belief_score(s, f, 0.1);
         assert!(
             off_grid > e05 && off_grid < e10,
-            "non-standard ε=0.07 (S={}, F={}) should be between ε=0.05 ({}) and ε=0.1 ({}), got {}",
-            s,
-            f,
-            e05,
-            e10,
-            off_grid
+            "non-standard ε=0.07 (S={s}, F={f}) should be between ε=0.05 ({e05}) and ε=0.1 ({e10}), got {off_grid}"
         );
     }
 
@@ -827,9 +817,7 @@ mod tests {
             let score = best_belief_score(15, 7, eps);
             assert!(
                 score > 0.0 && score < 1.0 && score.is_finite(),
-                "LUT score at eps={} invalid: {}",
-                eps,
-                score
+                "LUT score at eps={eps} invalid: {score}"
             );
         }
     }
@@ -881,8 +869,7 @@ mod statrs_reference {
         }
         if let Some((s, f, eps, ours, theirs)) = worst {
             eprintln!(
-                "G1 max_err vs statrs = {:.3e}  (worst: S={s}, F={f}, eps={eps}, ours={ours}, theirs={theirs})",
-                max_err
+                "G1 max_err vs statrs = {max_err:.3e}  (worst: S={s}, F={f}, eps={eps}, ours={ours}, theirs={theirs})"
             );
         } else {
             eprintln!("G1 max_err vs statrs = 0.0 (no points evaluated?)");

@@ -647,7 +647,7 @@ mod estimator_tests {
         est.observe_row(&logits);
         let delta = est.resolve_delta();
         // EMA = 0.99 * 1.0 + 0.01 * 3.0 = 0.99 + 0.03 = 1.02.
-        assert!((delta - 1.02).abs() < TOL, "got {}, expected 1.02", delta);
+        assert!((delta - 1.02).abs() < TOL, "got {delta}, expected 1.02");
     }
 
     #[test]
@@ -695,8 +695,7 @@ mod estimator_tests {
             SsmaxMode::Adaptive { rolling_delta } => {
                 assert!(
                     (rolling_delta - 2.4).abs() < TOL,
-                    "got {}, expected 2.4",
-                    rolling_delta
+                    "got {rolling_delta}, expected 2.4"
                 );
             }
             _ => panic!("expected Adaptive mode"),
@@ -710,7 +709,7 @@ mod estimator_tests {
         est.observe_row(&[1.00001_f32, 1.0, 1.0]); // max-mean ≈ tiny
         let mode = est.to_mode();
         let s_l = mode.resolve_s_l();
-        assert!(s_l > 5.0, "tiny gap should give high s_L, got {}", s_l);
+        assert!(s_l > 5.0, "tiny gap should give high s_L, got {s_l}");
     }
 
     #[test]
@@ -722,8 +721,7 @@ mod estimator_tests {
         let s_l = mode.resolve_s_l();
         assert!(
             s_l < 0.2,
-            "huge gap should give low s_L (mild sharpening), got {}",
-            s_l
+            "huge gap should give low s_L (mild sharpening), got {s_l}"
         );
     }
 
@@ -734,7 +732,7 @@ mod estimator_tests {
         use std::sync::Arc;
         use std::thread;
         let est = Arc::new(RollingDeltaEstimator::new(0.5));
-        let mut handles = Vec::new();
+        let mut handles = Vec::with_capacity(4);
         for _ in 0..4 {
             let est = Arc::clone(&est);
             handles.push(thread::spawn(move || {
@@ -751,8 +749,7 @@ mod estimator_tests {
         let delta = est.resolve_delta();
         assert!(
             delta > 0.5 && delta < 1.0,
-            "converged delta {} should be near 0.75",
-            delta
+            "converged delta {delta} should be near 0.75"
         );
     }
 
@@ -767,16 +764,14 @@ mod estimator_tests {
         let delta = est_zero.resolve_delta();
         assert!(
             (delta - (5.0 - 7.0 / 3.0) as f32).abs() < 0.01,
-            "alpha≈0 should fully adopt new value, got {}",
-            delta
+            "alpha≈0 should fully adopt new value, got {delta}"
         );
         // est_one should barely adapt (alpha clamped to 1-1e-6).
         est_one.observe_row(&[5.0_f32, 1.0, 1.0]);
         let delta_one = est_one.resolve_delta();
         assert!(
             (delta_one - 1.0).abs() < 0.01,
-            "alpha≈1 should barely move from warm-start, got {}",
-            delta_one
+            "alpha≈1 should barely move from warm-start, got {delta_one}"
         );
     }
 }

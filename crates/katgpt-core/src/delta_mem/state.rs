@@ -999,16 +999,12 @@ mod tests {
 
         assert!(
             suppression >= 0.30,
-            "G3 FAIL suppression: got {:.4}, target >= 0.30",
-            suppression
+            "G3 FAIL suppression: got {suppression:.4}, target >= 0.30"
         );
         assert!(
             recall_loss <= 0.05,
-            "G3 FAIL recall_loss: got {:.4}, target <= 0.05 \
-             (baseline_cos={:.4}, gated_cos={:.4})",
-            recall_loss,
-            baseline_recall,
-            gated_recall
+            "G3 FAIL recall_loss: got {recall_loss:.4}, target <= 0.05 \
+             (baseline_cos={baseline_recall:.4}, gated_cos={gated_recall:.4})"
         );
     }
 }

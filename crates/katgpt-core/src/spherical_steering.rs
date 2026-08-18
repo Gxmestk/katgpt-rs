@@ -612,12 +612,7 @@ mod tests {
                 let rel_err = ((norm_out - norm_h).abs() / norm_h).max(0.0);
                 assert!(
                     rel_err < 1e-4,
-                    "norm preservation failed: t={}, θ={:.4}, ‖h‖={:.6}, ‖out‖={:.6}, rel_err={:.2e}",
-                    t,
-                    theta,
-                    norm_h,
-                    norm_out,
-                    rel_err
+                    "norm preservation failed: t={t}, θ={theta:.4}, ‖h‖={norm_h:.6}, ‖out‖={norm_out:.6}, rel_err={rel_err:.2e}"
                 );
             }
         }
@@ -643,15 +638,14 @@ mod tests {
 
         // No NaN.
         for (i, &v) in out.iter().enumerate() {
-            assert!(v.is_finite(), "out[{}] = {} is non-finite", i, v);
+            assert!(v.is_finite(), "out[{i}] = {v} is non-finite");
         }
         // Norm preserved (the lerp fallback renormalizes, so this should hold).
         let norm_out = l2_norm(&out);
         let rel_err = ((norm_out - norm_h).abs() / norm_h).max(0.0);
         assert!(
             rel_err < 1e-4,
-            "aligned lerp: norm drift {:.2e} should be < 1e-4",
-            rel_err
+            "aligned lerp: norm drift {rel_err:.2e} should be < 1e-4"
         );
     }
 
@@ -682,20 +676,11 @@ mod tests {
                         let t = vmf_confidence_gate(s_t, kappa, alpha, beta);
                         assert!(
                             t.is_finite(),
-                            "t non-finite at s_t={}, κ={}, α={}, β={}",
-                            s_t,
-                            kappa,
-                            alpha,
-                            beta
+                            "t non-finite at s_t={s_t}, κ={kappa}, α={alpha}, β={beta}"
                         );
                         assert!(
                             (0.0..=1.0).contains(&t),
-                            "t={} out of [0,1] at s_t={}, κ={}, α={}, β={}",
-                            t,
-                            s_t,
-                            kappa,
-                            alpha,
-                            beta
+                            "t={t} out of [0,1] at s_t={s_t}, κ={kappa}, α={alpha}, β={beta}"
                         );
                     }
                 }
@@ -711,10 +696,7 @@ mod tests {
                 let t = vmf_confidence_gate(1.0, kappa, 1.0, beta);
                 assert!(
                     t.abs() < 1e-6,
-                    "s_t=1 should give t≈0, got t={} at κ={}, β={}",
-                    t,
-                    kappa,
-                    beta
+                    "s_t=1 should give t≈0, got t={t} at κ={kappa}, β={beta}"
                 );
             }
         }
@@ -736,10 +718,7 @@ mod tests {
             let t = vmf_confidence_gate(s_t, kappa, alpha, beta);
             assert!(
                 t >= prev_t - 1e-6,
-                "gate not monotone in drift: s_t={:.3}, t={:.4}, prev_t={:.4}",
-                s_t,
-                t,
-                prev_t
+                "gate not monotone in drift: s_t={s_t:.3}, t={t:.4}, prev_t={prev_t:.4}"
             );
             prev_t = t;
         }
@@ -821,10 +800,7 @@ mod tests {
         for (i, (&o, &e)) in out.iter().zip(expected.iter()).enumerate() {
             assert!(
                 (o - e).abs() < 1e-5,
-                "midpoint at θ=π/2: out[{}] = {} should be {}",
-                i,
-                o,
-                e
+                "midpoint at θ=π/2: out[{i}] = {o} should be {e}"
             );
         }
     }
@@ -858,9 +834,7 @@ mod tests {
         let cos_before = dot(&h, &mu_t) / l2_norm(&h);
         assert!(
             cos_after > cos_before + 1e-3,
-            "rotation should increase alignment with μ_T: before={}, after={}",
-            cos_before,
-            cos_after
+            "rotation should increase alignment with μ_T: before={cos_before}, after={cos_after}"
         );
     }
 

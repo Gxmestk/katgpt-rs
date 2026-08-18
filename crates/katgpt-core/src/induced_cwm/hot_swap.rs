@@ -521,7 +521,7 @@ mod tests {
         // longer critical section) induce a new kernel. The readers must
         // not panic and must always see a well-formed `(step_size, version)`
         // pair.
-        let mut handles = Vec::new();
+        let mut handles = Vec::with_capacity(4);
         for _ in 0..4 {
             let s = Arc::clone(&slot);
             handles.push(thread::spawn(move || {

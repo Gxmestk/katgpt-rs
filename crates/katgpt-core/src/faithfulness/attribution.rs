@@ -159,8 +159,7 @@ mod tests {
         // Exact gradient is weights = [3, 4], L2 norm = 5.0.
         assert!(
             (norm - 5.0).abs() < 1e-3,
-            "attribution_norm should be ~5.0 (‖[3,4]‖₂), got {}",
-            norm
+            "attribution_norm should be ~5.0 (‖[3,4]‖₂), got {norm}"
         );
     }
 
@@ -205,9 +204,7 @@ mod tests {
         // Ranking: A > B (consistent with exact gradient norms).
         assert!(
             norm_a > norm_b,
-            "segment A (‖[5,5]‖₂≈7.07) should rank higher than B (‖[1,1]‖₂≈1.41): {} vs {}",
-            norm_a,
-            norm_b
+            "segment A (‖[5,5]‖₂≈7.07) should rank higher than B (‖[1,1]‖₂≈1.41): {norm_a} vs {norm_b}"
         );
     }
 }

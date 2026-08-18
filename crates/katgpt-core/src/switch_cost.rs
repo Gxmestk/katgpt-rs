@@ -474,7 +474,7 @@ mod tests {
         let mut y = SwitchCostTable::<3>::new(DEFAULT_ALPHA);
         use fastrand::Rng;
         let mut rng = Rng::with_seed(42);
-        let mut events = Vec::new();
+        let mut events = Vec::with_capacity(500);
         for _ in 0..500 {
             let a = rng.usize(0..3);
             let b = rng.usize(0..3);

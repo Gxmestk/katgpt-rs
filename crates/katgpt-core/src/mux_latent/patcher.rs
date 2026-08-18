@@ -200,7 +200,7 @@ mod tests {
         match result {
             Err(PatchRejection::SegmentNotCompressible { .. })
             | Err(PatchRejection::OutOfRange { .. }) => {}
-            other => panic!("expected rejection, got {:?}", other),
+            other => panic!("expected rejection, got {other:?}"),
         }
     }
 

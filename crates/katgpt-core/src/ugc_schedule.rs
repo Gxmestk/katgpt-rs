@@ -779,7 +779,7 @@ pub fn certified_block_plan(boundaries: &[f32], uppers: &[f32], n_budget: usize)
 /// Expand a block plan into the full reveal-time grid: within block `k`,
 /// `ψ(t_{j+1}) = min((1+ρ̂_k)·ψ(t_j), ψ(b_{k+1}))` (Eq 20).
 pub fn reveal_grid_from_plan(plan: &UgcBlockPlan) -> Vec<f32> {
-    let mut grid = Vec::new();
+    let mut grid = Vec::with_capacity(plan.upper_k.len());
     grid.push(plan.boundaries[0]);
     for k in 0..plan.upper_k.len() {
         let rho = plan.multipliers[k];

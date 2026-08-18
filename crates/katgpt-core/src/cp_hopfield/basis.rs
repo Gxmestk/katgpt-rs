@@ -342,8 +342,7 @@ impl StructureConstants {
     fn lookup(ts: &[Triple], a: usize, b: usize, c: usize) -> f32 {
         ts.iter()
             .find(|t| t.i as usize == a && t.j as usize == b && t.k as usize == c)
-            .map(|t| t.val)
-            .unwrap_or(0.0)
+            .map_or(0.0, |t| t.val)
     }
 
     #[inline]

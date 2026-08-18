@@ -1496,12 +1496,7 @@ mod tests {
         let input = vec![1.0f32; d];
         let weights = compute_moa_gates(&input, &gating, d);
         for (k, &w) in weights.iter().enumerate() {
-            assert!(
-                (w - 0.5).abs() < 1e-6,
-                "weight[{}] = {}, expected 0.5",
-                k,
-                w
-            );
+            assert!((w - 0.5).abs() < 1e-6, "weight[{k}] = {w}, expected 0.5");
         }
     }
 
@@ -1558,10 +1553,7 @@ mod tests {
         for (i, &h) in hidden.iter().enumerate() {
             assert!(
                 (h - expected).abs() < 1e-4,
-                "hidden[{}] = {}, expected {}",
-                i,
-                h,
-                expected
+                "hidden[{i}] = {h}, expected {expected}"
             );
         }
     }
@@ -1606,10 +1598,7 @@ mod tests {
         for (i, &h) in hidden.iter().enumerate() {
             assert!(
                 (h - expected).abs() < 1e-3,
-                "hidden[{}] = {}, expected {}",
-                i,
-                h,
-                expected
+                "hidden[{i}] = {h}, expected {expected}"
             );
         }
     }

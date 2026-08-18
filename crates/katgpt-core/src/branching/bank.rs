@@ -470,9 +470,7 @@ impl<E: Clone> BranchBank<E> {
                 continue;
             }
             let i_util = self
-                .get(i)
-                .map(|b| b.stats.n_writes as u64 + b.stats.n_reads as u64)
-                .unwrap_or(0);
+                .get(i).map_or(0, |b| b.stats.n_writes as u64 + b.stats.n_reads as u64);
 
             for &j in &active_ids {
                 if i == j || !available.contains(&j) {
@@ -1086,7 +1084,7 @@ mod tests {
     fn debug_format() {
         let mut bank: BranchBank<()> = BranchBank::new(4);
         bank.spawn(vec![1.0]);
-        let s = format!("{:?}", bank);
+        let s = format!("{bank:?}");
         assert!(s.contains("max_branches: 4"));
         assert!(s.contains("n_active: 1"));
     }

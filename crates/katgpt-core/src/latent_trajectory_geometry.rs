@@ -829,42 +829,30 @@ mod tests {
         println!();
         println!("Trajectory class     | mean length | mean curvature (rad)");
         println!("---------------------|-------------|----------------------");
-        println!(
-            "oscillation (flip)   |   {:7.3}   |       {:6.3}",
-            osc_len, osc_curv
-        );
-        println!(
-            "committed (constant) |   {:7.3}   |       {:6.3}",
-            com_len, com_curv
-        );
-        println!(
-            "drift (rotate)       |   {:7.3}   |       {:6.3}",
-            drf_len, drf_curv
-        );
+        println!("oscillation (flip)   |   {osc_len:7.3}   |       {osc_curv:6.3}");
+        println!("committed (constant) |   {com_len:7.3}   |       {com_curv:6.3}");
+        println!("drift (rotate)       |   {drf_len:7.3}   |       {drf_curv:6.3}");
         println!();
         println!(
             "Gate G3.1 (curvature separates osc from committed):  {}",
             if g3_1_pass { "PASS" } else { "FAIL" }
         );
         println!(
-            "  osc curvature ({:.3}) - committed curvature ({:.3}) = +{:.3} rad (>= 0.5)",
-            osc_curv, com_curv, curv_gap
+            "  osc curvature ({osc_curv:.3}) - committed curvature ({com_curv:.3}) = +{curv_gap:.3} rad (>= 0.5)"
         );
         println!(
             "Gate G3.2 (length is blind to the pattern):          {}",
             if g3_2_pass { "PASS" } else { "FAIL" }
         );
         println!(
-            "  |osc length ({:.3}) - committed length ({:.3})| / committed = {:.3} (<= 0.15)",
-            osc_len, com_len, len_diff_ratio
+            "  |osc length ({osc_len:.3}) - committed length ({com_len:.3})| / committed = {len_diff_ratio:.3} (<= 0.15)"
         );
         println!(
             "Gate G3.3 (drift sits between, control):             {}",
             if g3_3_pass { "PASS" } else { "FAIL" }
         );
         println!(
-            "  committed ({:.3}) < drift ({:.3}) < oscillation ({:.3})",
-            com_curv, drf_curv, osc_curv
+            "  committed ({com_curv:.3}) < drift ({drf_curv:.3}) < oscillation ({osc_curv:.3})"
         );
         println!();
         let all_pass = g3_1_pass && g3_2_pass && g3_3_pass;

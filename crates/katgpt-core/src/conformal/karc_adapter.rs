@@ -152,7 +152,7 @@ mod tests {
 
         // Build training pairs: x_t = [u_t, u_{t-1}, u_{t-2}] (flattened K·D),
         // target = u_{t+1}.
-        let traj: Vec<[f32; D]> = (0..N + K + 1)
+        let traj: Vec<[f32; D]> = (0..=N + K)
             .map(|i| {
                 let t = i as f32 * 0.1;
                 [t.sin(), (t * 0.7).cos()]

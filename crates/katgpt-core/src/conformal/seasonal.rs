@@ -46,7 +46,7 @@ impl SeasonalPoolForecaster {
     /// - `pool_weight`: pool/anchor mixture weight in `[0,1]`.
     pub fn new(capacity: usize, m: usize, exp_lambda: f32, pool_weight: f32) -> Self {
         assert!(m >= 1, "seasonal period m must be >= 1");
-        assert!(capacity >= m, "capacity {} must be >= m {}", capacity, m);
+        assert!(capacity >= m, "capacity {capacity} must be >= m {m}");
         assert!(
             (0.0..=1.0).contains(&pool_weight),
             "pool_weight must be in [0,1]"
@@ -203,8 +203,7 @@ mod tests {
         let got = f.forecast(1);
         assert!(
             (got - 25.0).abs() < 1e-5,
-            "pool avg expected 25.0, got {}",
-            got
+            "pool avg expected 25.0, got {got}"
         );
     }
 

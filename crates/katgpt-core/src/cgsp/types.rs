@@ -420,7 +420,7 @@ impl CuriosityPrioritySnapshot {
             priorities.len(),
             "cgsp: directions and priorities must have equal length"
         );
-        let dim = directions.first().map(|d| d.dim() as u32).unwrap_or(0);
+        let dim = directions.first().map_or(0, |d| d.dim() as u32);
         Self {
             magic: SNAPSHOT_MAGIC,
             version: SNAPSHOT_VERSION,
@@ -482,8 +482,7 @@ impl CuriosityPrioritySnapshot {
         let magic = <[u8; 4]>::try_from(&bytes[0..4]).unwrap();
         if magic != SNAPSHOT_MAGIC {
             return Err(format!(
-                "cgsp snapshot: bad magic {:?}, expected {:?}",
-                magic, SNAPSHOT_MAGIC
+                "cgsp snapshot: bad magic {magic:?}, expected {SNAPSHOT_MAGIC:?}"
             ));
         }
         let version = u32::from_le_bytes(<[u8; 4]>::try_from(&bytes[4..8]).unwrap());
@@ -561,8 +560,7 @@ impl CuriosityPrioritySnapshot {
 fn snapshot_id_now() -> [u8; 16] {
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_millis() as u64);
     let mut id = [0u8; 16];
     // bytes 0..8 — timestamp with version nibble
     id[0] = ((now_ms >> 40) & 0xFF) as u8;

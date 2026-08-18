@@ -81,8 +81,7 @@ mod tests {
         let conf = llmexec_confidence(0.1, 0, &config);
         assert!(
             conf > 0.5,
-            "low entropy should give high confidence, got {}",
-            conf
+            "low entropy should give high confidence, got {conf}"
         );
     }
 
@@ -92,8 +91,7 @@ mod tests {
         let conf = llmexec_confidence(0.9, 4, &config);
         assert!(
             conf < 0.5,
-            "high entropy should give low confidence, got {}",
-            conf
+            "high entropy should give low confidence, got {conf}"
         );
     }
 

@@ -908,7 +908,7 @@ mod tests {
         extrapolated_snapshot_schedule(&s0, &s1, &lambda, &seeds, 0.05, &mut out1);
         extrapolated_snapshot_schedule(&s0, &s1, &lambda, &seeds, 0.05, &mut out2);
         for j in 0..3 {
-            assert_eq!(out1[j], out2[j], "run 1 != run 2 at j={}", j);
+            assert_eq!(out1[j], out2[j], "run 1 != run 2 at j={j}");
         }
     }
 
@@ -1160,9 +1160,7 @@ mod tests {
         let expected = g * (INV_SQRT_2 + tau) + c_h * epsilon;
         assert!(
             (bound - expected).abs() < 1e-6,
-            "bound={} expected={}",
-            bound,
-            expected
+            "bound={bound} expected={expected}"
         );
     }
 
@@ -1176,8 +1174,8 @@ mod tests {
         let b0 = lipschitz_gradient_bound(0.0, lambda, g, tau, c_h, epsilon);
         let b1 = lipschitz_gradient_bound(0.1, lambda, g, tau, c_h, epsilon);
         let b2 = lipschitz_gradient_bound(1.0, lambda, g, tau, c_h, epsilon);
-        assert!(b0 < b1, "b0={} should be < b1={}", b0, b1);
-        assert!(b1 < b2, "b1={} should be < b2={}", b1, b2);
+        assert!(b0 < b1, "b0={b0} should be < b1={b1}");
+        assert!(b1 < b2, "b1={b1} should be < b2={b2}");
     }
 
     // ── T1.6 pairwise_bound ──────────────────────────────────────────────
@@ -1444,15 +1442,11 @@ mod tests {
         let ratio = selected_min_bound / random_median;
 
         eprintln!(
-            "G1: selected_min_bound={:.4} random_median_min_bound={:.4} ratio={:.2}x (target >= 2.0x)",
-            selected_min_bound, random_median, ratio
+            "G1: selected_min_bound={selected_min_bound:.4} random_median_min_bound={random_median:.4} ratio={ratio:.2}x (target >= 2.0x)"
         );
         assert!(
             selected_min_bound >= 2.0 * random_median,
-            "G1 FAIL: selected min bound {:.4} should be >= 2x random median min bound {:.4} (ratio {:.2}x)",
-            selected_min_bound,
-            random_median,
-            ratio
+            "G1 FAIL: selected min bound {selected_min_bound:.4} should be >= 2x random median min bound {random_median:.4} (ratio {ratio:.2}x)"
         );
     }
 
@@ -1549,17 +1543,13 @@ mod tests {
         let n_ref = n_values[ref_idx];
         for (idx, &n_tokens) in n_values.iter().enumerate() {
             let tau = kendall_tau(ref_scores, &scores_by_n[idx]);
-            eprintln!(
-                "G2: Kendall tau at N={} vs N={}: {:.4}",
-                n_tokens, n_ref, tau
-            );
+            eprintln!("G2: Kendall tau at N={n_tokens} vs N={n_ref}: {tau:.4}");
         }
 
         let tau_32 = kendall_tau(ref_scores, &scores_by_n[2]);
         assert!(
             tau_32 >= 0.85,
-            "G2 FAIL: Kendall tau at N=32 vs N=256 is {:.4}, should be >= 0.85",
-            tau_32
+            "G2 FAIL: Kendall tau at N=32 vs N=256 is {tau_32:.4}, should be >= 0.85"
         );
     }
 
@@ -1639,10 +1629,10 @@ mod tests {
         );
 
         for j in 0..k {
-            assert_eq!(theta1[j], theta2[j], "theta[{}] differs across runs", j);
+            assert_eq!(theta1[j], theta2[j], "theta[{j}] differs across runs");
         }
         for i in 0..n {
-            assert_eq!(loss_vecs1[i], loss_vecs2[i], "loss_vec[{}] differs", i);
+            assert_eq!(loss_vecs1[i], loss_vecs2[i], "loss_vec[{i}] differs");
         }
         assert_eq!(selected1, selected2, "selected subset differs across runs");
     }

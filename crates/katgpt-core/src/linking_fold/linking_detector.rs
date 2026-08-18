@@ -558,8 +558,7 @@ fn build_epsilon_knn_graph(
         dists.sort_by(|a, b| a.0.total_cmp(&b.0));
         let kth = dists
             .get(kk.saturating_sub(1))
-            .map(|(d, _)| *d)
-            .unwrap_or(f32::INFINITY);
+            .map_or(f32::INFINITY, |(d, _)| *d);
         all_kth_distances.push(kth);
     }
 
@@ -1039,8 +1038,7 @@ mod tests {
         let verdict = detect_linking(&x, &y, 3, &cfg);
         assert!(
             verdict.linked,
-            "Hopf link should be detected as linked; got {:?}",
-            verdict
+            "Hopf link should be detected as linked; got {verdict:?}"
         );
         assert_eq!(verdict.link.abs(), 1, "Hopf link has link = ±1");
     }
@@ -1052,8 +1050,7 @@ mod tests {
         let verdict = detect_linking(&x, &y, 3, &cfg);
         assert!(
             !verdict.linked,
-            "Unlinked circles should not be detected as linked; got {:?}",
-            verdict
+            "Unlinked circles should not be detected as linked; got {verdict:?}"
         );
     }
 
@@ -1087,8 +1084,7 @@ mod tests {
         let after = detect_linking(&x_folded, &y_folded, 3, &cfg);
         assert!(
             !after.linked,
-            "After coordinate fold, Hopf link should be unlinked; got {:?}",
-            after
+            "After coordinate fold, Hopf link should be unlinked; got {after:?}"
         );
     }
 
@@ -1347,32 +1343,29 @@ mod tests {
             }
         }
         let total_pairs = cx.len() * cy.len();
-        match witness_pair {
-            Some((i, j, ev_at, sk)) => {
-                println!(
-                    "  BB-skip: rejected {}/{} pairs ({:.1}%), evaluated {} before witness",
-                    sk,
-                    total_pairs,
-                    sk as f64 * 100.0 / total_pairs as f64,
-                    ev_at
-                );
-                println!(
-                    "  witness: cycle_x[{}] (len={}) × cycle_y[{}] (len={}) → link found at evaluated-pair #{}",
-                    i,
-                    cx[i].len(),
-                    j,
-                    cy[j].len(),
-                    ev_at
-                );
-            }
-            None => {
-                println!(
-                    "  BB-skip: rejected {}/{} pairs ({:.1}%); NO witness found in manual scan",
-                    skipped,
-                    total_pairs,
-                    skipped as f64 * 100.0 / total_pairs as f64
-                );
-            }
+        if let Some((i, j, ev_at, sk)) = witness_pair {
+            println!(
+                "  BB-skip: rejected {}/{} pairs ({:.1}%), evaluated {} before witness",
+                sk,
+                total_pairs,
+                sk as f64 * 100.0 / total_pairs as f64,
+                ev_at
+            );
+            println!(
+                "  witness: cycle_x[{}] (len={}) × cycle_y[{}] (len={}) → link found at evaluated-pair #{}",
+                i,
+                cx[i].len(),
+                j,
+                cy[j].len(),
+                ev_at
+            );
+        } else {
+            println!(
+                "  BB-skip: rejected {}/{} pairs ({:.1}%); NO witness found in manual scan",
+                skipped,
+                total_pairs,
+                skipped as f64 * 100.0 / total_pairs as f64
+            );
         }
         // Also measure the REAL detect_linking path (with skip + early-exit) for
         // apples-to-apples comparison with the bench.

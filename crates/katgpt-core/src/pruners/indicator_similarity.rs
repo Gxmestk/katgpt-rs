@@ -263,13 +263,7 @@ mod tests {
                 let b = m.similarity(j, i);
                 assert!(
                     (a - b).abs() < 1e-5,
-                    "asymmetric: sim({},{})={} vs sim({},{})={}",
-                    i,
-                    j,
-                    a,
-                    j,
-                    i,
-                    b
+                    "asymmetric: sim({i},{j})={a} vs sim({j},{i})={b}"
                 );
             }
         }
@@ -303,10 +297,7 @@ mod tests {
             let within = m.similarity(i, j);
             assert!(
                 within > 0.6,
-                "within-block sim({},{}) = {} should be > 0.6",
-                i,
-                j,
-                within
+                "within-block sim({i},{j}) = {within} should be > 0.6"
             );
         }
 
@@ -333,10 +324,7 @@ mod tests {
         let ari = adjusted_rand_index(&clusters, &planted);
         assert!(
             ari >= 0.9,
-            "ARI {} < 0.9 — cluster did not recover planted blocks. clusters={:?} planted={:?}",
-            ari,
-            clusters,
-            planted
+            "ARI {ari} < 0.9 — cluster did not recover planted blocks. clusters={clusters:?} planted={planted:?}"
         );
     }
 

@@ -688,7 +688,7 @@ mod tests {
         /// tests to simulate a collapsed / trapped E-pool.
         fn one_hot(n: usize, hot: usize) -> Self {
             assert!(n > 0, "one_hot requires n > 0");
-            assert!(hot < n, "one_hot: hot arm {} out of range for n={}", hot, n);
+            assert!(hot < n, "one_hot: hot arm {hot} out of range for n={n}");
             let mut prios = vec![1e-6_f32; n];
             prios[hot] = 1.0;
             Self { prios }
@@ -860,10 +860,7 @@ mod tests {
         let expected = (0.5 * w_before).max(1.0);
         assert!(
             (w_after - expected).abs() < 1e-5,
-            "E-pool fail: w_e should be max(1.0, 0.5·{}) = {}, got {}",
-            w_before,
-            expected,
-            w_after
+            "E-pool fail: w_e should be max(1.0, 0.5·{w_before}) = {expected}, got {w_after}"
         );
 
         // Repeated failures floor at 1.0.
@@ -896,9 +893,7 @@ mod tests {
         let expected = (0.5 * w_before).max(1.0);
         assert!(
             (w_after - expected).abs() < 1e-5,
-            "X-pool success: w_e should decay to {}, got {}",
-            expected,
-            w_after
+            "X-pool success: w_e should decay to {expected}, got {w_after}"
         );
         assert!(
             w_after < w_before,
@@ -947,10 +942,7 @@ mod tests {
         for (i, &p) in x_after.iter().enumerate() {
             assert!(
                 (p - uniform).abs() < 1e-5,
-                "X-pool[{}] should be reset to uniform {}, got {}",
-                i,
-                uniform,
-                p
+                "X-pool[{i}] should be reset to uniform {uniform}, got {p}"
             );
         }
     }
@@ -1504,10 +1496,8 @@ mod tests {
         let real_eq: f32 = eq_window.iter().sum::<f32>() / eq_window.len() as f32;
         assert!(
             (real_eq - alpha_star).abs() < 0.20,
-            "G2/T3.1 FAIL (DualPoolBandit): equilibrium α = {} too far from \
-             α* = {} (|diff| ≥ 0.20). Router did not adapt to concave landscape.",
-            real_eq,
-            alpha_star
+            "G2/T3.1 FAIL (DualPoolBandit): equilibrium α = {real_eq} too far from \
+             α* = {alpha_star} (|diff| ≥ 0.20). Router did not adapt to concave landscape."
         );
         // Cumulative regret vs r(α*) must be within C·log(T). The equilibrium
         // gap is tiny (~0.002/cycle) so total regret ≈ 20 at T=10000, well
@@ -1535,9 +1525,7 @@ mod tests {
         let sim_eq: f32 = sim_eq_window.iter().sum::<f32>() / sim_eq_window.len() as f32;
         assert!(
             (sim_eq - alpha_star).abs() < 0.20,
-            "G2/T3.1 FAIL (sim): equilibrium α = {} too far from α* = {}",
-            sim_eq,
-            alpha_star
+            "G2/T3.1 FAIL (sim): equilibrium α = {sim_eq} too far from α* = {alpha_star}"
         );
         let sim_regret = *sim.regret_vs_opt.last().unwrap();
         assert!(
@@ -1619,28 +1607,21 @@ mod tests {
         let fixed_10_reg = *fixed_10.regret_vs_opt.last().unwrap();
         assert!(
             online_reg < fixed_05_reg,
-            "G2/T3.2 FAIL: online regret {} ≥ fixed-α=0.5 regret {} \
-             (Corollary 1 violation — online should beat over-exploration)",
-            online_reg,
-            fixed_05_reg
+            "G2/T3.2 FAIL: online regret {online_reg} ≥ fixed-α=0.5 regret {fixed_05_reg} \
+             (Corollary 1 violation — online should beat over-exploration)"
         );
         assert!(
             online_reg < fixed_10_reg * 0.3,
-            "G2/T3.2 FAIL: online regret {} ≥ 30% of fixed-α=1.0 regret {} \
+            "G2/T3.2 FAIL: online regret {online_reg} ≥ 30% of fixed-α=1.0 regret {fixed_10_reg} \
              (online should crush pure-exploit — staleness makes α=1.0 far \
-             from α* ≈ {})",
-            online_reg,
-            fixed_10_reg,
-            alpha_star
+             from α* ≈ {alpha_star})"
         );
         // Sanity: fixed-0.5 (closer to α*) should have much smaller regret
         // than fixed-1.0 (far from α*). Validates the concavity model.
         assert!(
             fixed_05_reg < fixed_10_reg * 0.5,
-            "G2/T3.2 FAIL: fixed-0.5 regret {} ≥ 50% of fixed-1.0 regret {} \
-             (concavity broken — α=0.5 should be much closer to α* than α=1.0)",
-            fixed_05_reg,
-            fixed_10_reg
+            "G2/T3.2 FAIL: fixed-0.5 regret {fixed_05_reg} ≥ 50% of fixed-1.0 regret {fixed_10_reg} \
+             (concavity broken — α=0.5 should be much closer to α* than α=1.0)"
         );
     }
 
@@ -1690,25 +1671,19 @@ mod tests {
         let ratio_eq: f32 = ratio_sim.alpha_curve[t_cycles - 2000..].iter().sum::<f32>() / 2000.0;
         assert!(
             (sigmoid_eq - alpha_star).abs() < 0.20,
-            "G2/T3.3 FAIL: sigmoid equilibrium α = {} too far from α* = {}",
-            sigmoid_eq,
-            alpha_star
+            "G2/T3.3 FAIL: sigmoid equilibrium α = {sigmoid_eq} too far from α* = {alpha_star}"
         );
         assert!(
             (ratio_eq - alpha_star).abs() < 0.20,
-            "G2/T3.3 FAIL: ratio equilibrium α = {} too far from α* = {} \
-             (concavity transfer per Research 249 §2.3 failed)",
-            ratio_eq,
-            alpha_star
+            "G2/T3.3 FAIL: ratio equilibrium α = {ratio_eq} too far from α* = {alpha_star} \
+             (concavity transfer per Research 249 §2.3 failed)"
         );
         // Both should be close to each other (same equilibrium up to
         // sigmoid-vs-ratio reparameterisation noise).
         assert!(
             (sigmoid_eq - ratio_eq).abs() < 0.15,
-            "G2/T3.3 FAIL: sigmoid α_eq = {} and ratio α_eq = {} differ by ≥ 0.15 \
-             (expected same equilibrium — both are monotone concave maps)",
-            sigmoid_eq,
-            ratio_eq
+            "G2/T3.3 FAIL: sigmoid α_eq = {sigmoid_eq} and ratio α_eq = {ratio_eq} differ by ≥ 0.15 \
+             (expected same equilibrium — both are monotone concave maps)"
         );
         // Comparable regret (within 2× — neither drastically dominates).
         let sigmoid_reg = *sigmoid_sim.regret_vs_opt.last().unwrap();
@@ -1716,11 +1691,8 @@ mod tests {
         let dominance = (sigmoid_reg / ratio_reg.max(0.01)).max(ratio_reg / sigmoid_reg.max(0.01));
         assert!(
             dominance < 2.0,
-            "G2/T3.3 FAIL: sigmoid regret {} and ratio regret {} differ by {:.2}× \
-             (expected comparable — both reach α* neighbourhood)",
-            sigmoid_reg,
-            ratio_reg,
-            dominance
+            "G2/T3.3 FAIL: sigmoid regret {sigmoid_reg} and ratio regret {ratio_reg} differ by {dominance:.2}× \
+             (expected comparable — both reach α* neighbourhood)"
         );
     }
 
@@ -1769,10 +1741,7 @@ mod tests {
             let cur_size = dp.e_pool().num_arms();
             assert!(
                 cur_size >= prev_size,
-                "G3/T4.1 FAIL: E-pool shrank at cycle {} ({} → {})",
-                cycle,
-                prev_size,
-                cur_size
+                "G3/T4.1 FAIL: E-pool shrank at cycle {cycle} ({prev_size} → {cur_size})"
             );
             prev_size = cur_size;
         }
@@ -1826,9 +1795,7 @@ mod tests {
         let final_e_size = dp.e_pool().num_arms();
         assert!(
             final_e_size > initial_e_size,
-            "G3/T4.2 FAIL: E-pool didn't grow ({} → {}) — optimal direction never promoted",
-            initial_e_size,
-            final_e_size
+            "G3/T4.2 FAIL: E-pool didn't grow ({initial_e_size} → {final_e_size}) — optimal direction never promoted"
         );
 
         // The optimal direction (X-pool arm 7) should now be in E-pool.
@@ -1840,10 +1807,8 @@ mod tests {
         let uniform_4 = 1.0 / 4.0; // Initial E-pool was uniform(4)
         assert!(
             max_e_prio > uniform_4,
-            "G3/T4.2 FAIL: no E-pool arm has elevated priority (max={:.4}, uniform={:.4}) \
-             — promoted direction not consolidated",
-            max_e_prio,
-            uniform_4
+            "G3/T4.2 FAIL: no E-pool arm has elevated priority (max={max_e_prio:.4}, uniform={uniform_4:.4}) \
+             — promoted direction not consolidated"
         );
     }
 
@@ -1954,8 +1919,7 @@ mod tests {
         // All arms should be faithful — the live consumer responds to all.
         assert!(
             !faithful_arms.is_empty(),
-            "Live consumer should detect some faithful arms, got {:?}",
-            faithful_arms
+            "Live consumer should detect some faithful arms, got {faithful_arms:?}"
         );
 
         // Model "dead" arms as arms the consumer structurally ignores.
@@ -2017,10 +1981,8 @@ mod tests {
         );
         assert!(
             e_size_gated < e_size_ungated,
-            "G4/T4.4 FAIL: gated E-pool ({}) should be smaller than ungated ({}) — \
-             faithfulness gate should filter dead items",
-            e_size_gated,
-            e_size_ungated
+            "G4/T4.4 FAIL: gated E-pool ({e_size_gated}) should be smaller than ungated ({e_size_ungated}) — \
+             faithfulness gate should filter dead items"
         );
     }
 }

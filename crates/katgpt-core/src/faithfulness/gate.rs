@@ -78,9 +78,8 @@ impl EntropyThresholdGate {
     pub fn new(tau: f32, lambda: f32) -> Self {
         debug_assert!(
             lambda > 0.0,
-            "EntropyThresholdGate::new: lambda must be > 0 (got {}), \
-             else the hot-path boolean collapses incorrectly",
-            lambda
+            "EntropyThresholdGate::new: lambda must be > 0 (got {lambda}), \
+             else the hot-path boolean collapses incorrectly"
         );
         Self { tau, lambda }
     }

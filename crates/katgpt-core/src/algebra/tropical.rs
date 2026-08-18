@@ -643,7 +643,7 @@ mod tests {
         let b = [10.0f32, 20.0, 30.0];
         let mut out = 0.0f32;
         tropical_dot_into(&a, &b, &mut out, 3);
-        assert!((out - 33.0).abs() < 1e-6, "expected 33, got {}", out);
+        assert!((out - 33.0).abs() < 1e-6, "expected 33, got {out}");
     }
 
     #[test]
@@ -670,8 +670,7 @@ mod tests {
         tropical_dot_into(&w_pos, &x_pos, &mut out_pos, 2);
         assert!(
             (out_pos - 3.7).abs() < 1e-6,
-            "ReLU(3.7): expected 3.7, got {}",
-            out_pos
+            "ReLU(3.7): expected 3.7, got {out_pos}"
         );
 
         // Negative x: ReLU(−2.1) = 0
@@ -680,8 +679,7 @@ mod tests {
         tropical_dot_into(&w_pos, &x_neg, &mut out_neg, 2);
         assert!(
             (out_neg - 0.0).abs() < 1e-6,
-            "ReLU(−2.1): expected 0.0, got {}",
-            out_neg
+            "ReLU(−2.1): expected 0.0, got {out_neg}"
         );
     }
 
@@ -771,12 +769,7 @@ mod tests {
         // head vertex — since all vertices are 5.0, the max of head
         // contributions is 5.0).
         for (i, &v) in output.data.iter().enumerate() {
-            assert!(
-                (v - 5.0).abs() < 1e-6,
-                "edge {}: expected 5.0, got {}",
-                i,
-                v
-            );
+            assert!((v - 5.0).abs() < 1e-6, "edge {i}: expected 5.0, got {v}");
         }
     }
 
@@ -804,15 +797,13 @@ mod tests {
         let tropical_result = tropical_line_integral(&cx, &edge_field, &path);
         assert!(
             (tropical_result - 3.0).abs() < 1e-6,
-            "tropical: expected 3.0 (bottleneck), got {}",
-            tropical_result
+            "tropical: expected 3.0 (bottleneck), got {tropical_result}"
         );
         // Sanity: linear would give 4.0 — prove we're NOT doing sum.
         let linear_result = crate::dec::line_integral(&cx, &edge_field, &path);
         assert!(
             (linear_result - 4.0).abs() < 1e-6,
-            "linear: expected 4.0 (sum), got {}",
-            linear_result
+            "linear: expected 4.0 (sum), got {linear_result}"
         );
     }
 
@@ -850,19 +841,13 @@ mod tests {
                 count_10 += 1;
             } else {
                 // All other edges should output ≤ −100.0 (from their head vertex).
-                assert!(
-                    v <= -100.0 + 1e-6,
-                    "edge {}: expected ≤ −100.0, got {}",
-                    i,
-                    v
-                );
+                assert!(v <= -100.0 + 1e-6, "edge {i}: expected ≤ −100.0, got {v}");
             }
         }
         // Vertex 8 is the bottom-right corner → 2 incident edges as head.
         assert!(
             count_10 >= 2,
-            "expected ≥2 edges with output 10.0 (vertex 8 head-incident), got {}",
-            count_10
+            "expected ≥2 edges with output 10.0 (vertex 8 head-incident), got {count_10}"
         );
     }
 }

@@ -548,8 +548,7 @@ mod tests {
         // After sustained periodic forcing, should have measurable energy
         assert!(
             features.rhythm_confidence > 0.0,
-            "Periodic impulse train should produce non-zero confidence: {:?}",
-            features
+            "Periodic impulse train should produce non-zero confidence: {features:?}"
         );
     }
 

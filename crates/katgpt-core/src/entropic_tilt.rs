@@ -236,12 +236,7 @@ pub fn tilt_advantages_loo_into(rewards: &[f32], gamma: f32, advantages_out: &mu
         // Z ≥ e_i by construction; the max element makes Z ≥ 1, and with
         // n ≥ 2 at least one other term is > 0, so z_loo > 0.
         let z_loo = z - e_i;
-        let w = match z_loo > 0.0 {
-            true => n_minus_1 * e_i / z_loo,
-            // Unreachable for finite rewards with n ≥ 2, but a saturated
-            // group (every other term underflowing to 0) must not emit inf.
-            false => 1.0,
-        };
+        let w = if z_loo > 0.0 { n_minus_1 * e_i / z_loo } else { 1.0 };
         advantages_out.push(w - 1.0);
     }
     beta

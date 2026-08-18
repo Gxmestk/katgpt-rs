@@ -492,8 +492,7 @@ mod tests {
         cache.maybe_resize(0.90);
         assert!(
             cache.plasma_capacity() > initial_cap,
-            "capacity should grow when hit rate ({:.3}) < target (0.90)",
-            initial_rate
+            "capacity should grow when hit rate ({initial_rate:.3}) < target (0.90)"
         );
     }
 

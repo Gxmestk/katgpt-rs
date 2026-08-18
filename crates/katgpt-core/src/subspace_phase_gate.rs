@@ -654,7 +654,7 @@ pub fn thin_svd_into(
     result: &mut SvdResultScratch,
     work: &mut SvdScratch,
 ) {
-    one_sided_jacobi_svd_into(m_flat, m_rows, n_cols, result, work)
+    one_sided_jacobi_svd_into(m_flat, m_rows, n_cols, result, work);
 }
 
 /// One-sided Jacobi SVD: factor `M (m × n, m ≥ n) = U Σ V^T` and write the

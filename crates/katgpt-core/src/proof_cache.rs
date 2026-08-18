@@ -242,17 +242,14 @@ impl ProofGoalCache {
     ) -> GoalResult {
         let hash = GoalHash::from_canonical(canonical_bytes);
 
-        match self.cache.get(&hash) {
-            Some(result) => {
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                result.clone()
-            }
-            None => {
-                let result = verifier.verify(canonical_bytes);
-                self.cache.insert(hash, result.clone());
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                result
-            }
+        if let Some(result) = self.cache.get(&hash) {
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            result.clone()
+        } else {
+            let result = verifier.verify(canonical_bytes);
+            self.cache.insert(hash, result.clone());
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            result
         }
     }
 
@@ -265,17 +262,14 @@ impl ProofGoalCache {
         canonical_bytes: &[u8],
         verifier: impl GoalVerifier,
     ) -> GoalResult {
-        match self.cache.get(&hash) {
-            Some(result) => {
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                result.clone()
-            }
-            None => {
-                let result = verifier.verify(canonical_bytes);
-                self.cache.insert(hash, result.clone());
-                self.misses.fetch_add(1, Ordering::Relaxed);
-                result
-            }
+        if let Some(result) = self.cache.get(&hash) {
+            self.hits.fetch_add(1, Ordering::Relaxed);
+            result.clone()
+        } else {
+            let result = verifier.verify(canonical_bytes);
+            self.cache.insert(hash, result.clone());
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            result
         }
     }
 
@@ -678,9 +672,10 @@ mod tests {
     fn closure_verifier_works() {
         let mut cache = ProofGoalCache::new();
         let verifier = |bytes: &[u8]| -> GoalResult {
-            match bytes.is_empty() {
-                true => GoalResult::Unknown,
-                false => GoalResult::Proved,
+            if bytes.is_empty() {
+                GoalResult::Unknown
+            } else {
+                GoalResult::Proved
             }
         };
 

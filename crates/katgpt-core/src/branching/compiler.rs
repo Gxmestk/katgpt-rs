@@ -1077,17 +1077,11 @@ mod tests {
             PriorityTier::WorkingMemory,
             PriorityTier::Query,
         ] {
-            assert_eq!(
-                out.tier_count(tier),
-                1,
-                "tier {:?} should have 1 item",
-                tier
-            );
+            assert_eq!(out.tier_count(tier), 1, "tier {tier:?} should have 1 item");
             assert_eq!(
                 out.tier_dropped(tier),
                 0,
-                "tier {:?} should have 0 dropped",
-                tier
+                "tier {tier:?} should have 0 dropped"
             );
         }
         assert_eq!(out.n_items(), 7);

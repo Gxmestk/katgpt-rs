@@ -123,8 +123,7 @@ impl CapacityCurve {
             .iter()
             .map(|p| p.n_memories)
             .min()
-            .map(|p| p as f32 / self.n_neurons as f32)
-            .unwrap_or(0.0)
+            .map_or(0.0, |p| p as f32 / self.n_neurons as f32)
     }
 }
 

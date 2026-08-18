@@ -598,13 +598,12 @@ mod tests {
         for i in 0..3 {
             let (decoded_tier, decoded_bucket) =
                 decode_cache_key(key[i]).expect("in-range tier discriminant");
-            assert_eq!(decoded_tier, tier[i], "tier mismatch at index {}", i);
+            assert_eq!(decoded_tier, tier[i], "tier mismatch at index {i}");
             // Bucket = floor(ρ * 0.5).
             let expected_bucket = ((pop[i] * 0.5_f32).floor().max(0.0)) as u64;
             assert_eq!(
                 decoded_bucket, expected_bucket,
-                "bucket mismatch at index {}",
-                i
+                "bucket mismatch at index {i}"
             );
         }
     }
@@ -858,7 +857,7 @@ mod tests {
         // Subsequent gets all miss.
         for z in 0..5u32 {
             let hit = cache.get_or_invalidate(z, 10.0, DensityTier::Dense, 0, 2.0);
-            assert!(hit.is_none(), "zone {} should miss after invalidate_all", z);
+            assert!(hit.is_none(), "zone {z} should miss after invalidate_all");
         }
     }
 

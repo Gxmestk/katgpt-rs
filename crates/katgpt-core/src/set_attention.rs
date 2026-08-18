@@ -1418,7 +1418,7 @@ mod tests {
         for i in 0..d {
             for j in 0..d {
                 let expected = if i == j { 1.0f32 } else { 0.0 };
-                assert_eq!(w[i * d + j], expected, "identity[{},{}] wrong", i, j);
+                assert_eq!(w[i * d + j], expected, "identity[{i},{j}] wrong");
             }
         }
     }
@@ -1575,7 +1575,7 @@ mod tests {
 
         // All outputs finite.
         for v in &out_topk {
-            assert!(v.is_finite(), "topk output not finite: {}", v);
+            assert!(v.is_finite(), "topk output not finite: {v}");
         }
         // With k_max=1 the sparse path must differ from dense (which uses all 5).
         let any_diff = out_topk

@@ -401,7 +401,7 @@ mod tests {
         // 70 task families, each containing primitive 0 in exactly one PTG.
         // Primitive 0 should have PRI = 70/70 = 1.0. Primitive 1 only appears
         // in the first family ⇒ PRI = 1/70.
-        let mut corpus = Vec::new();
+        let mut corpus = Vec::with_capacity(70);
         for fam in 0..70u32 {
             corpus.push(build_ptg(fam, &[0]));
         }

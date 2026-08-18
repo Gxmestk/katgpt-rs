@@ -437,16 +437,13 @@ pub fn tiled_attention_parallax_forward_retaining(
 
     // Allocate scratch on demand if caller didn't provide one
     let mut local_scratch;
-    let scratch = match scratch {
-        Some(s) => {
+    let scratch = if let Some(s) = scratch {
             s.ensure_capacity(seq_len, head_dim);
             s
-        }
-        None => {
+        } else {
             local_scratch = ParallaxScratch::new(seq_len, head_dim);
             &mut local_scratch
-        }
-    };
+        };
 
     let d = head_dim;
     let n = seq_len;

@@ -437,9 +437,7 @@ mod tests {
         // The repeated one should still win.
         assert!(
             score_seen >= score_unseen,
-            "repeated pattern should score >= unseen: {} vs {}",
-            score_seen,
-            score_unseen
+            "repeated pattern should score >= unseen: {score_seen} vs {score_unseen}"
         );
     }
 
@@ -457,9 +455,7 @@ mod tests {
         let score_unseen_byte = d.score(ctx, b"zzzzzzzzzzz"); // 11 bytes, 'z' not in corpus
         assert!(
             score_corpus_pattern > score_unseen_byte,
-            "corpus pattern 'guard needs' should score higher than unseen 'zzzzzzzzzzz': {} vs {}",
-            score_corpus_pattern,
-            score_unseen_byte
+            "corpus pattern 'guard needs' should score higher than unseen 'zzzzzzzzzzz': {score_corpus_pattern} vs {score_unseen_byte}"
         );
     }
 
@@ -486,11 +482,7 @@ mod tests {
         assert_eq!(batch.len(), single.len());
         // lz4_flex is deterministic — scores must match exactly.
         for (i, (b, s)) in batch.iter().zip(single.iter()).enumerate() {
-            assert_eq!(
-                b, s,
-                "batch vs single mismatch at index {}: {} vs {}",
-                i, b, s
-            );
+            assert_eq!(b, s, "batch vs single mismatch at index {i}: {b} vs {s}");
         }
     }
 
@@ -554,8 +546,7 @@ mod tests {
         let ml = scorer.suffix_match_len(b"", b"guard needs");
         assert!(
             ml >= 11,
-            "should find the full 'guard needs' substring, got {}",
-            ml
+            "should find the full 'guard needs' substring, got {ml}"
         );
     }
 

@@ -1457,9 +1457,7 @@ mod tests {
             let norm = simd_dot_f32(col_j, col_j, d).sqrt();
             assert!(
                 (norm - 1.0).abs() < 1e-4 || norm < 1e-6,
-                "Column {} norm = {}, expected ~1.0 or ~0",
-                j,
-                norm
+                "Column {j} norm = {norm}, expected ~1.0 or ~0"
             );
         }
         // Check orthogonality between columns 0 and 1.
@@ -1467,7 +1465,7 @@ mod tests {
             let col_0 = &basis[0..d];
             let col_1 = &basis[d..2 * d];
             let dot = simd_dot_f32(col_0, col_1, d);
-            assert!(dot.abs() < 1e-4, "Columns not orthogonal: dot = {}", dot);
+            assert!(dot.abs() < 1e-4, "Columns not orthogonal: dot = {dot}");
         }
     }
 
@@ -1504,9 +1502,7 @@ mod tests {
         let e2_component = direction[1].abs();
         assert!(
             e1_component > e2_component,
-            "High-σ axis should dominate: e1={} vs e2={}",
-            e1_component,
-            e2_component
+            "High-σ axis should dominate: e1={e1_component} vs e2={e2_component}"
         );
     }
 
@@ -1652,9 +1648,7 @@ mod tests {
 
         assert!(
             out_align < x_align,
-            "Erasure should reduce target alignment: before={}, after={}",
-            x_align,
-            out_align
+            "Erasure should reduce target alignment: before={x_align}, after={out_align}"
         );
     }
 
@@ -1684,8 +1678,7 @@ mod tests {
         let proj = simd_dot_f32(&out, &d_mean, d);
         assert!(
             proj.abs() < 1e-5,
-            "LEACE should zero the class-mean direction: proj = {}",
-            proj
+            "LEACE should zero the class-mean direction: proj = {proj}"
         );
     }
 
@@ -1919,18 +1912,16 @@ mod tests {
         );
         assert_eq!(infos_u.len(), infos_c.len(), "Round count must match");
         for (i, (iu, ic)) in infos_u.iter().zip(infos_c.iter()).enumerate() {
-            assert_eq!(iu.lambda, ic.lambda, "Round {} lambda mismatch", i);
+            assert_eq!(iu.lambda, ic.lambda, "Round {i} lambda mismatch");
             assert_eq!(
                 iu.displacement, ic.displacement,
-                "Round {} displacement mismatch",
-                i
+                "Round {i} displacement mismatch"
             );
             assert_eq!(
                 iu.local_radius, ic.local_radius,
-                "Round {} local_radius mismatch",
-                i
+                "Round {i} local_radius mismatch"
             );
-            assert_eq!(iu.alignment, ic.alignment, "Round {} alignment mismatch", i);
+            assert_eq!(iu.alignment, ic.alignment, "Round {i} alignment mismatch");
         }
     }
 

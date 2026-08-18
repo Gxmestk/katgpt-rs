@@ -213,7 +213,7 @@ mod tests {
         let got = crps(&samples, 5.0);
         // mean_abs = (5 + 5)/2 = 5; mean_pair = (|0-0|+|0-10|+|10-0|+|10-10|)/(2·4) = 20/8 = 2.5.
         // CRPS = 5 − 2.5 = 2.5.
-        assert!((got - 2.5).abs() < 1e-6, "got {}", got);
+        assert!((got - 2.5).abs() < 1e-6, "got {got}");
     }
 
     #[test]
@@ -248,7 +248,7 @@ mod tests {
         let actuals = vec![5.0_f32, 15.0, 5.0];
         // 2/3 inside.
         let cov = empirical_coverage(&intervals, &actuals);
-        assert!((cov - 2.0 / 3.0).abs() < 1e-6, "got {}", cov);
+        assert!((cov - 2.0 / 3.0).abs() < 1e-6, "got {cov}");
     }
 
     #[test]

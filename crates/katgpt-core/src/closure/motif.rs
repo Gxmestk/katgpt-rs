@@ -138,7 +138,7 @@ impl<'de, const N: usize> serde::Deserialize<'de> for FixedU32Set<N> {
         impl<'de, const N: usize> serde::de::Visitor<'de> for V<N> {
             type Value = FixedU32Set<N>;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "a sequence of at most {} u32 values", N)
+                write!(f, "a sequence of at most {N} u32 values")
             }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,
@@ -351,18 +351,15 @@ impl MotifMiner {
         for local in local_maps {
             for (hash, motif) in local {
                 let existing_opt: Option<Motif> = guard.get(&hash).cloned();
-                match existing_opt {
-                    Some(mut existing) => {
-                        // Merge: add occurrence counts, union task families.
-                        existing.occurrence_count += motif.occurrence_count;
-                        for fam in motif.task_family_ids.iter() {
-                            existing.task_family_ids.insert(fam);
-                        }
-                        guard.insert(hash, existing);
+                if let Some(mut existing) = existing_opt {
+                    // Merge: add occurrence counts, union task families.
+                    existing.occurrence_count += motif.occurrence_count;
+                    for fam in motif.task_family_ids.iter() {
+                        existing.task_family_ids.insert(fam);
                     }
-                    None => {
-                        guard.insert(hash, motif);
-                    }
+                    guard.insert(hash, existing);
+                } else {
+                    guard.insert(hash, motif);
                 }
             }
         }

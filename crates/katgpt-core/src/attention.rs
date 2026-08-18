@@ -155,15 +155,12 @@ fn tiled_attention_forward_impl(
     // Buffer must be at least BR * head_dim elements.
     let tile_elems = BR * head_dim;
     let mut local_o_tile;
-    let o_tile: &mut [f32] = match o_tile {
-        Some(buf) => {
-            debug_assert!(buf.len() >= tile_elems, "o_tile buffer too small");
-            buf
-        }
-        None => {
-            local_o_tile = vec![0.0f32; tile_elems];
-            &mut local_o_tile
-        }
+    let o_tile: &mut [f32] = if let Some(buf) = o_tile {
+        debug_assert!(buf.len() >= tile_elems, "o_tile buffer too small");
+        buf
+    } else {
+        local_o_tile = vec![0.0f32; tile_elems];
+        &mut local_o_tile
     };
 
     tiled_attention_inner(q, k, v, output, seq_len, head_dim, scale, o_tile);
@@ -625,8 +622,7 @@ mod ssmax_tests {
         for i in 0..(seq_len * head_dim) {
             assert_eq!(
                 out_wrapper[i], out_folded[i],
-                "SSMax wrapper must match scale-folded at [{}]",
-                i
+                "SSMax wrapper must match scale-folded at [{i}]"
             );
         }
     }
@@ -648,9 +644,7 @@ mod ssmax_tests {
         for (i, &out_i) in output.iter().enumerate() {
             assert!(
                 (out_i - 0.5).abs() < 1e-5,
-                "n=1 output[{}] = {}, expected 0.5",
-                i,
-                out_i
+                "n=1 output[{i}] = {out_i}, expected 0.5"
             );
         }
     }

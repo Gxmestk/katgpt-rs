@@ -235,7 +235,7 @@ where
                 Intervention::Shuffle => perturb::perturb_shuffle(slice, rng),
                 Intervention::Corrupt => perturb::perturb_corrupt(slice, rng),
                 Intervention::Irrelevant => {
-                    perturb::perturb_irrelevant(slice, rng, &self.irrelevant_pool)
+                    perturb::perturb_irrelevant(slice, rng, &self.irrelevant_pool);
                 }
                 Intervention::Filler => perturb::perturb_filler(slice, &self.filler_elem),
             }
@@ -322,7 +322,7 @@ where
                 Intervention::Shuffle => perturb::perturb_shuffle(slice, rng),
                 Intervention::Corrupt => perturb::perturb_corrupt(slice, rng),
                 Intervention::Irrelevant => {
-                    perturb::perturb_irrelevant(slice, rng, &self.irrelevant_pool)
+                    perturb::perturb_irrelevant(slice, rng, &self.irrelevant_pool);
                 }
                 Intervention::Filler => perturb::perturb_filler(slice, &self.filler_elem),
             }
@@ -594,8 +594,7 @@ mod tests {
         let threshold = 0.5;
         assert!(
             profile.is_faithfully_used(threshold),
-            "faithful consumer should be detected as faithfully used: {:?}",
-            profile
+            "faithful consumer should be detected as faithfully used: {profile:?}"
         );
     }
 
@@ -621,8 +620,7 @@ mod tests {
         let threshold = 0.5;
         assert!(
             !profile.is_faithfully_used(threshold),
-            "unfaithful consumer should NOT be detected as faithfully used: {:?}",
-            profile
+            "unfaithful consumer should NOT be detected as faithfully used: {profile:?}"
         );
     }
 

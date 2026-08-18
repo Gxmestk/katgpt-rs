@@ -300,8 +300,7 @@ pub fn compute_basis_into(
     debug_assert_eq!(out.len(), n * k, "out must be (n, k)");
     debug_assert!(
         (0.1..=5.0).contains(&temperature),
-        "temperature must be in [0.1, 5.0]: got {}",
-        temperature
+        "temperature must be in [0.1, 5.0]: got {temperature}"
     );
 
     if n == 0 || k == 0 {
@@ -476,8 +475,7 @@ pub fn solve_convex_combo_dual(
     debug_assert_eq!(z_op_t.len(), k * d);
     debug_assert!(
         alpha > 0.0 && alpha < 1.0,
-        "alpha must be in (0, 1): got {}",
-        alpha
+        "alpha must be in (0, 1): got {alpha}"
     );
 
     let one_minus_alpha = 1.0 - alpha;

@@ -424,7 +424,7 @@ fn hex_prefix(h: &[u8; 32]) -> String {
     use core::fmt::Write;
     let mut s = String::with_capacity(11);
     for b in &h[..4] {
-        let _ = write!(s, "{:02x}", b);
+        let _ = write!(s, "{b:02x}");
     }
     s.push_str("..");
     s
@@ -465,11 +465,9 @@ mod tests {
             let s = bank.project(&zero, l);
             assert!(
                 (s - 0.5).abs() < 1e-6,
-                "zero-state project for {:?} should be 0.5, got {}",
-                l,
-                s
+                "zero-state project for {l:?} should be 0.5, got {s}"
             );
-            assert!((0.0..=1.0).contains(&s), "score must be in (0,1): {}", s);
+            assert!((0.0..=1.0).contains(&s), "score must be in (0,1): {s}");
         }
         // State == direction → raw dot = ‖d‖² = 1, threshold = 0 → sigmoid(1).
         let state_a = [1.0f32, 0.0, 0.0, 0.0];
@@ -477,9 +475,7 @@ mod tests {
         let expected = fast_sigmoid(1.0 - 0.0);
         assert!(
             (s - expected).abs() < 1e-6,
-            "direction-self project: {} vs {}",
-            s,
-            expected
+            "direction-self project: {s} vs {expected}"
         );
     }
 
@@ -558,7 +554,7 @@ mod tests {
         for l in all {
             let d = l.as_u8();
             let back = DemoIndicatorLabel::from_u8(d).expect("valid discriminant");
-            assert_eq!(l, back, "round-trip failed for {:?}", l);
+            assert_eq!(l, back, "round-trip failed for {l:?}");
         }
         // Out-of-range → None.
         assert!(DemoIndicatorLabel::from_u8(3).is_none());
@@ -621,7 +617,7 @@ mod tests {
                 assert_eq!(got, truncated_len);
                 assert_ne!(expected, truncated_len);
             }
-            other => panic!("expected Truncated, got {:?}", other),
+            other => panic!("expected Truncated, got {other:?}"),
         }
     }
 

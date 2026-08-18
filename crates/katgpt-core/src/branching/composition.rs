@@ -595,11 +595,7 @@ mod t44_closure_composition {
         let mut proj: NonInterferenceProjection<D> = NonInterferenceProjection::default();
         let branch = BranchId::new(0);
         let result = proj.assign_direction(branch, &emb);
-        assert!(
-            result.error.is_none(),
-            "assign should succeed: {:?}",
-            result
-        );
+        assert!(result.error.is_none(), "assign should succeed: {result:?}");
 
         // Project the embedding onto the branch's own direction → high value.
         let projected = proj.project(branch, &emb).expect("assigned");
@@ -653,8 +649,8 @@ mod t44_closure_composition {
         let b1 = BranchId::new(1);
         let r0 = proj.assign_direction(b0, &emb_a);
         let r1 = proj.assign_direction(b1, &emb_b);
-        assert!(r0.error.is_none(), "assign b0: {:?}", r0);
-        assert!(r1.error.is_none(), "assign b1: {:?}", r1);
+        assert!(r0.error.is_none(), "assign b0: {r0:?}");
+        assert!(r1.error.is_none(), "assign b1: {r1:?}");
 
         // The projection's interference() must match the manual dot product.
         let measured = proj.interference(b0, b1);
@@ -688,7 +684,7 @@ mod t44_closure_composition {
         let mut proj: NonInterferenceProjection<D> = NonInterferenceProjection::default();
         let branch = BranchId::new(0);
         let assign = proj.assign_direction(branch, &emb);
-        assert!(assign.error.is_none(), "assign: {:?}", assign);
+        assert!(assign.error.is_none(), "assign: {assign:?}");
         assert!(proj.is_non_interfering_with_all(branch));
 
         // 2. ProceduralRule with the same direction.

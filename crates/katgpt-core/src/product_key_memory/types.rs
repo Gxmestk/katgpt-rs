@@ -219,15 +219,11 @@ impl<const SQRT_N: usize, const D_K: usize, const D_V: usize> ProductKeyMemory<S
     fn assert_dims() {
         assert!(
             D_K >= D_K_FLOOR && D_K.is_multiple_of(2),
-            "ProductKeyMemory: D_K must be even and >= {}, got {}",
-            D_K_FLOOR,
-            D_K
+            "ProductKeyMemory: D_K must be even and >= {D_K_FLOOR}, got {D_K}"
         );
         assert!(
             SQRT_N >= SQRT_N_FLOOR,
-            "ProductKeyMemory: SQRT_N must be >= {}, got {}",
-            SQRT_N_FLOOR,
-            SQRT_N
+            "ProductKeyMemory: SQRT_N must be >= {SQRT_N_FLOOR}, got {SQRT_N}"
         );
     }
 

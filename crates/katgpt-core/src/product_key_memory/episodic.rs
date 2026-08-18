@@ -864,8 +864,7 @@ mod tests {
             for (v_j, &t_j) in row.iter().zip(target.iter()) {
                 assert_eq!(
                     *v_j, t_j,
-                    "gate=1 should fully overwrite top-k slot {} to target",
-                    idx
+                    "gate=1 should fully overwrite top-k slot {idx} to target"
                 );
             }
         }
@@ -923,8 +922,7 @@ mod tests {
         let ratio = dist_after_second / dist_after_first.max(1e-12);
         assert!(
             (ratio - 0.5).abs() < 0.01,
-            "second gate=0.5 write should halve the distance (ratio≈0.5, got {})",
-            ratio
+            "second gate=0.5 write should halve the distance (ratio≈0.5, got {ratio})"
         );
     }
 
@@ -997,13 +995,12 @@ mod tests {
                 // Touched slots should differ (unless target happened to equal
                 // the original — extremely unlikely with from_random).
                 let any_diff = row_before.iter().zip(row_after.iter()).any(|(a, b)| a != b);
-                assert!(any_diff, "touched slot {} should have been mutated", idx);
+                assert!(any_diff, "touched slot {idx} should have been mutated");
             } else {
                 // Untouched slots should be byte-identical.
                 assert_eq!(
                     row_before, row_after,
-                    "untouched slot {} should be unchanged",
-                    idx
+                    "untouched slot {idx} should be unchanged"
                 );
             }
         }
@@ -1086,11 +1083,7 @@ mod tests {
             let actual_ratio = dist_w / dist_u.max(1e-12);
             assert!(
                 (actual_ratio - expected_ratio).abs() < 0.01,
-                "slot {} weight {}: dist_w/dist_u should be ≈{}, got {}",
-                idx,
-                weight,
-                expected_ratio,
-                actual_ratio
+                "slot {idx} weight {weight}: dist_w/dist_u should be ≈{expected_ratio}, got {actual_ratio}"
             );
         }
     }
@@ -1406,7 +1399,7 @@ mod tests {
             } else {
                 0
             };
-            assert_eq!(stats.slot_batch_count(i), expected, "slot {}", i);
+            assert_eq!(stats.slot_batch_count(i), expected, "slot {i}");
         }
     }
 
@@ -1491,22 +1484,20 @@ mod tests {
         for m in magnates {
             assert!(
                 !selected.contains(&m),
-                "zero-idf magnate {} must not be selected (got {:?})",
-                m,
-                selected
+                "zero-idf magnate {m} must not be selected (got {selected:?})"
             );
         }
         // Selected = top-4 by weight among the survivors = pool ranks 3..7
         // (weights are distinct almost surely under softmax).
         for &s in &selected {
             let rank = pool[..n].iter().position(|&(idx, _)| idx == s).unwrap();
-            assert!(rank >= 3, "selected rank {} should be >= 3", rank);
+            assert!(rank >= 3, "selected rank {rank} should be >= 3");
         }
         // Magnates' value rows are bit-identical to the reference.
         for m in magnates {
             let got = store.working().value(m);
             let old = reference.working().value(m);
-            assert_eq!(got, old, "magnate {} must be untouched", m);
+            assert_eq!(got, old, "magnate {m} must be untouched");
         }
     }
 
@@ -1631,11 +1622,7 @@ mod tests {
                 let e = o + scaled * (t - o);
                 assert!(
                     (g - e).abs() < 1e-6,
-                    "slot {} weight {} diverged: got {:?} expected {}",
-                    idx,
-                    weight,
-                    got,
-                    e
+                    "slot {idx} weight {weight} diverged: got {got:?} expected {e}"
                 );
             }
         }

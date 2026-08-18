@@ -1252,8 +1252,7 @@ mod tests {
         // Llama PMR should be ~5 (one 2.5 outlier among ~0.5 inliers).
         assert!(
             llama_pmr < PMR_THRESHOLD_2_2,
-            "Llama-like PMR {llama_pmr:.2} should be < threshold {}, got DirectRtn expected",
-            PMR_THRESHOLD_2_2
+            "Llama-like PMR {llama_pmr:.2} should be < threshold {PMR_THRESHOLD_2_2}, got DirectRtn expected"
         );
         assert_eq!(
             llama_strat,
@@ -1269,8 +1268,7 @@ mod tests {
         let qwen_strat = select_quant_strategy(&qwen, group_size, 0.05, PMR_THRESHOLD_2_2);
         assert!(
             qwen_pmr > PMR_THRESHOLD_2_2,
-            "Qwen-like PMR {qwen_pmr:.2} should be > threshold {}, got Rrq expected",
-            PMR_THRESHOLD_2_2
+            "Qwen-like PMR {qwen_pmr:.2} should be > threshold {PMR_THRESHOLD_2_2}, got Rrq expected"
         );
         assert_eq!(
             qwen_strat,
@@ -1383,7 +1381,7 @@ mod tests {
         for i in 0..8 {
             let direct = stage.dequant_at(i);
             let via_lut = lut[stage.code_at(i) as usize];
-            assert!((direct - via_lut).abs() < 1e-6, "i={}: direct={} lut={}", i, direct, via_lut);
+            assert!((direct - via_lut).abs() < 1e-6, "i={i}: direct={direct} lut={via_lut}");
         }
     }
 
@@ -1395,7 +1393,7 @@ mod tests {
         let mut unpacked = vec![0u8; 64];
         stage.codes_unpacked_into(&mut unpacked);
         for (i, &code) in unpacked.iter().enumerate().take(64) {
-            assert_eq!(code, stage.code_at(i), "i={}", i);
+            assert_eq!(code, stage.code_at(i), "i={i}");
         }
     }
 
@@ -1539,9 +1537,8 @@ mod tests {
 
         let ratio = rrq_ns / single_8bit_ns;
         eprintln!(
-            "g2_4stage_lut_vs_single_8bit: rrq_4stage={:.1}ns single_8bit={:.1}ns ratio={:.3}x \
-             (HONEST NEGATIVE — documented, gate was ≤ 1.05x)",
-            rrq_ns, single_8bit_ns, ratio
+            "g2_4stage_lut_vs_single_8bit: rrq_4stage={rrq_ns:.1}ns single_8bit={single_8bit_ns:.1}ns ratio={ratio:.3}x \
+             (HONEST NEGATIVE — documented, gate was ≤ 1.05x)"
         );
         // Document the negative: the 4-stage LUT path is slower (ratio > 1.05).
         // This is the expected possible outcome per Plan 568 risk table.
@@ -1550,8 +1547,7 @@ mod tests {
         assert!(
             ratio > 1.0,
             "expected the 4-stage LUT path to be slower (documented negative); \
-             ratio={:.3} is unexpectedly faster — re-evaluate the G2 verdict",
-            ratio
+             ratio={ratio:.3} is unexpectedly faster — re-evaluate the G2 verdict"
         );
     }
 }

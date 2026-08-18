@@ -337,12 +337,7 @@ mod tests {
             .expect("domains exist");
         assert_eq!(aggregated.len(), rank);
         for (a, b) in aggregated.iter().zip(weighted.iter()) {
-            assert!(
-                (a - b).abs() < 1e-6,
-                "bandit_weighted drift: {} vs {}",
-                a,
-                b
-            );
+            assert!((a - b).abs() < 1e-6, "bandit_weighted drift: {a} vs {b}");
         }
     }
 }

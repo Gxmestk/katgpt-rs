@@ -225,7 +225,7 @@ where
         match &best {
             None => best = Some((score.drift, P::into_output(candidate))),
             Some((d, _)) if score.drift < *d => {
-                best = Some((score.drift, P::into_output(candidate)))
+                best = Some((score.drift, P::into_output(candidate)));
             }
             _ => {}
         }

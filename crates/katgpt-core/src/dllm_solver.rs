@@ -112,7 +112,7 @@ pub fn build_dd_tree_adaptive(
     solver_kind: &mut SolverKind,
 ) -> Vec<SolverTransition> {
     let mut transitions = Vec::with_capacity(marginals_per_depth.len());
-    let vocab_size = marginals_per_depth.first().map(|m| m.len()).unwrap_or(0);
+    let vocab_size = marginals_per_depth.first().map_or(0, |m| m.len());
     let default_h_critical = if h_critical > 0.0 {
         h_critical
     } else {
@@ -1348,8 +1348,7 @@ mod tests {
         // Should be very fast — entropy is O(n) per depth
         assert!(
             per_call < std::time::Duration::from_micros(100),
-            "Adaptive build too slow: {:?}",
-            per_call
+            "Adaptive build too slow: {per_call:?}"
         );
     }
 
@@ -1367,8 +1366,7 @@ mod tests {
         let per_call = elapsed / 10000;
         assert!(
             per_call < std::time::Duration::from_micros(10),
-            "MBR select too slow: {:?}",
-            per_call
+            "MBR select too slow: {per_call:?}"
         );
     }
 
@@ -1508,8 +1506,7 @@ mod tests {
         let per_call = start.elapsed() / 1000;
         assert!(
             per_call < std::time::Duration::from_micros(200),
-            "Adaptive build too slow: {:?}",
-            per_call
+            "Adaptive build too slow: {per_call:?}"
         );
     }
 
@@ -1596,8 +1593,7 @@ mod tests {
         // MBR should be reasonably fast (O(K^2) for small K)
         assert!(
             mbr_time < std::time::Duration::from_micros(50),
-            "MBR too slow: {:?}",
-            mbr_time
+            "MBR too slow: {mbr_time:?}"
         );
 
         // Log comparison (not a hard assertion — informational)

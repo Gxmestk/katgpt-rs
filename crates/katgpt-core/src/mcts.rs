@@ -577,9 +577,10 @@ fn rollout<S: GameState>(
         *fm_calls += 1;
     }
 
-    match current.is_terminal() {
-        true => current.reward(player_id),
-        false => heuristic(&current, player_id),
+    if current.is_terminal() {
+        current.reward(player_id)
+    } else {
+        heuristic(&current, player_id)
     }
 }
 
@@ -609,13 +610,12 @@ fn backpropagate(nodes: &mut [MCTSNode], mut idx: usize, reward: f32) {
 #[cfg(test)]
 #[inline]
 fn ucb1_score(total_reward: f32, visits: usize, parent_visits: usize) -> f32 {
-    match visits {
-        0 => f32::INFINITY,
-        _ => {
-            let exploit = total_reward / visits as f32;
-            let explore = UCB1_C * (parent_visits as f32).ln().sqrt() / (visits as f32).sqrt();
-            exploit + explore
-        }
+    if visits == 0 {
+        f32::INFINITY
+    } else {
+        let exploit = total_reward / visits as f32;
+        let explore = UCB1_C * (parent_visits as f32).ln().sqrt() / (visits as f32).sqrt();
+        exploit + explore
     }
 }
 
@@ -653,9 +653,10 @@ mod tests {
         type Action = bool;
 
         fn available_actions(&self, _player_id: u8) -> Vec<Self::Action> {
-            match self.acted {
-                true => vec![], // terminal, no actions
-                false => vec![false, true],
+            if self.acted {
+                vec![]
+            } else {
+                vec![false, true]
             }
         }
 

@@ -953,27 +953,21 @@ fn test_fill_by_method_all_methods_produce_valid_queries() {
         for &q in &queries {
             assert!(
                 q.is_finite(),
-                "{:?} produced non-finite query {}",
-                method,
-                q
+                "{method:?} produced non-finite query {q}"
             );
         }
         // Empirical mean ≈ 0 (Gaussian, σ=0.1 → mean in [-0.05, 0.05] for k*dim=32 samples).
         let mean = queries.iter().sum::<f32>() / queries.len() as f32;
         assert!(
             mean.abs() < 0.1,
-            "{:?} mean {} too far from 0",
-            method,
-            mean
+            "{method:?} mean {mean} too far from 0"
         );
         // Empirical stddev ≈ σ (in [0.05, 0.2] for 32 samples from N(0,0.1²)).
         let var = queries.iter().map(|q| (q - mean).powi(2)).sum::<f32>() / queries.len() as f32;
         let std = var.sqrt();
         assert!(
             std > 0.05 && std < 0.2,
-            "{:?} stddev {} outside [0.05, 0.2]",
-            method,
-            std
+            "{method:?} stddev {std} outside [0.05, 0.2]"
         );
     }
 }
@@ -994,7 +988,7 @@ fn test_fill_by_method_is_deterministic_given_seed() {
     ] {
         fill_noise_queries_gaussian_qmc_by_method(method, 99, k, dim, sigma, &mut a);
         fill_noise_queries_gaussian_qmc_by_method(method, 99, k, dim, sigma, &mut b);
-        assert_eq!(a, b, "{:?} must be bit-identical for same seed", method);
+        assert_eq!(a, b, "{method:?} must be bit-identical for same seed");
     }
 }
 

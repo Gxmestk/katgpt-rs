@@ -310,10 +310,7 @@ pub fn ed_from_coeff_norms(coeff_norms: &[f32]) -> (f32, f32) {
         total += c;
         weighted = c.mul_add(k as f32, weighted);
     }
-    match total > 0.0 {
-        true => (weighted, weighted / total),
-        false => (0.0, 0.0),
-    }
+    if total > 0.0 { (weighted, weighted / total) } else { (0.0, 0.0) }
 }
 
 // ── Node sampling ────────────────────────────────────────────────────────────

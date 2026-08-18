@@ -18,12 +18,12 @@ pub fn save_frozen<T>(path: &Path, data: &T) -> Result<(), String> {
         && !parent.as_os_str().is_empty()
     {
         std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory {:?}: {e}", parent))?;
+            .map_err(|e| format!("Failed to create directory {parent:?}: {e}"))?;
     }
     let bytes = unsafe {
         std::slice::from_raw_parts(data as *const T as *const u8, std::mem::size_of::<T>())
     };
-    std::fs::write(path, bytes).map_err(|e| format!("Failed to write {:?}: {e}", path))
+    std::fs::write(path, bytes).map_err(|e| format!("Failed to write {path:?}: {e}"))
 }
 
 /// Load a `repr(C)` struct from disk as raw bytes.
@@ -31,7 +31,7 @@ pub fn save_frozen<T>(path: &Path, data: &T) -> Result<(), String> {
 /// Validates file size matches expected struct size.
 /// Caller should call `.validate()` on the result to check magic/version.
 pub fn load_frozen<T>(path: &Path) -> Result<T, String> {
-    let bytes = std::fs::read(path).map_err(|e| format!("Failed to read {:?}: {e}", path))?;
+    let bytes = std::fs::read(path).map_err(|e| format!("Failed to read {path:?}: {e}"))?;
     let expected = std::mem::size_of::<T>();
     if bytes.len() != expected {
         return Err(format!(

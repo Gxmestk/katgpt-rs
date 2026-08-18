@@ -158,10 +158,7 @@ impl PrivilegeConfig {
     /// it also makes the gate react violently to a single noisy observation.
     #[inline]
     pub fn for_delta_scale(typical_abs_delta: f32) -> Self {
-        let s = match typical_abs_delta.is_finite() && typical_abs_delta > 0.0 {
-            true => typical_abs_delta,
-            false => 1.0,
-        };
+        let s = if typical_abs_delta.is_finite() && typical_abs_delta > 0.0 { typical_abs_delta } else { 1.0 };
         Self {
             alpha: 0.15,
             margin: 0.25 * s,
@@ -395,9 +392,7 @@ impl PrivilegeLedger {
     /// failure in debug builds.
     #[inline]
     pub fn privilege(&self, slot: usize) -> f32 {
-        match self.factor.get(slot) {
-            Some(&p) => p,
-            None => {
+        if let Some(&p) = self.factor.get(slot) { p } else {
                 debug_assert!(
                     false,
                     "PrivilegeLedger::privilege: slot {slot} out of range (n_slots = {}) — \
@@ -406,7 +401,6 @@ impl PrivilegeLedger {
                 );
                 1.0
             }
-        }
     }
 
     /// Record one **exact per-slot** counterfactual outcome.
@@ -427,20 +421,17 @@ impl PrivilegeLedger {
             return;
         }
         let alpha = self.config.alpha;
-        let updated = match self.delta.get_mut(slot) {
-            Some(d) => {
+        let updated = if let Some(d) = self.delta.get_mut(slot) {
                 *d = (1.0 - alpha) * *d + alpha * credit;
                 *d
-            }
-            None => {
+            } else {
                 debug_assert!(
                     false,
                     "PrivilegeLedger::observe: slot {slot} out of range (n_slots = {})",
                     self.delta.len()
                 );
                 return;
-            }
-        };
+            };
         // Keep the cached factor in lockstep — this is the one place the
         // sigmoid is paid, and it is off the fusion hot path by construction.
         self.factor[slot] = privilege_of(updated, &self.config);
@@ -474,10 +465,7 @@ impl PrivilegeLedger {
             CreditAssignment::Uniform => false,
         };
         for (&slot, &w) in trace.slots().iter().zip(trace.weights().iter()) {
-            let share = match use_weighted {
-                true => w / weight_sum,
-                false => 1.0 / n,
-            };
+            let share = if use_weighted { w / weight_sum } else { 1.0 / n };
             // `observe` re-multiplies by `advantage`, so pass the already-split
             // delta and a unit advantage to avoid squaring the outcome weight.
             self.observe(slot as usize, 1.0, credit * share);

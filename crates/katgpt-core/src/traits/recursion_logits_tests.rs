@@ -92,8 +92,7 @@ fn trait_consumer_can_read_logits_via_trait_object() {
     // Index 0 is the candidate being sharpened toward, so margin should be positive.
     assert!(
         margin > 0.0,
-        "sharpened candidate must have positive margin, got {}",
-        margin
+        "sharpened candidate must have positive margin, got {margin}"
     );
 }
 

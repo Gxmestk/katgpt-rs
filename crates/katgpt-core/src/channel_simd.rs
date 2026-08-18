@@ -140,7 +140,7 @@ impl AlignedWeightMatrix {
         // Allow: intentional uninit-then-fill to skip the memset.
         #[allow(clippy::uninit_vec)]
         unsafe {
-            data.set_len(total_len)
+            data.set_len(total_len);
         };
         let mut offsets = Vec::with_capacity(rows);
 
@@ -255,8 +255,7 @@ mod tests {
         // 16 f32 = 64 bytes = exactly one cache line, so no padding needed
         assert!(
             overhead < 0.01,
-            "Expected near-zero overhead for exact cache line fit, got {}",
-            overhead
+            "Expected near-zero overhead for exact cache line fit, got {overhead}"
         );
     }
 

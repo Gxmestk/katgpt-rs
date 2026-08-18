@@ -208,13 +208,11 @@ impl SpecDiffScratch {
         let needed = self
             .fwd_plan
             .as_ref()
-            .map(|p| p.get_inplace_scratch_len())
-            .unwrap_or(0)
+            .map_or(0, |p| p.get_inplace_scratch_len())
             .max(
                 self.inv_plan
                     .as_ref()
-                    .map(|p| p.get_inplace_scratch_len())
-                    .unwrap_or(0),
+                    .map_or(0, |p| p.get_inplace_scratch_len()),
             );
         if self.fft_scratch.capacity() < needed {
             self.fft_scratch

@@ -348,9 +348,7 @@ mod tests {
                 assert_eq!(
                     s.to_bits(),
                     d.to_bits(),
-                    "same-tier {:?} projection not identity at index {}",
-                    tier,
-                    i,
+                    "same-tier {tier:?} projection not identity at index {i}",
                 );
             }
         }
@@ -391,11 +389,7 @@ mod tests {
                         assert_eq!(
                             src_wout_lod1[src_idx].to_bits(),
                             dst_wout_lod0[dst_idx].to_bits(),
-                            "down-tier LOD1→LOD0 column mismatch at (row={}, lag={}, coord={}, mode={})",
-                            out_row,
-                            lag,
-                            coord,
-                            mode,
+                            "down-tier LOD1→LOD0 column mismatch at (row={out_row}, lag={lag}, coord={coord}, mode={mode})",
                         );
                     }
                 }
@@ -437,11 +431,7 @@ mod tests {
                         assert_eq!(
                             src_wout_lod0[src_idx].to_bits(),
                             dst_wout_lod1[dst_idx].to_bits(),
-                            "up-tier LOD0→LOD1 source column not preserved at (row={}, lag={}, coord={}, mode={})",
-                            out_row,
-                            lag,
-                            coord,
-                            mode,
+                            "up-tier LOD0→LOD1 source column not preserved at (row={out_row}, lag={lag}, coord={coord}, mode={mode})",
                         );
                     }
                     // The 4 new modes (4..8) should be zero (caller-initialized).
@@ -451,11 +441,7 @@ mod tests {
                         assert_eq!(
                             dst_wout_lod1[dst_idx],
                             0.0,
-                            "up-tier LOD0→LOD1 new column not zero at (row={}, lag={}, coord={}, mode={})",
-                            out_row,
-                            lag,
-                            coord,
-                            mode,
+                            "up-tier LOD0→LOD1 new column not zero at (row={out_row}, lag={lag}, coord={coord}, mode={mode})",
                         );
                     }
                 }
@@ -513,8 +499,7 @@ mod tests {
                         assert_eq!(
                             src_wout_lod1[idx].to_bits(),
                             roundtrip_wout_lod1[idx].to_bits(),
-                            "LOD1→LOD0→LOD1 roundtrip not identity on surviving features at idx {}",
-                            idx,
+                            "LOD1→LOD0→LOD1 roundtrip not identity on surviving features at idx {idx}",
                         );
                     }
                 }
@@ -612,8 +597,7 @@ mod tests {
         let elapsed = start.elapsed();
         let per_call = elapsed.as_nanos() / n_calls as u128;
         eprintln!(
-            "project_wout_lod_into Lod0→Lod2 (64→512 cols × D=8): {} ns/call",
-            per_call,
+            "project_wout_lod_into Lod0→Lod2 (64→512 cols × D=8): {per_call} ns/call",
         );
         assert!(
             per_call < 10_000,

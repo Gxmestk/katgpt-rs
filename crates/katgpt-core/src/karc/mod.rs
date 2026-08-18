@@ -551,8 +551,7 @@ pub fn feature_expand_higher_order<B: KarcBasis<M>, const M: usize, const R: usi
             debug_assert_eq!(idx, d_h_1 * (d_h_1 + 1) / 2, "pair buffer size mismatch");
         }
         _ => panic!(
-            "feature_expand_higher_order: R={} not implemented (only R ∈ {{1,2}})",
-            R
+            "feature_expand_higher_order: R={R} not implemented (only R ∈ {{1,2}})"
         ),
     }
 }
@@ -1091,9 +1090,7 @@ pub fn low_rank_fit(
     assert!(r > 0, "low_rank_fit: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(lambda > 0.0, "low_rank_fit: lambda must be > 0");
     assert!(a_out.len() >= d_out * r, "a_out too small");
@@ -1613,9 +1610,7 @@ pub fn low_rank_fit_warm_start(
     assert!(r > 0, "low_rank_fit_warm_start: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit_warm_start: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit_warm_start: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(lambda > 0.0, "low_rank_fit_warm_start: lambda must be > 0");
     assert!(a_out.len() >= d_out * r, "a_out too small");
@@ -1700,9 +1695,7 @@ pub fn low_rank_fit_b_with_frozen_a(
     assert!(r > 0, "low_rank_fit_b_with_frozen_a: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit_b_with_frozen_a: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit_b_with_frozen_a: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(
         lambda > 0.0,

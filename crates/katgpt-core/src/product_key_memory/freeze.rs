@@ -697,9 +697,7 @@ mod tests {
                 let v = reader_frozen.current_version();
                 assert!(
                     v >= last_version,
-                    "version went backwards: {} -> {}",
-                    last_version,
-                    v
+                    "version went backwards: {last_version} -> {v}"
                 );
                 last_version = v;
             }
@@ -716,9 +714,7 @@ mod tests {
         // in-loop above), not that the reader saw every commit.
         assert!(
             last <= N_COMMITS as u64,
-            "reader's last version {} should be <= {} (the reader may finish before the writer)",
-            last,
-            N_COMMITS
+            "reader's last version {last} should be <= {N_COMMITS} (the reader may finish before the writer)"
         );
         // After both threads join, all commits are applied.
         assert_eq!(frozen.current_version(), N_COMMITS as u64);

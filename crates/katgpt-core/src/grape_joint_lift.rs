@@ -839,7 +839,7 @@ mod tests {
         // Same offset m = -5, derived from different (i, j) pairs.
         let m = -5_i32;
         let pairs = [(0_i32, 5), (10, 15), (100, 105), (1000, 1005)];
-        let mut scores = Vec::new();
+        let mut scores = Vec::with_capacity(pairs.len());
         for _ in &pairs {
             let mut scratch = [0.0_f32; 8];
             let mut score = 0.0;

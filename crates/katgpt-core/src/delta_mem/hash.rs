@@ -536,11 +536,7 @@ mod tests {
                 let actual = hasher.projection[i * feature_dim + j];
                 assert!(
                     (expected - actual).abs() == 0.0,
-                    "projection[({}, {})] bit-drift: expected {} got {}",
-                    i,
-                    j,
-                    expected,
-                    actual
+                    "projection[({i}, {j})] bit-drift: expected {expected} got {actual}"
                 );
             }
         }

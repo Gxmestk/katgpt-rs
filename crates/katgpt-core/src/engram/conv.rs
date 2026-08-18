@@ -602,8 +602,7 @@ mod tests {
             conv_causal_dyn_into(&v_tilde, &mut out_dyn, &kernel_dyn, dil);
             assert_eq!(
                 out_static, out_dyn,
-                "dyn must match static at K=4 (dilation={})",
-                dil
+                "dyn must match static at K=4 (dilation={dil})"
             );
         }
     }

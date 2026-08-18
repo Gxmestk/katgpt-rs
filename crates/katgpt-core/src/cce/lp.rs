@@ -489,15 +489,12 @@ impl CceLp {
                 }
             }
 
-            match worst {
-                Some((i, di, _v)) => {
+            if let Some((i, di, _v)) = worst {
                     active.push((i, di));
-                }
-                None => {
+                } else {
                     // No violated constraint found — converged.
                     return Ok(rho);
                 }
-            }
         }
 
         // Exhausted iteration budget without convergence — numerical failure.

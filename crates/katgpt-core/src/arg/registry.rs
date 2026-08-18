@@ -640,7 +640,7 @@ mod tests {
         for n in 1..=20u8 {
             let u = unit(n, n, n as u64);
             let result = reg.canonicalize(&u, &mut scratch);
-            assert!(result.is_none(), "iter {} must be NoMatch", n);
+            assert!(result.is_none(), "iter {n} must be NoMatch");
             reg.insert(u);
         }
         // Scratch is cleared each call; capacity unchanged by the no-match path.

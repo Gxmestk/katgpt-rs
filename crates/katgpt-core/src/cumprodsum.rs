@@ -576,7 +576,7 @@ mod tests {
         for i in 0..t {
             assert!(out[i].is_finite(), "Output {} is not finite: {}", i, out[i]);
             if i > 0 {
-                assert!(out[i] > out[i - 1], "Not monotonically increasing at {}", i);
+                assert!(out[i] > out[i - 1], "Not monotonically increasing at {i}");
             }
         }
     }
@@ -731,7 +731,7 @@ mod tests {
         // a = [1, 1, 1] → all info persists → freshness high
         let a = [1.0, 1.0, 1.0];
         let f = context_freshness(&a);
-        assert!(f > 0.9, "Expected high freshness for no decay, got {}", f);
+        assert!(f > 0.9, "Expected high freshness for no decay, got {f}");
     }
 
     #[test]
@@ -739,7 +739,7 @@ mod tests {
         // a = [0, 0, 0] → nothing persists → freshness low
         let a = [0.0, 0.0, 0.0];
         let f = context_freshness(&a);
-        assert!(f < 0.1, "Expected low freshness for fast decay, got {}", f);
+        assert!(f < 0.1, "Expected low freshness for fast decay, got {f}");
     }
 
     #[test]
@@ -747,14 +747,14 @@ mod tests {
         // a = [0.5, 0.5, 0.5] → moderate
         let a = [0.5, 0.5, 0.5];
         let f = context_freshness(&a);
-        assert!(f > 0.0 && f < 1.0, "Expected moderate freshness, got {}", f);
+        assert!(f > 0.0 && f < 1.0, "Expected moderate freshness, got {f}");
     }
 
     #[test]
     fn freshness_empty() {
         let a: [f32; 0] = [];
         let f = context_freshness(&a);
-        assert!((f - 0.5).abs() < 1e-5, "Expected 0.5 for empty, got {}", f);
+        assert!((f - 0.5).abs() < 1e-5, "Expected 0.5 for empty, got {f}");
     }
 
     // ── property: cumprodsum matches GDN2-style recurrence ─────────

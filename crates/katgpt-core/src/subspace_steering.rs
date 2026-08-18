@@ -607,9 +607,7 @@ mod tests {
             let expected = alphas[0] * field.block[0][j] + alphas[1] * field.block[1][j];
             assert!(
                 (sj - expected).abs() < 1e-6,
-                "j={j}: got {}, expected {}",
-                sj,
-                expected
+                "j={j}: got {sj}, expected {expected}"
             );
         }
     }
@@ -872,8 +870,7 @@ mod tests {
         let clean_dot = dot_product(&field.block[0], &field.block[1]);
         assert!(
             clean_dot.abs() < 1e-4,
-            "orthogonalized block rows must be orthogonal, got dot = {}",
-            clean_dot
+            "orthogonalized block rows must be orthogonal, got dot = {clean_dot}"
         );
     }
 

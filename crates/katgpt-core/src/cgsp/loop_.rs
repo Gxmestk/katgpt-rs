@@ -424,7 +424,7 @@ where
         // (required by the paired snapshot format). Zero = "no associated
         // direction" — honest for phantom arms.
         if directions.len() < priorities.len() {
-            let dim = directions.first().map(|d| d.dim()).unwrap_or(0);
+            let dim = directions.first().map_or(0, |d| d.dim());
             let pad_count = priorities.len() - directions.len();
             directions.reserve(pad_count);
             for _ in 0..pad_count {
@@ -476,7 +476,7 @@ where
     where
         F: FnMut(&CuriosityPrioritySnapshot),
     {
-        let mut emitted = Vec::new();
+        let mut emitted = Vec::with_capacity(n);
         let every_n = every_n.max(1);
         for i in 0..n {
             let _ = self.cycle(target, scratch);

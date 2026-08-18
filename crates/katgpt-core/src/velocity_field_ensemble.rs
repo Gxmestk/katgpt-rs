@@ -724,10 +724,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_err < 1e-4,
-            "η recovery failed: η = {:?}, η* = {:?}, max_err = {}",
-            eta,
-            eta_star,
-            max_err
+            "η recovery failed: η = {eta:?}, η* = {eta_star:?}, max_err = {max_err}"
         );
     }
 
@@ -850,9 +847,7 @@ mod tests {
         for (i, &eta_i) in ensemble.eta().iter().enumerate() {
             assert!(
                 eta_i.is_finite(),
-                "η[{}] = {} is not finite (λ failed to stabilize)",
-                i,
-                eta_i
+                "η[{i}] = {eta_i} is not finite (λ failed to stabilize)"
             );
         }
         // The ridge solution splits the target equally between the duplicates
@@ -860,9 +855,7 @@ mod tests {
         let (e0, e1) = (ensemble.eta()[0], ensemble.eta()[1]);
         assert!(
             (e0 - e1).abs() < 1e-3,
-            "duplicate fields should get equal weights: η = [{}, {}]",
-            e0,
-            e1
+            "duplicate fields should get equal weights: η = [{e0}, {e1}]"
         );
     }
 

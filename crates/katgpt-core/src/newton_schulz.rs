@@ -1243,7 +1243,7 @@ mod tests {
         let mut momentum = vec![0.0f32; 16];
         let mut out = vec![0.0f32; 16];
 
-        let mut norms = Vec::new();
+        let mut norms = Vec::with_capacity(3);
         for _ in 0..3 {
             muon_update(&grad, &mut momentum, 0.9, 4, 4, &mut out);
             // Track the momentum buffer norm (before orthogonalization in next step)
@@ -1359,8 +1359,7 @@ mod tests {
         for i in 0..r * r {
             assert!(
                 (out_alloc[i] - out_scratch[i]).abs() < 1e-6,
-                "Mismatch at {}",
-                i
+                "Mismatch at {i}"
             );
         }
     }

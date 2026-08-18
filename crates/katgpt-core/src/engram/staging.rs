@@ -226,13 +226,10 @@ impl<'a> StagingEngramTable<'a> {
         for m in &pending {
             let start = m.slot_idx * d;
             let end = start + d;
-            match &m.new_pattern {
-                Some(pattern) => {
-                    new_slots[start..end].copy_from_slice(pattern);
-                }
-                None => {
-                    new_slots[start..end].fill(0.0);
-                }
+            if let Some(pattern) = &m.new_pattern {
+                new_slots[start..end].copy_from_slice(pattern);
+            } else {
+                new_slots[start..end].fill(0.0);
             }
         }
 

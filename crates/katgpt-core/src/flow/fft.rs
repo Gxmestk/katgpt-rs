@@ -268,8 +268,7 @@ mod tests {
         let center_val = grid[cy * w + cx];
         assert!(
             center_val > -50.0,
-            "local minimum should be smoothed out, got {}",
-            center_val
+            "local minimum should be smoothed out, got {center_val}"
         );
     }
 

@@ -316,7 +316,7 @@ impl<const K: usize, const L: usize> ErasedCluster for ClusterHolder<K, L> {
 
     fn override_pi(&mut self, pi: &[f32]) {
         // DRY: delegate to the inherent method (Issue 189 T2).
-        self.override_pi_direct(pi)
+        self.override_pi_direct(pi);
     }
 }
 
@@ -372,12 +372,11 @@ impl<const DOMAINS: usize, const D_FULL: usize, const A: usize>
                 for i in 1..idx.len() {
                     debug_assert!(
                         idx[i] > idx[i - 1],
-                        "domain {} projection indices must be strictly ascending",
-                        d
+                        "domain {d} projection indices must be strictly ascending"
                     );
                 }
                 if let Some(&last) = idx.last() {
-                    debug_assert!(last < D_FULL, "domain {} index {} >= D_FULL {}", d, last, D_FULL);
+                    debug_assert!(last < D_FULL, "domain {d} index {last} >= D_FULL {D_FULL}");
                 }
             }
         }
@@ -852,8 +851,7 @@ mod tests {
         // Dims 0,1 written by the blend; dims 2,3 NOT in combat's mask stay zero.
         assert!(
             dz_out[2] == 0.0 && dz_out[3] == 0.0,
-            "non-projected dims must stay zero, got {:?}",
-            dz_out
+            "non-projected dims must stay zero, got {dz_out:?}"
         );
         // Dim 0,1 should have non-trivial output (the blend wrote something).
         // We can't assert exact values without re-deriving the blend, but we
@@ -886,7 +884,7 @@ mod tests {
             let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
             assert!(verdict.domain < 2);
             for v in dz_out.iter() {
-                assert!(v.is_finite(), "NaN in dz_out: {:?}", dz_out);
+                assert!(v.is_finite(), "NaN in dz_out: {dz_out:?}");
             }
         }
     }
@@ -969,8 +967,7 @@ mod tests {
         router.tick(&z, &activity, &mut scratch, &mut dz_out);
         assert!(
             dz_out[2] == 0.0 && dz_out[3] == 0.0,
-            "non-projected dims must stay zero, got {:?}",
-            dz_out
+            "non-projected dims must stay zero, got {dz_out:?}"
         );
         assert!(dz_out[0].is_finite() && dz_out[1].is_finite());
     }
@@ -1024,7 +1021,7 @@ mod tests {
             let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
             assert!(verdict.domain < 2);
             for v in dz_out.iter() {
-                assert!(v.is_finite(), "NaN in dz_out: {:?}", dz_out);
+                assert!(v.is_finite(), "NaN in dz_out: {dz_out:?}");
             }
         }
     }
@@ -1062,11 +1059,10 @@ mod tests {
             let mut dz2 = [0.0f32; 4];
             let v2 = static_router.tick(&z, &activity, &mut s2, &mut dz2);
 
-            assert_eq!(v1, v2, "verdict mismatch at iter {}: {:?} vs {:?}", i, v1, v2);
+            assert_eq!(v1, v2, "verdict mismatch at iter {i}: {v1:?} vs {v2:?}");
             assert_eq!(
                 dz1, dz2,
-                "dz_out bit-mismatch at iter {}: {:?} vs {:?}",
-                i, dz1, dz2
+                "dz_out bit-mismatch at iter {i}: {dz1:?} vs {dz2:?}"
             );
         }
     }

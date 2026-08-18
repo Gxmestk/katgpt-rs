@@ -504,7 +504,7 @@ mod tests {
 
         for face in &complex.faces {
             for w in face.windows(2) {
-                assert!(w[0] <= w[1], "face corners should be sorted: {:?}", face);
+                assert!(w[0] <= w[1], "face corners should be sorted: {face:?}");
             }
         }
     }
@@ -534,7 +534,7 @@ mod tests {
             let start = std::time::Instant::now();
             let _complex = std::hint::black_box(cubical_nerve(&poset));
             let elapsed = start.elapsed();
-            println!("cubical_nerve(chain {} zones): {:?}", n, elapsed);
+            println!("cubical_nerve(chain {n} zones): {elapsed:?}");
         }
 
         // --- Bushy poset (many covering pairs from single root) ---
@@ -543,7 +543,7 @@ mod tests {
             let start = std::time::Instant::now();
             let _complex = std::hint::black_box(cubical_nerve(&poset));
             let elapsed = start.elapsed();
-            println!("cubical_nerve(bushy {} zones): {:?}", n, elapsed);
+            println!("cubical_nerve(bushy {n} zones): {elapsed:?}");
         }
 
         // Assert 100-zone chain completes within generous 100ms bound.
@@ -625,7 +625,7 @@ mod tests {
         let threshold = 64; // NERVE_OPT_THRESHOLD
         let sizes = [32, 64, 128, 256];
 
-        println!("\nNerve construction benchmark (threshold={}):", threshold);
+        println!("\nNerve construction benchmark (threshold={threshold}):");
 
         for &n in &sizes {
             let poset = chain_poset(n);

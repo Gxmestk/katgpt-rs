@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn semantic_type_debug_does_not_dump_array() {
         let s = SemanticType::basis("x", 0);
-        let dbg = format!("{:?}", s);
+        let dbg = format!("{s:?}");
         assert!(dbg.contains("x"));
         assert!(!dbg.contains("0.0, 0.0"));
     }

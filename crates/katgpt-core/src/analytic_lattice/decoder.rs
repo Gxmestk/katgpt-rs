@@ -275,7 +275,7 @@ mod tests {
         // Ranking must match exactly (sigmoid is monotone, so ranking is
         // determined by the dot product alone).
         for (i, (s, r)) in simd_scores.iter().zip(ref_scores.iter()).enumerate() {
-            assert!((s - r).abs() < 1e-6, "rank {}: simd {} vs ref {}", i, s, r);
+            assert!((s - r).abs() < 1e-6, "rank {i}: simd {s} vs ref {r}");
         }
     }
 }

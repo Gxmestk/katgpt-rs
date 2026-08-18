@@ -636,7 +636,7 @@ mod tests {
     /// tolerated failure in 72 applications (1.4% ≤ NOISE_TOL).
     #[test]
     fn regime_a_consistent_application() {
-        let mut apps = Vec::new();
+        let mut apps = Vec::with_capacity(6);
         let mut task = 0u32;
         // 6 levels × 4 tasks × 3 apps; a single failure on the first
         // level-3 task's last application.
@@ -660,7 +660,7 @@ mod tests {
     /// so each level sees the same fail rate).
     #[test]
     fn regime_b_random_flakiness() {
-        let mut apps = Vec::new();
+        let mut apps = Vec::with_capacity(6);
         let mut task = 0u32;
         let mut idx = 0usize;
         for _lvl in 0..6u8 {
@@ -689,7 +689,7 @@ mod tests {
     /// paper's nesting-depth signature (19/24 at short context).
     #[test]
     fn regime_c_complexity_clustered_nesting_anchor() {
-        let mut apps = Vec::new();
+        let mut apps = Vec::with_capacity(5);
         let mut task = 0u32;
         // 19 correct applications across levels 1..=4, 5 failures at level 5
         // — exactly the paper's 19/24 nesting-depth-5 row.
@@ -746,7 +746,7 @@ mod tests {
     /// Single stray failure at one level is NOT a cluster (MIN_SUFFIX_FAILURES).
     #[test]
     fn single_stray_failure_is_not_a_cluster() {
-        let mut apps = Vec::new();
+        let mut apps = Vec::with_capacity(5);
         let mut task = 0u32;
         for lvl in 0..5u8 {
             for _ in 0..4 {
@@ -763,7 +763,7 @@ mod tests {
     /// Graded degradation (0.0, 0.6, 1.0 failure rates) is honestly Ambiguous.
     #[test]
     fn graded_degradation_is_ambiguous() {
-        let mut apps = Vec::new();
+        let mut apps = Vec::with_capacity(5);
         let mut task = 0u32;
         // Level 0: 5 apps all correct. Level 1: 5 apps, 3 fail (60%). Level 2: 5 apps all fail.
         for _ in 0..5 {
