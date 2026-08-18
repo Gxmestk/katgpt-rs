@@ -2,9 +2,9 @@
 
 > **Source:** [jundot/omlx PR #2756](https://github.com/jundot/omlx/pull/2756) — onthehub97, "feat(qwen3.5): add experimental dual-ANE/GPU prompt processing", merged 2026-08-17 (commit `fbb98dc`, 19.3k-star MLX inference server). Follow-ups: #2760 (oQ4e + runtime hardening, merged), #2781 (M3 Max: 16K +13%, 32K +57% prefill, open), #2803 (DeepSeek, open).
 > **Date:** 2026-08-18
-> **Status:** Active — Gain (POC-gated; riir-ai Issue 726 filed). Partially fires Research 427's revisit trigger #1: ANE fused-kernel dispatch decisions now matter at LLM-prefill scale — but on the **private-runtime** path, not CoreML.
+> **Status:** Active — Gain (POC-gated; riir-ai Issue 726 filed, retargeted same day to Ternary-Bonsai). Partially fires Research 427's revisit trigger #1: ANE fused-kernel dispatch decisions now matter at LLM-prefill scale — but on the **private-runtime** path, not CoreML.
 > **Related Research:** 155 (ANE Backend Verdict — Path B `rane` private-API precedent, Path A CoreML decision), 377 (ANE architecture: 0.23ms dispatch floor, 2MB working set, int8 formats), 223/224 (ANE distillation + coremltools), 427 (tile-graph overlap — dependency-chain analysis kin), 419 (PackInfer, loose)
-> **Related Plans/Benches:** Plan 255 + Bench 053 (`ane_npc` GOAT FAIL — dispatch-floor economics), Plan 379 (`ane_roofline.rs`), Bench 438/439 (ANE fused-chain cost model: fusion saves 95.3% dispatch-bound; CoreML routes large F32 to CPU)
+> **Related Plans/Benches:** Plan 255 + Bench 053 (`ane_npc` GOAT FAIL — dispatch-floor economics), Plan 379 (`ane_roofline.rs`), Bench 438/439 (ANE fused-chain cost model: fusion saves 95.3% dispatch-bound; CoreML routes large F32 to CPU); riir-clippy **Bench 010** (the live-gap anchor — see §5)
 > **Classification:** Public
 
 ---
@@ -15,7 +15,7 @@ oMLX PR #2756 adds a hybrid prompt-processing path for dense Qwen 3.5/3.6/3.8: e
 
 For us this is the **first production-grade proof of the regime Bench 053 predicted ANE would win**: our CoreML ANE path failed economically because per-dispatch compute (~11µs of NPC projection) was dwarfed by the ~0.28ms ANE dispatch floor. A 2048-token × hidden GEMM is ~25-60ms of compute per layer — the floor amortizes ~100×. Crucially, the winning path is **NOT CoreML** (our Path A): it is the private `AppleNeuralEngine.framework` runtime with **procedure banks** (112 procedures in 2 resident programs under a ~121-handle budget), **instance pinning** (two pinned submissions beat one unpinned: 41.51ms vs 57.90ms), and INT8 per-output-channel requant with fail-open GPU fallback. That is Research 155's Path B (`rane`-style private access), which we shelved as "experimental fallback" — now validated at production scale by an external codebase.
 
-**Verdict: Gain (modest).** Not Super-GOAT (external prior art caps Q1; perf not a new behavior class). Actionable output: riir-ai Issue 726 (dual-ANE/GPU hybrid prefill POC for riir-gpu gemma2/deltanet on M3 Max, default-off, fail-open, GOAT-gated). katgpt-rs gets **no** new primitive now — `ane_roofline.rs` suffices; a hybrid-split cost term is a follow-up only if the POC lands.
+**Verdict: Gain (POC-gated).** Not Super-GOAT (external prior art caps Q1; perf not a new behavior class). Actionable output: riir-ai Issue 726 — dual-ANE/GPU hybrid prefill POC on **Ternary-Bonsai-27B** (`TernaryDeltanetGpuForward`, the only model in focus per Issue 629's 2026-08-15 directive; retargeted from gemma2, which we don't run — Bonsai's deltanet layers are omlx's own GDN target): default-off, fail-open, GOAT-gated. katgpt-rs gets **no** new primitive now — `ane_roofline.rs` suffices; a hybrid-split cost term is a follow-up only if the POC lands.
 
 ---
 
@@ -74,14 +74,14 @@ Bench 053's "When ANE Would Win" section predicted exactly this: heavier workloa
 
 ## 5. Novelty gate + routing verdict
 
-- **Q1 no** (§3). **Q2 no** (perf, not a new behavior class). **Q3 partial** ("all-three-engines inference on Apple Silicon" is an engine-tooling selling point, not a game-NPC one). **Q4 yes** (connects ANE substrate 155/377/427/379 × riir-gpu Metal prefill × our GDN/deltanet kernels × Bonsai-27B M3 inference).
+- **Q1 no** (§3). **Q2 no** (perf, not a new behavior class). **Q3 partial** ("all-three-engines inference on Apple Silicon" is an engine-tooling selling point, not a game-NPC one). **Q4 yes** (connects ANE substrate 155/377/427/379 × riir-gpu batched ternary prefill × our deltanet substrate × Bonsai-27B, the only model in focus per Issue 629's directive).
 - → **Gain, not Super-GOAT.** No guide/plan mandated by the gate.
-- **riir-ai Issue 726** (filed): dual-ANE/GPU hybrid prefill POC — riir-gpu gemma2 q4 gate/up + deltanet `z+qkv` on M3 Max, feature `ane_prefill` (default-off, macOS-only), fail-open, GOAT G1 numerics / G2 ≥+15% @8K / G3 no-regression.
+- **riir-ai Issue 726** (filed; retargeted 2026-08-18): dual-ANE/GPU hybrid prefill POC on **Ternary-Bonsai-27B deltanet** — `in_proj_concat` (qkv|z|a|b, already fused — mirrors omlx's combined-procedure decision) + `gate_up_proj` channel split, ANE prefix + GPU batched-GEMM suffix (the Issue 637/641 kernels — **riir-clippy Bench 010's "no batched prefill at all" finding is stale**, they landed after it and `prefill_project` is wired), feature `ane_prefill` (default-off, macOS-only), fail-open, GOAT G1 numerics (ternary→int8 requant is **lossless** — weights ∈ {−1,0,1}; better than omlx's 0.9992) / G2 ≥+15% @≥4K / G3 no-regression. Live-gap anchor: Bench 010 (prefill was 8.38× behind llama.cpp when unbatched; 17.89 vs 149.95 tok/s). **Honest scope:** short clippy prompts (93-154 tok) never engage the ANE path — the lever is long-context prefill (4K-32K; omlx M3 Max +13%→+57%), complementing Issue 721 (tree-verify) which owns the decode half of the latency budget.
 - **katgpt-rs: nothing now.** `ane_roofline.rs` (Plan 379) already models dispatch floor + working set; if the POC lands, extend it with a hybrid-split cost term (pick `fraction` by predicted ANE/GPU overlap, replacing a manual sweep). Research 427 tile-graph stays deferred — the PR's 38.8% duty-cycle analysis is dependency-chain reasoning, but we don't need a simulator to pick one scalar split fraction; a sweep suffices.
 
 ## 6. Defend-wrong scope (what we do NOT claim)
 
-No quality or performance parity claim for OUR stack. Their cosine 0.9992 is their requant path on their model; any adoption claim requires our own PoC (GPU-only vs hybrid, identical prompts, riir-gpu bench) per the §3.6 rule. Architecturally the analog exists (Bench 438 measured our ANE fusion mechanism); latency and quality on the private runtime from Rust are **unproven** until Issue 726's gates run.
+No quality or performance parity claim for OUR stack. Their cosine 0.9992 is their requant path on their model; any adoption claim requires our own PoC (GPU-only vs hybrid, identical prompts, riir-gpu bench) per the §3.6 rule. Architecturally the analog exists (Bench 438 measured our ANE fusion mechanism); latency and quality on the private runtime from Rust are **unproven** until Issue 726's gates run. The ≥+15% gate is a hypothesis derived from their measurements on a different model/quant/runtime — not a transferable number.
 
 ## 7. riir-clippy distill verdict — NO (recorded; conversation-only per distill skill)
 
