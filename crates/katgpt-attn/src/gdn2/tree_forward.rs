@@ -512,6 +512,7 @@ pub fn forward_tree_gdn2_hola(
 mod tests {
     use super::*;
     use crate::gdn2::forward_gdn2;
+    use katgpt_core::speculative::types::TreePath;
     use katgpt_core::types::Rng;
 
     /// Generate random weights for testing.
