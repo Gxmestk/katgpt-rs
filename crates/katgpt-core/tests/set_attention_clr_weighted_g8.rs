@@ -341,8 +341,7 @@ fn g8b_clr_weighted_sa_aggregate_amplification() {
     let amplification = clr_mean / plain_mean.max(1e-10);
 
     eprintln!(
-        "G8b: plain SA aggregate proj = {:.4}, CLR-weighted SA = {:.4}, amplification = {:.2}× (target ≥ 2×)",
-        plain_mean, clr_mean, amplification
+        "G8b: plain SA aggregate proj = {plain_mean:.4}, CLR-weighted SA = {clr_mean:.4}, amplification = {amplification:.2}× (target ≥ 2×)"
     );
 
     assert!(

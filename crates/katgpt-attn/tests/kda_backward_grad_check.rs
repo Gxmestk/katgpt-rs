@@ -320,12 +320,12 @@ fn gradient_check_all_params() {
 
     // Report.
     eprintln!("═══ KDA gradient check ═══");
-    eprintln!("  max relative error across all checked params: {:.6}", max_rel_err);
-    eprintln!("  tolerance: {:.6}", tol);
+    eprintln!("  max relative error across all checked params: {max_rel_err:.6}");
+    eprintln!("  tolerance: {tol:.6}");
     if !failures.is_empty() {
         eprintln!("  FAILURES ({}):", failures.len());
         for f in &failures {
-            eprintln!("    {}", f);
+            eprintln!("    {f}");
         }
     }
     assert!(
@@ -461,15 +461,11 @@ fn gradient_check_state_bptt_seam() {
         "  head={}, entry={} (S[{},{}]): analytic={}, numeric={}, rel_err={:.6}",
         head, entry, entry / dk, entry % dk, analytic_ds, numeric_ds, err
     );
-    eprintln!("  tolerance: {:.6}", tol);
+    eprintln!("  tolerance: {tol:.6}");
 
     assert!(
         err < tol,
-        "state-gradient check FAILED: rel_err = {:.6} >= {:.6}. analytic={}, numeric={}",
-        err,
-        tol,
-        analytic_ds,
-        numeric_ds
+        "state-gradient check FAILED: rel_err = {err:.6} >= {tol:.6}. analytic={analytic_ds}, numeric={numeric_ds}"
     );
 }
 
@@ -535,14 +531,13 @@ fn gradient_check_input_hidden() {
             max_err = err;
         }
         eprintln!(
-            "  h[{}][{}]: analytic={}, numeric={}, rel_err={:.6}",
-            t_check, i, analytic, numeric, err
+            "  h[{t_check}][{i}]: analytic={analytic}, numeric={numeric}, rel_err={err:.6}"
         );
     }
 
     eprintln!("═══ KDA input-gradient check ═══");
-    eprintln!("  max relative error: {:.6}", max_err);
-    assert!(max_err < tol, "input-gradient check FAILED: max rel_err = {:.6}", max_err);
+    eprintln!("  max relative error: {max_err:.6}");
+    assert!(max_err < tol, "input-gradient check FAILED: max rel_err = {max_err:.6}");
 }
 
 // ─── Multi-token gradient check (Plan 318 Phase C C5) ───────────────────────
@@ -723,13 +718,13 @@ fn gradient_check_multitoken_all_params() {
     }
 
     eprintln!("═══ KDA multi-token gradient check (L={}, K={}) ═══", l, config.conv_kernel_size);
-    eprintln!("  max relative error across checked params: {:.6}", max_rel_err);
-    eprintln!("  tolerance: {:.6}", tol);
-    eprintln!("  skipped (noise-dominated): {}", skipped);
+    eprintln!("  max relative error across checked params: {max_rel_err:.6}");
+    eprintln!("  tolerance: {tol:.6}");
+    eprintln!("  skipped (noise-dominated): {skipped}");
     if !failures.is_empty() {
         eprintln!("  FAILURES ({}):", failures.len());
         for f in &failures {
-            eprintln!("    {}", f);
+            eprintln!("    {f}");
         }
     }
     assert!(
@@ -785,22 +780,19 @@ fn gradient_check_multitoken_input_hidden() {
         }
         if err > tol {
             failures.push(format!(
-                "h[{}][{}]: analytic={}, numeric={}, rel_err={:.6}",
-                t_check, i, analytic, numeric, err
+                "h[{t_check}][{i}]: analytic={analytic}, numeric={numeric}, rel_err={err:.6}"
             ));
         }
         eprintln!(
-            "  h[{}][{}]: analytic={}, numeric={}, rel_err={:.6}",
-            t_check, i, analytic, numeric, err
+            "  h[{t_check}][{i}]: analytic={analytic}, numeric={numeric}, rel_err={err:.6}"
         );
     }
 
-    eprintln!("═══ KDA multi-token input-gradient check (t={}, L={}) ═══", t_check, l);
-    eprintln!("  max relative error: {:.6}", max_err);
+    eprintln!("═══ KDA multi-token input-gradient check (t={t_check}, L={l}) ═══");
+    eprintln!("  max relative error: {max_err:.6}");
     assert!(
         failures.is_empty(),
-        "multi-token input-gradient check FAILED: max rel_err = {:.6}. See stderr.",
-        max_err
+        "multi-token input-gradient check FAILED: max rel_err = {max_err:.6}. See stderr."
     );
 }
 
@@ -871,12 +863,7 @@ fn sequence_matches_token_shared_gradients() {
             }
             assert!(
                 diff < tol,
-                "{}[{}] should match but differs: {} vs {} (diff {})",
-                name,
-                i,
-                av,
-                bv,
-                diff
+                "{name}[{i}] should match but differs: {av} vs {bv} (diff {diff})"
             );
         }
     };
@@ -909,8 +896,8 @@ fn sequence_matches_token_shared_gradients() {
         &mut max_diff,
     );
 
-    eprintln!("═══ KDA sequence-vs-token shared-gradient check (L={}) ═══", l);
-    eprintln!("  max diff on shared gradients: {:.6e} (tol {:.6e})", max_diff, tol);
+    eprintln!("═══ KDA sequence-vs-token shared-gradient check (L={l}) ═══");
+    eprintln!("  max diff on shared gradients: {max_diff:.6e} (tol {tol:.6e})");
 }
 
 /// Smoke test: `kda_backward_sequence` matches `kda_backward_token` for L=1.
@@ -973,7 +960,7 @@ fn sequence_matches_token_for_l1() {
             if diff > *max_diff {
                 *max_diff = diff;
             }
-            assert!(diff < tol, "{}[{}] mismatch: {} vs {} (diff {})", name, i, av, bv, diff);
+            assert!(diff < tol, "{name}[{i}] mismatch: {av} vs {bv} (diff {diff})");
         }
     };
     check("q_proj", &grads_tok.q_proj, &grads_seq.q_proj, &mut max_diff);
@@ -1001,7 +988,7 @@ fn sequence_matches_token_for_l1() {
     }
 
     eprintln!("═══ KDA sequence-vs-token L=1 check ═══");
-    eprintln!("  max diff: {:.6e} (tol {:.6e})", max_diff, tol);
+    eprintln!("  max diff: {max_diff:.6e} (tol {tol:.6e})");
 }
 
 // ─── Weight accessor trait impls for the finite-diff helpers ────────────────

@@ -65,12 +65,10 @@ fn jacobian_svd_at_into_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "jacobian_svd_at_into allocated {} times in {} calls (expected 0)",
-        alloc_delta, N_CALLS
+        "jacobian_svd_at_into allocated {alloc_delta} times in {N_CALLS} calls (expected 0)"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "jacobian_svd_at_into deallocated {} times in {} calls (expected 0)",
-        dealloc_delta, N_CALLS
+        "jacobian_svd_at_into deallocated {dealloc_delta} times in {N_CALLS} calls (expected 0)"
     );
 }

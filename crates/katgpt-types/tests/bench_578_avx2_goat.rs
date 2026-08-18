@@ -101,8 +101,7 @@ fn g2_avx2_vs_scalar_speedup() {
         let speedup = t_scalar / t_avx2;
         min_speedup = min_speedup.min(speedup);
         println!(
-            "{:>5}x{:<6} {:>14.0} {:>14.0} {:>13.2}x",
-            rows, cols, t_avx2, t_scalar, speedup
+            "{rows:>5}x{cols:<6} {t_avx2:>14.0} {t_scalar:>14.0} {speedup:>13.2}x"
         );
 
         // THE GATE: AVX2 must beat scalar by ≥ 2×. The scalar loop is simple

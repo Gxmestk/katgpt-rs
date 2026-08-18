@@ -111,12 +111,10 @@ fn g4_batched_forecast_into_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G4 FAIL: KarcBatchForecaster::forecast_into allocated {} times in {} calls",
-        alloc_delta, N_CALLS
+        "G4 FAIL: KarcBatchForecaster::forecast_into allocated {alloc_delta} times in {N_CALLS} calls"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G4 FAIL: KarcBatchForecaster::forecast_into deallocated {} times in {} calls",
-        dealloc_delta, N_CALLS
+        "G4 FAIL: KarcBatchForecaster::forecast_into deallocated {dealloc_delta} times in {N_CALLS} calls"
     );
 }

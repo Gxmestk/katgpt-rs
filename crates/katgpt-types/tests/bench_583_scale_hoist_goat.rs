@@ -106,7 +106,7 @@ fn g2_hoisted_vs_folded() {
         "shape", "hoisted", "folded", "speedup"
     );
 
-    let mut speedups = Vec::new();
+    let mut speedups = Vec::with_capacity(SHAPES.len());
     for &(rows, cols) in &SHAPES {
         let src = dense_matrix(rows, cols, 0x583);
         let gw = TernaryGroupWeights::quantize_from_f32(&src, rows, cols);

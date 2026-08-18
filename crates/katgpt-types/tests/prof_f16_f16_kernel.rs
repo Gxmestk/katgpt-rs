@@ -142,16 +142,14 @@ fn prof_f16_f16_kernel_speedup() {
         }
 
         println!(
-            "{:<40} {:>10.1} {:>10.1} {:>10.1} {:>8.3}x {:>8.3}x",
-            label, f32_ns, f16_f32_ns, f16_f16_ns, wf16_speedup, f16f16_speedup
+            "{label:<40} {f32_ns:>10.1} {f16_f32_ns:>10.1} {f16_f16_ns:>10.1} {wf16_speedup:>8.3}x {f16f16_speedup:>8.3}x"
         );
     }
 
     println!();
     println!("── Decision gate (Issue 201 Phase 1) ──");
     println!(
-        "  f16xf16 best speedup at L3+ sizes (>=65536): {:.3}x",
-        large_f16f16_speedup
+        "  f16xf16 best speedup at L3+ sizes (>=65536): {large_f16f16_speedup:.3}x"
     );
     const GATE: f64 = 1.5;
     if large_f16f16_speedup >= GATE {

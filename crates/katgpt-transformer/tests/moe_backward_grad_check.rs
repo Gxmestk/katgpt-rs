@@ -216,7 +216,7 @@ fn gradient_check_all_params() {
         );
     }
 
-    println!("MoE gradient check PASSED. max_rel_err = {:.4} ({})", max_rel_err, worst);
+    println!("MoE gradient check PASSED. max_rel_err = {max_rel_err:.4} ({worst})");
 }
 
 // ─── Input hidden gradient check ────────────────────────────────────────────
@@ -260,7 +260,7 @@ fn gradient_check_input_hidden() {
             i, re, tol, dh[i], numeric
         );
     }
-    println!("MoE dL/dh gradient check PASSED. max_rel_err = {:.4}", max_rel_err);
+    println!("MoE dL/dh gradient check PASSED. max_rel_err = {max_rel_err:.4}");
 }
 
 // ─── Non-latent path gradient check ───────────────────────────────────────
@@ -312,7 +312,7 @@ fn gradient_check_nonlatent_path() {
         if re > max_rel_err {
             max_rel_err = re;
         }
-        assert!(re < tol, "router_weight[{}]: rel_err {:.4}", i, re);
+        assert!(re < tol, "router_weight[{i}]: rel_err {re:.4}");
     }
 
     // Check dh gradient
@@ -325,12 +325,11 @@ fn gradient_check_nonlatent_path() {
         let (lm, _) = run_forward(&config, &weights, &h_minus);
         let n = (lp - lm) / (2.0 * epsilon);
         let re = rel_err(dh[i], n);
-        assert!(re < tol, "dh[{}]: rel_err {:.4}", i, re);
+        assert!(re < tol, "dh[{i}]: rel_err {re:.4}");
     }
 
     println!(
-        "MoE non-latent path gradient check PASSED. max_rel_err (router) = {:.4}",
-        max_rel_err
+        "MoE non-latent path gradient check PASSED. max_rel_err (router) = {max_rel_err:.4}"
     );
 }
 
@@ -467,12 +466,11 @@ fn gradient_check_wide_gamma() {
             max_rel_err = re;
             worst = format!("dh[{}]: analytic={:.6e} numeric={:.6e}", i, dh[i], n);
         }
-        assert!(re < tol, "dh[{}]: rel_err {:.4} >= tol {:.4}", i, re, tol);
+        assert!(re < tol, "dh[{i}]: rel_err {re:.4} >= tol {tol:.4}");
     }
 
     println!(
-        "MoE wide-gamma gradient check PASSED. max_rel_err = {:.4} ({})",
-        max_rel_err, worst
+        "MoE wide-gamma gradient check PASSED. max_rel_err = {max_rel_err:.4} ({worst})"
     );
 }
 
@@ -499,11 +497,11 @@ fn backward_smoke() {
     }
     for (e, eg) in grads.experts.iter().enumerate() {
         for &g in &eg.gate_proj {
-            assert!(g.is_finite(), "NaN/Inf in experts[{}].gate_proj", e);
+            assert!(g.is_finite(), "NaN/Inf in experts[{e}].gate_proj");
         }
     }
     for &g in &dh {
         assert!(g.is_finite(), "NaN/Inf in dh");
     }
-    println!("MoE backward smoke test PASSED (kimi_k3_0_40b config, d={}).", d);
+    println!("MoE backward smoke test PASSED (kimi_k3_0_40b config, d={d}).");
 }

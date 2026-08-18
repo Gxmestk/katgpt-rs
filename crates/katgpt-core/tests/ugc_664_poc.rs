@@ -989,7 +989,7 @@ fn g4_scratch_reuse_stability() {
     let dz = NoisyRepeatedBit { d, eta: 0.2 };
     let mut rng = Rng::new(4);
     let mut s = UgcScratch::new(d, 2, 32, 64);
-    let mut outs = Vec::new();
+    let mut outs = Vec::with_capacity(4);
     for _ in 0..4 {
         let mut rng = Rng::new(4); // same seed ⇒ same stream ⇒ identical estimate
         let est = estimate_interval(&dz, 0.15, 0.85, 32, 0.1, &mut rng, &mut s);

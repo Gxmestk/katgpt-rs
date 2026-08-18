@@ -68,16 +68,13 @@ fn greedy_move(
             best_move = Some(i);
         }
     }
-    match best_move {
-        Some(idx) => {
+    if let Some(idx) = best_move {
             board.play(idx);
             history.push(Some((idx / BOARD_SIZE, idx % BOARD_SIZE)));
-        }
-        None => {
+        } else {
             board.pass();
             history.push(None);
         }
-    }
     board.is_game_over()
 }
 
@@ -108,16 +105,13 @@ where
             // sees the same position the PUCT player left behind. The PUCT
             // player's `select_move` advances its OWN internal board copy; we
             // keep a separate board for the greedy forward pass.
-            match mv {
-                Some(idx) => {
+            if let Some(idx) = mv {
                     board.play(idx);
                     history.push(Some((idx / BOARD_SIZE, idx % BOARD_SIZE)));
-                }
-                None => {
+                } else {
                     board.pass();
                     history.push(None);
                 }
-            }
         } else {
             let _ = greedy_move(
                 &mut board,

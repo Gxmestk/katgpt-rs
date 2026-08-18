@@ -230,7 +230,7 @@ fn wasmi_puct_winrate_vs_greedy() {
 
     println!("\n=== Issue 204 follow-up: WASM PUCT win-rate parity (wasmi, budget=50) ===");
     println!("Native reference (Bench 205, budget=50): 94.0% (n=100)");
-    println!("WASM-via-wasmi result:                    {:.1}% ({}/{})", win_rate, puct_wins, NUM_GAMES);
+    println!("WASM-via-wasmi result:                    {win_rate:.1}% ({puct_wins}/{NUM_GAMES})");
     println!("Wall clock: {:.1}s ({:.1}s/game avg)", elapsed.as_secs_f64(), elapsed.as_secs_f64() / NUM_GAMES as f64);
     for line in &games_summary {
         println!("{line}");

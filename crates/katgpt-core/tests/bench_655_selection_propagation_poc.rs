@@ -573,7 +573,7 @@ fn run_sweep() -> Vec<(Cell, [f64; 8])> {
         seed: 0,
     };
 
-    let mut rows = Vec::new();
+    let mut rows = Vec::with_capacity(hops.len());
     eprintln!("hop | distr |  k | single-hop chain/tail | BFS-decay chain/tail | prop(Mass) chain/tail | prop(Mean) chain/tail");
     eprintln!("----|-------|----|----------------------|----------------------|----------------------|--------------------");
     for &hop in &hops {

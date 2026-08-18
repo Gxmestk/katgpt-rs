@@ -326,8 +326,7 @@ fn g1_zero_bias_matches_reference() {
     let diff = max_abs_diff(&f32_out, &ref_out);
     assert!(
         diff < 1e-4,
-        "zero-bias f32 vs f64 max diff = {} (tol 1e-4)",
-        diff
+        "zero-bias f32 vs f64 max diff = {diff} (tol 1e-4)"
     );
 }
 
@@ -347,8 +346,7 @@ fn g1_nonzero_bias_matches_reference() {
     let diff = max_abs_diff(&f32_out, &ref_out);
     assert!(
         diff < 1e-4,
-        "nonzero-bias f32 vs f64 max diff = {} (tol 1e-4)",
-        diff
+        "nonzero-bias f32 vs f64 max diff = {diff} (tol 1e-4)"
     );
 }
 
@@ -387,8 +385,7 @@ fn g1_bias_changes_selection() {
     sorted.sort();
     assert_eq!(
         sorted, vec![0, 2],
-        "with bias [+0.9, -0.9, +0.9, -0.9], experts {{0, 2}} must be selected, got {:?}",
-        idx_biased
+        "with bias [+0.9, -0.9, +0.9, -0.9], experts {{0, 2}} must be selected, got {idx_biased:?}"
     );
 }
 
@@ -429,8 +426,7 @@ fn g1_bias_does_not_leak_into_renormalization() {
         .fold(0.0f64, f64::max);
     assert!(
         ref_diff > 1e-5,
-        "correct vs buggy reference must differ when bias ≠ 0 (got max diff {})",
-        ref_diff
+        "correct vs buggy reference must differ when bias ≠ 0 (got max diff {ref_diff})"
     );
 
     // (b) The f32 impl must match the CORRECT reference, not the buggy one.
@@ -438,13 +434,11 @@ fn g1_bias_does_not_leak_into_renormalization() {
     let diff_buggy = max_abs_diff(&f32_out, &ref_buggy);
     assert!(
         diff_correct < 1e-4,
-        "f32 must match CORRECT reference (raw-score renorm); diff = {} (tol 1e-4)",
-        diff_correct
+        "f32 must match CORRECT reference (raw-score renorm); diff = {diff_correct} (tol 1e-4)"
     );
     assert!(
         diff_buggy > 1e-5,
-        "f32 must NOT match buggy reference (biased-score renorm); diff = {} (should be > 1e-5)",
-        diff_buggy
+        "f32 must NOT match buggy reference (biased-score renorm); diff = {diff_buggy} (should be > 1e-5)"
     );
 }
 
@@ -477,16 +471,14 @@ fn g1_shared_expert_always_on() {
     let diff = max_abs_diff(&f32_out, &ref_out);
     assert!(
         diff < 1e-4,
-        "shared-expert-only f32 vs f64 max diff = {} (tol 1e-4)",
-        diff
+        "shared-expert-only f32 vs f64 max diff = {diff} (tol 1e-4)"
     );
 
     // And the output must be non-zero (the shared expert actually fires).
     let magnitude: f32 = f32_out.iter().map(|v| v.abs()).sum();
     assert!(
         magnitude > 1e-3,
-        "shared expert output must be non-zero, got sum |v| = {}",
-        magnitude
+        "shared expert output must be non-zero, got sum |v| = {magnitude}"
     );
 }
 
@@ -507,8 +499,7 @@ fn g1_kimi_k3_0_40b_dims_match_reference() {
     let diff = max_abs_diff(&f32_out, &ref_out);
     assert!(
         diff < 1e-3,
-        "kimi_k3_0_40b dims f32 vs f64 max diff = {} (tol 1e-3)",
-        diff
+        "kimi_k3_0_40b dims f32 vs f64 max diff = {diff} (tol 1e-3)"
     );
 }
 
@@ -530,7 +521,6 @@ fn g1_renormalization_disabled_matches_reference() {
     let diff = max_abs_diff(&f32_out, &ref_out);
     assert!(
         diff < 1e-4,
-        "renormalize=false f32 vs f64 max diff = {} (tol 1e-4)",
-        diff
+        "renormalize=false f32 vs f64 max diff = {diff} (tol 1e-4)"
     );
 }

@@ -72,13 +72,11 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G5 FAIL: compose_chain_into allocated {} times in {} calls",
-            alloc_delta, N_CALLS
+            "G5 FAIL: compose_chain_into allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G5 FAIL: compose_chain_into deallocated {} times in {} calls",
-            dealloc_delta, N_CALLS
+            "G5 FAIL: compose_chain_into deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 
@@ -119,13 +117,11 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G5 FAIL: batch_compose_chain_into allocated {} times in {} calls",
-            alloc_delta, N_CALLS
+            "G5 FAIL: batch_compose_chain_into allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G5 FAIL: batch_compose_chain_into deallocated {} times in {} calls",
-            dealloc_delta, N_CALLS
+            "G5 FAIL: batch_compose_chain_into deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 
@@ -165,13 +161,11 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G5 FAIL: direction_vector_decode allocated {} times in {} calls",
-            alloc_delta, N_CALLS
+            "G5 FAIL: direction_vector_decode allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G5 FAIL: direction_vector_decode deallocated {} times in {} calls",
-            dealloc_delta, N_CALLS
+            "G5 FAIL: direction_vector_decode deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 }

@@ -292,7 +292,7 @@ fn g1_correctness_no_nan_across_10k_inputs() {
         let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
         assert!(verdict.domain < 3, "domain out of range");
         for v in dz_out.iter() {
-            assert!(v.is_finite(), "NaN in dz_out at iter {}: {:?}", i, dz_out);
+            assert!(v.is_finite(), "NaN in dz_out at iter {i}: {dz_out:?}");
         }
     }
 }

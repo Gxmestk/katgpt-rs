@@ -54,8 +54,7 @@ fn g1_anticipate_emits_populated_slots() {
     for (i, slot) in artifact.slots.iter().enumerate() {
         assert_eq!(
             slot.dir.blake3, dirs[i].blake3,
-            "slot {} dir commitment mismatch",
-            i
+            "slot {i} dir commitment mismatch"
         );
         assert!(
             (0.0..=1.0).contains(&slot.predictability),
@@ -102,8 +101,7 @@ fn g1_consume_is_deterministic() {
         assert_eq!(
             out1[j].to_bits(),
             out2[j].to_bits(),
-            "dim {} not bit-identical",
-            j
+            "dim {j} not bit-identical"
         );
     }
 }
@@ -142,9 +140,7 @@ fn g1_predictability_range_in_unit_interval() {
         let p = scorer.predictability(&c, &dir);
         assert!(
             (0.0..=1.0).contains(&p),
-            "predictability {} out of [0,1] at scale {}",
-            p,
-            scale
+            "predictability {p} out of [0,1] at scale {scale}"
         );
     }
 }
@@ -190,8 +186,7 @@ fn g2_amortization_factor_wins_at_paper_reference() {
     let factor = m.amortization_factor(sleep_cost, 10, 0.5);
     assert!(
         factor < 1.0,
-        "G2 FAIL: pre-compute should win at e_gate=0.5, N=10; got factor {}",
-        factor
+        "G2 FAIL: pre-compute should win at e_gate=0.5, N=10; got factor {factor}"
     );
 }
 
@@ -224,10 +219,7 @@ fn g2_total_cost_monotone_decreasing() {
         let c = m.total_cost(sleep_cost, n, e);
         assert!(
             c <= prev + 1e-6,
-            "total_cost not monotone decreasing in e_gate: e={} cost={} prev={}",
-            e,
-            c,
-            prev
+            "total_cost not monotone decreasing in e_gate: e={e} cost={c} prev={prev}"
         );
         prev = c;
         e += 0.1;

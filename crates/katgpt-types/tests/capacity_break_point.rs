@@ -217,13 +217,10 @@ fn all_pairs_realizable(n: usize, d: usize, mode: QueryMode, seed: u64) -> bool 
     for i in 0..n {
         for j in (i + 1)..n {
             let targets = [i, j];
-            let ok = match mode {
-                QueryMode::Perceptron => perceptron_realizes(&docs, n, d, &targets, 200),
-                _ => {
+            let ok = if let QueryMode::Perceptron = mode { perceptron_realizes(&docs, n, d, &targets, 200) } else {
                     let q = build_query(&docs, n, d, &targets, mode);
                     top_k_matches(&docs, n, d, &q, &targets)
-                }
-            };
+                };
             if !ok {
                 return false;
             }

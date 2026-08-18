@@ -37,7 +37,7 @@ fn g1_nop_only_head() {
     let cfg = SinkClassifierConfig::default();
     let mut scratch = StableRankScratch::new(d);
     let diag = classify_sink_at(0, &attn_column, &values, None, &cfg, &mut scratch);
-    assert_eq!(diag.kind, SinkKind::Nop, "expected Nop, got {:?}", diag);
+    assert_eq!(diag.kind, SinkKind::Nop, "expected Nop, got {diag:?}");
     assert!(diag.strength > 0.99, "strength should be ~1.0");
     assert!(
         diag.value_norm_ratio < 0.01,
@@ -74,8 +74,7 @@ fn g1_broadcast_only_head() {
     assert_eq!(
         diag.kind,
         SinkKind::Broadcast,
-        "expected Broadcast, got {:?}",
-        diag
+        "expected Broadcast, got {diag:?}"
     );
     assert!(
         (diag.value_norm_ratio - 1.0).abs() < 0.01,
@@ -178,8 +177,7 @@ fn g1_no_sink_head() {
     classify_all_sinks(&attn, &values, &cfg, &mut scratch, &mut out);
     assert!(
         out.is_empty(),
-        "no position should exceed τ_sink=0.5 under uniform attention, got {:?}",
-        out
+        "no position should exceed τ_sink=0.5 under uniform attention, got {out:?}"
     );
 }
 
@@ -239,8 +237,7 @@ fn g1_stable_rank_zero_matrix() {
     let sr = stable_rank_update_into(&o, &mut scratch, 5);
     assert!(
         sr.abs() < 1e-6,
-        "stable rank of zero matrix should be 0, got {}",
-        sr
+        "stable rank of zero matrix should be 0, got {sr}"
     );
     assert!(!sr.is_nan());
 }
@@ -370,7 +367,7 @@ fn issue001_cached_invalidate_forces_reaudit() {
 /// Helper: flatten a Vec<Vec<f32>> row-major into a single Vec<f32>.
 /// Used to feed identical data to both layout variants in parity tests.
 fn flatten(rows: &[Vec<f32>]) -> Vec<f32> {
-    let d = rows.first().map(|r| r.len()).unwrap_or(0);
+    let d = rows.first().map_or(0, |r| r.len());
     let mut out = Vec::with_capacity(rows.len() * d);
     for r in rows {
         out.extend_from_slice(r);
@@ -404,20 +401,16 @@ fn plan288_stable_rank_flat_parity() {
     // Both should classify as effectively rank-1 (cosine probe fires).
     assert!(
         (sr_vec - 1.0).abs() < 0.05,
-        "vec sr={}, expected ~1.0",
-        sr_vec
+        "vec sr={sr_vec}, expected ~1.0"
     );
     assert!(
         (sr_flat - 1.0).abs() < 0.05,
-        "flat sr={}, expected ~1.0",
-        sr_flat
+        "flat sr={sr_flat}, expected ~1.0"
     );
     // Bit-identical (same arithmetic, just different slicing).
     assert!(
         (sr_vec - sr_flat).abs() < 1e-6,
-        "vec={} flat={}",
-        sr_vec,
-        sr_flat
+        "vec={sr_vec} flat={sr_flat}"
     );
 }
 
@@ -429,11 +422,7 @@ fn plan288_stable_rank_flat_zero_matrix() {
     let o_flat = vec![0.0f32; n * d];
     let mut scratch = StableRankScratch::new(d);
     let sr = stable_rank_update_into_flat(&o_flat, n, d, &mut scratch, 5);
-    assert!(
-        sr.abs() < 1e-6,
-        "zero-matrix flat sr should be 0, got {}",
-        sr
-    );
+    assert!(sr.abs() < 1e-6, "zero-matrix flat sr should be 0, got {sr}");
     assert!(!sr.is_nan());
 }
 

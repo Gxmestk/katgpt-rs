@@ -215,7 +215,7 @@ fn vfe_vs_conformal_floor_ar1() {
     let test_corpus = &full[N_TRAIN..];
 
     let corpus = TrajectoryCorpus::from_slice(
-        format!("ar1_phi{}_sigma{}_n{}", PHI, SIGMA, N_TEST).as_str(),
+        format!("ar1_phi{PHI}_sigma{SIGMA}_n{N_TEST}").as_str(),
         test_corpus,
         32, // warmup: seed the floor's residual pool before scoring
     );

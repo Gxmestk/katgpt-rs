@@ -74,8 +74,7 @@ fn g4_wout_byte_identical_across_instances_fourier() {
         assert_eq!(
             f1.wout.len(),
             f2.wout.len(),
-            "λ={}: wout length mismatch",
-            lambda
+            "λ={lambda}: wout length mismatch"
         );
         // Byte-identical comparison via raw bit patterns (catches NaN payload
         // differences and signed-zero differences that == would miss).
@@ -83,8 +82,7 @@ fn g4_wout_byte_identical_across_instances_fourier() {
         let bits_b: Vec<u32> = f2.wout.iter().map(|x| x.to_bits()).collect();
         assert_eq!(
             bits_a, bits_b,
-            "λ={}: Wout not byte-identical (bit-pattern mismatch)",
-            lambda
+            "λ={lambda}: Wout not byte-identical (bit-pattern mismatch)"
         );
     }
 }
@@ -104,8 +102,7 @@ fn g4_wout_byte_identical_across_instances_chebyshev() {
         let bits_b: Vec<u32> = f2.wout.iter().map(|x| x.to_bits()).collect();
         assert_eq!(
             bits_a, bits_b,
-            "λ={}: Wout not byte-identical (Chebyshev)",
-            lambda
+            "λ={lambda}: Wout not byte-identical (Chebyshev)"
         );
     }
 }

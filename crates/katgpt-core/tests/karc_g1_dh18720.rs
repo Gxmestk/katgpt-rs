@@ -251,8 +251,7 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     const N_S: usize = 2000;
 
     println!(
-        "smoke: K={}, M={}, R={}, d_h={} (full-rank Cholesky)",
-        K_S, M_S, R, D_H_S
+        "smoke: K={K_S}, M={M_S}, R={R}, d_h={D_H_S} (full-rank Cholesky)"
     );
 
     let traj_raw = generate_double_scroll(N_S + K_S + 50, DT, 1000, SUBSTEPS);
@@ -388,8 +387,7 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
     println!(
-        "  Cholesky fit {:.2?}, NRMSE(1 LT)={:.6e}, threshold={:.2} LT",
-        fit_dt, nrmse_one_lt, thr_lt
+        "  Cholesky fit {fit_dt:.2?}, NRMSE(1 LT)={nrmse_one_lt:.6e}, threshold={thr_lt:.2} LT"
     );
     println!("  reference (Phase 2 direct Cholesky): NRMSE 1.67e-4, threshold 2.85 LT");
 
@@ -399,15 +397,13 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     // broken — investigate before running the 30-min d_h=18_720 test.
     assert!(
         nrmse_one_lt < 5e-4,
-        "smoke NRMSE {:.6e} exceeds 5e-4 wiring-correctness bound \
+        "smoke NRMSE {nrmse_one_lt:.6e} exceeds 5e-4 wiring-correctness bound \
          (Phase 2 reference was 1.67e-4) — pipeline is broken, investigate \
-         before running the d_h=18_720 measurement",
-        nrmse_one_lt
+         before running the d_h=18_720 measurement"
     );
     assert!(
         thr_lt > 1.0,
-        "smoke threshold {:.2} LT below 1.0 LT — model is barely above noise",
-        thr_lt
+        "smoke threshold {thr_lt:.2} LT below 1.0 LT — model is barely above noise"
     );
 }
 
@@ -417,12 +413,10 @@ fn g1_dh_18720_k8_m8_r2() {
     use std::time::Instant;
 
     println!(
-        "Issue 187 T7 / Plan 308 T4.5: KARC G1 at d_h = {} (K={}, M={}, R={}) [full-rank Cholesky]",
-        D_H, K, M, R
+        "Issue 187 T7 / Plan 308 T4.5: KARC G1 at d_h = {D_H} (K={K}, M={M}, R={R}) [full-rank Cholesky]"
     );
     println!(
-        "  Lyapunov time ≈ {} units ≈ {} samples",
-        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
+        "  Lyapunov time ≈ {LYAPUNOV_TIME_UNITS} units ≈ {SAMPLES_PER_LT} samples"
     );
 
     // ── 1. Generate trajectory + normalize to [-1, 1] per coordinate ──────
@@ -530,7 +524,7 @@ fn g1_dh_18720_k8_m8_r2() {
     let mut wt = vec![0.0f64; D_H * D]; // d_h × D, transposed Wout
     ridge_solve_direct_f64(&mut wt, &mut chol, &mut z, &gram, &cov, D_H, D);
     let fit_dt = t_fit.elapsed();
-    eprintln!("  Cholesky fit: {:.2?}", fit_dt);
+    eprintln!("  Cholesky fit: {fit_dt:.2?}");
 
     // Free the Gram + Cholesky factor — we only need Wout for the rollout.
     drop(gram);
@@ -595,14 +589,13 @@ fn g1_dh_18720_k8_m8_r2() {
     let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
     println!();
-    println!("── G1 results (d_h = {}, K={}, M={}, R={}) ────────────────────", D_H, K, M, R);
-    println!("  Cholesky fit wall: {:.2?}", fit_dt);
-    println!("  NRMSE over 1 LT:   {:.6e}   (target ≤ 1.0e-3)", nrmse_one_lt);
+    println!("── G1 results (d_h = {D_H}, K={K}, M={M}, R={R}) ────────────────────");
+    println!("  Cholesky fit wall: {fit_dt:.2?}");
+    println!("  NRMSE over 1 LT:   {nrmse_one_lt:.6e}   (target ≤ 1.0e-3)");
     println!(
-        "  threshold (ε=0.1): {} samples = {:.2} LT   (target ≥ 8 LT)",
-        thr_sample, thr_lt
+        "  threshold (ε=0.1): {thr_sample} samples = {thr_lt:.2} LT   (target ≥ 8 LT)"
     );
-    println!("  σ(u) mean per-coord: {:.4}", sigma);
+    println!("  σ(u) mean per-coord: {sigma:.4}");
     println!();
     let nrmse_pass = nrmse_one_lt <= 1.0e-3;
     let thr_pass = thr_lt >= 8.0;
@@ -665,8 +658,7 @@ fn smoke_k4_m8_r2_lambda_sweep() {
     const N_S: usize = 2000;
 
     println!(
-        "smoke λ-sweep: K={}, M={}, R={}, d_h={}, N={}",
-        K_S, M_S, R, D_H_S, N_S
+        "smoke λ-sweep: K={K_S}, M={M_S}, R={R}, d_h={D_H_S}, N={N_S}"
     );
 
     // Build trajectory + normalize
@@ -819,8 +811,7 @@ fn smoke_k4_m8_r2_lambda_sweep() {
         let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
         println!(
-            "{:>10.0e} {:>15.6e} {:>15.2}   (fit {:.2?})",
-            lambda, nrmse_one_lt, thr_lt, fit_dt
+            "{lambda:>10.0e} {nrmse_one_lt:>15.6e} {thr_lt:>15.2}   (fit {fit_dt:.2?})"
         );
         results.push((lambda, nrmse_one_lt, thr_lt));
 
@@ -848,15 +839,13 @@ fn smoke_k4_m8_r2_lambda_sweep() {
     let baseline = results[0].1;
     assert!(
         baseline < 5e-4,
-        "λ=5e-3 baseline NRMSE {:.6e} exceeds 5e-4 wiring-correctness bound \
-         (Phase 2 reference was 1.67e-4) — pipeline is broken",
-        baseline
+        "λ=5e-3 baseline NRMSE {baseline:.6e} exceeds 5e-4 wiring-correctness bound \
+         (Phase 2 reference was 1.67e-4) — pipeline is broken"
     );
     println!();
     println!(
-        "  PASS: K=4 λ-sweep reproduces Phase 2 baseline ({:.6e}) and shows \
-         the expected non-decreasing trend.",
-        baseline
+        "  PASS: K=4 λ-sweep reproduces Phase 2 baseline ({baseline:.6e}) and shows \
+         the expected non-decreasing trend."
     );
 }
 
@@ -893,13 +882,11 @@ fn g1_dh_18720_lambda_sweep() {
     use std::time::Instant;
 
     println!(
-        "Issue 187 T7 follow-up: KARC G1 λ-sweep at d_h = {} (K={}, M={}, R={}) \
-         [full-rank Cholesky, parallel]",
-        D_H, K, M, R
+        "Issue 187 T7 follow-up: KARC G1 λ-sweep at d_h = {D_H} (K={K}, M={M}, R={R}) \
+         [full-rank Cholesky, parallel]"
     );
     println!(
-        "  Lyapunov time ≈ {} units ≈ {} samples",
-        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
+        "  Lyapunov time ≈ {LYAPUNOV_TIME_UNITS} units ≈ {SAMPLES_PER_LT} samples"
     );
 
     // ── 1. Trajectory + per-coordinate normalization to [-1, 1] ───────────
@@ -1118,8 +1105,7 @@ fn g1_dh_18720_lambda_sweep() {
     // ── 5. Summary ───────────────────────────────────────────────────────
     println!();
     println!(
-        "── λ-sweep summary (d_h = {}, K={}, M={}, R={}) ────────────────────",
-        D_H, K, M, R
+        "── λ-sweep summary (d_h = {D_H}, K={K}, M={M}, R={R}) ────────────────────"
     );
     println!(
         "  sweep wall: {:.2?} ({} Cholesky factorizations in parallel)",
@@ -1163,8 +1149,7 @@ fn g1_dh_18720_lambda_sweep() {
         );
         for (lambda, nrmse_one_lt, thr_lt, _) in &winners {
             println!(
-                "    λ={:.0e}: NRMSE={:.6e}, threshold={:.2} LT",
-                lambda, nrmse_one_lt, thr_lt
+                "    λ={lambda:.0e}: NRMSE={nrmse_one_lt:.6e}, threshold={thr_lt:.2} LT"
             );
         }
     } else {
@@ -1239,13 +1224,11 @@ fn g1_dh_29160_k10_lambda_sweep() {
     const D_H: usize = higher_order_feature_count(D_H_1, R); // 29_160
 
     println!(
-        "Issue 187 T7 follow-up #2: KARC G1 λ-sweep at d_h = {} (K={}, M={}, R={}) \
-         [full-rank Cholesky, parallel]",
-        D_H, K, M, R
+        "Issue 187 T7 follow-up #2: KARC G1 λ-sweep at d_h = {D_H} (K={K}, M={M}, R={R}) \
+         [full-rank Cholesky, parallel]"
     );
     println!(
-        "  Lyapunov time ≈ {} units ≈ {} samples",
-        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
+        "  Lyapunov time ≈ {LYAPUNOV_TIME_UNITS} units ≈ {SAMPLES_PER_LT} samples"
     );
 
     // ── 1. Trajectory + per-coordinate normalization to [-1, 1] ───────────
@@ -1467,8 +1450,7 @@ fn g1_dh_29160_k10_lambda_sweep() {
     // ── 5. Summary ───────────────────────────────────────────────────────
     println!();
     println!(
-        "── λ-sweep summary (d_h = {}, K={}, M={}, R={}) ────────────────────",
-        D_H, K, M, R
+        "── λ-sweep summary (d_h = {D_H}, K={K}, M={M}, R={R}) ────────────────────"
     );
     println!(
         "  sweep wall: {:.2?} ({} Cholesky factorizations in parallel)",
@@ -1512,8 +1494,7 @@ fn g1_dh_29160_k10_lambda_sweep() {
         );
         for (lambda, nrmse_one_lt, thr_lt, _) in &winners {
             println!(
-                "    λ={:.0e}: NRMSE={:.6e}, threshold={:.2} LT",
-                lambda, nrmse_one_lt, thr_lt
+                "    λ={lambda:.0e}: NRMSE={nrmse_one_lt:.6e}, threshold={thr_lt:.2} LT"
             );
         }
     } else {
@@ -1574,8 +1555,7 @@ fn g1_r1_k8_m24_dh576_lambda_sweep() {
     const N_R1: usize = 4000;
 
     println!(
-        "Phase 5.3 R=1 K=8/M=24 λ-sweep: d_h={}, N={}",
-        D_H_R1, N_R1
+        "Phase 5.3 R=1 K=8/M=24 λ-sweep: d_h={D_H_R1}, N={N_R1}"
     );
     println!("  Reference (Phase 1, λ=5e-3): NRMSE 4.79e-3, threshold 8.16 LT");
 
@@ -1729,8 +1709,7 @@ fn g1_r1_k8_m24_dh576_lambda_sweep() {
         let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
         println!(
-            "{:>10.0e} {:>15.6e} {:>15.2}   (fit {:?})",
-            lambda, nrmse_one_lt, thr_lt, fit_dt
+            "{lambda:>10.0e} {nrmse_one_lt:>15.6e} {thr_lt:>15.2}   (fit {fit_dt:?})"
         );
         results.push((lambda, nrmse_one_lt, thr_lt));
     }

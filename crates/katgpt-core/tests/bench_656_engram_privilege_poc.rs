@@ -156,15 +156,12 @@ impl Geometry {
         orthogonalize(&mut w0, &[&u]);
         normalize(&mut w0);
 
-        let w1 = match two_class {
-            true => {
+        let w1 = if two_class {
                 let mut w1: Vec<f32> = (0..D).map(|_| rng.signed()).collect();
                 orthogonalize(&mut w1, &[&u, &w0]);
                 normalize(&mut w1);
                 w1
-            }
-            false => w0.clone(),
-        };
+            } else { w0.clone() };
         Self { u, w: [w0, w1] }
     }
 
@@ -231,10 +228,7 @@ impl Regime {
     }
     /// Which utility direction query `idx` is scored against.
     fn query_class(self, idx: usize) -> usize {
-        match self.two_class() {
-            true => idx % 2,
-            false => 0,
-        }
+        if self.two_class() { idx % 2 } else { 0 }
     }
 }
 
@@ -389,12 +383,7 @@ impl Noise {
     }
     #[inline]
     fn perturb(&mut self, delta: f32) -> f32 {
-        match self.amp == 0.0 {
-            true => delta,
-            // Noise scaled by |δ| so `amp` reads as a signal-to-noise ratio
-            // rather than an absolute magnitude tied to this fixture's units.
-            false => delta + self.amp * delta.abs() * self.rng.signed(),
-        }
+        if self.amp == 0.0 { delta } else { delta + self.amp * delta.abs() * self.rng.signed() }
     }
 }
 
@@ -530,10 +519,7 @@ where
             continue;
         }
         sum_rel += (sp - sc).abs() / sc.abs();
-        sum_pur += match m > 1e-9 {
-            true => sp / m,
-            false => 0.0,
-        };
+        sum_pur += if m > 1e-9 { sp / m } else { 0.0 };
         n += 1;
     }
     let n = n.max(1) as f64;
@@ -620,20 +606,17 @@ fn sparsity_sweep(periods: &[usize], noise_amp: f32) -> Vec<SparsityPoint> {
                     let class = regime.query_class(r);
                     // Every round is a retrieval event; only every `period`-th
                     // one pays for counterfactual scoring.
-                    match r % period == 0 {
-                        true => {
+                    if r % period == 0 {
                             update_exact(
                                 table, &geo, &query, class, &cfg, &mut ledger, &mut s, noise,
                             );
                             updates += 1;
-                        }
-                        false => {
+                        } else {
                             let mut tr = PrivilegeTrace::new();
                             privileged_score(
                                 table, &geo, &query, class, &cfg, &ledger, &mut tr, &mut s,
                             );
                         }
-                    }
                 }
                 (ledger, updates)
             };
@@ -708,12 +691,9 @@ fn run_regime(regime: Regime) -> RegimeReport {
         for r in 0..rounds {
             let query = make_query(&geo, r, &mut rng);
             let class = regime.query_class(r);
-            calls += match exact {
-                true => update_exact(
+            calls += if exact { update_exact(
                     table, &geo, &query, class, &cfg, &mut ledger, &mut s, &mut Noise::none(),
-                ),
-                false => update_aggregate(table, &geo, &query, class, &cfg, &mut ledger, &mut s),
-            };
+                ) } else { update_aggregate(table, &geo, &query, class, &cfg, &mut ledger, &mut s) };
         }
         (ledger, calls)
     };
@@ -727,10 +707,7 @@ fn run_regime(regime: Regime) -> RegimeReport {
 
     let (p_good, p_poison) = privilege_split(&led_poisoned_exact, regime);
     let (_, p_poison_odd) = privilege_split(&led_odd, regime);
-    let recency_latch = match p_poison.is_nan() {
-        true => 0.0,
-        false => (p_poison - p_poison_odd).abs(),
-    };
+    let recency_latch = if p_poison.is_nan() { 0.0 } else { (p_poison - p_poison_odd).abs() };
 
     // ── Evaluate ────────────────────────────────────────────────────────────
     let naive = {
@@ -757,10 +734,7 @@ fn run_regime(regime: Regime) -> RegimeReport {
     let priv_aggregate = eval_priv(&led_poisoned_agg, &led_clean_agg);
 
     let recovery = |arm: &ArmResult| -> f64 {
-        match naive.rel_err > 1e-9 {
-            true => (naive.rel_err - arm.rel_err) / naive.rel_err,
-            false => f64::NAN, // no penalty to recover — regime C
-        }
+        if naive.rel_err > 1e-9 { (naive.rel_err - arm.rel_err) / naive.rel_err } else { f64::NAN }
     };
 
     RegimeReport {
@@ -927,10 +901,7 @@ fn main() {
         "regime", "p_good", "p_poison", "ratio", "recency_latch"
     );
     for r in &reports {
-        let ratio = match r.p_poison > 1e-9 {
-            true => format!("{:.1}×", r.p_good / r.p_poison),
-            false => "∞".to_string(),
-        };
+        let ratio = if r.p_poison > 1e-9 { format!("{:.1}×", r.p_good / r.p_poison) } else { "∞".to_string() };
         println!(
             "{:<38} {:>10.4} {:>10.4} {:>10} {:>14.4}",
             r.regime.name(),
@@ -1156,9 +1127,7 @@ fn main() {
         sparse_noisy.map_or(f64::NAN, |sp| sp.recovery) * 100.0
     );
 
-    match failures.is_empty() {
-        true => println!("\n  ALL GATES PASS\n"),
-        false => {
+    if failures.is_empty() { println!("\n  ALL GATES PASS\n") } else {
             println!("\n  FAILURES:");
             for f in &failures {
                 println!("    · {f}");
@@ -1166,12 +1135,8 @@ fn main() {
             println!();
             std::process::exit(1);
         }
-    }
 }
 
 fn pf(b: bool) -> &'static str {
-    match b {
-        true => "PASS",
-        false => "FAIL",
-    }
+    if b { "PASS" } else { "FAIL" }
 }

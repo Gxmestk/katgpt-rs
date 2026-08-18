@@ -164,27 +164,19 @@ fn run_g2(sigma: f32, seed: u64) -> (f32, f32) {
 #[test]
 fn g2_contrast_separable_sigma_1_5() {
     let (acc, cos) = run_g2(1.5, 0xA200_0001);
-    println!(
-        "G2 σ=1.5: LOO accuracy = {:.4}, cos to true dir = {:.4} (gate ≥ 0.75)",
-        acc, cos
-    );
+    println!("G2 σ=1.5: LOO accuracy = {acc:.4}, cos to true dir = {cos:.4} (gate ≥ 0.75)");
     assert!(
         acc >= 0.75,
-        "G2 FAIL at σ=1.5: LOO accuracy = {:.4} < 0.75. Primitive must demote to Gain.",
-        acc
+        "G2 FAIL at σ=1.5: LOO accuracy = {acc:.4} < 0.75. Primitive must demote to Gain."
     );
 }
 
 #[test]
 fn g2_contrast_separable_sigma_3_0() {
     let (acc, cos) = run_g2(3.0, 0xA200_0002);
-    println!(
-        "G2 σ=3.0: LOO accuracy = {:.4}, cos to true dir = {:.4} (gate ≥ 0.60)",
-        acc, cos
-    );
+    println!("G2 σ=3.0: LOO accuracy = {acc:.4}, cos to true dir = {cos:.4} (gate ≥ 0.60)");
     assert!(
         acc >= 0.60,
-        "G2 FAIL at σ=3.0: LOO accuracy = {:.4} < 0.60. Separability ceiling too low.",
-        acc
+        "G2 FAIL at σ=3.0: LOO accuracy = {acc:.4} < 0.60. Separability ceiling too low."
     );
 }

@@ -70,13 +70,11 @@ fn g3_interval_into_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: interval_into allocated {} times in {} calls × 8 channels",
-        alloc_delta, N_CALLS
+        "G3 FAIL: interval_into allocated {alloc_delta} times in {N_CALLS} calls × 8 channels"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: interval_into deallocated {} times in {} calls × 8 channels",
-        dealloc_delta, N_CALLS
+        "G3 FAIL: interval_into deallocated {dealloc_delta} times in {N_CALLS} calls × 8 channels"
     );
 }
 
@@ -123,12 +121,10 @@ fn g3_update_residual_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: update_residual allocated {} times in {} calls × 8 channels",
-        alloc_delta, N_CALLS
+        "G3 FAIL: update_residual allocated {alloc_delta} times in {N_CALLS} calls × 8 channels"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: update_residual deallocated {} times in {} calls × 8 channels",
-        dealloc_delta, N_CALLS
+        "G3 FAIL: update_residual deallocated {dealloc_delta} times in {N_CALLS} calls × 8 channels"
     );
 }

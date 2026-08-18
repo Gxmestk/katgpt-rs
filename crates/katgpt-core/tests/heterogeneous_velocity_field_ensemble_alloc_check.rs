@@ -139,13 +139,11 @@ fn g3_eval_and_fit_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: HeterogeneousEnsemble::eval_into allocated {} times in {} calls",
-        alloc_delta, N_CALLS
+        "G3 FAIL: HeterogeneousEnsemble::eval_into allocated {alloc_delta} times in {N_CALLS} calls"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: HeterogeneousEnsemble::eval_into deallocated {} times in {} calls",
-        dealloc_delta, N_CALLS
+        "G3 FAIL: HeterogeneousEnsemble::eval_into deallocated {dealloc_delta} times in {N_CALLS} calls"
     );
 
     // ── Part 2: fit_into zero-alloc ─────────────────────────────────────────
@@ -162,12 +160,10 @@ fn g3_eval_and_fit_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: HeterogeneousEnsemble::fit_into allocated {} times in {} calls",
-        alloc_delta, N_FITS
+        "G3 FAIL: HeterogeneousEnsemble::fit_into allocated {alloc_delta} times in {N_FITS} calls"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: HeterogeneousEnsemble::fit_into deallocated {} times in {} calls",
-        dealloc_delta, N_FITS
+        "G3 FAIL: HeterogeneousEnsemble::fit_into deallocated {dealloc_delta} times in {N_FITS} calls"
     );
 }

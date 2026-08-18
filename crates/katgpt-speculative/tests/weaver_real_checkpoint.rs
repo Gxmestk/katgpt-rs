@@ -158,17 +158,13 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         }
     }
 
-    eprintln!(
-        "Max |residual| across all (depth, K) positions: {:.6}",
-        max_abs_residual
-    );
+    eprintln!("Max |residual| across all (depth, K) positions: {max_abs_residual:.6}");
 
     assert!(
         max_abs_residual > 1e-4,
-        "G2 FAIL — trained weights produced near-zero residual (max={:.6}). \
+        "G2 FAIL — trained weights produced near-zero residual (max={max_abs_residual:.6}). \
          Either the checkpoint is untrained (zero-init) or the loader silently \
-         zeroed the weights.",
-        max_abs_residual
+         zeroed the weights."
     );
 
     eprintln!("✅ PASS — real checkpoint loads, format compatible, residuals non-zero.");
@@ -274,7 +270,7 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         "    Overhead: {:.1}% of a verifier step",
         median_scratch_us / verifier_step_us * 100.0
     );
-    eprintln!("    Speedup: {:.2}× vs allocating", speedup_scratch);
+    eprintln!("    Speedup: {speedup_scratch:.2}× vs allocating");
     eprintln!();
     eprintln!("  Path 3 — Parallel (correct_parallel / weaver_forward_parallel):");
     eprintln!(
@@ -291,9 +287,9 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         "    Overhead: {:.1}% of a verifier step",
         median_parallel_us / verifier_step_us * 100.0
     );
-    eprintln!("    Speedup: {:.2}× vs allocating", speedup_parallel);
+    eprintln!("    Speedup: {speedup_parallel:.2}× vs allocating");
     eprintln!();
-    eprintln!("  Runs:    {} (warmup: {})", MEASURED_RUNS, WARMUP_RUNS);
+    eprintln!("  Runs:    {MEASURED_RUNS} (warmup: {WARMUP_RUNS})");
     eprintln!();
     eprintln!(
         "  Verdict (parallel path): {}",

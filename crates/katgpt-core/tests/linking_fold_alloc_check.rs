@@ -91,13 +91,11 @@ fn g4_zero_alloc_after_warmup_both_folds() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G4 FAIL: fold_projection_into (D={}) allocated {} times in {} calls (expected 0)",
-            D_HLA, alloc_delta, N_CALLS
+            "G4 FAIL: fold_projection_into (D={D_HLA}) allocated {alloc_delta} times in {N_CALLS} calls (expected 0)"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G4 FAIL: fold_projection_into (D={}) deallocated {} times in {} calls (expected 0)",
-            D_HLA, dealloc_delta, N_CALLS
+            "G4 FAIL: fold_projection_into (D={D_HLA}) deallocated {dealloc_delta} times in {N_CALLS} calls (expected 0)"
         );
     }
 
@@ -134,13 +132,11 @@ fn g4_zero_alloc_after_warmup_both_folds() {
         let dealloc_delta = DEALLOC_COUNT.load(Ordering::Relaxed) - dealloc_before;
         assert_eq!(
             alloc_delta, 0,
-            "G4 FAIL: fold_projection_into (D={}) allocated {} times in {} calls",
-            D_SHARD, alloc_delta, N_CALLS
+            "G4 FAIL: fold_projection_into (D={D_SHARD}) allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G4 FAIL: fold_projection_into (D={}) deallocated {} times in {} calls",
-            D_SHARD, dealloc_delta, N_CALLS
+            "G4 FAIL: fold_projection_into (D={D_SHARD}) deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 
@@ -177,13 +173,11 @@ fn g4_zero_alloc_after_warmup_both_folds() {
         let dealloc_delta = DEALLOC_COUNT.load(Ordering::Relaxed) - dealloc_before;
         assert_eq!(
             alloc_delta, 0,
-            "G4 FAIL: fold_gelu_into (D={}) allocated {} times in {} calls",
-            D_HLA, alloc_delta, N_CALLS
+            "G4 FAIL: fold_gelu_into (D={D_HLA}) allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G4 FAIL: fold_gelu_into (D={}) deallocated {} times in {} calls",
-            D_HLA, dealloc_delta, N_CALLS
+            "G4 FAIL: fold_gelu_into (D={D_HLA}) deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 
@@ -220,13 +214,11 @@ fn g4_zero_alloc_after_warmup_both_folds() {
         let dealloc_delta = DEALLOC_COUNT.load(Ordering::Relaxed) - dealloc_before;
         assert_eq!(
             alloc_delta, 0,
-            "G4 FAIL: fold_gelu_into (D={}) allocated {} times in {} calls",
-            D_SHARD, alloc_delta, N_CALLS
+            "G4 FAIL: fold_gelu_into (D={D_SHARD}) allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G4 FAIL: fold_gelu_into (D={}) deallocated {} times in {} calls",
-            D_SHARD, dealloc_delta, N_CALLS
+            "G4 FAIL: fold_gelu_into (D={D_SHARD}) deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 }

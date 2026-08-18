@@ -110,10 +110,7 @@ fn g1_coverage_m12_sigma_list() {
             eprintln!("m={m} sigma={sigma} alpha={alpha} → coverage {cov:.4}");
             assert!(
                 (0.93..=0.97).contains(&cov),
-                "G1 FAIL: m={} sigma={} → coverage {} outside [0.93, 0.97]",
-                m,
-                sigma,
-                cov
+                "G1 FAIL: m={m} sigma={sigma} → coverage {cov} outside [0.93, 0.97]"
             );
         }
     }
@@ -135,9 +132,7 @@ fn g1_coverage_m1_hstep_nonseasonal() {
         eprintln!("m=1 sigma={sigma} alpha={alpha} → coverage {cov:.4}");
         assert!(
             (0.90..=0.99).contains(&cov),
-            "G1 FAIL (m=1): sigma={} → coverage {} outside [0.90, 0.99]",
-            sigma,
-            cov
+            "G1 FAIL (m=1): sigma={sigma} → coverage {cov} outside [0.90, 0.99]"
         );
     }
 }
@@ -162,11 +157,7 @@ fn g1_coverage_varying_alpha() {
         let hi = (target + 0.04).min(0.999);
         assert!(
             (lo..=hi).contains(&cov),
-            "G1 FAIL (alpha sweep): alpha={} → coverage {} outside [{:.3}, {:.3}]",
-            alpha,
-            cov,
-            lo,
-            hi
+            "G1 FAIL (alpha sweep): alpha={alpha} → coverage {cov} outside [{lo:.3}, {hi:.3}]"
         );
     }
 }

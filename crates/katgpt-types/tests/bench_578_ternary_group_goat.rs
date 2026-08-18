@@ -147,8 +147,7 @@ fn g2_perf_group_scale_vs_row_scale_and_dense() {
         let vs_row = t_group / t_row;
         let vs_dense = t_dense / t_group;
         println!(
-            "{:>5}x{:<6} {:>14.0} {:>14.0} {:>14.0} {:>9.2}x {:>9.2}x",
-            rows, cols, t_group, t_row, t_dense, vs_row, vs_dense
+            "{rows:>5}x{cols:<6} {t_group:>14.0} {t_row:>14.0} {t_dense:>14.0} {vs_row:>9.2}x {vs_dense:>9.2}x"
         );
 
         // THE GATE: the extra per-group vmulq must cost < 1.5x the row-scale

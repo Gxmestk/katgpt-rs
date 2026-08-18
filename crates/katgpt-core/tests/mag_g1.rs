@@ -62,10 +62,9 @@ fn g1_mine_direction_recovers_known_shift() {
     let cos = dot; // dir is unit-norm, v is unit-norm
     assert!(
         cos >= 0.99,
-        "G1 FAIL: mine_direction recovered direction with cos = {:.6} < 0.99",
-        cos
+        "G1 FAIL: mine_direction recovered direction with cos = {cos:.6} < 0.99"
     );
-    println!("G1 mine_direction: cos = {:.6} (≥ 0.99) ✓", cos);
+    println!("G1 mine_direction: cos = {cos:.6} (≥ 0.99) ✓");
 }
 
 #[test]
@@ -105,8 +104,7 @@ fn g1_mine_contrast_recovers_known_class_direction() {
     }
     assert!(
         dot >= 0.95,
-        "G1 FAIL: mine_contrast_direction recovered direction with cos = {:.6} < 0.95",
-        dot
+        "G1 FAIL: mine_contrast_direction recovered direction with cos = {dot:.6} < 0.95"
     );
-    println!("G1 mine_contrast_direction: cos = {:.6} (≥ 0.95) ✓", dot);
+    println!("G1 mine_contrast_direction: cos = {dot:.6} (≥ 0.95) ✓");
 }

@@ -82,8 +82,7 @@ fn als_jacobi_matches_kronecker_d96_r4() {
     // different trajectory through weight space.
     assert_eq!(
         iters_kron, iters_jac,
-        "iteration count mismatch: kron={}, jac={}",
-        iters_kron, iters_jac
+        "iteration count mismatch: kron={iters_kron}, jac={iters_jac}"
     );
 
     // Check ‖A_jacobi − A_kron‖_F and ‖B_jacobi − B_kron‖_F are both small.
@@ -101,13 +100,11 @@ fn als_jacobi_matches_kronecker_d96_r4() {
     let b_diff = b_diff_sq.sqrt();
     assert!(
         a_diff < 1e-6,
-        "‖A_jacobi − A_kron‖_F = {:e} exceeds 1e-6",
-        a_diff
+        "‖A_jacobi − A_kron‖_F = {a_diff:e} exceeds 1e-6"
     );
     assert!(
         b_diff < 1e-6,
-        "‖B_jacobi − B_kron‖_F = {:e} exceeds 1e-6",
-        b_diff
+        "‖B_jacobi − B_kron‖_F = {b_diff:e} exceeds 1e-6"
     );
 }
 
@@ -140,10 +137,10 @@ fn als_jacobi_is_deterministic() {
 
     assert_eq!(n1, n2, "iteration count must match");
     for i in 0..d_out * r {
-        assert_eq!(a1[i].to_bits(), a2[i].to_bits(), "A bit mismatch at {}", i);
+        assert_eq!(a1[i].to_bits(), a2[i].to_bits(), "A bit mismatch at {i}");
     }
     for i in 0..r * d_h {
-        assert_eq!(b1[i].to_bits(), b2[i].to_bits(), "B bit mismatch at {}", i);
+        assert_eq!(b1[i].to_bits(), b2[i].to_bits(), "B bit mismatch at {i}");
     }
 }
 
@@ -235,8 +232,7 @@ fn als_householder_matches_kronecker_d96_r4() {
     // per-iter B-step decomposition differs).
     assert_eq!(
         iters_kron, iters_hh,
-        "iteration count mismatch: kron={}, householder={}",
-        iters_kron, iters_hh
+        "iteration count mismatch: kron={iters_kron}, householder={iters_hh}"
     );
 
     // Frobenius-norm differences must be well under the convergence tol.
@@ -254,12 +250,10 @@ fn als_householder_matches_kronecker_d96_r4() {
     let b_diff = b_diff_sq.sqrt();
     assert!(
         a_diff < 1e-6,
-        "Householder path: ‖A_hh − A_kron‖_F = {:e} exceeds 1e-6",
-        a_diff
+        "Householder path: ‖A_hh − A_kron‖_F = {a_diff:e} exceeds 1e-6"
     );
     assert!(
         b_diff < 1e-6,
-        "Householder path: ‖B_hh − B_kron‖_F = {:e} exceeds 1e-6",
-        b_diff
+        "Householder path: ‖B_hh − B_kron‖_F = {b_diff:e} exceeds 1e-6"
     );
 }

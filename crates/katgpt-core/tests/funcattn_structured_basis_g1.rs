@@ -549,13 +549,11 @@ fn structured_basis_on_pde_like_broadband_signal() {
     // spectrum than the hand-crafted basis's n_modes signal-matched rows.
     if cos_dct > cos_hand {
         println!(
-            "  Note: DCT-log ({:+.4}) > hand-crafted ({:+.4}) on broadband — DCT-log's",
-            cos_dct, cos_hand
+            "  Note: DCT-log ({cos_dct:+.4}) > hand-crafted ({cos_hand:+.4}) on broadband — DCT-log's"
         );
         println!("    8 log-spaced rows cover more spectrum than the hand-crafted basis's");
         println!(
-            "    {} signal-matched rows. The hand-crafted 'upper bound' assumption breaks",
-            n_modes
+            "    {n_modes} signal-matched rows. The hand-crafted 'upper bound' assumption breaks"
         );
         println!("    for broadband signals (it only holds when the basis can fully span");
         println!("    the signal's spectral modes, which requires n_modes ≥ signal rank).",);

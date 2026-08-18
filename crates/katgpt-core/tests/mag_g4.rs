@@ -141,29 +141,21 @@ fn g4_mag_beats_raw_cosine() {
     let mag_rate = mag_hits as f32 / N_TRIALS as f32;
     let random_floor = 1.0 / N_CANDIDATES as f32;
 
-    println!("G4 transfer prediction ({} trials):", N_TRIALS);
-    println!(
-        "  Raw centroid cosine Top-1: {:.3} (random ≈ {:.3})",
-        raw_rate, random_floor
-    );
-    println!(
-        "  MAG class-conditional Top-1: {:.3} (gate ≥ 0.50)",
-        mag_rate
-    );
+    println!("G4 transfer prediction ({N_TRIALS} trials):");
+    println!("  Raw centroid cosine Top-1: {raw_rate:.3} (random ≈ {random_floor:.3})");
+    println!("  MAG class-conditional Top-1: {mag_rate:.3} (gate ≥ 0.50)");
 
     // MAG must beat 3× random.
     assert!(
         mag_rate >= 0.50,
-        "G4 FAIL: MAG Top-1 = {:.3} < 0.50. Transfer prediction not working.",
-        mag_rate
+        "G4 FAIL: MAG Top-1 = {mag_rate:.3} < 0.50. Transfer prediction not working."
     );
 
     // Raw cosine should be near-random (well below 0.50).
     // This confirms the paper's ρ ≈ 0 finding on this synthetic structure.
     assert!(
         raw_rate < 0.40,
-        "G4 WARNING: raw cosine Top-1 = {:.3} — expected near-random (< 0.40). \
-         The synthetic structure may not adequately confound raw cosine.",
-        raw_rate
+        "G4 WARNING: raw cosine Top-1 = {raw_rate:.3} — expected near-random (< 0.40). \
+         The synthetic structure may not adequately confound raw cosine."
     );
 }

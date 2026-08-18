@@ -251,8 +251,7 @@ fn gradient_check_all_params_nope() {
     }
 
     println!(
-        "MLA gradient check (nope) PASSED. max_rel_err = {:.4} ({})",
-        max_rel_err, worst
+        "MLA gradient check (nope) PASSED. max_rel_err = {max_rel_err:.4} ({worst})"
     );
 }
 
@@ -276,8 +275,8 @@ fn gradient_check_input_hidden_nope() {
     let mut scratch = MlaForwardScratch::new(&config, l);
     let mut rope = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
 
-    let mut all_saved = Vec::new();
-    let mut all_outputs = Vec::new();
+    let mut all_saved = Vec::with_capacity(h_seq.len());
+    let mut all_outputs = Vec::with_capacity(h_seq.len());
     for h in &h_seq {
         let (output, saved) =
             mla_forward_token_with_saved(&config, &weights, &mut cache, &mut scratch, &mut rope, h);
@@ -319,11 +318,10 @@ fn gradient_check_input_hidden_nope() {
         }
         assert!(
             re < tol,
-            "dh[{}][{}]: rel_err {:.4} >= tol {:.4}",
-            t_check, i, re, tol
+            "dh[{t_check}][{i}]: rel_err {re:.4} >= tol {tol:.4}"
         );
     }
-    println!("MLA dL/dh gradient check (nope) PASSED. max_rel_err = {:.4}", max_rel_err);
+    println!("MLA dL/dh gradient check (nope) PASSED. max_rel_err = {max_rel_err:.4}");
 }
 
 // ─── Standalone RMSNorm backward test ──────────────────────────────────────
@@ -399,8 +397,8 @@ fn backward_smoke_kimi_k3() {
     let mut scratch = MlaForwardScratch::new(&config, l);
     let mut rope = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
 
-    let mut all_saved = Vec::new();
-    let mut all_outputs = Vec::new();
+    let mut all_saved = Vec::with_capacity(h_seq.len());
+    let mut all_outputs = Vec::with_capacity(h_seq.len());
     for h in &h_seq {
         let (output, saved) =
             mla_forward_token_with_saved(&config, &weights, &mut cache, &mut scratch, &mut rope, h);
@@ -437,5 +435,5 @@ fn backward_smoke_kimi_k3() {
             assert!(g.is_finite(), "NaN/Inf in dh");
         }
     }
-    println!("MLA backward smoke test PASSED (kimi_k3_0_40b, d={}, L={}).", d, l);
+    println!("MLA backward smoke test PASSED (kimi_k3_0_40b, d={d}, L={l}).");
 }

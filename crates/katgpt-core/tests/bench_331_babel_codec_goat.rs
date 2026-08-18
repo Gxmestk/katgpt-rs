@@ -394,7 +394,7 @@ fn gate_g3_latency(corpus: &[String]) -> GateResult {
         for i in 0..8 {
             use std::fmt::Write;
             let _ = writeln!(s, "npc_{i} has hp = {i}00 and level = {i}");
-            let _ = writeln!(s, "Config[combat]: base_damage = {}0(hp)", i);
+            let _ = writeln!(s, "Config[combat]: base_damage = {i}0(hp)");
         }
         s.trim_end().to_string()
     };

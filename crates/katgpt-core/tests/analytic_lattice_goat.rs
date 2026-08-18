@@ -98,9 +98,7 @@ fn g1_compose_chain_is_bit_identical() {
         assert_eq!(
             x.to_bits(),
             y.to_bits(),
-            "G1 FAIL: compose_chain not bit-identical ({} vs {})",
-            x,
-            y
+            "G1 FAIL: compose_chain not bit-identical ({x} vs {y})"
         );
     }
 }
@@ -188,7 +186,7 @@ fn g2_decoder_ranking_matches_reference_cos_ge_095() {
     let norm_b: f32 = ref_scores.iter().map(|x| x * x).sum::<f32>().sqrt();
     let cos = dot / (norm_a * norm_b);
 
-    assert!(cos >= 0.95, "G2 FAIL: decoder ranking cos {} < 0.95", cos);
+    assert!(cos >= 0.95, "G2 FAIL: decoder ranking cos {cos} < 0.95");
 }
 
 #[test]
@@ -250,8 +248,7 @@ fn g2_batch_compose_matches_naive_frobenius_le_1e6() {
 
     assert!(
         max_err < 1e-6,
-        "G2 FAIL: batch vs naive max Frobenius err {} >= 1e-6",
-        max_err
+        "G2 FAIL: batch vs naive max Frobenius err {max_err} >= 1e-6"
     );
 }
 
@@ -295,11 +292,7 @@ fn g2_batch_compose_into_matches_typed() {
             let r = raw_out[i * k * k + j];
             assert!(
                 (t - r).abs() < 1e-6,
-                "G2 FAIL: typed[{}][{}] = {} vs raw = {}",
-                i,
-                j,
-                t,
-                r
+                "G2 FAIL: typed[{i}][{j}] = {t} vs raw = {r}"
             );
         }
     }
@@ -348,8 +341,7 @@ fn g3_associativity_frobenius_le_1e5() {
 
     assert!(
         max_err < 1e-5,
-        "G3 FAIL: associativity max Frobenius err {} >= 1e-5",
-        max_err
+        "G3 FAIL: associativity max Frobenius err {max_err} >= 1e-5"
     );
 }
 
