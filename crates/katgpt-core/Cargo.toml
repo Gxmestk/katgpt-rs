@@ -121,6 +121,14 @@ statrs = "0.17"
 
 [features]
 
+# ignition_schedule (Issue 459 T5, 2026-08-19): closed-form logistic
+# ignition curves z(t) = K·σ(ζt−c), the patience law t* = ln(1/ε)/ζ, and a
+# ζ-descending ordering helper — the modelless half of NQF staged learning
+# (arXiv:2608.13335 via riir-train Research 422 §3.5). GOAT G1–G4 PASS
+# (Bench 666). Opt-in: promotion to default requires the consumer pilot win
+# (selection patience scaled by ignition_time vs fixed patience).
+ignition_schedule = []
+
 # limit_fixture (Issue 580, 2026-08-10): the LIMIT adversarial retrieval fixture
 # from arXiv:2508.21038 §5.2 — a combinatorially dense qrel matrix for stressing
 # single-vector retrieval capacity, plus recall@k and a reference modelless

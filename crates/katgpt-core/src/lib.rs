@@ -81,6 +81,17 @@ pub mod entropic_tilt;
 pub use entropic_tilt::{
     KL_BUDGET_LN2, solve_beta, tilt_advantages_into, tilt_advantages_loo_into, tilted_weights,
 };
+// ignition — closed-form logistic ignition (Issue 459 T5, Research 422 §3.5
+// via arXiv:2608.13335): z(t) = K·σ(ζt − ln((K−z₀)/z₀)) per singular mode,
+// the patience law t* = ln(1/ε)/ζ, and a ζ-descending ordering helper
+// (modes ignite in ζ order). Sigmoid-in-time is the adoption shape GD itself
+// produces — the second grounding for sigmoid-not-softmax (after R315).
+// Opt-in; GOAT G1–G4 PASS (Bench 666). Promotion needs the consumer pilot
+// win (selection patience ∝ 1/ζ vs fixed patience).
+#[cfg(feature = "ignition_schedule")]
+pub mod ignition;
+#[cfg(feature = "ignition_schedule")]
+pub use ignition::{IgnitionSchedule, ignition_time, order_by_ignition_into};
 // Conformal Predictive Intervals — modelless UQ overlay (Plan 340, Research
 // 322, arXiv:2605.03789 CSP + arXiv:2606.09473 "Report the Floor"). Wraps any
 // PointForecaster with a per-channel × per-horizon-bucket exp-recency-
