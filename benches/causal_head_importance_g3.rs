@@ -88,8 +88,7 @@ fn main() {
         let x_ratio = causal_ns / attn_ns;
         let verdict = if x_ratio <= 2.0 { "PASS" } else { "FAIL" };
         println!(
-            "{:>8} {:>16.3} {:>16.1} ns {:>16.1} ns {:>8.2}x  {}",
-            n, critical_ratio, causal_ns, attn_ns, x_ratio, verdict
+            "{n:>8} {critical_ratio:>16.3} {causal_ns:>16.1} ns {attn_ns:>16.1} ns {x_ratio:>8.2}x  {verdict}"
         );
         if x_ratio > 2.0 {
             all_within_target = false;

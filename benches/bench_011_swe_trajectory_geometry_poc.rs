@@ -290,9 +290,7 @@ fn run_t52() -> (Vec<(usize, CompactionDecision<4>)>, bool) {
     let fired_at = |step: usize| {
         decisions
             .iter()
-            .find(|(s, _)| *s == step)
-            .map(|(_, d)| matches!(d, CompactionDecision::Compress { .. }))
-            .unwrap_or(false)
+            .find(|(s, _)| *s == step).is_some_and(|(_, d)| matches!(d, CompactionDecision::Compress { .. }))
     };
     let pass = fired_at(20)
         && fired_at(40)
@@ -659,9 +657,7 @@ fn run_t53b() -> (T53bStrategyResult, T53bStrategyResult) {
                     .enumerate()
                     .max_by(|(_, a), (_, b)| {
                         a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal)
-                    })
-                    .map(|(k, _)| k)
-                    .unwrap_or(0);
+                    }).map_or(0, |(k, _)| k);
                 let correct = matching_gate > 0.6 && argmax_k == mode_idx;
                 if correct {
                     n_correct += 1;
@@ -733,7 +729,7 @@ fn main() {
             compress_steps.push(*step);
         }
     }
-    println!("  Compress fired at steps: {:?}", compress_steps);
+    println!("  Compress fired at steps: {compress_steps:?}");
     println!("  (expected: [20, 40] — synthetic test-pass events)");
     println!();
     println!(
@@ -752,10 +748,10 @@ fn main() {
         println!("    deterministic: {}", r.deterministic);
         println!("    pi-derived sigmoid gates (per archetype):");
         for (k, g) in r.gates.iter().enumerate() {
-            println!("      archetype {}: sigmoid(pi_{k}/tau) = {:.4}", k, g);
+            println!("      archetype {k}: sigmoid(pi_{k}/tau) = {g:.4}");
         }
         let max_gate = r.gates.iter().cloned().fold(0.0_f32, f32::max);
-        println!("    max gate = {:.4} (non-degenerate threshold: > 0.6)", max_gate);
+        println!("    max gate = {max_gate:.4} (non-degenerate threshold: > 0.6)");
         println!("    non_degenerate: {}", r.non_degenerate);
         println!();
     }

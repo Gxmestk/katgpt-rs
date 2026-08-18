@@ -419,6 +419,6 @@ fn main() {
     for d in 1..=9u8 {
         let commits = speculate_one_round(d);
         let rate = commits as f32 / INKALA_EMPTIES as f32;
-        println!("{:<10} {:>12} {:>14.6}", d, commits, rate);
+        println!("{d:<10} {commits:>12} {rate:>14.6}");
     }
 }

@@ -124,8 +124,8 @@ fn unit_dir(rng: &mut fastrand::Rng) -> [f32; D] {
 /// distinctive key dir and value = e_j (orthogonal identification space).
 fn gen_stream(seed: u64, n_regimes: usize) -> Stream {
     let mut rng = fastrand::Rng::with_seed(seed);
-    let mut keys = Vec::new();
-    let mut values = Vec::new();
+    let mut keys = Vec::with_capacity(n_regimes);
+    let mut values = Vec::with_capacity(n_regimes);
     for _ in 0..n_regimes {
         let kdir = unit_dir(&mut rng);
         let vdir = unit_dir(&mut rng);
