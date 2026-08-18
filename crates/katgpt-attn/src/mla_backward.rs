@@ -283,7 +283,26 @@ pub fn mla_forward_token_with_saved(
     let attn_out_gated = scratch.attn_out.clone();
     let attn_out_pre = if config.use_output_gate && !gate_values.is_empty() {
         (0..proj_size)
-            .map(|i| attn_out_gated[i] / gate_values[i])
+            .map(|i| {
+                let g = gate_values[i];
+                // Issue 460: `attn_out_pre` is genuinely UNRECOVERABLE where the
+                // gate underflowed to zero — `gated` is then 0 too and 0/0
+                // carries no information. The old unguarded divide produced NaN
+                // here and poisoned every consumer downstream.
+                //
+                // The gradient path no longer reads this field (the `g` cancels
+                // analytically — see `d_gate_pre` below), so nothing depends on
+                // the reconstruction any more. It is kept because the field is
+                // public, and reported as 0.0 on the singular elements: a
+                // finite, obviously-neutral value beats a NaN that silently
+                // propagates. Callers needing the exact pre-gate activation
+                // should use the checkpoint path, which SAVES it instead of
+                // dividing it back out (`kimi_k3/checkpoint.rs`).
+                match g > 0.0 {
+                    true => attn_out_gated[i] / g,
+                    false => 0.0,
+                }
+            })
             .collect::<Vec<_>>()
     } else {
         attn_out_gated.clone()
@@ -396,7 +415,27 @@ pub fn mla_backward_token(
         for i in 0..proj_size {
             let g = saved.gate_values[i];
             d_attn[i] = d_gated_attn[i] * g;
-            d_gate_pre[i] = d_gated_attn[i] * saved.attn_out[i] * g * (1.0 - g);
+            // Issue 460: this reads
+            //     d_gate_pre = d_gated_attn * attn_out_PRE * g * (1 - g)
+            // and `attn_out_pre` used to be reconstructed as `attn_out_gated / g`
+            // (see the recompute path above). That division is singular exactly
+            // when the gate saturates: `sigmoid(W_g · h)` underflows to a HARD
+            // ZERO in f32 once the pre-activation drops below ~-88, and then the
+            // reconstruction is 0/0 = NaN.
+            //
+            // Since `attn_out_gated == attn_out_pre * g` by construction, the
+            // `g` cancels:
+            //     attn_out_pre * g * (1 - g) == attn_out_gated * (1 - g)
+            // so the identity below is bit-equivalent wherever the old form was
+            // finite, removes the singularity entirely (no epsilon, no clamp,
+            // no bias), and drops one divide per element.
+            //
+            // Measured before the fix (`random_train_init` seed 42, 0.40B
+            // shape): 4 of 10 real sequences produced an all-zero gate at one
+            // token, which turned every downstream gradient non-finite — while
+            // the forward and the loss stayed perfectly normal, so nothing
+            // upstream flagged it.
+            d_gate_pre[i] = d_gated_attn[i] * saved.attn_out_gated[i] * (1.0 - g);
         }
         // dL/d(W_g) += outer(d_gate_pre, h)
         if let Some(ref mut w_g_grad) = grads.w_g {

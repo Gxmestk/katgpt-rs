@@ -680,3 +680,142 @@ fn backward_smoke_kimi_k3_0_40b() {
 
     eprintln!("Backward smoke test PASSED (kimi_k3_0_40b dims, vocab=64).");
 }
+
+/// Issue 460 regression — a SATURATED MLA output gate must not poison the
+/// gradients.
+///
+/// The MLA backward used to reconstruct the pre-gate activation as
+/// `attn_out_gated / gate`. `gate = sigmoid(W_g · h)` underflows to a hard zero
+/// in f32 once the pre-activation drops below ~-88, so that reconstruction
+/// became 0/0 = NaN and every downstream gradient went non-finite — while the
+/// forward pass and the loss stayed completely normal, so nothing upstream
+/// flagged it. Measured on `random_train_init(seed 42)` at the 0.40B shape:
+/// 4 of 10 real sequences were destroyed this way.
+///
+/// This drives the gate deliberately into saturation by making `w_g` strongly
+/// negative, so `sigmoid` returns exact zeros, and asserts the gradients stay
+/// finite. It fails on the pre-fix code and passes on the algebraic form
+/// (`attn_out_pre * g * (1-g) == attn_out_gated * (1-g)`).
+///
+/// Why saturate rather than reuse seed 42: the seed reproduces the fault only
+/// as a side effect of an unlucky init, so it would silently stop testing
+/// anything the moment the init changed. Forcing the gate to zero tests the
+/// singular case directly.
+#[test]
+fn issue460_saturated_output_gate_keeps_gradients_finite() {
+    let config = small_config();
+    let tokens: Vec<u32> = vec![1, 2, 3, 4, 5];
+    let l = tokens.len();
+
+    // Build weights whose MLA output gate is driven to saturation, run the
+    // forward, and report how many gate values underflowed to an exact zero.
+    //
+    // The sign matters and is not knowable up front: with every `w_g` element
+    // set to `c`, the gate pre-activation is `c * sum(h)`, so which of ±c drives
+    // it negative depends on the sign of `sum(h)`. Trying both is what makes
+    // this deterministic instead of init-lucky.
+    let build = |c: f32| {
+        let mut weights = KimiK3ModelWeights::random(&config, 7);
+        let mut gated_layers = 0;
+        for (i, layer) in weights.layers.iter_mut().enumerate() {
+            if !config.is_mla_layer(i) {
+                continue;
+            }
+            if let katgpt_rs::kimi_k3::decoder_layer::KimiAttentionWeights::Mla(m) =
+                &mut layer.attention
+                && let Some(ref mut wg) = m.w_g
+            {
+                for w in wg.iter_mut() {
+                    *w = c;
+                }
+                gated_layers += 1;
+            }
+        }
+        assert!(
+            gated_layers > 0,
+            "test config must contain at least one gated MLA layer"
+        );
+
+        let mut runtime = KimiK3Runtime::new(&config, 8);
+        let mut saved: Vec<TokenSavedActivations> =
+            (0..l).map(|_| TokenSavedActivations::new()).collect();
+        runtime.reset();
+        for (pos, &tok) in tokens.iter().enumerate() {
+            kimi_k3_forward_token_saved(&config, &weights, &mut runtime, tok, pos, &mut saved[pos]);
+        }
+        let zeros = saved[..l - 1]
+            .iter()
+            .flat_map(|t| t.layers.iter())
+            .filter_map(|lay| lay.mla_saved.as_ref())
+            .flat_map(|m| m.gate_values.iter())
+            .filter(|g| **g == 0.0)
+            .count();
+        (weights, runtime, saved, zeros)
+    };
+
+    let (weights, runtime, saved, saturated) = {
+        let neg = build(-1.0e3);
+        match neg.3 > 0 {
+            true => neg,
+            false => build(1.0e3),
+        }
+    };
+
+    // The premise: the gate really did underflow to an exact zero. Without this
+    // the assertions below would pass vacuously on a non-singular input.
+    assert!(
+        saturated > 0,
+        "premise failed: no MLA gate underflowed to exactly 0 at either sign, so \
+         the 0/0 path is untested"
+    );
+
+    // Same synthetic upstream gradient the other checks in this file use — it
+    // guarantees a non-zero d_logits, so a finite result cannot be an artifact
+    // of nothing flowing backward at all.
+    let d_logits: Vec<Vec<f32>> = saved[..l - 1]
+        .iter()
+        .map(|s| s.logits.iter().map(|&v| 2.0 * v).collect())
+        .collect();
+
+    let mut grads = KimiK3ModelGradients::zeros_like(&config, &weights);
+    kimi_k3_backward_sequence(
+        &config,
+        &weights,
+        &runtime,
+        &saved[..l - 1],
+        &d_logits,
+        &mut grads,
+    );
+
+    let assert_finite = |v: &[f32], label: &str| {
+        let bad = v.iter().filter(|x| !x.is_finite()).count();
+        assert_eq!(
+            bad,
+            0,
+            "{label}: {bad}/{} gradients non-finite with a saturated output gate \
+             (Issue 460 regression)",
+            v.len()
+        );
+    };
+    assert_finite(&grads.embed_weight, "embed_weight");
+    assert_finite(&grads.lm_head_weight, "lm_head_weight");
+    for (i, lg) in grads.layers.iter().enumerate() {
+        assert_finite(&lg.input_layernorm_weight, &format!("layer{i}.input_ln"));
+        assert_finite(
+            &lg.post_attention_layernorm_weight,
+            &format!("layer{i}.post_attn_ln"),
+        );
+        if let Some(m) = &lg.mla_grads {
+            assert_finite(&m.w_o, &format!("layer{i}.mla.w_o"));
+            // `w_g` is the tensor the 0/0 hit FIRST — it is the only consumer
+            // of the reconstructed pre-gate activation.
+            if let Some(g) = &m.w_g {
+                assert_finite(g, &format!("layer{i}.mla.w_g"));
+            }
+        }
+        if let Some(d) = &lg.dense_grads {
+            assert_finite(&d.gate_proj, &format!("layer{i}.dense.gate_proj"));
+            assert_finite(&d.down_proj, &format!("layer{i}.dense.down_proj"));
+        }
+    }
+}
