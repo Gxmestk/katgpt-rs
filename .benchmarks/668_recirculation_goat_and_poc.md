@@ -95,6 +95,15 @@ the same class as the M3 nohup note; scheduled-task processes survive).
   ~4.2 cores sustained, output grows ~one line per completed arm — a static
   file for hours mid-arm is NORMAL (block-buffered stdout), do not diagnose
   a hang from a static file alone; check CPU advancement instead.
+- **Progress (2026-08-20 06:56, second data point):** arm 2 landed —
+  `A_research_arxiv recirc_a007: ppl=117.1081 (mean NLL 4.7631) [5208.0s,
+  25600/arm]`. Two facts: (1) the per-arm rate is CONFIRMED STABLE
+  (5208.0s vs 5208.7s — single-stack arms are ~87 min each, so arms 1-8
+  finish ~20:30 box time TONIGHT; only the 4 dual-stack recirc/overwrite
+  arms add uncertainty beyond that); (2) first paper-scale cell agrees
+  with session scale — α=0.07 recirc is HARMFUL here too (+4.81 ppl vs
+  the run's own baseline 112.2940; compare Run 3 cells against Run 3's
+  baseline, NOT Run 1's 91.32 — the register shift moves absolute ppl).
 - **Box state:** both repos synced to develop (riir-ai `7b931d0db`,
   katgpt-rs `e580ad35e`); toolchain `1.95.0-x86_64-pc-windows-msvc`;
   GPU idle/unused (CPU harness).
