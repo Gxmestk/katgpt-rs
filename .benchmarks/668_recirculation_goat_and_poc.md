@@ -60,7 +60,56 @@ Operator unit tests: convex+norm-match boundedness (triangle-inequality class), 
 # Operator GOAT
 cargo test -p katgpt-core --features recirculation --lib recirculation::
 cargo test --release -p katgpt-core --features recirculation --lib g2_step_mixture -- --nocapture
-cargo test -p katgpt-core --features recirculation --test recirculation_alloc_check --release
+cargo test --release -p katgpt-core --features recirculation --test recirculation_alloc_check --release
 # PoC (real model; ~5-13 min per config on M3)
 GEMMA2_2B_GGUF=... TOKENIZER_MODEL=... cargo test -p riir-poc --test recirculation_poc --release -- --nocapture --ignored
 ```
+
+## Reopen attempt (2026-08-20, in flight / blocked — collection instructions)
+
+**Status: the paper-scale re-run is RUNNING detached on the 4090 box; the
+base-model check is BLOCKED on owner action.**
+
+### Paper-scale re-run (in flight)
+
+Launched via `schtasks /TN recirc_paperscale` (the Windows-native detached
+run — Start-Process children DIE with the SSH session's job-object teardown,
+the same class as the M3 nohup note; scheduled-task processes survive).
+
+- **Output:** `E:\git\riir-ai\target\recirc\paperscale_out.txt` (12
+  per-arm lines + the verdict table; poll for `[poc] ... ppl=` lines).
+- **Config:** `RECIRC_POC_WINDOWS=50 RECIRC_POC_WINDOW_TOKENS=512`, both
+  dataset dirs env-pinned (`RECIRC_POC_DS_A_DIR=E:\git\katgpt-rs\.research`,
+  `RECIRC_POC_DS_B_DIR=E:\git\riir-ai\.docs` — the harness gained the
+  env knobs after the hardcoded `/Users/katopz` paths silently produced
+  1-token datasets on the box; riir-ai `7b931d0db`).
+- **Model:** gemma-2-2b-it-f16 (the same register as Runs 1-2 — this run
+  discharges the SCALE caveat, not the register caveat).
+- **ETA:** 307,200 token-steps at ~8-24 tok/s (context-growth dependent)
+  ≈ 4-11 h from 2026-08-20 ~03:00 box time.
+- **Box state:** both repos synced to develop (riir-ai `7b931d0db`,
+  katgpt-rs `e580ad35e`); toolchain `1.95.0-x86_64-pc-windows-msvc`;
+  GPU idle/unused (CPU harness).
+- **Collection:** when the verdict table lands, append it here as **Run 3
+  (paper-scale)** + update the verdict row if the direction flips on any
+  dataset (12/12 recirc cells were harmful at session scale; the reopen
+  question is whether scale changes the sign or only the magnitudes).
+
+### Base-model check (BLOCKED — owner action required)
+
+No public **base** (non-IT) Gemma-2-family GGUF exists on HF (verified
+2026-08-20 via the HF API: bartowski/lmstudio-community have only IT
+quantizations; `google/gemma-2-2b-GGUF` EXISTS but is `gated=manual` —
+requires Gemma license acceptance + an authenticated HF token). The two
+runnable paths, both owner-dependent:
+
+1. Accept the license on `google/gemma-2-2b-GGUF` + provide the box an
+   HF token → `Invoke-WebRequest` the f32 GGUF (~10 GB; E: has 55 GB free)
+   → re-run the PoC session-scale against it (the f16 loader handles f32
+   GGML types via the same dequant path — verify `from_gguf` accepts the
+   type id first).
+2. Convert `google/gemma-2-2b` safetensors via llama.cpp's
+   `convert_hf_to_gguf.py` (also gated; same token prerequisite).
+
+Until one lands, the model-register caveat stands and the negative verdict
+remains scoped to **IT-tuned** residual streams.
