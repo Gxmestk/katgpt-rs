@@ -85,8 +85,16 @@ the same class as the M3 nohup note; scheduled-task processes survive).
   1-token datasets on the box; riir-ai `7b931d0db`).
 - **Model:** gemma-2-2b-it-f16 (the same register as Runs 1-2 — this run
   discharges the SCALE caveat, not the register caveat).
-- **ETA:** 307,200 token-steps at ~8-24 tok/s (context-growth dependent)
-  ≈ 4-11 h from 2026-08-20 ~03:00 box time.
+- **ETA (REVISED 2026-08-20 05:35, measured):** the original 4-11h
+  estimate assumed 8-24 tok/s; the MEASURED baseline-arm rate is **4.9 tok/s**
+  (arm 1: `A baseline ppl=112.2940, 5208.7s for 25600 tokens` — 512-token
+  windows pay ~5× the per-token context cost of Runs 1-2's 96-160-token
+  windows). 12 arms at this rate ≈ 17-24h+ (the 4 recirc/overwrite arms run
+  2 stack instances/token and will be slower still). **Realistic completion:
+  2026-08-21 early morning box time.** Health signature while running:
+  ~4.2 cores sustained, output grows ~one line per completed arm — a static
+  file for hours mid-arm is NORMAL (block-buffered stdout), do not diagnose
+  a hang from a static file alone; check CPU advancement instead.
 - **Box state:** both repos synced to develop (riir-ai `7b931d0db`,
   katgpt-rs `e580ad35e`); toolchain `1.95.0-x86_64-pc-windows-msvc`;
   GPU idle/unused (CPU harness).
@@ -94,6 +102,9 @@ the same class as the M3 nohup note; scheduled-task processes survive).
   (paper-scale)** + update the verdict row if the direction flips on any
   dataset (12/12 recirc cells were harmful at session scale; the reopen
   question is whether scale changes the sign or only the magnitudes).
+  First data point already on record: `A baseline ppl=112.2940` (Run 1's
+  2×96-token baseline was 91.32 — the 512-token register shifts absolute
+  ppl; compare Run 3 cells against Run 3's OWN baseline, not Run 1's).
 
 ### Base-model check (BLOCKED — owner action required)
 
