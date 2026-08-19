@@ -825,3 +825,49 @@ cannot feel. Cell verdicts: bs=8 → **−8.6%** (worse than preset-8), bs=15 �
 faithful to the paper, the schedules are constructible, and the arithmetic is
 exact. This is a **regime negative**, not an implementation bug: the GOAT track is
 CLOSED. Reopen only on a dllm regime with measurably non-flat ε(N).
+
+
+## 40. Pair-Scored Path Selection — G2 FAIL: the two signals are collinear (Issue 671)
+
+**Feature flag:** rides `bigram_markov` in katgpt-speculative (the substrate
+`katgpt_speculative::pair_select` ships inside the existing opt-in feature; no
+new flag). Issue 671 RESOLVED-NEGATIVE + removed 2026-08-19; research record
+[Research 490](../../.research/490_DFlash2_Pair_Scored_Path_Selection.md), gate
+[riir-ai Bench 699](../../../riir-ai/.benchmarks/699_issue671_pair_scored_selection_gate.md).
+
+**The hypothesis:** DFlash 2's path selector lifts parallel drafting by
+composing per-position marginal evidence `U_t(b)` + adjacent-pair coherence.
+The modelless instantiation — `S_t(a,b) = ln U_t(b) + λ_t · ln P_bigram(b|a)`
+with `U_t` from t-step forward propagation of the same bigram table, walked
+greedily, three λ gates (Flat/Entropy/Margin) — should lift chain acceptance
+from 0.2987 toward the 0.5–0.7 break-even band without training and without
+tree verification.
+
+**What passed:** G1 — λ=0 ≡ argmax-of-marginals **bit-identical** on all
+2,000 subsampled positions at full vocab (10 unit tests, t-step propagation
+pinned vs dense matrix powers). The substrate is correct.
+
+**What failed:** G2 — best pair-scored acceptance **0.2855 < 0.5** (chain full
+0.2987 / sub 0.2845, argmax-of-marginals 0.2730, tree-oracle ceiling 0.8770,
+unigram control 0.1310 degenerates as designed). The entire λ × gate matrix
+(λ ∈ {0.5, 1, 2} × {Flat, Entropy, Margin}) spans 0.2780–0.2845 — 0.98×–1.00×
+of the chain. **Root cause: collinearity** — `U_t` is forward-propagated from
+the *same* transition table the pair term scores with; no orthogonal evidence
+enters the selection, so the λ sweep interpolates between two arms that both
+sit at ~0.27–0.28. DFlash 2's selector works because its `U` (a neural
+drafter's context-conditioned logits) is evidence *independent* of the trained
+pair coherence; with bigram-only statistics the composition is a re-weighting,
+not an information gain.
+
+**Two secondary findings:** (1) the entropy gate TIES flat λ exactly (0.2845 =
+0.2845) — the `H(h_t)` analog is dead weight at this operating point; (2) the
+0.877 tree ceiling is an *oracle containment* measure, not single-path
+realizable by any scorer built from the table's own statistics — the G2 target
+(0.5) was calibrated on DFlash 2's numbers where a neural drafter's Recall@16
+is 99.5%, vs the modelless table's ~22% top-1 rate (Bench 664); the headroom
+decomposition does not transfer to a drafter this weak.
+
+**Redirect:** the selection headroom (0.28 → 0.87 containment) needs a real
+drafter's context-conditioned `U` — riir-train lineage / the Issue 717
+tree-verify path. Reopen only with an information source orthogonal to the
+pair table.

@@ -2716,3 +2716,38 @@ UQ-bearing (a complexity scalar, not a distribution/interval/coverage claim),
 so the Issue 010 "Report the Floor" rule does not apply. Issue 668
 RESOLVED+REMOVED 2026-08-18 (T1–T6 in `2d5a9efc`; consumer verdict folded in
 `89e3910d`).
+
+## 83. Ignition Schedule — closed-form logistic ignition primitive (Issue 459 T5)
+
+**Feature flag:** `ignition_schedule = []` in katgpt-core (zero deps, opt-in).
+
+`IgnitionSchedule` (katgpt-core/src/ignition.rs) — the Neural Quadratic Forms
+ignition theorems (arXiv:2608.13335 Thms 5–8; riir-train Research 422 §3.5) as
+pure closed-form math:
+
+- `IgnitionSchedule::new(z0, k, zeta)` — contract-asserted (`0 < z0 < k`, `zeta > 0`)
+- `at(t)` — `z(t) = K / (1 + ((K−z₀)/z₀)·e^{−ζt})` ≡ `K·σ(ζt − ln((K−z₀)/z₀))`, one `exp`, no iteration
+- `time_to_reach(target)` — per-curve inverse
+- `ignition_time(zeta, eps)` — the patience law `t* = ln(1/ε)/ζ` (Thm 8, capacity-free)
+- `order_by_ignition_into(zetas, &mut [usize])` — ζ-descending ignition order, index-ascending tie-break, caller-owned buffer
+
+Design anchors: sigmoid-in-time is the adoption shape GD itself produces (the
+second grounding for sigmoid-not-softmax after R315); patience ∝ 1/ζ —
+pre-ignition signal is ε-small, so keying on raw rates amplifies noise (the
+measured riir-clippy Issue 026 starved-pool negative is the anchor this
+predicts). Correctness pinned beyond the gates: RK4 ODE anchor to the GLV
+dynamics (<5e-4 rel), exact-sigmoid identity (<1e-5), inverse roundtrip (<1e-5).
+
+### GOAT (Bench 666)
+
+G1 monotone ranking **PASS** (t* strictly decreasing over ζ ∈ [0.1, 4.0] at
+ε ∈ {1e-2, 1e-3, 1e-4}; `order_by_ignition_into` == observed threshold-crossing
+order) · G2 latency **PASS** (**3.88 ns/call** release / 13.15 ns debug, n=100k
+— 12.9× release headroom) · G3 no-regression **PASS** (default 1897/0/6 exact
+baseline; feature-on 1911/0/6 (+14); clippy 0 both states) · G4 alloc-free
+**PASS** (TrackingAllocator: 0 allocs across 1000× `at()` + 1000×
+`ignition_time()` + the ordering helper).
+
+**Consumer pilot (promotion gate — OPEN):** riir-clippy selection patience
+scaled by `ignition_time(ζ̂, ε)` vs fixed patience on the heal-loop fixture.
+Promotion to default only on a measured win; stays opt-in otherwise.
