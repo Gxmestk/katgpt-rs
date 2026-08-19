@@ -1,5 +1,7 @@
 # Research 490: DFlash 2 — Pair-Scored Path Selection over Parallel Draft Candidates
 
+**Status:** DISTILLED → POC EXECUTED, G2 FAIL (2026-08-19) — [Bench 699](../../riir-ai/.benchmarks/699_issue671_pair_scored_selection_gate.md): the modelless composition (t-step table marginals as `U`) does not lift chain acceptance (0.2855 vs 0.5 gate; chain 0.2845, tree ceiling 0.8770) — the two signals are collinear; G1 PASS, entropy gate = dead weight. Substrate kept opt-in as the negative-result artifact; the headroom redirect is a real-drafter `U` (riir-train lineage) or Issue 717 tree-verify.
+
 > **Source:** "DFlash 2: Keep Drafting Parallel" — Inco AI blog, 2026-08-18, https://inco.ai/blog/dflash2/ (blog-only; no arXiv as of 2026-08-19). Successor to DFlash [arXiv:2602.06036, Z Lab, ICML 2026].
 > **Date:** 2026-08-19
 > **Status:** Active — distilled; POC filed as Issue 671
