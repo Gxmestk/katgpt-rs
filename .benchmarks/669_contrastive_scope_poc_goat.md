@@ -26,7 +26,23 @@
 
 > "if G-gates pass AND a consumer adopts (riir-clippy L4 2D gate or riir-ai engram), promote per GOAT discipline; else record negative result and close."
 
-Primitive gates all PASS. **No consumer adopted this session** — the natural pairings (riir-clippy L4: rule-coverage × input-scope 2D gate over the Issue 017 in/adversarial fixture corpora; riir-ai engram gates: shard-corpus vs OOD-zone embeddings) are recorded as the adoption paths. Per the rule: **not promoted; issue closed with the POC verdict recorded here** (a shipped opt-in primitive awaiting its consumer — not a negative on the mechanism, whose toy-corpus gates all passed).
+Primitive gates all PASS. **T5 CLOSED 2026-08-20 — the consumer adoption LANDED**:
+riir-clippy Bench 040 / Plan 016 shipped the input-scope gate at the `heal()`
+seam (`ScopeModel` over the domain corpus vs a canonical 18-doc non-Rust
+out-corpus; the 2D complement of the Issue 030 rule-coverage gate). Measured:
+OOS inputs declined **8/8** vs **8/8 SERVED** un-gated (the demonstrated
+defend-wrong bug with seeded memory — the production state); in-distribution
+healing **bit-identical** over the full 40-fixture corpus (the haircut
+saturates to exactly `1.0f32`); **529 ns/input** (release); steady-state
+alloc delta **−1** (adds zero); the L4 path never sees garbage (0 calls vs
+1 — saves the ~48 s GPU call). **κ/θ re-pinned by the consumer from its
+measured gap** (θ = 0 — in-margin 7.6 bits / out-margin 24.4 bits; κ = 4.5 —
+saturation 34.3 ≥ 16.6 at the worst fixture), discharging this bench's
+"consumers re-pin per their benches" caveat. Honest scope: Rust-vs-not-Rust
+garbage only — cross-domain Rust stays out (Issue 020's ~70% lexical
+ceiling). ⇒ **`contrastive_scope` PROMOTED to katgpt-core `default`**
+(2026-08-20). The riir-clippy consumer stays opt-in at its own feature level
+(the `l4_lora` install-time precedent).
 
 ## Substrate check (substrate-first skill)
 
@@ -35,7 +51,8 @@ Searched vocabulary: `log_odds|log_ratio|naive_bayes|llr|contrastive|score_table
 ## Run
 
 ```bash
-cargo test -p katgpt-core --features contrastive_scope --lib contrastive_scope::   # 8 tests
-cargo test --release -p katgpt-core --features contrastive_scope --lib t2_scope_score_us -- --nocapture
-cargo test -p katgpt-core --features contrastive_scope --test contrastive_scope_alloc_check --release
+# DEFAULT-ON since the 2026-08-20 promotion — no feature flag needed:
+cargo test -p katgpt-core --lib contrastive_scope::  # 7 tests (1 timing test ignored in debug)
+cargo test --release -p katgpt-core --lib contrastive_scope::  # incl. the µs timing gate
+cargo test -p katgpt-core --test contrastive_scope_alloc_check --release
 ```
