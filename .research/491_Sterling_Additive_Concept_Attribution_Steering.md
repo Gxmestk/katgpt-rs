@@ -2,7 +2,7 @@
 
 > **Source:** "Scaling Inherently Interpretable Language Models" — [arXiv:2608.07594](https://arxiv.org/abs/2608.07594) — Guide Labs Team, Madsen, Ismail, Nguyen, ..., Adebayo — 2026-08-06 (Steerling-8B)
 > **Date:** 2026-08-19
-> **Status:** IMPLEMENTED (opt-in) — Issue 672 T1–T5 shipped behind `sterling_primitives` + the ungated `noisy_or` core util (civ site delegates); GOAT G1–G4 PASS ([Bench 667](../.benchmarks/667_sterling_primitives_goat.md)). Promotion awaits the riir-ai Issue 732 consumer GOAT.
+> **Status:** IMPLEMENTED (opt-in) — Issue 672 T1–T5 shipped behind `sterling_primitives` + the ungated `noisy_or` core util (civ site delegates); GOAT G1–G4 PASS ([Bench 667](../.benchmarks/667_sterling_primitives_goat.md)). The first consumer LANDED 2026-08-20: riir-ai Issue 732 (`exact_emotion_attribution` — the additive goal-scoring variant + `NpcDecisionAttribution` ledger, GOAT G1/G2/G3/G4/G8 ALL PASS incl. the +10 ns/NPC G2 + the gemv bit-identity oracle; riir-ai Bench 702). Both features stay opt-in pending a game-level A/B; the consumer GOAT named as 672's promotion gate is now on record.
 > **Related Research:** 290 (latent field steering — the shipped inference twin), 393 (subspace concept primitive), 397 (MAG mining + `calibrate_alpha`), 409 (MANCE concept erasure), 388 (jacobian lens concept readout), 144 (functional emotions / linear representations → behavior control), 301 (indicator probe bank), 382 (spherical steering), 357 (activation steering)
 > **Cross-ref:** riir-ai Issue 732 (exact NPC emotion attribution — the white space), riir-train Research 425 + Issue 467 (training recipe / dllm-defaults insurance)
 > **Classification:** Public
