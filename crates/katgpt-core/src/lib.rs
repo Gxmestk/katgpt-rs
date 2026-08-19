@@ -35,6 +35,50 @@ pub fn sigmoid(x: f32) -> f32 {
     simd::fast_sigmoid(x)
 }
 
+/// Noisy-OR span aggregation `1 − Π(1−kᵢ)`, direct product form.
+///
+/// Generalized from the riir-games-civ salience gate's literal
+/// `1 − (1−c)(1−boost)` (Research 491 distilled item 5 / Issue 672 T4 — the
+/// civ site delegates here). Inputs are clamped to `[0, 1]` (each k is a
+/// probability-style weight). Boundary identities: all k = 0 ⇒ exactly 0;
+/// any k = 1 ⇒ exactly 1; monotone non-decreasing in every k.
+///
+/// **Bit-compatibility note:** for the two-term case the accumulation is
+/// exactly `(1.0−k₀)·(1.0−k₁)` in source order — bit-identical to the civ
+/// inline formula it replaces (pinned by the sterling module's test).
+///
+/// Always available — no feature gate — same rationale as [`sigmoid`]: a
+/// pure math utility consumed across domains, with a DEFAULT-ON consumer
+/// (civ salience gate) that must not gain a feature dependency for a
+/// behavior-preserving refactor.
+#[inline]
+pub fn noisy_or(ks: &[f32]) -> f32 {
+    let mut acc = 1.0f32;
+    for &k in ks {
+        let one_minus = 1.0 - k.clamp(0.0, 1.0);
+        acc *= one_minus;
+    }
+    1.0 - acc
+}
+
+/// Log1p-stable noisy-OR for spans of MANY small weights:
+/// `1 − exp(Σ ln(1−kᵢ)) = −expm1(Σ log1p(−kᵢ))`.
+///
+/// The direct product form underflows to `1 − 0 = 1` prematurely when
+/// enough small factors accumulate (catastrophic for long spans of tiny
+/// probabilities); the log1p/expm1 form keeps resolution. Inputs clamped
+/// to `[0, 1]`: k = 1 yields `log1p(−1) = −∞` ⇒ the stable form returns
+/// exactly 1.0 — the correct saturated limit.
+#[inline]
+pub fn noisy_or_stable(ks: &[f32]) -> f32 {
+    let mut sum = 0.0f32;
+    for &k in ks {
+        let kc = k.clamp(0.0, 1.0);
+        sum += (-kc).ln_1p(); // ln(1 − k), stable for small k
+    }
+    -sum.exp_m1()
+}
+
 #[cfg(feature = "tiled_attention")]
 pub mod attention;
 
@@ -2423,6 +2467,40 @@ pub use selection_propagation::{
     PropagationBlend, PropagationConfig, PropagationOutcome, SelectionPropagationScratch,
     propagate_selection_to_fixpoint_into,
 };
+
+// Sterling-derived modelless primitives (Issue 672 / Research 491,
+// arXiv:2608.07594 Steerling-8B): ReLU-gated logit suppression (the naive
+// subtraction promotes anti-aligned tokens), exact-decomposition readout
+// (Σ parts + residual == fused, bit-identical by fixed summation order),
+// lift-set steering targets (two-pass corpus statistic), γ=τ/peak logit-space
+// calibration, + the HSIC-style cross-covariance gauge (measure-only). The
+// noisy-OR rider lives UNGATED at the crate root (`noisy_or` / `noisy_or_stable`)
+// because the riir-games-civ salience gate delegates to it under the DEFAULT
+// feature set. Opt-in — promotion requires a consumer GOAT (riir-ai Issue 732,
+// the exact-emotion-ledger NPC decision surface, is the first candidate).
+#[cfg(feature = "sterling_primitives")]
+pub mod sterling;
+
+// Recirculation — cross-step residual mixture operator (Issue 673 Phase 1 /
+// Research 492, arXiv:2608.17981 Mozer et al. DeepMind): leaks a convex,
+// norm-matched mixture of the previous step's deep-layer state into a
+// shallow destination layer at the NEXT input step. Sibling of RelocateOp
+// (R417/Plan 431 — whose defend-wrong PoC refuted the overwrite semantics
+// this mixture answers). Opt-in — promotion requires the Phase 2 defend-wrong
+// PoC on gemma-2-2b (ppl reduction > 0 on ≥2 datasets AND strictly safer than
+// the overwrite at equal layer pairs); default stays OFF until then.
+#[cfg(feature = "recirculation")]
+pub mod recirculation;
+
+// Contrastive scope gate (Issue 674 / Research 493, arXiv:2608.13545
+// LittleLearner): two-corpus log-odds table + Naive-Bayes log-LLR document
+// scope score D(x) + epistemic haircut ĉ = c·sigmoid(−κ·D) + decline wiring
+// + the paired OOS probe battery (Report-the-Floor extension). "A relevance
+// check is not a scope check." Opt-in POC — per the issue's own T5 rule,
+// promotion requires a consumer adoption (riir-clippy L4 2D gate / riir-ai
+// engram gates); otherwise record negative and close.
+#[cfg(feature = "contrastive_scope")]
+pub mod contrastive_scope;
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,

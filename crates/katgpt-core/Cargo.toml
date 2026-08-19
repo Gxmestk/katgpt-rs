@@ -121,6 +121,40 @@ statrs = "0.17"
 
 [features]
 
+# sterling_primitives (Issue 672 / Research 491, 2026-08-19): Steerling-8B
+# (arXiv:2608.07594) inference-time distillate — relu_gated_suppression_into
+# (one-sided logit mask; naive subtraction promotes anti-aligned tokens),
+# decomposed_readout[_gemv_into] (Σ parts + residual == fused BIT-IDENTICAL via
+# fixed summation order — attribution as a byproduct of the computation it
+# explains), LiftTableBuilder/lift_set_to_bias_table (two-pass corpus
+# statistic expression targets), tau_over_peak_calibration (γ = τ/peak), + the
+# HSIC-style cross-covariance gauge (measure-only). The noisy-OR rider is
+# UNGATED at the crate root (civ salience gate delegates under DEFAULT
+# features). Opt-in: promotion requires a consumer GOAT (riir-ai Issue 732 —
+# exact-emotion-ledger NPC decisions — is the first candidate).
+sterling_primitives = []
+
+# recirculation (Issue 673 Phase 1 / Research 492, 2026-08-19): RecircOp —
+# cross-step convex norm-matched residual mixture (arXiv:2608.17981 Mozer et
+# al., DeepMind), sibling of RelocateOp (R417). Paper: 4.7–16% ppl reduction
+# training-free on Gemma3. Opt-in: promotion requires the Phase 2 defend-wrong
+# PoC on gemma-2-2b (ppl reduction > 0 on ≥2 datasets AND strictly safer than
+# the R417 overwrite at equal layer pairs) — the 2×-KV/serial-prefill cost
+# accounting rides the same PoC.
+recirculation = []
+
+# contrastive_scope (Issue 674 / Research 493, 2026-08-19): LittleLearner
+# scope-gated epistemics (arXiv:2608.13545) — ContrastiveScoreTable (two-corpus
+# log-odds, BLAKE3-committed, freeze/thaw-able), scope_score D(x) (Naive-Bayes
+# log-LLR sparse GEMV), epistemic haircut ĉ = c·sigmoid(−κ·D) + decline wiring,
+# + the paired OOS probe battery (Report-the-Floor extension). "A relevance
+# check is not a scope check." Opt-in POC: per the issue's own T5 rule,
+# promotion requires consumer adoption (riir-clippy L4 2D gate / riir-ai
+# engram gates); else record negative and close. No papaya dep — the built
+# table is immutable (lock-free reads by construction); papaya is reserved
+# for a live-update consumer integration.
+contrastive_scope = []
+
 # ignition_schedule (Issue 459 T5, 2026-08-19): closed-form logistic
 # ignition curves z(t) = K·σ(ζt−c), the patience law t* = ln(1/ε)/ζ, and a
 # ζ-descending ordering helper — the modelless half of NQF staged learning

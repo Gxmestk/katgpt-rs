@@ -2,7 +2,7 @@
 
 > **Source:** "Scaling Inherently Interpretable Language Models" — [arXiv:2608.07594](https://arxiv.org/abs/2608.07594) — Guide Labs Team, Madsen, Ismail, Nguyen, ..., Adebayo — 2026-08-06 (Steerling-8B)
 > **Date:** 2026-08-19
-> **Status:** DISTILLED — pending owner decision
+> **Status:** IMPLEMENTED (opt-in) — Issue 672 T1–T5 shipped behind `sterling_primitives` + the ungated `noisy_or` core util (civ site delegates); GOAT G1–G4 PASS ([Bench 667](../.benchmarks/667_sterling_primitives_goat.md)). Promotion awaits the riir-ai Issue 732 consumer GOAT.
 > **Related Research:** 290 (latent field steering — the shipped inference twin), 393 (subspace concept primitive), 397 (MAG mining + `calibrate_alpha`), 409 (MANCE concept erasure), 388 (jacobian lens concept readout), 144 (functional emotions / linear representations → behavior control), 301 (indicator probe bank), 382 (spherical steering), 357 (activation steering)
 > **Cross-ref:** riir-ai Issue 732 (exact NPC emotion attribution — the white space), riir-train Research 425 + Issue 467 (training recipe / dllm-defaults insurance)
 > **Classification:** Public

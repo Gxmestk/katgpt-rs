@@ -171,6 +171,27 @@ Belief-recirculation guide (riir-ai `.research/`): the L2→L1 next-tick leak, �
 
 ## Citation
 
+## PoC Addendum (Issue 673 Phase 2, 2026-08-19 — the defend-wrong verdict)
+
+**Result: ppl axis FAILED on our substrate; operator ships opt-in; Phases 3/5 do not proceed.**
+
+Harness: `riir-ai/crates/riir-poc/tests/recirculation_poc.rs` — gemma-2-2b-**it** f16 GGUF, serial token-by-token windows, paper layer pair for 26 layers (src=11/dst=4), ramp 10, two local text registers (katgpt-rs `.research` = arXiv-style; riir-ai `.docs` = long-form technical; PG19 not on disk).
+
+| run | dataset | baseline ppl | α=0.07 | α=0.10 | α=0.15 | overwrite | temp-1.2 |
+|---|---|---|---|---|---|---|---|
+| 2×96, post-dst | A | 91.32 | 99.66 | 104.80 | 114.28 | 2.2e8 | 68.38 |
+| 2×96, post-dst | B | 311.20 | 329.88 | 342.66 | 374.97 | 5.4e8 | 197.16 |
+| 3×160, pre-dst | A | 339.03 | 361.97 | 380.10 | 432.03 | 4.4e9 | 233.87 |
+| 3×160, pre-dst | B | 342.44 | 370.27 | 389.42 | 439.43 | 8.5e9 | 233.11 |
+
+- **12/12 recirc cells harmful** (−6…−28% ppl, dose-dependent in α, both injection points, both registers). The paper's Gemma3-family training-free gains do NOT transfer to gemma-2-2b-**it** under this harness.
+- **Safety axis PASSES**: mixture ≫ overwrite at equal pairs (the R417 clobbering catastrophe reproduced on a real model — Plan 431's failure mode, the strongest contrast arm; the mixture is the safe member of the relocation family by construction and by measurement).
+- **temp-1.2 improves ppl** (+25…+37%) — same direction as the paper's control, so the harness measures real distribution effects.
+
+Honest caveats (binding for any reopen): session-scaled counts (192–480 tokens/arm vs paper ~500×1024 — direction consistent + monotone, magnitudes small-sample); IT-tuned model (paper validated base models); markdown corpora (not wikitext/PG19 prose). Reopen = paper-scale re-run + base-model check on the 4090. Full record: [`.benchmarks/668_recirculation_goat_and_poc.md`](../.benchmarks/668_recirculation_goat_and_poc.md).
+
+**Status update:** Phase 1 operator + Phase 2 PoC SHIPPED (bench 668); Phase 3/5 closed by the gate; `recirculation` stays opt-in with the negative recorded.
+
 ```bibtex
 @article{mozer2026recirculation,
   title   = {Recirculation},

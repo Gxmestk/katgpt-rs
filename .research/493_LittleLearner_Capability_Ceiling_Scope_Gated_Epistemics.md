@@ -1,6 +1,6 @@
 # 493 — LittleLearner: The Capability-Ceiling Law + Scope-Gated Epistemics
 
-**Status:** DISTILLED — pending owner decision (tracking: katgpt-rs Issue 674 + riir-train Issue 469)
+**Status:** IMPLEMENTED (opt-in POC) — Issue 674 T1–T4 shipped behind `contrastive_scope`, GOAT G1–G4 + T4 battery PASS ([Bench 669](../.benchmarks/669_contrastive_scope_poc_goat.md)); T5 verdict recorded (no consumer adopted yet — promotion deferred, issue closed per its own rule) (tracking: katgpt-rs Issue 674 + riir-train Issue 469)
 **Verdict:** Gain (not Super-GOAT — Q1 fails: every extracted technique is textbook; the value is the law as planning gate + the fusion placements)
 **Paper:** Li, Zeller, Prada-Corral, Wiedemer, Mayilvahanan, Cotterell, Brendel — arXiv:2608.13545 "LittleLearner: Language Models Under Pedagogically Controlled Knowledge Exposure" (MPI-IS / ETHZ, Aug 2026)
 
