@@ -87,7 +87,23 @@ Papers framed in database-engine vocabulary describe **access patterns** whose *
 | episode buffer / experience replay | `EpisodeBuffer` FIFO, Raven/δ-Mem input queue |
 | unified query planner / SQL/Cypher/Vector fused | **NO direct analog** — individual access patterns map to latent ops + neuro-symbolic edges + raw commitment |
 
-## 6. Unified decision rule — substrate-as-instantiation vs mechanism-as-value
+## 6. Standing coefficient / blend-shape vocabulary (MANDATORY when the paper's mechanism is a fitted/adaptive/mixture coefficient — Le Critique lesson, canonical failure #3, 2026-08-20)
+
+Papers about adaptive blending, mixture coefficients, ensemble weighting, baseline interpolation, or "how much to trust estimator A vs B" ship in our codebase as **hand-tuned constants** with "Weight on the X axis" style doc comments — never under the words "blend"/"mixture"/"adaptive". And the shape ships where you don't expect it: the Le Critique miss was a blend-vocab grep scoped to katgpt-core while the hit sat in riir-clippy's `self_evolve.rs`.
+
+**Grep set (run repo-wide across ALL repos, never scoped to the expected home):**
+
+`W_[A-Z]|const [A-Z_]+: f32|_WEIGHT|weight: f32|alpha: f32|trust: f32|blend_factor`
+
+| Paper vocabulary | Codebase vocabulary (shipped instances) |
+|---|---|
+| "adaptive mixture coefficient" / "fitted blend weight" / "interpolation ratio" | `W_EVO = 0.6 / W_RATE = 0.4` (riir-clippy `select_best_candidate` — the Le Critique direct hit, ρ hand-pinned at 0.4); `alpha: f32` (`DualLeoMixer`, fixed 0.3); `latent_weight` (retrieval fusion — measured INERT, T3.5); `RetrievalWeights.trust = 0.2` (EvidenceTier); `KvRoutingConfig::blend_factor` (fixed thresholds — EVPO-style) |
+| "ensemble weighting" / "combine predictors by measured accuracy" | the same constants — if FIXED, the paper's contribution is usually making them data-fit (TETHER ρ*) |
+| "realized outcome" / "return" / "reward stream" (what the coefficient is fit against) | `EvolveRecorder::record_outcome` (riir-clippy, fires on every applied fix), trajectory success counts, bench verdict streams — if the feed already fires, the adaptive version is an A/B away |
+
+**Rule:** a paper whose core mechanism is FITTING a coefficient structurally matches every hand-pinned constant implementing the same convex combination. Coverage requires reading the **containing expression** (the §3.6 granularity rule in the main skill) — and checking whether the outcome stream it would be fit against already fires.
+
+## 7. Unified decision rule — substrate-as-instantiation vs mechanism-as-value
 
 This rule prevents false-PASS/false-redirect across four paper classes (R418 hardware + R368 LLM + R300 database + Flow Sampling training-math):
 
@@ -98,7 +114,7 @@ This rule prevents false-PASS/false-redirect across four paper classes (R418 har
   - **Flow Sampling training-math:** closed-form drift / conditional score / Riemannian correction / regression target (training loop is instantiation, dllm + Latent Field Steering + freeze/thaw is ours).
 - **Value = substrate-fabrication-advance itself** (new transistor geometry, new query optimizer algorithm, new optimizer like Muon, new loss function, new RL algorithm, semantic code generation) → no modelless analog → PASS or → riir-train.
 
-## 7. Worked examples
+## 8. Worked examples
 
 **DiPOD paper → riir-ai code:** paper-vocabulary grep misses `latent_functor/reestimation.rs` which ships DiPOD's "interleave self-distillation when ELBO drifts" as "coherence-driven re-estimation scheduler when coherence < tau_reest". Vocabulary translation is the only defense — notes framing can use codebase vocabulary that paper-vocabulary grep misses on BOTH layers.
 
