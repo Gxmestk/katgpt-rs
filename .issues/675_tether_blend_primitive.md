@@ -33,11 +33,12 @@ Prior art honesty: forecast combination (Bates–Granger) is 50+ years old; EVPO
 4. **`horizon_decay(c, L) -> f32` LUT** — λ = c^(1/L) ("retain fraction c after horizon L"); the paper's near-1 λ finding (0.4^(1/8192) ≈ 0.9999 beats 1.0 at 8k).
 5. **Admissibility vocabulary** — doc-level per-channel rule (own-future inadmissible; independent-instance sibling outcomes admissible; contested shared encounters violate it). Monte-Carlo fixture: mean advantage preserved under admissible z, measurably biased under a leaking z.
 
-## Consumers (≥2 required)
+Consumers (≥2 required):
 
 1. riir-train `loss_grpo` TETHER baseline (Plan 345) — the p1=LOO / p2=value-head endpoint pair.
-2. `DualLeoMixer` adaptive-α variant for future consumers (seal, quest) — NOT a civ reopen (riir-ai 322 stop rule honored; see Research 426 §6 R1).
-3. (Fusion candidates, unfunded) KARC×conformal-floor regime blending; deliberation route-scoring; cohort LOO credit.
+2. riir-clippy **selection blend** (riir-clippy Issue 033) — `select_best_candidate`'s `W_EVO·evo + W_RATE·reliability` is literally `b(ρ)=(1−ρ)p1+ρp2` with ρ hand-pinned at 0.4 (`const W_EVO: f32 = 0.6; const W_RATE: f32 = 0.4;`) and never swept; the `EvolveRecorder::record_outcome` stream is the realized-outcome feed. A/B on the existing Issue-026 harness. (User-challenge find 2026-08-20 — promoted from the original R2 deferral, which had conflated this with the retrieval-layer fusion.)
+3. `DualLeoMixer` adaptive-α variant for future consumers (seal, quest) — NOT a civ reopen (riir-ai 322 stop rule honored; see Research 426 §6 R1).
+4. (Fusion candidates, unfunded) KARC×conformal-floor regime blending; deliberation route-scoring; cohort LOO credit.
 
 ## Report-the-Floor hazard (pinned in-source)
 
