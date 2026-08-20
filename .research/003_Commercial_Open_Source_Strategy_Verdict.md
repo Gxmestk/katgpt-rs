@@ -10,7 +10,7 @@
 
 ## The Boundary
 
-Seven repos. The split is absolute.
+Eight repos. The split is absolute.
 
 | Repo | License | Role |
 |------|---------|------|
@@ -20,6 +20,7 @@ Seven repos. The split is absolute.
 | `riir-neuron-db` | Private (internal) | **Neuron-shard leaf crate** — `NeuronShard` weight blob, `ShardIndex`, generic `MerkleTree`/`MerkleProof`, `MerkleFrozenEnvelope`, MAPE-K self-healing, Raven/δ-Mem consolidation, AnyRAG gateway, vibe KG triples. No chain dependency. |
 | `riir-train` | Private (internal) | **Training research** — adapter training methods, training data, trained weights. Know-how vault. |
 | `riir-game-sdk` | Private (internal) | **Game-vocabulary SDK** — facade over `riir-games-shared` (Layer 0 vocabulary) + `riir-games` systems; dev-tool workspace hosting `crates/riir-viz` + `crates/riir-gm-tool`. Consumed by `seal-online-remaster`, `riir-mmorpg-examples`. The dev entry point for the game stack — see `riir-game-sdk/AGENTS.md` facade constraint. |
+| `riir-dapps` | Private (internal) | **dApp layer** — composes game outcomes into generic chain settlements. Depends on the chain side ONLY; the game layer calls *into* it. Game vocabulary in, `Settlement` out; a game predicate crosses as an opaque 32-byte hash so the ledger never learns "quest". See its `AGENTS.md`. |
 | `riir-armageddon` | Private (internal) | **Arena/game-product domain types** — raw-vs-latent boundary for the game-product domain (the arena). Read its README; do not put research, chain code, or training data here. |
 
 **Rule: anything `riir-*` is internal. No exceptions.**
@@ -57,8 +58,17 @@ The actual game-product moat is the **runtime that runs on top of a game** — f
 The table above is the **public/private** axis. It says nothing about *which
 private repo* a game concern goes in, and that gap let game rules land inside
 the chain's consensus-critical program set (`riir-chain/src/programs/`
-quest/bounty/crafting — filed as `riir-chain` Issue 095, 2,294 LOC, one of them
+quest/bounty/crafting — filed as `riir-chain` Issue 096, 2,294 LOC, one of them
 moving no money at all).
+
+The dApp layer that closes it is **`riir-dapps`** (private, created 2026-08-20,
+`riir-chain` Issue 096 T1 / `riir-dapps` Plan 001) — the 8th repo. It was made a
+separate repo rather than a crate under either end deliberately: under
+`riir-chain` the chain repo would again contain "quest", and under
+`riir-game-sdk`/`riir-ai` the game repo would depend on the ledger — which is
+what `riir-games-civ/src/civ/latcal_wire.rs` already does wrong. A separate repo
+makes the dependency direction checkable, and
+`riir-dapps/scripts/direction_gate.sh` checks it.
 
 **The rule: a layer is defined by what it must agree on, not by what it stores.**
 
@@ -66,7 +76,7 @@ moving no money at all).
 |---|---|---|---|
 | **game** | nothing globally — local rules, content, progress | `riir-game-sdk` (vocabulary + systems), `riir-ai` (`riir-games`) | recipe tables, quest objectives, kill-credit, class balance, loot rules |
 | **store** | durability, not consensus | `riir-neuron-db` | quest progress, experience graph, local KV |
-| **dApp** | how a game outcome becomes a chain instruction | **gap — no repo yet** (`riir-dapps` proposed; `riir-chain` Issue 095 T1) | "quest completed → claim escrow", "craft succeeded → mint NFT" |
+| **dApp** | how a game outcome becomes a chain instruction | `riir-dapps` (private) | "quest completed → claim escrow", "craft succeeded → mint NFT" |
 | **chain** | value, authority, unmanipulable randomness | `riir-chain` | token transfer, escrow, staking, `FairRng` commit-reveal, AOI reveal filter |
 
 ### The test, in one question

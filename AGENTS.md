@@ -93,7 +93,7 @@ pipeline, state management, spatial query, or vocabulary type, run the
    operator names like `GenericSpatialBelief`, not English names like "threat
    field"). A single-vocabulary grep returns ZERO hits even when substrate
    fully exists.
-2. **Codebase grep** — search `*.rs` source across all 7 repos, not just
+2. **Codebase grep** — search `*.rs` source across all 8 repos, not just
    `.plans`/`.docs`/`.issues`.
 3. **Architectural rule check** — domain classification, two-brain model, sync
    boundary, bridge pattern.
@@ -104,12 +104,15 @@ This prevents the recurring drift pattern where an agent builds a parallel
 system that duplicates already-shipped substrate under a different name
 (canonical failures: ThreatField Issue 047, orchard/motivation Issues 490/493).
 
-> **Repo count:** 7 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
-> `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon` (private).
+> **Repo count:** 8 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
+> `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon`, `riir-dapps`
+> (private).
 > The historical "5-repo quintet" terminology referred to the 5 distillation
 > targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
 > facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
-> types) were added later. See Research 003 for the canonical boundary.
+> types) were added later, and `riir-dapps` (the dApp layer — game outcome →
+> generic chain settlement) on 2026-08-20. See Research 003 for the canonical
+> boundary.
 >
 > **Two axes, not one.** Research 003's repo table is the *public/private*
 > axis; its §"The Second Axis: Layering (game / dApp / chain)" is the
@@ -118,7 +121,8 @@ system that duplicates already-shipped substrate under a different name
 > quorum commit?** No → it is not a chain program, however well it fits the
 > account layout. Canonical failure: game rules (quest / bounty / crafting,
 > one of them moving no money at all) shipped inside `riir-chain`'s
-> consensus-critical program set — `riir-chain` Issue 095.
+> consensus-critical program set — `riir-chain` Issue 096, closed on the
+> layering side by `riir-dapps`.
 
 ## Numbering Discipline
 
