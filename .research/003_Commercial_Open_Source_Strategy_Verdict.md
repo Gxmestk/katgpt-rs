@@ -52,6 +52,65 @@ The actual game-product moat is the **runtime that runs on top of a game** — f
 
 ---
 
+## The Second Axis: Layering (game / dApp / chain)
+
+The table above is the **public/private** axis. It says nothing about *which
+private repo* a game concern goes in, and that gap let game rules land inside
+the chain's consensus-critical program set (`riir-chain/src/programs/`
+quest/bounty/crafting — filed as `riir-chain` Issue 095, 2,294 LOC, one of them
+moving no money at all).
+
+**The rule: a layer is defined by what it must agree on, not by what it stores.**
+
+| Layer | Must agree on | Repo | Examples |
+|---|---|---|---|
+| **game** | nothing globally — local rules, content, progress | `riir-game-sdk` (vocabulary + systems), `riir-ai` (`riir-games`) | recipe tables, quest objectives, kill-credit, class balance, loot rules |
+| **store** | durability, not consensus | `riir-neuron-db` | quest progress, experience graph, local KV |
+| **dApp** | how a game outcome becomes a chain instruction | **gap — no repo yet** (`riir-dapps` proposed; `riir-chain` Issue 095 T1) | "quest completed → claim escrow", "craft succeeded → mint NFT" |
+| **chain** | value, authority, unmanipulable randomness | `riir-chain` | token transfer, escrow, staking, `FairRng` commit-reveal, AOI reveal filter |
+
+### The test, in one question
+
+> **Does this instruction move value, or bind authority, in a way that needs
+> quorum commit?** No → it is not a chain program.
+
+A game system with **no transaction** never belongs in a ledger, however
+naturally it fits the account layout. Storability is not jurisdiction. Note the
+"quest/economy tuning → `riir-ai`" row in the Decision Rules table below already
+implied this; it was routed as *IP secrecy* and read by no one as a *layering*
+constraint, which is exactly how the drift happened.
+
+### When a game feature genuinely needs settlement: split it
+
+The chain gets the game-agnostic half under a game-agnostic name; the game keeps
+the predicate. A "quest reward" is a *multi-claim, deadline-bounded conditional
+escrow* plus a claim predicate the chain must not be able to name — ship the
+escrow, pass the predicate as an opaque 32-byte hash. A chain primitive whose
+doc comment says "kill contract" has already lost the boundary.
+
+Inverse direction, same principle: `FairRng` needs both split-key halves, so an
+unmanipulable roll is a genuine chain **service**. The game layer *calls* it; it
+does not host it — and hosting a recipe table next to it is not justified by
+needing the roll.
+
+### Anti-pattern — game vocabulary as a chain type name
+
+`ProgramId 13 = CRAFTING`, `BountyProgram`, `QuestCreate`. A wire constant
+naming a game mechanic makes rebalancing content a **protocol change**: the
+instruction set is versioned, proof-gated, and combinatorially CI'd, so a recipe
+tweak pays consensus review costs forever. (Retiring such an ID is itself a
+protocol change — retire, never reuse.) The mirror-image anti-pattern is a
+chain-vocabulary type in a game crate reaching for `LatCalIx` directly, which
+`riir-ai/crates/riir-games-civ/src/civ/latcal_wire.rs` does today — that call
+should go through the dApp layer once it exists.
+
+**Naming-only exception:** anti-cheat is *chain*, even when it is named for the
+game. `riir-chain`'s `game_trust_flag` / `TrustFlag` is driven by consensus
+anomalies and feeds inclusion probability — misnamed, correctly placed. Rename
+it; do not move it.
+
+---
+
 ## Repo Structure & Tier Model (public engine only)
 
 The public engine splits across TWO crates:

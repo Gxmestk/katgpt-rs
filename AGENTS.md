@@ -110,6 +110,15 @@ system that duplicates already-shipped substrate under a different name
 > targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
 > facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
 > types) were added later. See Research 003 for the canonical boundary.
+>
+> **Two axes, not one.** Research 003's repo table is the *public/private*
+> axis; its §"The Second Axis: Layering (game / dApp / chain)" is the
+> *layering* axis — which private repo a game concern goes in. The test:
+> **does this instruction move value, or bind authority, in a way that needs
+> quorum commit?** No → it is not a chain program, however well it fits the
+> account layout. Canonical failure: game rules (quest / bounty / crafting,
+> one of them moving no money at all) shipped inside `riir-chain`'s
+> consensus-critical program set — `riir-chain` Issue 095.
 
 ## Numbering Discipline
 
