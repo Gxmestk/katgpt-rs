@@ -116,12 +116,18 @@ system that duplicates already-shipped substrate under a different name
 >
 > **Two axes, not one.** Research 003's repo table is the *public/private*
 > axis; its §"The Second Axis: Layering (game / dApp / chain)" is the
-> *layering* axis — which private repo a game concern goes in. The test:
-> **does this instruction move value, or bind authority, in a way that needs
-> quorum commit?** No → it is not a chain program, however well it fits the
-> account layout. Canonical failure: game rules (quest / bounty / crafting,
-> one of them moving no money at all) shipped inside `riir-chain`'s
-> consensus-critical program set — `riir-chain` Issue 096, closed on the
+> *layering* axis — which private repo a game concern goes in. **Three tests,
+> all must pass** (revised 2026-08-20; the earlier one-question form admitted
+> FAME as "value" and ignored write rate):
+> **(1) Product** — would a commerce customer of the chain want this in their
+> dependency? An NFT is a token, so yes; a quest, no. **(2) Value** — BigInt
+> fungible currency, a token, or an authority binding? FAME / XP / items /
+> reputation are game scalars, not money. **(3) Rate** — does it fit a Glacial
+> tier (≤0.1 Hz)? Binds hardest; `riir-neuron-db` is 1,627× cheaper per write
+> and one chain tx at 10⁵ accounts eats 63% of a 20 Hz hot tick.
+> Canonical failure: game rules (quest / bounty / crafting / reputation, two of
+> them moving no money at all) shipped inside `riir-chain`'s
+> consensus-critical program set — `riir-chain` Issues 096 + 097, closed on the
 > layering side by `riir-dapps`.
 
 ## Numbering Discipline

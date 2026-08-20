@@ -79,16 +79,46 @@ makes the dependency direction checkable, and
 | **dApp** | how a game outcome becomes a chain instruction | `riir-dapps` (private) | "quest completed → claim escrow", "craft succeeded → mint NFT" |
 | **chain** | value, authority, unmanipulable randomness | `riir-chain` | token transfer, escrow, staking, `FairRng` commit-reveal, AOI reveal filter |
 
-### The test, in one question
+### The test — three questions, all must pass
 
-> **Does this instruction move value, or bind authority, in a way that needs
-> quorum commit?** No → it is not a chain program.
+Revised 2026-08-20: the original one-question form ("does it move value or bind
+authority") was **insufficient**. It admits FAME as "value" and says nothing
+about write rate, which is what actually disqualifies game traffic.
+
+**1. Product.** *Would a customer using the chain for commerce want this in
+their dependency?* Ask this first — it needs no benchmark and reaches the right
+verdict instantly. An NFT: **yes**, an NFT *is* a token, with its own value,
+that trades and settles. A quest, a recipe table, a kill-credit predicate:
+**no**.
+
+**2. Value.** *Is it BigInt fungible currency, a token, or an authority
+binding?* FAME, XP, items, reputation, karma and quest progress are **game
+scalars** — not fungible, not BigInt, not DeFi. A number you can gain and lose
+is not money.
+
+**3. Rate.** *Does the write rate fit a Glacial tier (≤ 0.1 Hz)?* This binds
+hardest: a BigInt currency transfer at 20 Hz is still wrong. Measured —
+`riir-neuron-db` is **1,627× cheaper per write** than the chain (826 ns vs
+1,344.5 µs), and one chain transaction at 10⁵ accounts costs **31.6 ms, 63% of
+an entire 20 Hz hot tick**. `riir-game-sdk`'s `tick_tier_model.md` already
+placed quorum at Glacial and said *"chain heartbeat; never 20Hz"*.
 
 A game system with **no transaction** never belongs in a ledger, however
-naturally it fits the account layout. Storability is not jurisdiction. Note the
-"quest/economy tuning → `riir-ai`" row in the Decision Rules table below already
-implied this; it was routed as *IP secrecy* and read by no one as a *layering*
-constraint, which is exactly how the drift happened.
+naturally it fits the account layout. Storability is not jurisdiction. **And
+most game systems have no transaction** — a free quest ("kill 10 boars, get
+FAME") settles nothing at all, so the paid quest is the exception, not the
+model.
+
+The weights are inverted, which is why one substrate cannot serve both:
+**game = 80 fast / 20 secure** (`riir-neuron-db`: BLAKE3-committed, keyed row
+MACs, Merkle-frozen — fast *and* secure enough), **defi = 20 fast / 80 secure**
+(`riir-chain`: quorum, split-key, determinant audits). A quest turn-in does not
+need Byzantine agreement between mutually distrusting validators; it needs an
+authenticated write.
+
+Note the "quest/economy tuning → `riir-ai`" row in the Decision Rules table
+below already implied the layering; it was routed as *IP secrecy* and read by
+no one as a *layering* constraint, which is exactly how the drift happened.
 
 ### When a game feature genuinely needs settlement: split it
 
@@ -102,6 +132,21 @@ Inverse direction, same principle: `FairRng` needs both split-key halves, so an
 unmanipulable roll is a genuine chain **service**. The game layer *calls* it; it
 does not host it — and hosting a recipe table next to it is not justified by
 needing the roll.
+
+### Anti-pattern — a feature gate that hides the impl but not the vocabulary
+
+`riir-chain` gates each game program behind `chain_prog_*`, which looks like it
+keeps a commerce customer clean. It does not: `LatCalIx` is **one
+`#[repr(C, u8)]` enum, 88 variants, zero `cfg` attributes**
+(`grep -c "cfg(feature" src/programs/cpi.rs` → `0`). Enable no program feature
+at all and `QuestCreate` / `CraftingRegister` / `ReputationInit` are still in
+your wire format. **An opt-in gate on the implementation is not a boundary if
+the vocabulary is unconditional.**
+
+Worse for the fix: the enum has no explicit discriminants and the tag is read
+straight out of the layout, so the wire tag is *declaration order* — removing a
+game variant renumbers unrelated programs. Pin discriminants before deleting
+anything (`riir-chain` Issue 096 T0/T8).
 
 ### Anti-pattern — game vocabulary as a chain type name
 
