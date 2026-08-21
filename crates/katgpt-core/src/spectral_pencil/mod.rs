@@ -51,6 +51,8 @@
 pub mod attribution;
 pub mod bounds;
 pub mod dense;
+#[cfg(feature = "committed_field_blend")]
+pub mod field;
 pub mod gauge;
 pub mod init;
 pub mod shape;

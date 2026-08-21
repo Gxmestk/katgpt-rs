@@ -52,8 +52,8 @@ impl<const D: usize> MonotoneWarp<D> {
         // writing raw offs into SymPacked.data silently halves them in
         // to_full()).
         let mut bf = [[0.0_f32; D]; D];
-        for i in 0..D {
-            bf[i][i] = 1.0;
+        for (i, row) in bf.iter_mut().enumerate() {
+            row[i] = 1.0;
         }
         for (beta, dir) in betas.iter().zip(dirs.iter()) {
             for i in 0..D {
