@@ -36,7 +36,7 @@ Prior art honesty: forecast combination (Bates–Granger) is 50+ years old; EVPO
 Consumers (≥2 required):
 
 1. riir-train `loss_grpo` TETHER baseline (Plan 345) — the p1=LOO / p2=value-head endpoint pair.
-2. riir-clippy **selection blend** (riir-clippy Issue 033) — `select_best_candidate`'s `W_EVO·evo + W_RATE·reliability` is literally `b(ρ)=(1−ρ)p1+ρp2` with ρ hand-pinned at 0.4 (`const W_EVO: f32 = 0.6; const W_RATE: f32 = 0.4;`) and never swept; the `EvolveRecorder::record_outcome` stream is the realized-outcome feed. A/B on the existing Issue-026 harness. (User-challenge find 2026-08-20 — promoted from the original R2 deferral, which had conflated this with the retrieval-layer fusion.)
+2. riir-clippy **selection blend** (riir-clippy Issue 033 — **MEASURED NEGATIVE 2026-08-21**, see the consumer note below) — `select_best_candidate`'s `W_EVO·evo + W_RATE·reliability` is literally `b(ρ)=(1−ρ)p1+ρp2` with ρ hand-pinned at 0.4 (`const W_EVO: f32 = 0.6; const W_RATE: f32 = 0.4;`) and never swept; the `EvolveRecorder::record_outcome` stream is the realized-outcome feed. A/B on the existing Issue-026 harness. (User-challenge find 2026-08-20 — promoted from the original R2 deferral, which had conflated this with the retrieval-layer fusion.)
 3. `DualLeoMixer` adaptive-α variant for future consumers (seal, quest) — NOT a civ reopen (riir-ai 322 stop rule honored; see Research 426 §6 R1).
 4. (Fusion candidates, unfunded) KARC×conformal-floor regime blending; deliberation route-scoring; cohort LOO credit.
 
@@ -53,3 +53,50 @@ Blending a UQ primitive WITH the conformal-naive floor does **not** discharge th
 - [ ] T5: admissibility doc-rule + Monte-Carlo mean-preservation/bias fixture pair
 - [ ] T6: GOAT gate — G1 (above fixtures, bit-identical two runs), G2 (<100ns per observe at K≤64), G3 (opt-in, default surface untouched), G4 (counting allocator: 0 steady-state allocs); report-the-floor hazard comment in-source
 - [ ] T7: promote/demote ruling recorded in Research 426 + katgpt-rs research note follow-up if promoted
+
+## Consumer #2 measured NEGATIVE (riir-clippy, 2026-08-21) — the hazard this primitive must document
+
+riir-clippy ran the full A/B against an inlined copy of T1's ρ* form
+(riir-clippy `.benchmarks/042_tether_selection_blend_ab.md`, commit `5494dbe`;
+Research 426 §6 R2b updated). Split verdict:
+
+**Validated for T1/T2/T6 (free evidence for this issue, from a real consumer):**
+
+- The in-sample guarantee holds **exactly** on real recorded streams:
+  `SSE(ρ*) ≤ min(SSE(p1-only), SSE(p2-only))` AND `≤ SSE(previous fixed ρ)`.
+- EMA + lag law + degenerate guard behave as specified; the guard fired in a
+  live pipeline stream and correctly held the previous ρ.
+- The **API shape does prevent same-window application** — an `observe()` that
+  only touches accumulators plus a window close that publishes afterwards made
+  the bias unrepresentable, no debug-assert needed.
+- G4: the fit is heap-free (0 allocs over 10 000 observations); pipeline
+  steady-state delta −1 vs the fixed-weight mode.
+- Determinism: bit-identical ρ across repeat runs, both standalone and at the
+  pipeline seam.
+- ρ drift is a large, clean signal (0.058 with an oracle p1 axis ↔ 0.565 with a
+  noise p1 axis), i.e. the paper's Fig-6 signature reproduces.
+
+**FAILED on that consumer's quality metric — add this to the primitive's docs:**
+
+> **ρ* minimizes a PREDICTION loss. It is a gain only where the consumer's
+> metric IS prediction error.** A consumer whose metric is a ranking or an
+> argmax (selection, routing, retrieval order) can get a strictly better SSE
+> and a strictly worse outcome — especially when one endpoint is a
+> *deliberately biased* estimator (a conservative lower bound is a bad
+> predictor and a good ranker, so the fit correctly downweights it and
+> incorrectly loses the ranking). Fit ρ against the consumer's own metric, or
+> ship a ranking-aware objective.
+
+Measured: paired discovery under common random numbers significantly WORSE at
+one noise level (McNemar z = −13.86) and +0.0007 at the other (z = +4.29);
+selection regret worse in all three attempt budgets. Density was NOT the cause
+(≈29 000 samples, 18 351 windows, 0 degenerate) — this is objective mismatch,
+which is why it does **not** transfer to `loss_grpo` (Plan 345), a
+value-prediction consumer.
+
+**Consequence for this issue:** the ≥2-consumer justification now rests on
+`loss_grpo` + the future `DualLeoMixer` adaptive-α; riir-clippy is a measured
+negative consumer kept as a reproducible artifact. T1/T2/T6 gain the fixture
+list above; **add the prediction-vs-ranking hazard comment alongside the
+Report-the-Floor one** when T1 lands, and keep the riir-clippy inline until
+then (it is delete-on-landing by design).
