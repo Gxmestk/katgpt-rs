@@ -1,6 +1,6 @@
 # Commercial Strategy — Public Routing Rules (trimmed)
 
-**Date:** 2026-06 (revised 2026-07-17 — added `riir-game-sdk` + `riir-armageddon` to Boundary table, 7-repo count; revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
+**Date:** 2026-06 (revised 2026-08-20 — added `riir-dapps` (the dApp layer) + §"The Second Axis: Layering"; 8-repo count; revised 2026-07-17 — added `riir-game-sdk` + `riir-armageddon` to Boundary table; revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
 **Status:** Active (public subset)
 **Purpose:** Let public-research agents self-govern the public/private boundary without needing the sensitive moat doc.
 
@@ -159,15 +159,21 @@ anything (`riir-chain` Issue 096 T0/T8).
 naming a game mechanic makes rebalancing content a **protocol change**: the
 instruction set is versioned, proof-gated, and combinatorially CI'd, so a recipe
 tweak pays consensus review costs forever. (Retiring such an ID is itself a
-protocol change — retire, never reuse.) The mirror-image anti-pattern is a
-chain-vocabulary type in a game crate reaching for `LatCalIx` directly, which
-`riir-ai/crates/riir-games-civ/src/civ/latcal_wire.rs` does today — that call
-should go through the dApp layer once it exists.
+protocol change — retire, never reuse. All four game IDs — quest 17,
+bounty 11, crafting 13, reputation 14 — were retired 2026-08-21,
+`riir-chain` Issue 096 T3/T4/T7; their tags are dead holes, pinned
+undecodable.) The mirror-image anti-pattern is a chain-vocabulary type in
+a game crate reaching for `LatCalIx` directly, which
+`riir-ai/crates/riir-games-civ/src/civ/latcal_wire.rs` did before 2026-08-21
+— it now composes through `riir-dapps` (`riir-dapps` Plan 001 §3.1), the
+layer built for exactly that call.
 
 **Naming-only exception:** anti-cheat is *chain*, even when it is named for the
 game. `riir-chain`'s `game_trust_flag` / `TrustFlag` is driven by consensus
-anomalies and feeds inclusion probability — misnamed, correctly placed. Rename
-it; do not move it.
+anomalies and feeds inclusion probability — misnamed, correctly placed. It was
+renamed to `chain_trust_flag` on 2026-08-20 (`riir-chain` Issue 096 T5); the
+old name remains a deprecated Cargo alias until
+`riir-ai/crates/riir-games` (`game_replay_verify`) migrates off it.
 
 ---
 
