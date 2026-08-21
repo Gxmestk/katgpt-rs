@@ -171,6 +171,90 @@ A per-NPC gate genome (seeded construction, γk ≥ ½ certificate, canonical-ga
 
 ---
 
+## PoC Addendum (Issue 736 Phase A, 2026-08-22)
+
+**Status: RECORD** — Phase A defend-wrong PoC landed (riir-ai
+`crates/riir-poc/src/spectral_neuron_poc.rs`, 11 gates green,
+debug-marked behavioral set). Raw numbers + per-axis calls:
+
+### Toy
+
+100-NPC cluster (Bench-010 shape), 480 ticks, 32 world seeds, one scripted
+threat (waypoint walk). Belief x ∈ [0,5]⁴: threat proximity, evidence EMA,
+safety (NSD), fatigue (NSD). Shaped genome (family M): A₀ = seeded ladder
+(the 676 init; 0@k simple eigenvalue, γk ≈ 1 at neutral) + rank-one-PSD
+threat feature (β ∈ [0.6, 1.2] + αI) + weaker rank-one evidence + NSD
+diagonals. Matched operating point: 85th-percentile threshold over a
+shared reference belief distribution (same protocol for every score arm).
+
+### A2 structural — 5/5 CONFIRMED, zero violations
+
+| Axis | Gate | Result |
+|---|---|---|
+| Eigengap ≥ ½ at population scale | 10⁴ family-S seeds × 17 box points | 0 violations (the 0@k mechanism holds at consumer scale) |
+| Monotone sweeps | 300 genomes × 4 features × 101 pts | 0 violations (by construction, verified) |
+| Attribution = FD | 10⁴ probes, trusted-gap only | 0 violations |
+| Lipschitz envelope | 10⁴ random pairs vs Σ|δᵢ|‖Aᵢ‖ | 0 violations |
+| Curvature (interactions) | interaction deviation in score space | pencil interior-k > 1e-3 median; dot EXACTLY 0 (logit-linear) |
+
+### A3 behavioral — 2 of 3 axes CONFIRMED
+
+**(a) Temperament ladder — CONFIRMED, graded, 32/32 seeds monotone.**
+Tipping medians along the strong-signal axis by k (0-indexed):
+`[6.0, 6.0, 6.0, 6.0, 6.0, 5.0, 3.8, 2.2]` (6.0 = never-fires sentinel).
+Exactly the interlacing prediction: rank-one PSD evidence lifts only the
+top eigenvalues, so low-k NPCs attend to diffuse evidence only, high-k to
+single strong signals. A GRADED behavioral axis from one genome constructor
+— not a cliff.
+
+**(b) Curiosity-at-kinks — REFUTED at toy scale (honest wash).** 16/32
+wins at pre-registered τ=0.5, medians equal (138 vs 138); τ=0.25 also wash
+(12/32, kink mean slightly WORSE: 128.97 vs 130.56). Mechanism: at
+interior k the rank-one response is O(t²), so spatial γk variation is
+dominated by the mild NSD town-distance gradient — the 4 lookahead
+directions barely differ in γk. The axis may re-open with
+rank-one-dominated genomes or a k-D curiosity readout; at this scale it is
+refuted.
+
+**(c) Decay-to-baseline — CONFIRMED as a recovery-lag asymmetry.** Pencil
+return after threat-vanish: **0 ticks** at every T_on ∈ {20,60,120,240}
+(memoryless ⇒ structurally immediate). Raw accumulator: 45 ticks flat
+(the ln 2 / 0.015 fear-decay timescale, as predicted). Patience patch
+(Issue-054): only helps long chases — T_on=20 → 42 ticks (patience
+unexpired at vanish), T_on ≥ 60 → 6–8. No hard locks at production
+constants in ANY arm (honest: at production constants the fear-lock
+disease is lag, not permanent lock).
+
+### A1 headline — the Q2/Q3 evidence
+
+32-seed totals, arms [pencil k=4, pencil k=7, dot, accum, frozen]:
+
+| Metric | pencil k=4 | pencil k=7 | dot (hand-tuned) | accum | frozen |
+|---|---|---|---|---|---|
+| damage events | 3683 | **0** | 0 | 3200 | 25700 |
+| forage score | 92110 | **110466** | 110566 | 67168 | 132324 |
+| flee rate | 0.255 | **0.184** | 0.204 | 0.194 | 0 |
+
+**The load-bearing result:** the SEEDED, UNTUNED k=D−1 pencil matches the
+hand-tuned dot+sigmoid incumbent on damage (0 vs 0) and forage (110466 vs
+110566, within 0.1%) at a LOWER flee rate — while carrying monotone-by-
+construction, γk confidence, exact attribution, and the Lipschitz
+certificate, none of which the incumbent has. And temperament selection is
+load-bearing behavior: the same genome family at k=4 takes 3683 damage.
+Zero hand-tuning reached incumbent parity — the paper's promise, measured.
+
+### Verdict effect
+
+The Research 451-style Q2 capability hypothesis now has measured evidence
+on 2 of 3 axes (ladder + recovery) plus parity-with-certificates on the
+headline. Per Issue 736 Phase C: the Super-GOAT re-gate (per-fusion
+prior-art searches: seeded eigengap personalities; certificate-Lipschitz
+composition; Sturm quorum predicates) is ARMED — owner decision point.
+Curiosity-at-kinks is recorded refuted at toy scale and does NOT proceed
+to Phase B wiring.
+
+---
+
 ## PASS-Redirects
 
 N/A — Gain verdict (files created: this note + Issues 676/736/472).
