@@ -2,7 +2,7 @@
 
 > **Source:** [When Does LeJEPA Learn a World Model?](https://www.alphaxiv.org/abs/2605.26379) — David Klindt, Yann LeCun, Randall Balestriero, 2026-05
 > **Date:** 2026-05-30
-> **Related Research:** 115 (PEIRA), 136 (Latent Prediction), 121 (Spectral Hierarchy), 070 (GDN2), 034 (D2F), 035 (Attractor Fixed-Point), 051 (Deep Manifold)
+> **Related Research:** 115 (PEIRA), 136 (Latent Prediction), 121 (Spectral Hierarchy), 070 (GDN2), 034 (D2F), 035 (Attractor Fixed-Point), 051 (Deep Manifold), 498 (LeVLJEPA/SIGReg follow-up — arXiv:2607.00784 distills the SIGReg half into an inference-time gaussianity probe + edge_lora guard)
 > **Related Plans:** 156 (Spectral Hierarchy ✅), 149 (Dirichlet Energy ✅), 150 (PEIRA ⏳), 154 (Sleep ⏳)
 > **Domain:** katgpt-rs (open, representation quality diagnostics)
 
