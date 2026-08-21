@@ -25,6 +25,7 @@
 | [`mtp_threshold.md`](mtp_threshold.md) | MTP threshold guide — when multi-token-prediction drafts are worth accepting (Plan 055 + Plan 117) |
 | [`kv_compression.md`](kv_compression.md) | KV cache compression research & alternatives (TurboQuant → SpectralQuant → OCTOPUS) |
 | [`progressive_mcgs.md`](progressive_mcgs.md) | Progressive MCGS — Monte Carlo graph search with reference edges |
+| [`spectral_pencil.md`](spectral_pencil.md) | The affine matrix pencil scalar gate `f(x)=λk(A₀+ΣxᵢAᵢ)` — shape-by-construction, exact attribution, γk≥½ seeded init (Issue 676, Research 495) |
 
 ## See also
 

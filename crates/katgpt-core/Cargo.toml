@@ -297,9 +297,10 @@ tether = []
 # riir-train Issue 472 (training recipes), CommittedFieldBlend certificate
 # upgrade. Implies hebbian_kernel_memory (SeedRng substrate — splitmix64 +
 # Box-Muller deterministic gaussians; default-on anyway).
-# Opt-in — T1–T5 core substrate landed 2026-08-22; T6 attribution, T7
-# shape DSL, T8 canonical gauge, T9 invertible warp, T10 bench+GOAT,
-# T11 doc, T12 UQ floor follow-through land in follow-up cycles.
+# Opt-in — ALL 12 tasks complete 2026-08-22 (T1-T9 + T10 GOAT
+# [Bench 671](../../.benchmarks/671_spectral_pencil_goat.md): G1-G4 PASS;
+# T12 UQ readouts scope-limited per the Report-the-Floor rule). Stays
+# opt-in — promotion is the consumer's GOAT (riir-ai Issue 736).
 spectral_pencil = ["hebbian_kernel_memory"]
 conformal_predictive_intervals = []  # Conformal Predictive Intervals — modelless UQ overlay (Plan 340, Research 322, arXiv:2605.03789 CSP + arXiv:2606.09473 "Report the Floor"). Wraps any PointForecaster (SeasonalPoolForecaster ships; KARC adapter in Phase 2) with a per-channel × per-horizon-bucket exp-recency-weighted residual ring buffer, reads empirical quantiles to produce coverage-guaranteed predictive intervals [point+q_{α/2}, point+q_{1−α/2}]. CRPS / Winkler / empirical-coverage metrics (conformal::metrics). The ConformalIntervalCalibrator<SeasonalNaiveForecaster> with m=1 is the canonical conformal-naive floor — every UQ-bearing primitive's GOAT gate MUST beat it (Issue 010 "Report the Floor" rule, AGENTS.md Feature Flag Discipline). No training, no learned params. DEFAULT-ON (Plan 468 promotion, 2026-07-20): primitive-level G1–G4 GOAT PASSed (Bench 340, 2026-06-30); runtime-consumer promotion gate satisfied by Bench 564 (MCTS collapse G3 PASS) + Bench 565 (Salience Tri-Gate G3 PASS, dF1=+0.3145 at 6.3x gate margin, dFP=-0.8155). Plan 513 width-definition fix vindicated Bench 565 bit-identically. Two consumers FAILED (Bench 562 curiosity — wider than 5×EMA; Bench 563 sleep-time — distribution-level summary loses cycle info); the Cargo.toml language required only one consumer win, two landed. Consumer-level gates (riir-engine karc_conformal_width + salience_conformal_width + 4 probe features) STAY opt-in — this promotion only removes the katgpt-core-level re-forward friction, does not auto-enable any consumer.
 sense_composition = ["plasma_path", "domain_latent", "dep:katgpt-sense", "katgpt-sense/sense_composition"]  # KG Latent Octree Sense Composition (Plan 221). Substrate lives in the katgpt-sense crate (Issue 007 Phase E Tier 2 #7, Plan 338); this feature turns on the re-export + forwards the flag. NOTE: when `self_advantage_gate` is also enabled, the forward there picks up the inline advantage gate in katgpt-sense's reconstruction.rs — but only when this feature (sense_composition) is also active (otherwise katgpt-sense is not compiled and the gate is inert, matching pre-refactor behavior).
@@ -1317,6 +1318,14 @@ required-features = ["best_belief"]
 name = "tether_bench"
 harness = false
 required-features = ["tether"]
+
+# Issue 676 — spectral_pencil G2 perf gate: ns/eval for dense (pinned
+# Jacobi) vs tridiagonal (Sturm bisection) pencils at d ∈ {8,16,32} + the
+# O(d) integer predicate. GOAT record: .benchmarks/671_spectral_pencil_goat.md
+[[bench]]
+name = "spectral_pencil_bench"
+harness = false
+required-features = ["spectral_pencil"]
 
 # Plan 337 Phase 2 — Tropical (max, +) semiring G1 non-redundancy gate.
 # Three substrates: (1) DEC game-map cochain top-3 ranking divergence
