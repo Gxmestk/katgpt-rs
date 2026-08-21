@@ -1,6 +1,6 @@
 ---
 name: goat-audit
-description: Audit cross-repo GOAT/gain primitive cherry-pick status across the 7-repo stack (katgpt-rs → riir-ai / riir-chain / riir-neuron-db; riir-game-sdk + riir-armageddon are downstream consumers, typically out of cherry-pick scope). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
+description: Audit cross-repo GOAT/gain primitive cherry-pick status across the multi-repo stack (katgpt-rs upstream, riir-* consumers). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
 ---
 
 # goat-audit — Cross-Repo GOAT/Gain Cherry-Pick Audit
