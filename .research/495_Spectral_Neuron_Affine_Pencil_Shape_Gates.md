@@ -7,7 +7,7 @@
 > **Classification:** Public — open-primitive layer (generic symmetric-eigenvalue math; no game/chain/shard IP)
 > **Related Research:** [466](466_CPd_minus_1_Hopfield_Top_Eigenvector_Recall.md) (cp_hopfield — closest structural cousin: matrix from memories, top-eigenvector output vs matrix from input, eigenvalue output), [451](451_Delta_Lattice_Tunneling_Transfer_Matrix_Band_Structure.md) (band-structure analyzer — the verdict-discipline template this note follows), [039](039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md) (calibrated eigenbasis, dataset-level), [246 MPI router](246_Manifold_Power_Iteration_MoE_Router.md) (Rayleigh-quotient ascent), [053](053_CNA_Contrastive_Neuron_Attribution.md) / [491](491_Sterling_Additive_Concept_Attribution_Steering.md) / riir-ai [009](../../riir-ai/.research/009_MDA_Mechanistic_Data_Attribution.md) (attribution family), [269](269_Variable_Width_Shape_Adapter_Fusion.md) (width-shape adapters — different "shape"), [307](307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md)
 > **Related shipped code:** `katgpt-core/src/cp_hopfield/` (`hermitian_top_eigenvector` — power iteration + Rayleigh quotient, reusable solver substrate), `katgpt-core/src/committed_field_blend.rs` (`ArchetypeFieldSource::lipschitz_bound` — hand-constant Lipschitz certificates this paper would upgrade), `katgpt-spectral/src/hla_eigenbasis.rs` (window eigenbasis), `katgpt-core/src/conformal/floor_harness.rs` (the UQ floor the eigengap-confidence items must beat), riir-mmorpg-examples Issue 078 / Bench 027 (hero attribution ledger + FusionArm rig — the consumer-side PoC surface)
-> **Issues filed:** katgpt-rs [676](../.issues/676_spectral_pencil_open_primitive.md) (open primitive), riir-ai [736](../../riir-ai/.issues/736_spectral_neuron_consumer_poc_personality_gates.md) (consumer PoC + Super-GOAT re-gate), riir-train [472](../../riir-train/.issues/472_spectral_neuron_training_recipes.md) (training-track recipe fragments)
+> **Issues filed:** katgpt-rs [676](../.issues/676_spectral_pencil_open_primitive.md) (open primitive), katgpt-rs [678](../.issues/678_lean_spectral_pencil_package.md) (Lean 4 package — blocked on 676), katgpt-rs [679](../.issues/679_owner_ruling_lp_anchor_compile_legality.md) (owner ruling: LP-anchor compile), riir-ai [736](../../riir-ai/.issues/736_spectral_neuron_consumer_poc_personality_gates.md) (consumer PoC + Super-GOAT re-gate), riir-train [472](../../riir-train/.issues/472_spectral_neuron_training_recipes.md) (training-track recipe fragments). The Sturm-at-chain-seam item stays deliberately unfiled (speculative — no Glacial-rate consumer exists; reopen from this note if one materializes).
 
 ---
 
@@ -91,10 +91,10 @@ Two advocates ran in parallel (No-GD 41-item extraction; Model-based 14-item ext
 - Curiosity-at-kinks: `sigmoid(−γk/τ)` as a zero-training exploration signal (cgsp consumer; A/B vs flat-curiosity).
 - Temperament k-index: k=1 pessimist (any-direction veto) … k=d optimist; runtime re-index = explainable mood swap with exact attribution delta.
 
-**P2 (owner-ruling / later):**
-- Sturm integer predicates at the chain seam ("≥ j modes below θ" — exact, platform-stable, tamper-evident; consumed via riir-dapps at Glacial rates only; most outcomes settle nothing — `Settlement::None` stays the default).
-- LP anchor interpolation on the commuting subclass (order-statistic-of-affines fitting is quantile-curve LP — deterministic construction, not GD; flagged for owner ruling on legality class) + seeded property-test search.
-- Lean 4 package: sym-isometry, Weyl 1-Lipschitz, Loewner monotonicity, **the constructive eigengap bound** — static matrix algebra, fits the FV doctrine (public items → `KatgptProof`; bump `EXPECTED_THEOREMS`; paired SpecTests + Rust spec_match + negative perturbations).
+- **P2 (owner-ruling / later):**
+- Sturm integer predicates at the chain seam ("≥ j modes below θ" — exact, platform-stable, tamper-evident; consumed via riir-dapps at Glacial rates only; most outcomes settle nothing — `Settlement::None` stays the default) — **deliberately unfiled** (no Glacial consumer exists; reopen from this note if one materializes).
+- LP anchor interpolation on the commuting subclass (order-statistic-of-affines fitting is quantile-curve LP — deterministic construction, not GD; flagged for owner ruling on legality class — **Issue 679**) + seeded property-test search.
+- Lean 4 package: sym-isometry, Weyl 1-Lipschitz, Loewner monotonicity, **the constructive eigengap bound** — static matrix algebra, fits the FV doctrine (public items → `KatgptProof`; bump `EXPECTED_THEOREMS`; paired SpecTests + Rust spec_match + negative perturbations) — **Issue 678**.
 
 ### 3.2 Admitted — model-based track (riir-train 472; frozen-Pod shipping complies with the mandate's sanctioned weight states)
 
@@ -149,7 +149,7 @@ A per-NPC gate genome (seeded construction, γk ≥ ½ certificate, canonical-ga
 | P0 | `spectral_pencil` open primitive (packing, dense+tridiag+Sturm kernel, seeded init, bounds, attribution, shape DSL, rank-one path, pinned evaluation) | katgpt-rs (katgpt-core, opt-in flag) | Issue 676 |
 | P1 | Consumer PoC: personality genomes + certificate Lipschitz + ledger integration + curiosity/temperament A/Bs + Super-GOAT re-gate | riir-ai (riir-poc → consumer) | Issue 736 |
 | P1 | Training recipes: sym packing, squareplus, eigengap init, hero 4th fusion arm, auction CDF probe | riir-train | Issue 472 |
-| P2 | Sturm chain predicates (via riir-dapps, Glacial-only, `Settlement::None` default), LP-anchor compile (owner ruling), Lean package | katgpt-rs / riir-chain / .proofs | follow-ups of 676/736 |
+| P2 | Sturm chain predicates (via riir-dapps, Glacial-only, `Settlement::None` default — unfiled by design), LP-anchor compile (Issue 679), Lean package (Issue 678) | katgpt-rs / riir-chain / .proofs | 679 / 678 |
 
 ## 8. Validation protocol (GOAT sketch — full gates live in the issues)
 
