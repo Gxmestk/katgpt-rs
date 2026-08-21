@@ -143,6 +143,11 @@ at all and `QuestCreate` / `CraftingRegister` / `ReputationInit` are still in
 your wire format. **An opt-in gate on the implementation is not a boundary if
 the vocabulary is unconditional.**
 
+*Status: RESOLVED by removal, not gating — riir-chain Issue 096 T4 (bounty,
+quest), T3 (crafting), T7 (reputation, 2026-08-21) retired all four game
+programs outright; no game variant exists in any build and the retired tags
+(45..=48, 54..=57, 58..=61, 68..=71) are pinned undecodable.*
+
 Worse for the fix: the enum has no explicit discriminants and the tag is read
 straight out of the layout, so the wire tag is *declaration order* — removing a
 game variant renumbers unrelated programs. Pin discriminants before deleting
