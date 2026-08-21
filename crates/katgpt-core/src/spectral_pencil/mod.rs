@@ -48,9 +48,11 @@
 //! (invertible warp), T10 (bench + GOAT), T11 (module doc), T12 (UQ
 //! floor follow-through) land in follow-up cycles per the issue.
 
+pub mod attribution;
 pub mod bounds;
 pub mod dense;
 pub mod init;
+pub mod shape;
 pub mod sym;
 pub mod tridiag;
 
