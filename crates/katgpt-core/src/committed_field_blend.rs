@@ -405,17 +405,31 @@ impl<const N: usize, const D: usize> CommittedFieldBlend<N, D> {
 
     /// Deterministic safety bound of the committed blend (FAME Lemma 1).
     ///
-    /// Returns `max_k { sigmoid(pi_k / tau) · L_k }` — the worst-case
-    /// Lipschitz constant of the blended field. This is a closed-form quantity
-    /// that can be LatCal-committed alongside `pi` (Plan 321 Phase 3).
+    /// Returns `Σ_k sigmoid(pi_k / tau) · L_k` — the Lipschitz bound of the
+    /// blended field `f_pi(z) = Σ_k gate_k·f_k(z)` (triangle inequality over
+    /// the gated sum). This is a closed-form quantity that can be
+    /// LatCal-committed alongside `pi` (Plan 321 Phase 3).
     ///
     /// If any field reports `L_k = ∞` (the default), this returns `∞`.
+    ///
+    /// # Composition-law correction (riir-ai Issue 736 B1, 2026-08-22)
+    ///
+    /// The original form was `max_k { gate_k·L_k }`, which **under-reports**
+    /// whenever two or more gates are positive: two fields with `L = 5` and
+    /// `L = 2` at full gate blend to a map with Lipschitz ≈ 7, not 5. A
+    /// safety bound that under-estimates is the worst failure direction, so
+    /// the composition now sums. The sum only ever INCREASES the bound —
+    /// every existing "realized ≤ bound" gate stays green; only the
+    /// equality-shape test was re-pinned.
     pub fn lipschitz_bound(&self, fields: &[&dyn ArchetypeFieldSource<D>; N]) -> f32 {
         let mut bound = 0.0f32;
         for (k, field_k) in fields.iter().enumerate() {
-            let gate = sigmoid(self.pi[k] / self.tau);
             let l_k = field_k.lipschitz_bound();
-            bound = bound.max(gate * l_k);
+            if !l_k.is_finite() {
+                return f32::INFINITY;
+            }
+            let gate = sigmoid(self.pi[k] / self.tau);
+            bound += gate * l_k;
         }
         bound
     }
@@ -1146,7 +1160,7 @@ mod tests {
     // ─── Phase 3 T3.2: lipschitz_bound sanity ────────────────────────────
 
     #[test]
-    fn lipschitz_bound_matches_max_gate_times_lk() {
+    fn lipschitz_bound_matches_sum_of_gate_times_lk() {
         let f0 = LinearField::new(2.0, 0); // L = 2.0
         let f1 = LinearField::new(5.0, 1); // L = 5.0
         let f2 = LinearField::new(1.0, 2); // L = 1.0
@@ -1158,9 +1172,11 @@ mod tests {
         let mut blend = TriArchetypeBlend::uncommitted();
         blend.commit(&summary, &dirs, &fields, 1);
 
-        // All pi = pi_max = 10 → gate ≈ 0.99995. Bound ≈ max(0.99995*2, 0.99995*5, 0.99995*1) ≈ 5*0.99995.
+        // All pi = pi_max = 10 → gate ≈ 0.99995. Bound ≈ 0.99995·(2+5+1) —
+        // the gated SUM (triangle inequality over Σ gate_k·f_k; the pre-736-B1
+        // max-form under-reported this blend as ≈ 0.99995·5).
         let bound = blend.lipschitz_bound(&fields);
-        let expected = sigmoid(10.0 / 1.0) * 5.0;
+        let expected = sigmoid(10.0 / 1.0) * (2.0 + 5.0 + 1.0);
         assert!(
             (bound - expected).abs() < 1e-3,
             "bound={bound}, expected≈{expected}"
