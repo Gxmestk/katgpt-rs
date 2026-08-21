@@ -1,13 +1,13 @@
 ---
 name: boundary-guard
-description: Audit + enforce game-stack boundary rules across the 10-repo workspace (katgpt-rs, riir-ai/-chain/-neuron-db/-train/-game-sdk/-mmorpg-examples/-unity/-viewbridge/-clippy, future riir-bevy). Use when adding a new System impl, game logic, vocabulary type, FFI surface, or view-layer code; reviewing PRs touching game systems or view/FFI boundaries; when a violation is suspected ("why is this logic here?" or "why is this game logic in C#"); or quarterly as a boundary-hygiene gate. Covers 7 surfaces; consumer src/ (no generic game logic), SDK facade (no engine deps), SDK root-vs-members (root clean), leaf vocabulary (engine deps feature-gated), view C#/Bevy (render only), FFI bridge (raw physical, no latent), dev tools (no game coupling). Enforces via grep checks + ci_boundary_guard.sh. Sibling to feature-gate-audit + goat-audit + doc-sync.
+description: Audit + enforce game-stack boundary rules across the 10-repo workspace (katgpt-rs, riir-ai/-chain/-neuron-db/-train/-game-sdk/-mmorpg-examples/-unity/-viewbridge/-clippy, future riir-bevy). Use when adding a new System impl, game logic, vocabulary type, FFI surface, or view-layer code; reviewing PRs touching game systems or view/FFI boundaries; when a violation is suspected ("why is this logic here?" or "why is this game logic in C#"); or quarterly as a boundary-hygiene gate. Covers 8 surfaces; consumer src/ (no generic game logic), SDK facade (no engine deps), SDK root-vs-members (root clean), leaf vocabulary (engine deps feature-gated), view C#/Bevy (render only), FFI bridge (raw physical, no latent), dev tools (no game coupling), dApp layer (game→dapps→chain one-way + three-test chain residency on the agreement axis). Enforces via grep checks + ci_boundary_guard.sh. Sibling to feature-gate-audit + goat-audit + doc-sync.
 ---
 
 # Boundary Guard
 
 Generic game logic → substrate (`riir-games`). View renders state, doesn't compute it. FFI moves raw bytes only.
 
-## Seven surfaces
+## Eight surfaces
 
 | # | Surface | Rule | Grep check |
 |---|---------|------|------------|
@@ -18,6 +18,15 @@ Generic game logic → substrate (`riir-games`). View renders state, doesn't com
 | 5 | View consumers (`riir-unity` C#, `riir-bevy`) | Rendering + input only — NO game logic (AI, combat, physics, sync). Documented deliberate debt in an OPEN issue + cross-language contract doc (the `WireProtocol.cs` precedent: riir-unity Issue 002 Phase A, contract at `.docs/03_game_client/wire_protocol.md`) = record as such, don't re-file | `grep -rn 'sigmoid\|dot_product\|class.*System' riir-unity/**/*.cs \| grep -v Showcase\|Benchmark\|Camera` |
 | 6 | FFI bridge (`riir-viewbridge`) | Raw physical only (`pos[3]`, `rot[4]`) — NO latent state crosses FFI | `grep -rn 'emotion\|fear\|mood\|curiosity' riir-viewbridge/crates/*/src/` |
 | 7 | Dev tools (`riir-clippy`) | Zero game-domain coupling in the DEFAULT build (only `katgpt-core`, the public primitives crate). Sanctioned opt-in arms where reimplementation would duplicate whole substrates: `ternary_inference` (riir-engine + riir-gpu), `latent_retrieval` (riir-rag) | `grep -E 'riir-games\|riir-chain' riir-clippy/Cargo.toml` (must be empty; engine/rag allowed only `optional = true` behind their features) |
+| 8 | dApp layer (`riir-dapps`) | One-way **game → dapps → chain** — never a game dep here (`scripts/direction_gate.sh`); a `Settlement` stays chain vocabulary (never quest/kill/recipe — gate check 3 of direction_gate.sh); anything a game wants on-chain passes the **three-test rule** (product / value / rate) on the **agreement axis** — the chain hosts what mutually distrusting parties must agree on; neuron-db hosts authenticated durability. A paid quest still needs NO chain program (neuron-db template + the one generic `MultiClaimEscrow`) | `grep -E 'riir-games\|riir-game-sdk\|riir-engine' riir-dapps/Cargo.toml` + game-vocab scan in `scripts/direction_gate.sh` |
+
+### The dApp three-test rule (surface 8 detail — riir-chain Issues 096/097 + riir-dapps Proposal 001)
+
+1. **Product** — would a commerce customer of this chain want it in their dependency? (An NFT is a token → yes. A quest/recipe/kill-credit predicate → no.)
+2. **Value** — BigInt fungible currency, a token, or an authority binding? Not FAME/XP/items/reputation/karma/quest progress.
+3. **Rate** — quorum-coordination ops are Glacial (≤0.1 Hz); settlement transactions are **capacity-share bound** (783 req/s measured floor) — different limits, both binding.
+
+The defining axis is **agreement** (Research 003 §"The Second Axis" "Must agree on" column) — value and rate are the disqualifying tests, not the definition. Full argument + failure-mode matrix: `riir-dapps/.proposals/001_agreement_boundary_and_tiered_durability.md`.
 
 All greps should return **empty** (clean), modulo the sanctioned opt-in exceptions noted per-surface.
 
