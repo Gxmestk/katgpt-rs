@@ -151,6 +151,7 @@ mod tests {
     /// T9 G1: round-trip g⁻¹(g(x)) == x across random constructions —
     /// 10⁵ release tier / 1k debug.
     #[test]
+    #[allow(clippy::needless_range_loop)] // symmetric matrix fill — both indices index `af`
     fn warp_round_trip_holds() {
         const D: usize = 6;
         const TRIALS: usize = if cfg!(debug_assertions) { 1_000 } else { 100_000 };
@@ -173,7 +174,7 @@ mod tests {
             let mut dirs = [[0.0_f32; 32]; 2];
             for d in dirs.iter_mut() {
                 let mut n2 = 0.0_f32;
-                for (i, e) in d.iter_mut().enumerate().take(D) {
+                for e in d.iter_mut().take(D) {
                     *e = rng.next_f32();
                     n2 += *e * *e;
                 }
