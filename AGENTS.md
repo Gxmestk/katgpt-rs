@@ -122,9 +122,16 @@ This prevents the recurring drift pattern where an agent builds a parallel
 system that duplicates already-shipped substrate under a different name
 (canonical failures: ThreatField Issue 047, orchard/motivation Issues 490/493).
 
-> **Repo count:** 8 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
-> `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon`, `riir-dapps`
-> (private).
+> **Repo count:** the **product/distillation set is 8** — `katgpt-rs` (public) +
+> `riir-ai`, `riir-chain`, `riir-neuron-db`, `riir-train`, `riir-game-sdk`,
+> `riir-armageddon`, `riir-dapps` (private). That is NOT the repo total: the
+> workspace is **15 repos**, all of which now carry a root `BOUNDARY.md`
+> (add `riir-mmorpg-examples`, `riir-clippy`, `riir-unity`, `riir-viewbridge`,
+> `riir-auth`, `riir-burner`, `katgpt-web`). Measured 2026-08-21 by
+> `../riir-ai/scripts/ci_boundary_contract.sh`, which enumerates the set
+> instead of trusting a prose count — four of those repos had no contract at
+> all until that run, and `riir-armageddon` had been consuming `riir-games` +
+> `katgpt-core` unaudited. Read a count in prose as a claim, not a fact.
 > The historical "5-repo quintet" terminology referred to the 5 distillation
 > targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
 > facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
