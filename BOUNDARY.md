@@ -1,8 +1,13 @@
 # katgpt-rs — boundary contract
 
 > The single source of truth for what may live in and depend on this repo.
-> Audited by the `boundary-guard` skill. Cross-repo rules LINK to their one
-> canonical home — never copied. Handoff tracker: `../riir-ai/.issues/737`.
+> Audited by the `boundary-guard` skill + two scripts:
+> `../riir-ai/scripts/ci_boundary_contract.sh` (workspace — is the dep graph
+> what this file says, and is this file still honest?) and
+> `../riir-mmorpg-examples/scripts/ci_boundary_guard.sh` (per-repo — is the
+> CODE in the right repo?). Cross-repo rules LINK to their one
+> canonical home — never copied. Rollout record:
+> `../riir-ai/.docs/01_orientation/737_boundary_contract_rollout_record.md`.
 
 ## Owns
 

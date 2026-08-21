@@ -3,6 +3,24 @@
 The global `~/.agents/` rules apply; this file documents repo-local context
 that supplements them.
 
+## Boundary contract — read `BOUNDARY.md` first
+
+[`BOUNDARY.md`](BOUNDARY.md) is the authoritative per-repo contract: what this
+repo **owns**, what it **does not own** (with the correct home for each), the
+crate-granular **allowlist** of what it may depend on, links to the cross-repo
+rules' one canonical home, and the **drift ledger** of known gaps. On any
+conflict with prose in this file, BOUNDARY.md wins.
+
+- **Domain test:** is this a **modelless inference primitive** with no riir dep (this repo is upstream of everything)? NO → it belongs in another repo; file there.
+- **Read it before** adding any dep, crate, module, System impl, or vocabulary
+  type — and before assuming a concern is yours to implement.
+- **Enforcement** is not prose: `../riir-ai/scripts/ci_boundary_contract.sh`
+  fails on an undeclared cross-repo dep, on a drift row without its open issue,
+  and on a contract row that no longer matches the measured graph. Run boundary
+  checks VIA the `boundary-guard` skill, not as ad-hoc greps.
+- **Found a violation?** File the issue FIRST (`.issues/NNN_boundary_*.md`), add
+  the drift row, then fix. Closing the issue removes the row in the same commit.
+
 ## Modelless-first mandate (the core principle)
 
 **This repo ships modelless inference primitives.** No training, no backprop,
