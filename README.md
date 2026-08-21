@@ -1,5 +1,7 @@
 # KatGPT-RS
 
+> **Boundary contract:** [BOUNDARY.md](BOUNDARY.md) — what lives here, what may depend on it, known drift.
+
 A **GOAT-proved** neuro-symbolic micro-Transformer with speculative decoding, constraint pruning, and **378 feature flags (152 default-on, all GOAT-proved)** — built in Rust. Pure algorithms, zero side effects, MIT licensed.
 
 Inspired by [Andrej Karpathy's microgpt](https://karpathy.github.io/2026/02/12/microgpt/).
