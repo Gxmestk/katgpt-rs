@@ -271,6 +271,18 @@ substrate_gate = []  # SubstrateGate passthrough — inference-time capability s
 belief_drafter = ["katgpt-types/belief_drafter"]  # NextLat Belief-State Speculative Drafter — entropy threshold config (Plan 217)
 best_belief = []  # ε-quantile Beta lower bound for conservative selection (Plan 336, Research 320, RQGM arXiv:2606.26294 Prop. 4). Complements sample_beta (Thompson exploration) with a conservative-exploitation counterpart. DEFAULT-ON (Phase 2 G2-unblock, 2026-06-28): LUT hot path 3.38ns<<100ns (32x32x5 table bit-identical to closed-form), G1 3.099e-5<1e-4, G4 0 allocs.
 entropic_tilt = []  # KL-budgeted entropic (max-seeking) advantage tilt — TTT-Discover arXiv:2601.16175, prior art RS-GRPO arXiv:2509.24261 / RSPO arXiv:2508.01174. Max-seeking sibling of best_belief (mean-seeking): scores from the SHAPE of the current group, not per-candidate history. Hoisted 2026-08-18 from riir-clippy selection_entropic (Issue 026) when riir-train Plan 341 became the second consumer — one implementation, two imports. Batch form (zero-sum) for ranking consumers, leave-one-out form (debiased, paper A.1) for gradient-scaling consumers. Opt-in pending Plan 341 Phase 2/3 GOAT.
+# tether (Issue 675 / Research 426, 2026-08-21): closed-form outcome-fit
+# estimator blend — ρ* per window by OLS against realized outcomes
+# (b(ρ)=(1−ρ)p1+ρp2; exact in-sample never-worse), lag law as API shape,
+# EMA smoothing, EvAccumulator + control-variate gate, horizon_decay LUT.
+# arXiv:2608.16739 "Le Critique" TETHER baseline, validated end-to-end by a
+# real consumer BEFORE landing (riir-clippy Bench 042 — guarantee exact,
+# drift reproducible, alloc 0, bit-exact; that consumer's METRIC measured
+# negative, kept as the in-source prediction-vs-ranking hazard). Consumers:
+# riir-train loss_grpo TETHER baseline (Plan 345). Opt-in; GOAT G1–G4 PASS
+# (Bench 670). Promotion = a consumer GOAT (Plan 345 Phase 2/3), never a
+# ranking consumer.
+tether = []
 conformal_predictive_intervals = []  # Conformal Predictive Intervals — modelless UQ overlay (Plan 340, Research 322, arXiv:2605.03789 CSP + arXiv:2606.09473 "Report the Floor"). Wraps any PointForecaster (SeasonalPoolForecaster ships; KARC adapter in Phase 2) with a per-channel × per-horizon-bucket exp-recency-weighted residual ring buffer, reads empirical quantiles to produce coverage-guaranteed predictive intervals [point+q_{α/2}, point+q_{1−α/2}]. CRPS / Winkler / empirical-coverage metrics (conformal::metrics). The ConformalIntervalCalibrator<SeasonalNaiveForecaster> with m=1 is the canonical conformal-naive floor — every UQ-bearing primitive's GOAT gate MUST beat it (Issue 010 "Report the Floor" rule, AGENTS.md Feature Flag Discipline). No training, no learned params. DEFAULT-ON (Plan 468 promotion, 2026-07-20): primitive-level G1–G4 GOAT PASSed (Bench 340, 2026-06-30); runtime-consumer promotion gate satisfied by Bench 564 (MCTS collapse G3 PASS) + Bench 565 (Salience Tri-Gate G3 PASS, dF1=+0.3145 at 6.3x gate margin, dFP=-0.8155). Plan 513 width-definition fix vindicated Bench 565 bit-identically. Two consumers FAILED (Bench 562 curiosity — wider than 5×EMA; Bench 563 sleep-time — distribution-level summary loses cycle info); the Cargo.toml language required only one consumer win, two landed. Consumer-level gates (riir-engine karc_conformal_width + salience_conformal_width + 4 probe features) STAY opt-in — this promotion only removes the katgpt-core-level re-forward friction, does not auto-enable any consumer.
 sense_composition = ["plasma_path", "domain_latent", "dep:katgpt-sense", "katgpt-sense/sense_composition"]  # KG Latent Octree Sense Composition (Plan 221). Substrate lives in the katgpt-sense crate (Issue 007 Phase E Tier 2 #7, Plan 338); this feature turns on the re-export + forwards the flag. NOTE: when `self_advantage_gate` is also enabled, the forward there picks up the inline advantage gate in katgpt-sense's reconstruction.rs — but only when this feature (sense_composition) is also active (otherwise katgpt-sense is not compiled and the gate is inert, matching pre-refactor behavior).
 slod = ["spectral_hierarchy"]  # SLoD Spectral Level-of-Detail Pruner (Plan 235, GOAT G1-G6 all pass, default-ON)
@@ -1279,6 +1291,14 @@ required-features = ["lacam_escalation"]
 name = "best_belief_bench"
 harness = false
 required-features = ["best_belief"]
+
+# Issue 675 — tether G2 perf gate. Median per-observe latency at the two
+# window cadences (target ≤ 100 ns per observe at K ≤ 64), plus the blend /
+# close / horizon_decay surfaces.
+[[bench]]
+name = "tether_bench"
+harness = false
+required-features = ["tether"]
 
 # Plan 337 Phase 2 — Tropical (max, +) semiring G1 non-redundancy gate.
 # Three substrates: (1) DEC game-map cochain top-3 ranking divergence

@@ -125,6 +125,23 @@ pub mod entropic_tilt;
 pub use entropic_tilt::{
     KL_BUDGET_LN2, solve_beta, tilt_advantages_into, tilt_advantages_loo_into, tilted_weights,
 };
+// tether — closed-form outcome-fit estimator blend (Issue 675, Research 426
+// via arXiv:2608.16739 "Le Critique" TETHER baseline): ρ* per window by OLS
+// against realized outcomes with the exact in-sample never-worse guarantee,
+// the lag law encoded as API shape (same-window application unrepresentable),
+// EMA smoothing, an explained-variance accumulator + control-variate gate,
+// and the horizon-decay LUT λ = c^(1/L). Two documented hazards in-source:
+// Report-the-Floor (blending does not discharge the promotion gate) and
+// prediction-vs-ranking (measured NEGATIVE on a ranking consumer, Bench 042
+// — fit ρ against the consumer's own metric). Consumers: riir-train
+// loss_grpo TETHER baseline (Plan 345). Opt-in; G1–G4 PASS (Bench 670).
+#[cfg(feature = "tether")]
+pub mod tether;
+#[cfg(feature = "tether")]
+pub use tether::{
+    control_variate_improves, fit_rho, horizon_decay, sse, EvAccumulator, TetherBlend, TetherStats,
+    DEFAULT_EMA_DECAY, DEFAULT_RHO, DEFAULT_WINDOW, DEGENERATE_EPS,
+};
 // ignition — closed-form logistic ignition (Issue 459 T5, Research 422 §3.5
 // via arXiv:2608.13335): z(t) = K·σ(ζt − ln((K−z₀)/z₀)) per singular mode,
 // the patience law t* = ln(1/ε)/ζ, and a ζ-descending ordering helper
