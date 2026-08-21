@@ -51,10 +51,12 @@
 pub mod attribution;
 pub mod bounds;
 pub mod dense;
+pub mod gauge;
 pub mod init;
 pub mod shape;
 pub mod sym;
 pub mod tridiag;
+pub mod warp;
 
 pub use dense::{DenseScratch, JacobiReport, jacobi_eigen, kth_eigenvalue};
 pub use init::{
