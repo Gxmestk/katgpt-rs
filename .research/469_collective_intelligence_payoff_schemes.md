@@ -5,6 +5,7 @@
 > **Status:** Active — Gain (covers shipped primitives; one actionable fusion opportunity against a documented limitation).
 > **Related Research:** 255 (CLR — feedback-payoff shape, `(mean_m v_k,m)^M`), 274 (CCE Moderator — designer-steerable crowd coordination), 354 (Set Attention — crowd aggregation, G8 collective inference FAILED), 370 (Manifold Bandit — diversity-preservation G2 FAILED)
 > **PASS-Redirects:** none needed (this IS the note).
+> **PASS-Redirects (synthesis):** Tomašev, Franklin, Leibo, Jacobs, Cunningham, Gabriel & Osindero [arXiv:2509.10147 "Virtual Agent Economies"] — the paper's Distribution section (Dworkin's auction-based equality of resources: equal initial endowments + envy test, "price of fairness") is the fair-allocation framing over the payoff-scheme credit assignment this note covers; the auction mechanism ships (LatCal auction program, Research 167), envy-test allocation has no game consumer (target_coordination heuristics own contested resources), and FAME/XP non-transferability already implements its community-currency non-transferability principle — validation, no actionable gap.
 > **Cross-ref (riir-ai):** [Research 143 — Latent CCE Moderator Crowd Emergent Coordination](../../riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md) (the runtime crowd-CCE guide + Doc 61/62 prior-art search covering 14 closest cousins; none is this Wang/Plotkin paper)
 > **Classification:** Public (katgpt-rs/MIT)
 
