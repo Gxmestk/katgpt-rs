@@ -7,6 +7,24 @@ description: Audit + enforce game-stack boundary rules across the 10-repo worksp
 
 Generic game logic → substrate (`riir-games`). View renders state, doesn't compute it. FFI moves raw bytes only.
 
+## Spec source — each repo's `BOUNDARY.md`
+
+Every repo ships a root [`BOUNDARY.md`](../../riir-ai/BOUNDARY.md) — the per-repo
+contract this skill audits against: **Owns** / **Does not own** / **May depend
+on** (crate-granular allowlist with Location) / **Inherited** (links) / **Drift
+ledger**. The 8-surface table below is the workspace *methodology*; the per-repo
+rules + exceptions come from that repo's BOUNDARY.md, not from this file's prose.
+Findings are therefore two classes: **code-vs-contract violations** and
+**contract rot** (drift row without an open issue, allowlist row without a gate,
+by-design row whose decision record is gone).
+
+**Drift-ledger semantics** (scripts consume this): Disposition ∈ `fixable` |
+`owner-call` | `by-design`. `fixable`/`owner-call` rows REQUIRE an open issue;
+`by-design` rows cite a decision record instead. Issue closes → row removed in
+the same commit. Exit semantics: ledger unparseable → hard error; finding mapped
+to a row → exit 0 with a LOUD known-drift count; unmapped finding → exit 1;
+row-without-open-issue → exit 1 (rot). Never silently fail open or closed.
+
 ## Eight surfaces
 
 | # | Surface | Rule | Grep check |
@@ -53,7 +71,22 @@ If unsure → file an issue, don't add the code.
 2. Reference which surface (1–7)
 3. Include file:line + grep output
 4. Propose extraction target (substrate module + trait)
-5. Don't fix in same commit
+5. **Issue BEFORE fix** — every fixable finding gets its `.issues/NNN_boundary_*.md`
+   filed BEFORE any fix commit, even trivially-fixable ones. The fix commit
+   references the issue; closing the issue removes the drift row in the SAME
+   commit. Only the guard/script tooling itself may be fixed in-run — boundary
+   CODE never.
+
+## Move by script, never regenerate
+
+Any relocation of boundary content — extracting superseded sections from
+AGENTS.md into BOUNDARY.md, removing drift rows, linking READMEs, or any future
+crate/repo move — is done **by script** (`git mv` + anchored sed/python) with a
+before/after **grep-parity check** (every rule sentence present exactly once
+post-move). Re-typing or regenerating the content is forbidden. Grounding:
+the AGENTS.md section silently dropped by a concurrent session's stale-buffer
+commit (`88e5f98`), and the edit-fuzzy-match that ate a raw-string `#`
+terminator — both would have been caught by parity checks.
 
 ## Running
 
@@ -62,6 +95,11 @@ cd riir-mmorpg-examples && ./scripts/ci_boundary_guard.sh   # exit 0 = clean
 ```
 
 For other repos, adapt the SRC_DIR + patterns. Or as pre-commit: `exec ./scripts/ci_boundary_guard.sh`
+
+**Run boundary checks VIA this skill** — not as ad-hoc greps. The skill reads
+each repo's BOUNDARY.md as the contract, applies the methodology below, and
+records the run in the log. The full-via-skill run is gated on the Issue 737
+T-CI/T-GATE wiring landing (ledger parsing + split-prep gates).
 
 ## Run log
 
