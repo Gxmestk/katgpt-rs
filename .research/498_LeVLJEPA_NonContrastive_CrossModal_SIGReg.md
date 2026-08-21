@@ -4,7 +4,7 @@
 > **Date:** 2026-08-21
 > **Related Research:** 138 (LeJEPA — direct ancestor, same Balestriero/LeCun lineage), 115 (PEIRA closed-form inter-view predictor), 394 (GNN within-class erank), 475 (ICA non-Gaussian directions), 200 (quantization outlier collapse → Plan 224 KS substrate)
 > **Related Plans:** 224 (OAQG ks_d_statistic), 252 (riir-train LoRA Outlier Guard — training-time KS twin), 568 (RRQ consumes KS as scalar)
-> **Status:** DISTILLED — pending owner decision (two issues filed: katgpt-rs #681, riir-ai #742)
+> **Status:** DISTILLED — pending owner decision (two issues filed: katgpt-rs #681, riir-ai #743)
 > **Domain:** katgpt-rs (open primitive: sketched gaussianity probe) + riir-ai (edge_lora hidden-space guard)
 
 ---
@@ -46,9 +46,9 @@ Ablation insight worth keeping verbatim: **symmetric cross-modal regression coll
 
 The panel's model-based arm found the training surfaces; coordinator verdicts per §3.5 (discards need auditable reasons):
 
-1. **edge_lora cross-game anti-collapse** — advocate claimed "EXACTLY the paper's ablation-#4 collapse shape". **CORRECTED (discard of the collapse claim):** `CrossGameEpisode.target_output` is recorded episode data — targets are stop-gradient **by construction** within `TopologyTrainingLoop` (`training.rs` L326-335, `g = 2·reward·diff` against fixed dataset targets). The paper's symmetric co-training collapse does not apply. **What survives:** the hidden-state populations on BOTH sides are unregularized AND unmonitored (no erank/gaussianity check anywhere in the loop; `sleep_consolidation.rs` clusters these same states — collapse silently degrades consolidation). → **Issue riir-ai #742** (guard-first; optional SIGReg-as-aux-loss A/B <2 GPU-h M3).
+1. **edge_lora cross-game anti-collapse** — advocate claimed "EXACTLY the paper's ablation-#4 collapse shape". **CORRECTED (discard of the collapse claim):** `CrossGameEpisode.target_output` is recorded episode data — targets are stop-gradient **by construction** within `TopologyTrainingLoop` (`training.rs` L326-335, `g = 2·reward·diff` against fixed dataset targets). The paper's symmetric co-training collapse does not apply. **What survives:** the hidden-state populations on BOTH sides are unregularized AND unmonitored (no erank/gaussianity check anywhere in the loop; `sleep_consolidation.rs` clusters these same states — collapse silently degrades consolidation). → **Issue riir-ai #743** (guard-first; optional SIGReg-as-aux-loss A/B <2 GPU-h M3).
 2. **DualEncoderIndexer BCE→continuous-mass regression** — real but bench-only surface (opt-in `trained_indexer`; the bench's own header concedes the thresholded labels are low-signal). Keep as fusion opportunity in this note; not filed (no production consumer).
-3. **SIGReg aux loss on edge_lora hidden states** — folded into #742 phase 2.
+3. **SIGReg aux loss on edge_lora hidden states** — folded into #743 phase 2.
 4. **gemma2_directions re-open with trained head** (<1 GPU-h, decisive either way) — re-opens the Bench 571 measured negative; owner call, not filed.
 5. Stop-grad asymmetry 5× in-stack — coverage, no action.
 
@@ -86,7 +86,7 @@ Gain. Two issues, no Super-GOAT guide.
 | Issue | Repo | What | GOAT sketch |
 |---|---|---|---|
 | #681 | katgpt-rs | `data_probe/gaussianity.rs` — sketched multi-direction projection-normality probe, feature `gaussianity_probe` | G1: isotropic fixture passes (bit-identical ×3); bimodal/heavy-tail/discrete fixtures reject while `effective_rank` on the SAME fixtures passes (non-redundancy pin, the `p415_g2` pattern); G2: latency vs erank (no O(d³) eigensolve — should win at audit cadence); G3 default-untouched; G4 zero-alloc; cross-crate agreement vs `katgpt_spectral::ks_d_statistic` on 1D projections (leaf constraint: core cannot dep on spectral — the rrq_quant scalar-inversion note; the agreement test lives in katgpt-spectral, which CAN see core) |
-| #742 | riir-ai | edge_lora hidden-space distribution guard — wire `within_class_erank` (+ #681 probe when landed) as training-time advisory + `sleep_consolidation` precondition; optional phase-2 SIGReg aux-loss A/B (<2 GPU-h M3, λ ∈ [0.005, 0.04] — the paper's stable band) | G1: erank floor held across long runs (planted-collapse fixture must trip the guard); G2 ≤5% step-time overhead; G3 arena mixed-episode win-rate no-regression (Plan 298 G3 ≥5pp must hold); G4 guard scratch-owned |
+| #743 | riir-ai | edge_lora hidden-space distribution guard — wire `within_class_erank` (+ #681 probe when landed) as training-time advisory + `sleep_consolidation` precondition; optional phase-2 SIGReg aux-loss A/B (<2 GPU-h M3, λ ∈ [0.005, 0.04] — the paper's stable band) | G1: erank floor held across long runs (planted-collapse fixture must trip the guard); G2 ≤5% step-time overhead; G3 arena mixed-episode win-rate no-regression (Plan 298 G3 ≥5pp must hold); G4 guard scratch-owned |
 
 ### Fusion opportunities (recorded, not filed)
 
@@ -106,7 +106,7 @@ Gain. Two issues, no Super-GOAT guide.
 
 ## Advocate-correction record (§3.5 discipline)
 
-- Model-based finding #1's "EXACTLY ablation-#4 collapse shape" — **discarded** after coordinator read of `cross_game_edge.rs` L59-69 + `training.rs` L326-335: targets are recorded episodes (fixed data), not co-trained encoder outputs. Symmetric-collapse requires both sides gradient-coupled. Surviving half (distribution guard) filed as #742 with honest framing.
+- Model-based finding #1's "EXACTLY ablation-#4 collapse shape" — **discarded** after coordinator read of `cross_game_edge.rs` L59-69 + `training.rs` L326-335: targets are recorded episodes (fixed data), not co-trained encoder outputs. Symmetric-collapse requires both sides gradient-coupled. Surviving half (distribution guard) filed as #743 with honest framing.
 
 ## References
 

@@ -58,7 +58,7 @@ pub fn sketched_gaussianity(states: &[f32], d: usize, scratch: &mut [f32]) -> Ga
 ## Consumers (why now)
 
 1. `band_conditioner` Fisher-z precondition guard (turn the documented assumption into a checked precondition — advisory field, no gate-semantics change)
-2. riir-ai #742 edge_lora hidden-space monitor (consumes this or erank)
+2. riir-ai #743 edge_lora hidden-space monitor (consumes this or erank)
 3. riir-neuron-db freeze-gate advisory (`FreezeGateReport` additive field — the bimodal-two-styles-before-freeze case)
 
 ## Tasks
