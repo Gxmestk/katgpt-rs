@@ -15,6 +15,7 @@
 //! - [`geometry`]         — Representation geometry diagnostics (Plan 151) — gated `sink_aware_attn`
 //! - `sink_classify`    — Per-head NOP/Broadcast sink classifier (Plan 287) — gated `sink_aware_attn`
 //! - `gold_share`       — Content-specific output-fraction diagnostic (Plan 411) — gated `gold_share_probe`
+//! - `gaussianity`      — Sketched projection-normality probe (Issue 681) — gated `gaussianity_probe`
 //!
 //! # Always-on vs feature-gated split
 //!
@@ -84,6 +85,15 @@ pub mod sink_classify;
 #[cfg(feature = "gold_share_probe")]
 pub mod gold_share;
 
+/// Sketched Gaussianity Probe — multi-direction projection-normality for
+/// embedding populations (Issue 681, Research 498 — SIGReg distilled from
+/// training loss to inference-time diagnostic). Catches the bimodal /
+/// heavy-tail / discrete marginals that pass every second-moment metric
+/// (erank et al.). Standalone: BLAKE3 direction table + self-contained KS;
+/// gated `gaussianity_probe` (opt-in until a consumer promotes).
+#[cfg(feature = "gaussianity_probe")]
+pub mod gaussianity;
+
 // ── Re-exports (always-on items) ────────────────────────────────────────
 
 pub use claim::{ClaimCard, Intervention, ValidityVerdict};
@@ -118,7 +128,15 @@ pub use sink_classify::{
     stable_rank_update_into_flat,
 };
 
-// ── Re-exports (gold_share items, gated) ───────────────────────────────
+// ── Re-exports (gold_share items, gated) ────────────────────────────────
 
 #[cfg(feature = "gold_share_probe")]
 pub use gold_share::{GoldShareReport, GoldShareScratch, gold_share, gold_share_flat};
+
+// ── Re-exports (gaussianity items, gated) ──────────────────────────────
+
+#[cfg(feature = "gaussianity_probe")]
+pub use gaussianity::{
+    GaussianityReport, GaussianityScratch, N_AXIS_ANCHORS, N_DIRECTIONS, ks_d_vs_fitted_gaussian,
+    sketched_gaussianity,
+};

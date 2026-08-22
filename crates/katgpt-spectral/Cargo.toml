@@ -138,6 +138,13 @@ hla_eigenbasis_recovery = ["uuid", "blake3"]
 # at the root crate level (see root Cargo.toml `default` list).
 ica_lens = ["hla_eigenbasis_recovery"]
 
+# Issue 681 — cross-crate agreement test for katgpt-core's sketched
+# gaussianity probe: core's `ks_d_vs_fitted_gaussian` (the verbatim port of
+# this crate's `ks_d_statistic`, made because the katgpt-core leaf must not
+# depend on katgpt-spectral — the rrq_quant scalar-inversion rule) must
+# agree with the original on the same 1D samples. Test-only feature
+gaussianity_agreement = ["katgpt-core/gaussianity_probe"]
+
 # Spectral Rewiring — weight delta purification via base SVD projection
 # (Plan 423, Research 406 — Zhang et al. arXiv:2607.03065). Projects ΔW onto
 # W₀'s top-rank SVD subspace, extracting the compact rewiring matrix M = U_rᵀΔWV_r
@@ -183,3 +190,10 @@ name = "bench_475_ica_lens_goat"
 path = "benches/bench_475_ica_lens_goat.rs"
 required-features = ["ica_lens"]
 harness = false
+
+# Issue 681 — ks_d_statistic ↔ katgpt-core ks_d_vs_fitted_gaussian agreement
+# (bit-identical by construction; pins the port against the original).
+[[test]]
+name = "gaussianity_agreement"
+path = "tests/gaussianity_agreement.rs"
+required-features = ["gaussianity_agreement"]

@@ -4,7 +4,7 @@
 > **Date:** 2026-08-21
 > **Related Research:** 138 (LeJEPA — direct ancestor, same Balestriero/LeCun lineage), 115 (PEIRA closed-form inter-view predictor), 394 (GNN within-class erank), 475 (ICA non-Gaussian directions), 200 (quantization outlier collapse → Plan 224 KS substrate)
 > **Related Plans:** 224 (OAQG ks_d_statistic), 252 (riir-train LoRA Outlier Guard — training-time KS twin), 568 (RRQ consumes KS as scalar)
-> **Status:** DISTILLED — pending owner decision (two issues filed: katgpt-rs #681, riir-ai #743)
+> **Status:** DISTILLED — pending owner decision on riir-ai #743 (Phase 1 erank guard); katgpt-rs #681 (sketched gaussianity probe) COMPLETE 2026-08-22 — GOAT ALL PASS, opt-in `gaussianity_probe` (Bench 673); the SIGReg training-loss A/B (743 Phase 2) remains gated on Phase 1 evidence
 > **Domain:** katgpt-rs (open primitive: sketched gaussianity probe) + riir-ai (edge_lora hidden-space guard)
 
 ---
