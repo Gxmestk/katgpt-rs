@@ -123,3 +123,5 @@ What none of the cousins alone can do: CGSP has the loop but not the discriminat
 ## PASS-Redirects (synthesis)
 
 None (Gain verdict). Closest shipped cousins updated by this note's signal-diff table instead: Research 038 (SDAR — designer-side gap noted), Research 240 (SGS/CGSP — conflation documented), riir-ai `.research/126` (CGSP guide — three-regime extension pointer in Guide 340).
+
+> **Follow-up (2026-08-22):** [EnvHarness arXiv:2608.19880] — the architectural COMPLEMENT to this note: transform a FROZEN env via composable Setup/Rule/Link wrapper layers (verifier inherited untouched) instead of generating new MDPs; diagnosis-first targeting (name the weakness, then rig) vs this note's score-first loop. Distilled as Research 500 (katgpt-rs) with the wrap-axis signal-diff + the delta Path 0 table; refines Plan 576/Guide 340 before implementation.
