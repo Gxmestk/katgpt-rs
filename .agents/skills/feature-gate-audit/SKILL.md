@@ -176,7 +176,7 @@ already produced a wrong verdict in this workspace:
 |---|---|---|
 | the item's own `#[cfg]` | you read line N (`pub mod X;`) and miss line N-1 (`#[cfg(...)]`) | riir-ai Issue 741 / Proposal 041 called `transformer/gemma2_train` **UNGATED** and used "largest AND ungated" to set eviction priority. Line 41 was the `pub mod`; line **40** was `#[cfg(feature = "gemma_lora")]`. It was gated at the exact commit measured. |
 | every **ancestor** `mod` up to `lib.rs` | the item is bare, so you call it ungated — but its parent module is gated | riir-ai Issue 744 §4: `deltanet/{lm_head_lora_train,backward}` are bare, so a first pass claimed "compiled into every build, default included". The parent is `#[cfg(feature = "deltanet_inference")] pub mod deltanet;` (`lib.rs:90`). Never in a default build. |
-| the crate's `default = [...]` | "default build" is assumed to mean "most features on" | `riir-engine` declares **no default features at all**, so a default build excludes far more than it looks like it should. |
+| the crate's `default = [...]` | the list is read with the wrong instrument, and "no match" is mistaken for "no features" | A Python regex `^(\w+)\s*=\s*\[(.*?)\]\s*$` over `riir-engine/Cargo.toml` returned nothing, and that was written up as *"riir-engine declares no default features at all"* — in a riir-ai issue, a proposal, and **this table**. Measured with `cargo metadata`: **59 default features on a single 14,288-character line**, closure **76**, including `deltanet_inference` and `lora_still`. The wrong reading survived two rounds of "correction" and inverted a real finding (1,507 LOC of BPTT+AdamW *were* in every default build). **`cargo metadata --no-deps` is the authority; a regex over Cargo.toml is not.** |
 | a consumer's `required-features` / dep-declaration features | you walk the `[features]` table and conclude a feature is unreachable | riir-ai Issue 744 §5: a closure walk of `riir-examples`' `[features]` "proved" `deltanet_ternary_inference` unreachable from `default`. It arrives via the `bonsai-*` rows, and the `riir-engine` dep is `default-features = false`. |
 
 Note the first two are the **same mistake at different depths** — and the second
@@ -192,6 +192,22 @@ F=crates/riir-engine/src/deltanet/lm_head_lora_train.rs
 grep -rnB2 "pub mod lm_head_lora_train;" crates/riir-engine/src/deltanet/mod.rs  # link 1
 grep -rnB2 "pub mod deltanet;"           crates/riir-engine/src/lib.rs           # link 2 (repeat per ancestor)
 python3 -c "import re,io;print(re.search(r'(?m)^default\s*=\s*\[(.*?)\]',io.open('crates/riir-engine/Cargo.toml').read()))"  # link 3
+```
+
+**Resolve the closure with the tool that owns it.** Manifests defeat regexes:
+arrays span lines, or are one 14 kB line, or nest.
+
+```bash
+# The authority. Never a regex over Cargo.toml.
+cargo metadata --no-deps --format-version 1 | python3 -c "
+import json,sys
+p=[x for x in json.load(sys.stdin)['packages'] if x['name']=='CRATE'][0]
+f=p['features']; seen=set(); stack=list(f.get('default',[]))
+while stack:
+    k=stack.pop()
+    if k in seen: continue
+    seen.add(k); stack += [t for t in f.get(k,[]) if '/' not in t]
+print(len(f.get('default',[])),'direct /',len(seen),'in closure'); print(sorted(seen))"
 ```
 
 **And the closing rule: settle it with a build, not a read.** Every one of the
