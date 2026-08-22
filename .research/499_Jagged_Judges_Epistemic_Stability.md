@@ -2,7 +2,7 @@
 
 > **Source:** [arXiv:2608.12645](https://arxiv.org/abs/2608.12645) "Jagged Judges: Epistemic Stability Under Silence, Pressure, and Persistence" — Zhao, Bhattacharjee, Korevaar, Radharapu, El-Arini (Meta Superintelligence Labs / FAIR at Meta), 2026-08-14
 > **Date:** 2026-08-22
-> **Status:** DISTILLED — pending owner decision (two actionable POC issues filed: riir-ai Issue 745, riir-clippy Issue 036)
+> **Status:** DISTILLED — pending owner decision (two actionable POC issues filed: riir-ai Issue 745, riir-clippy Issue 036). **riir-clippy Issue 036 RESOLVED-NEGATIVE 2026-08-23**: zero instability events on the 129-span fixture population (72/72 verdicts Resolved — ρ uncomputable; the instability regime does not exist on minimal fixtures; harness kept at `src/draft/jury_disagreement.rs`, reopen = real-file spans via fix_verify). riir-ai Issue 745 still open.
 > **Related Research:** 255 (VibeThinker CLR test-time reliability), 493 (LittleLearner scope-gated epistemics), 497 (Signed Coupling — ships `crowd_conviction` + `SusceptibilityAccumulator`), 322 (Conformal UQ overlay / Report-the-Floor)
 > **Related Plans:** none (POC issues instead — the deltas are single-experiment falsifiables, not multi-phase builds)
 > **Cross-ref:** riir-ai `.issues/745_conviction_gated_persuasion_poc.md`; riir-clippy `.issues/036_jury_disagreement_verify_escalation.md`
