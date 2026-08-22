@@ -2796,3 +2796,69 @@ riir-ai Issue 736 B2) → riir-mmorpg-examples spectral fear-gate (`00fa172`)
 max↔mean interpolation knob; c=0 bit-identical to Max). Stays opt-in —
 swapping a game gate onto the spectral neuron is a gameplay decision (the
 CLR precedent).
+
+## 85. signed_coupling_dynamics — signed-graph opinion dynamics + crowd order parameters (Issue 680)
+
+> **Added:** 2026-08-22. Source: arXiv:2608.16578 "Physics of Agents" (El et
+> al., Stanford, Aug 2026) /
+> [Research 497](../../.research/497_Signed_Coupling_Opinion_Phase_Forecast.md)
+> / [Bench 672](../../.benchmarks/672_signed_coupling_goat.md) ·
+> Code: `katgpt-core/src/signed_coupling.rs`
+
+Glauber (heat-bath) update on a **signed** social graph — ties are typed
+(`J_ij = +1` ally, `−1` rival, `0` absent) and each type gets its own
+coupling:
+
+```text
+h_i = β⁺·Σ J⁺s + β⁻·Σ J⁻s + β₀·Σ|J|s + g_i        P(s_i = +1) = σ(h_i)
+```
+
+`g_i` is the intrinsic field — in our stack a direction-vector dot product
+(personality × question), which is why nothing here trains: the caller
+**authors** the couplings, and the paper's fitted ranges ship as
+designer-facing constants (`PAPER_BETA_*_RANGE`).
+
+- `SignedGraph` — row-compressed signed adjacency (CSR, `u32` indices, no heap
+  after construction). Symmetric (the paper's energy form) **and** directed
+  (asymmetric social influence: a recruit weighs the veteran, not the reverse).
+- `Couplings` + `at_social_temperature(t)` — the one-scalar designer dial. High
+  T = apathetic milling, low T = decisive mob.
+- `signed_coupling_update_into` — 2 conditional adds per edge, ~1.8 ns/edge.
+- `signed_coupling_update_informed_into` + `InformedCouplings` — the paper's
+  5-coupling **truth asymmetry** (correct neighbors pull harder on the
+  concordant channel, wrong ones push harder on the discordant). A sibling fn,
+  not a flag, so no branch enters the inner loop.
+- `sample_states_into` — caller-supplied uniforms ⇒ RNG-free and replayable.
+- **Order parameters:** `net_opinion` (mean), `crowd_conviction` (**mean of
+  squares — new; nothing in the stack shipped a mean-square crowd reducer**),
+  `SusceptibilityAccumulator` (Welford `Var_t(|n|)` in f64 → `χ = N·Var`).
+
+### GOAT (Bench 672)
+
+G1–G4 **ALL PASS**, stays **opt-in** (promotion waits on a production consumer
+— the CLR precedent). G1a/G1b reproduce indifference / polarization /
+consensus on three graph families both deterministically and via a seeded
+stochastic rollout; G1c reproduces the paper's `β⁺ > β⁻` consensus bias as a
+mechanism; G1d locates an interior χ peak over the paper's 41-point sweep; G2
+is at parity-to-2%-faster than the naive three-accumulator form (median
+pairwise ratio 0.97–1.02× over 9 interleaved rounds); G4 is 0 allocs on every
+steady-state path.
+
+**Two findings the gate forced out** (both now on the type docs): `β₀ > β⁻`
+makes rivals *attractive* — at the range midpoints the discordant weight is
+`+0.15`, so a frustrated graph converges and polarization needs the
+`β⁻ > β₀` corner of the fitted ranges; and "cold ⇒ consensus" is a claim about
+the *graph*, since a cold short-range lattice quench freezes into domains
+(`|n|=0.27`, `c=0.98`) unless given a shared field.
+
+**Vocabulary collision (load-bearing for greps):** `crowd_conviction` here is a
+crowd **order parameter** `mean(s²)`; Sheaf-ADMM `conviction`
+(`katgpt-dec::sheaf_admm`, `riir-agents::multi_agent`) is per-agent
+**resistance** in the consensus quadratic. Different quantities — and they
+compose, since a sheaf conviction vector is a natural `g_i` source.
+
+**Not claimed:** no calibrated-forecast claim (`σ(h_i)` is a dynamics rule; any
+prediction-quality claim owes the conformal floor per Issue 010), and no
+framing novelty — Research 497 §3 scored Q1 NO (De Marzo arXiv:2605.10721 /
+De Nobili arXiv:2608.02178 published the "stat-mech predicts LLM crowds"
+headline first). Gain, not Super-GOAT.

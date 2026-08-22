@@ -2461,6 +2461,30 @@ pub use phase_separation::{
     phase_separation_all, phase_separation_sorted,
 };
 
+// Issue 680: Signed-Coupling Opinion Dynamics — Glauber (heat-bath) update on
+// a SIGNED social graph plus the three crowd order parameters, distilled from
+// "Physics of Agents" (El et al., arXiv:2608.16578; Research 497). The kernel
+// is CLR set attention's sibling — the same σ(gated weighted sum) shape, but
+// with signed, tie-typed couplings on a stance instead of unsigned relevance
+// weights: h_i = β⁺Σ J⁺s + β⁻Σ J⁻s + β₀Σ|J|s + g_i, collapsed to one
+// branch-free O(edges) pass over a CSR row. Ships the three reducers nothing
+// else in the stack had: net_opinion (mean), crowd_conviction (mean of
+// squares — genuinely new), and the χ = N·Var_t(|n|) susceptibility
+// accumulator whose peak over a temperature sweep locates the critical social
+// temperature. Pure modelless (the paper's only gradient descent fits ~19
+// scalars to real LLM transitions; a game crowd AUTHORS its couplings, so the
+// paper's fitted ranges become designer-facing defaults). OPT-IN — promotion
+// waits on a production consumer, the CLR precedent.
+#[cfg(feature = "signed_coupling_dynamics")]
+pub mod signed_coupling;
+#[cfg(feature = "signed_coupling_dynamics")]
+pub use signed_coupling::{
+    Couplings, InformedCouplings, PAPER_BETA_MINUS_RANGE, PAPER_BETA_PLUS_RANGE,
+    PAPER_BETA_ZERO_RANGE, PAPER_TRUTH_GAP_RANGE, SignedGraph, SignedGraphError,
+    SusceptibilityAccumulator, crowd_conviction, net_opinion, sample_states_into,
+    signed_coupling_update_informed_into, signed_coupling_update_into,
+};
+
 // Plan 568: Recurrent Residual Quantization (RRQ) — single-checkpoint
 // multi-precision weight representation via iterated 2-bit RTN residual
 // corrections (Luo et al. Intel, arXiv:2608.04048 Aug 2026; Research 467).

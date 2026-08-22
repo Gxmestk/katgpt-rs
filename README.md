@@ -3124,6 +3124,49 @@ Bench 028 — the coupling c is the continuous max↔mean interpolation knob,
 c=0 bit-identical to Max). Opt-in; full narrative:
 [`.docs/02_inference/spectral_pencil.md`](.docs/02_inference/spectral_pencil.md).
 
+### 🧠 signed_coupling_dynamics — Crowds With a Social Temperature (Issue 680, arXiv:2608.16578)
+
+Glauber (heat-bath) dynamics on a **signed** social graph. Ties are typed —
+`J_ij = +1` ally, `−1` rival, `0` absent — and each type gets its own coupling:
+
+```text
+h_i = β⁺·Σ J⁺_ij s_j  +  β⁻·Σ J⁻_ij s_j  +  β₀·Σ |J_ij| s_j  +  g_i
+P(s_i = +1) = σ(h_i)
+```
+
+`g_i` is the intrinsic field — a direction-vector dot product (personality ×
+question), our house pattern. Nothing trains: the paper's only gradient descent
+fits ~19 scalars to *real LLM* transitions, while a game crowd **authors** its
+couplings, so the fitted ranges ship as designer-facing constants.
+
+`Couplings::at_social_temperature(t)` is the whole selling point in one scalar:
+**high T** = apathetic milling (couplings vanish, everyone follows their own
+disposition), **low T** = decisive mob (couplings dominate, the crowd orders
+itself). Plus the three order parameters — `net_opinion` (mean), and the two
+nothing in the stack had: `crowd_conviction` (`mean(s²)`) and
+`SusceptibilityAccumulator` (`χ = N·Var_t(|n|)`, whose sweep peak locates the
+critical social temperature).
+
+**GOAT G1–G4 ALL PASS** ([Bench 672](.benchmarks/672_signed_coupling_goat.md)) —
+**~1.8 ns/edge**, flat from N=32 to N=1024, at 0.97–1.02× the naive
+three-accumulator form (median pairwise ratio over 9 interleaved rounds); 0
+allocs on every steady-state path; indifference / polarization / consensus
+reproduced on three graph families both deterministically and through a seeded
+stochastic rollout.
+
+Why `crowd_conviction` had to exist: to `net_opinion` alone, a deadlocked
+two-faction standoff and an apathetic crowd read identically (`|n| ≈ 0`); to
+`mean(s²)` they are opposite (**0.9998 vs 0.0000**, measured). Two findings the
+gate forced out, both now on the type docs: `β₀ > β⁻` makes rivals
+*attractive* (at the fitted-range midpoints the discordant weight is `+0.15`,
+so a frustrated graph converges — polarization needs the `β⁻ > β₀` corner), and
+"cold ⇒ consensus" is a claim about the **graph**, since a cold short-range
+lattice quench freezes into domains unless given a shared field.
+
+Opt-in — promotion waits on a production consumer (the CLR precedent).
+`σ(h_i)` is a dynamics rule, not a calibrated forecaster: no prediction-quality
+claim is made, and any future one owes the conformal floor.
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional

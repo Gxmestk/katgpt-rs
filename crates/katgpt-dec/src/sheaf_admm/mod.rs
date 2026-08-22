@@ -21,6 +21,19 @@
 //! into the edge stalk `ℝ^{d_e}`. Agents agree only on these projections
 //! (heterogeneous consensus), formalizing the latent-to-raw sync rule.
 //!
+//! # Vocabulary collision: "conviction"
+//!
+//! The **conviction vector** in this primitive (the caller-supplied per-dim
+//! weighting in the consensus quadratic — how strongly one agent holds its
+//! ground, see `apply_restriction_into` below) is NOT the same quantity as
+//! `katgpt_core::signed_coupling::crowd_conviction`, which is the crowd-level
+//! **order parameter** `mean(s²)` from the signed-coupling opinion dynamics
+//! (Issue 680). Per-agent resistance vs crowd-level commitment: different
+//! things, both called "conviction", and a grep for the word must see both.
+//!
+//! They compose rather than compete — a sheaf conviction vector is a natural
+//! source for the opinion kernel's per-agent intrinsic field `g_i`.
+//!
 //! # Relationship to shipped DEC operators
 //!
 //! The sheaf Laplacian `L_F z = Σ_e F_{i→e}^T (F_{i→e} z_i − F_{j→e} z_j)` is

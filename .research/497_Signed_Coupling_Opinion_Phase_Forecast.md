@@ -2,7 +2,7 @@
 
 > **Source:** [arXiv:2608.16578](https://arxiv.org/abs/2608.16578) — "Physics of Agents: Statistical Mechanics Predicts Collective Behavior of AI Agents" — Batu El, Jinhee Paeng, Fatih Dinc, Shiye Su, Mete Erdogan, Aneesh Pappu, Haotian Ye, Wanjia Zhao, Surya Ganguli, James Zou (Stanford), 17 Aug 2026, 51pp
 > **Date:** 2026-08-21
-> **Status:** DISTILLED — pending owner decision (primitive spec below; implementation issue filed)
+> **Status:** SHIPPED 2026-08-22 — `signed_coupling_dynamics` (opt-in) in `katgpt-core/src/signed_coupling.rs`; GOAT G1–G4 ALL PASS, [Bench 672](../.benchmarks/672_signed_coupling_goat.md). Issue 680 resolved-and-removed. Two measured findings the §10 spec did not anticipate: (i) at the fitted-range MIDPOINTS a discordant tie is net ATTRACTIVE (`β₀ − β⁻ = +0.15`), so a frustrated graph converges — polarization needs the `β⁻ > β₀` corner of the same ranges; (ii) the `|J|` channel is not independent (`Σ|J|s = P + D`), so the three-coupling sum collapses to two channel sums weighted once per NODE — the per-edge weight-table form of the §10 spec measured 1.5× SLOWER. Promotion to default still waits on a production consumer (§7: swarm emotions first).
 > **Related Research:** 470 (Lonely Runner phase separation — the in-stack statistical-mechanics ancestor), 354 (NPT cross-NPC set attention), 468 (Beckmann MFG transport — the other crowd-dynamics formalism), 478 (MOP crowd occupancy)
 > **Related Plans:** none yet — gated on the primitive issue below
 > **Cross-ref (riir-ai):** swarm `emotion.rs` (tick_swarm_emotions / tamed_aura / CLR collective — the closest shipped propagation substrate); Sheaf-ADMM conviction (vocabulary collision, §5)
