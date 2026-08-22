@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/katopz/katgpt-rs/compare/katgpt-dec-v0.1.2...katgpt-dec-v0.1.3) - 2026-08-22
+
+### Added
+
+- *(680)* signed_coupling_dynamics — signed-graph Glauber dynamics + the three crowd order parameters (GOAT G1-G4 PASS, opt-in)
+
+### Fixed
+
+- clippy heal — member-crate benches/examples slice (canon/dec/speculative/spectral benches + types example, 6 files, 65 edits)
+- clippy heal — crates src slice 1 (spectral/dec/kv/attn-match, 42 files, 515 edits)
+- katgpt-dec manual_checked_ops warning (unblocks -D warnings gate)
+
+### Other
+
+- hot-path optimization sweep across crates/ + src/ (39 files)
+- *(todo)* correct bogus/stale plan references in 4 inline TODOs
+
 ## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-dec-v0.1.1...katgpt-dec-v0.1.2) - 2026-07-31
 
 ### Added

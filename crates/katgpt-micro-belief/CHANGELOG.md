@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/katopz/katgpt-rs/compare/katgpt-micro-belief-v0.2.0...katgpt-micro-belief-v0.2.1) - 2026-08-22
+
+### Fixed
+
+- clippy heal — crates src slice 2 (speculative/attn/transformer/percepta/types + 16 small-tail crates, 91 files, 411 edits)
+
+### Other
+
+- *(todo)* fix stale Plan 276 G2.1 reference in micro-belief tests
+
 ## [0.2.0](https://github.com/katopz/katgpt-rs/compare/katgpt-micro-belief-v0.1.1...katgpt-micro-belief-v0.2.0) - 2026-07-31
 
 ### Added

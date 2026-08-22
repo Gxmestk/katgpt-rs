@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/katopz/katgpt-rs/compare/katgpt-hla-v0.1.2...katgpt-hla-v0.1.3) - 2026-08-22
+
+### Other
+
+- *(simd)* shared cache-friendly transpose-matvec kernel for backward + HLA
+
 ## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-hla-v0.1.1...katgpt-hla-v0.1.2) - 2026-07-31
 
 ### Added
