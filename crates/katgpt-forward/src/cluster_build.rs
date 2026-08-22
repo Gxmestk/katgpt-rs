@@ -274,6 +274,22 @@ pub fn cluster_map_from_embeddings_with_init(
     let proj_dim = PROJ_DIM.min(n_embd);
     let data = project_rows(lm_head, vocab_size, n_embd, proj_dim);
 
+    // Constant projected geometry (every row identical — an all-zero or
+    // otherwise untrained `wte`) leaves k-means nothing to separate: every
+    // centre coincides with the data, and the strict `<` in the assignment
+    // step collapses all tokens into cluster 0, yielding one mega-cluster
+    // instead of the baseline map the degenerate-input contract promises
+    // above. Round-robin is what k-means reduces to with no geometry to
+    // exploit, so return it directly. Identical input rows project to
+    // identical results (same dot products over the same bytes), so the
+    // bitwise slice comparison is exact.
+    if data[proj_dim..]
+        .chunks_exact(proj_dim)
+        .all(|row| row == &data[..proj_dim])
+    {
+        return cluster_map_round_robin(vocab_size, cluster_size);
+    }
+
     // See `kmeanspp_init` for why the strided variant is pathological on
     // ID-periodic geometry.
     let mut centers = match init {
@@ -694,6 +710,27 @@ mod tests {
         assert_eq!(
             cluster_map_from_embeddings(&short, 100, 16, 25),
             cluster_map_round_robin(100, 25)
+        );
+    }
+
+    #[test]
+    fn constant_geometry_falls_back_to_round_robin() {
+        // All-zero embeddings (the untrained-`wte` shape) and any constant
+        // row set carry no geometry for k-means to exploit — the documented
+        // contract returns the baseline map, not a single mega-cluster.
+        // Regression: the strict-`<` assignment used to collapse these into
+        // one cluster containing every token (riir-engine
+        // `test_cluster_map_from_embeddings_fallback` has pinned this
+        // contract since the mtp.rs de-fork, 3d69ccaf1).
+        let zeros = vec![0.0f32; 100 * 32];
+        assert_eq!(
+            cluster_map_from_embeddings(&zeros, 100, 32, 25),
+            cluster_map_round_robin(100, 25)
+        );
+        let constant = vec![0.5f32; 80 * 16];
+        assert_eq!(
+            cluster_map_from_embeddings(&constant, 80, 16, 20),
+            cluster_map_round_robin(80, 20)
         );
     }
 }
