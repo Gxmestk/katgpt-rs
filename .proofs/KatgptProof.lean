@@ -22,4 +22,10 @@ import KatgptProof.Hope.SpecTests
 import KatgptProof.Ssmax.Basic
 import KatgptProof.Ssmax.DilutionBound
 import KatgptProof.Ssmax.Asymptotic
+import KatgptProof.Pencil.Sym
+import KatgptProof.Pencil.RayleighCF
+import KatgptProof.Pencil.Weyl
+import KatgptProof.Pencil.Loewner
+import KatgptProof.Pencil.Eigengap
+import KatgptProof.Pencil.SpecTests
 import KatgptProof.Ssmax.SpecTests

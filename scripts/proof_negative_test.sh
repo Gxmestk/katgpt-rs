@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# KatgptProof negative test — measured error-catching power (Issue 678 P4;
+# mirrors riir-chain's Plan 016 G2 pattern).
+#
+# The pencil SpecTests and theorems prove the spec against itself; the Rust
+# spec-match tests prove Rust against the spec. NEITHER catches a spec
+# transcription error. The concrete hand-instances in
+# KatgptProof/Pencil/SpecTests.lean close that gap — this script MEASURES
+# it: each perturbation below simulates a spec typo, and `lake build` MUST
+# fail. A perturbation that builds green is a hole.
+#
+# Usage: scripts/proof_negative_test.sh
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROOFS="$REPO_ROOT/.proofs"
+SRC="$PROOFS/KatgptProof/Pencil"
+
+export PATH="$HOME/.elan/bin:$PATH"
+
+if ! command -v lake >/dev/null 2>&1; then
+    echo "✗ lake (Lean 4) not installed — negative test cannot run"
+    echo "  install: curl https://elan.lean-lang.org/elan_init.sh -sSf | sh"
+    exit 1
+fi
+
+BACKUP_DIR="$(mktemp -d)"
+restore_all() {
+    local f
+    for f in "$BACKUP_DIR"/*.bak; do
+        [ -e "$f" ] || continue
+        local name
+        name="$(basename "$f" .bak)"
+        cp "$f" "${name//__//}"
+    done
+    rm -rf "$BACKUP_DIR"
+}
+trap restore_all EXIT
+
+pass=0
+fail=0
+
+# Perturb one file, assert `lake build` fails, then revert.
+#   $1 = file path relative to Pencil/
+#   $2 = sed expression
+#   $3 = human description of the bug being simulated
+perturb() {
+    local rel="$1" expr="$2" desc="$3"
+    local file="$SRC/$rel"
+    local key="${SRC}/${rel}"
+    local bak="$BACKUP_DIR/${key//\//__}.bak"
+
+    cp "$file" "$bak"
+    sed "$expr" "$bak" > "$file"
+
+    # A sed that matched nothing would "pass" vacuously — that is a harness
+    # bug, not a proof result. Catch it explicitly.
+    if cmp -s "$bak" "$file"; then
+        echo "  ✗ HARNESS BUG: perturbation matched nothing (spec text changed?)"
+        echo "     expr: $expr"
+        cp "$bak" "$file"
+        fail=$((fail + 1))
+        return
+    fi
+
+    if (cd "$PROOFS" && lake build >/dev/null 2>&1); then
+        echo "  ✗ BUILD PASSED — this bug would ship undetected"
+        fail=$((fail + 1))
+    else
+        echo "  ✓ build failed as required"
+        pass=$((pass + 1))
+    fi
+
+    cp "$bak" "$file"
+    rm -f "$bak"
+}
+
+echo "── Pencil negative tests (Issue 678 P4) ──"
+
+echo "P1: the 1/√2 packing scale typo (paper's own example: 1/√2 → 1/2)"
+perturb "Sym.lean" \
+    's/(Real.sqrt 2)⁻¹ \* v i j/(2 : ℝ)⁻¹ * v i j/' \
+    "symMat stores off-diagonals scaled by 1/2 instead of 1/√2"
+
+echo "P2: the hand-instance expected value (18 → 17)"
+perturb "SpecTests.lean" \
+    's/frobSq (symMat v22) = 18/frobSq (symMat v22) = 17/' \
+    "spec test expects the wrong Frobenius norm"
+
+echo "P3: mirror-pairing factor (2 * upper → upper, i.e. dropped mirror)"
+perturb "Sym.lean" \
+    's/2 \* ∑ p ∈ Finset.univ.filter (fun p : Fin D × Fin D => p.1 < p.2),/∑ p ∈ Finset.univ.filter (fun p : Fin D × Fin D => p.1 < p.2),/' \
+    "off-diagonal double sum forgets the ×2 mirror factor"
+
+echo "P4: Weyl inequality direction (≤ → <)"
+perturb "Weyl.lean" \
+    's/    |eigval hA i - eigval hB i| ≤ ‖A - B‖ := by/    |eigval hA i - eigval hB i| < ‖A - B‖ := by/' \
+    "Weyl stated strictly — false at equality (diagonal ground truth)"
+
+if [ "$fail" -gt 0 ]; then
+    echo "✗ $fail perturbation(s) built green — spec-test holes"
+    exit 1
+fi
+echo "✓ all $pass perturbations caught — the spec tests have teeth"

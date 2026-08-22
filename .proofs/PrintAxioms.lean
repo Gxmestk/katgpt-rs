@@ -34,10 +34,16 @@ import KatgptProof.Hope.SpecTests
 import KatgptProof.Ssmax.Basic
 import KatgptProof.Ssmax.DilutionBound
 import KatgptProof.Ssmax.Asymptotic
+import KatgptProof.Pencil.Sym
+import KatgptProof.Pencil.RayleighCF
+import KatgptProof.Pencil.Weyl
+import KatgptProof.Pencil.Loewner
+import KatgptProof.Pencil.Eigengap
 
 open KatgptProof.Bridge
 open KatgptProof.Hope
 open KatgptProof.Ssmax
+open KatgptProof.Pencil
 
 -- Action-bridge ranking preservation (the sigmoid strict-monotonicity chain).
 #print axioms action_bridge_ranking_preserved
@@ -65,3 +71,31 @@ open KatgptProof.Ssmax
 #print axioms eventually_c_ge_two
 #print axioms tendsto_leakage_zero
 #print axioms tendsto_alphaGold_one
+
+-- Pencil sym packing (Issue 678 T1): the isometry.
+#print axioms sym_isometry_norm_sq
+#print axioms sym_isometry_dot
+#print axioms sym_isometry_norm
+
+-- Pencil Rayleigh/Courant–Fischer core (Issue 678, substrate for T2–T4).
+#print axioms eigval_antitone
+#print axioms ray_eq_sum
+#print axioms inner_self_eq_sum
+#print axioms ray_le_top
+#print axioms cf_ge
+#print axioms cf_dual
+
+-- Pencil Weyl (Issue 678 T2): 1-Lipschitz eigenvalues.
+#print axioms weyl_one_sided
+#print axioms eigval_zero_le_opNorm
+#print axioms weyl_lipschitz
+
+-- Pencil Loewner + mirror (Issue 678 T3).
+#print axioms loewner_mono
+#print axioms mirror_dual
+
+-- Pencil eigengap (Issue 678 T4): shift lemma + the analytic core.
+#print axioms eigval_add_smul_one
+#print axioms ray_diagonal
+#print axioms opNorm_diagonal_le
+#print axioms eigengap_ge_half

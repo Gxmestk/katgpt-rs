@@ -49,7 +49,11 @@ ALLOWED_AXIOMS=("propext" "Classical.choice" "Quot.sound")
 # Adding theorems? Add the `#print axioms` line, then bump this number.
 #   17 → Bridge ranking preservation (3), HOPE spec instances (2),
 #        Ssmax core (3), Ssmax dilution bound (3), Ssmax asymptotics (6)
-EXPECTED_THEOREMS=17
+#   35 → Pencil (Issue 678): T1 isometry (3) + Courant–Fischer core (6)
+#        + Weyl T2 (3) + Loewner/mirror T3 (2) + eigengap T4 core (4);
+#        the auxiliary lemmas (mirror-pairing, combo expansion, SDA,
+#        shift, PSD-ray, diagonal-ray) are covered by the audited heads.
+EXPECTED_THEOREMS=35
 
 # Bare `axiom` declarations that are allowed to exist, by name. Empty here:
 # KatgptProof declares none, and a new one must be justified in review rather
