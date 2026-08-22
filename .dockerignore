@@ -1,0 +1,40 @@
+# BuildKit named-context trim for riir-chaind builds (deploy/Dockerfile,
+# Issue 028 analysis, 2026-08-22). This repo arrives as a named context
+# (`--build-context katgpt-rs=../katgpt-rs`); BuildKit applies THIS file at
+# the context root. Without it the context ships .git/ (184 MB) — and on a
+# local builder, target/ (tens of GB).
+#
+# The daemon build compiles ZERO katgpt crates (measured: `cargo tree -p
+# riir-chaind --bin riir-chaind` — the context exists for manifest
+# resolution only), so nothing here is load-bearing for that image beyond
+# Cargo.toml manifests + declared target files.
+
+target/
+**/target/
+.git/
+.github/
+
+# Lean toolchain artifacts — the daemon image does not need the proofs.
+.proofs/
+**/.lake/
+**/.agents/
+
+# Docs and research the build has no use for.
+.benchmarks/
+.research/
+.issues/
+.plans/
+.proposals/
+.docs/
+**/node_modules/
+
+# NOT excluded, deliberately: `tests/`, `examples/`, `benches/` — workspace
+# manifests declare `[[test]]`/`[[example]]`/`[[bench]]` targets by name, and
+# cargo fails at MANIFEST LOAD if a declared target's file is missing (the
+# riir-chain .dockerignore lesson).
+
+# Local editor and OS noise.
+.DS_Store
+*.swp
+.idea/
+.vscode/
