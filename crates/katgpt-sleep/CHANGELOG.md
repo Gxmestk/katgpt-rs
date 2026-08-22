@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/katopz/katgpt-rs/compare/katgpt-sleep-v0.1.2...katgpt-sleep-v0.1.3) - 2026-08-22
+
+### Fixed
+
+- clippy heal — crates src slice 2 (speculative/attn/transformer/percepta/types + 16 small-tail crates, 91 files, 411 edits)
+
 ## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-sleep-v0.1.1...katgpt-sleep-v0.1.2) - 2026-07-31
 
 ### Other
