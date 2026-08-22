@@ -2751,3 +2751,48 @@ baseline; feature-on 1911/0/6 (+14); clippy 0 both states) · G4 alloc-free
 **Consumer pilot (promotion gate — OPEN):** riir-clippy selection patience
 scaled by `ignition_time(ζ̂, ε)` vs fixed patience on the heal-loop fixture.
 Promotion to default only on a measured win; stays opt-in otherwise.
+
+## 84. spectral_pencil — the affine matrix pencil scalar gate (Issue 676)
+
+> **Added:** 2026-08-21 (`9795a9bd` closeout; doc-sync catch 2026-08-22 — the
+> closeout landed the narrative doc but missed this catalog + the README +
+> overview rows). Source: arXiv:2608.08003 "The Spectral Neuron" (Shtoff,
+> TII 2026) / [Research 495](../../.research/495_Spectral_Neuron_Affine_Pencil_Shape_Gates.md)
+> / [Bench 671](../../.benchmarks/671_spectral_pencil_goat.md) ·
+> Code: `katgpt-core/src/spectral_pencil/` ·
+> Narrative: [`.docs/02_inference/spectral_pencil.md`](../02_inference/spectral_pencil.md)
+
+The scalar decision function `f(x) = λk(A₀ + Σ xᵢAᵢ)` — the input enters
+**linearly** into a symmetric matrix; the nonlinearity is reading **one
+ordered eigenvalue**. Expressivity grows with matrix dimension d while
+retaining linear-model-style transparency (shape by construction: k=1
+concave, k=d convex, `Aᵢ ⪰ 0` ⇒ Loewner-monotone per feature; Weyl global
+influence bounds; exact Hellmann–Feynman attribution `∂f/∂xᵢ = vᵀAᵢv`;
+canonical-gauge commitment bytes; invertible monotone warp; the γk ≥ ½
+eigengap-guaranteed seeded init from paper Lemma 2).
+
+- `tridiag` eval — 748 ns @ d=8 → 3.71 µs @ d=32 (Sturm bisection; the
+  per-tick path at the 10k NPC × 20 Hz production shape)
+- `dense` eval — 3.95 µs @ d=8 → 166.7 µs @ d=32 (pinned Jacobi; the
+  spawn-time/GM/canonical-gauge low-cardinality path)
+- `count_below` — **51 ns** exact integer Sturm count
+- PSD/NSD feature constructors (`shape.rs`), Lipschitz certificate
+  (`bounds.rs`), `field::SpectralField` archetype adapter + `GenomePod`
+  per-NPC genome persistence (riir-ai Issue 736 B1/B3 extensions)
+
+### GOAT (Bench 671)
+
+G1–G4 **ALL PASS** — determinism (pinned full sweeps, bit-identical),
+latency (table above; tridiag is ~41% of one P-core at d=16 / ~15% at d=8
+under the production shape), no-regression (default untouched — opt-in
+feature implying `hebbian_kernel_memory` + `karc_forecaster`), alloc-free
+hot paths. UQ-bearing scope-limit recorded honestly: no
+calibrated-prediction claim (the Report-the-Floor rule would apply before
+any).
+
+**Consumers:** `riir_game_sdk::spectral` facade (`spectral_hero_gate`,
+riir-ai Issue 736 B2) → riir-mmorpg-examples spectral fear-gate (`00fa172`)
++ the 4th `FusionArm::Spectral` (mmorpg Bench 028 — c the continuous
+max↔mean interpolation knob; c=0 bit-identical to Max). Stays opt-in —
+swapping a game gate onto the spectral neuron is a gameplay decision (the
+CLR precedent).

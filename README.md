@@ -3101,6 +3101,29 @@ flowchart LR
 
 The probe is a **consumer concern** — the primitive consumes a pre-computed erasure direction (from MAG, CNA, or HLA EmotionDirections) and does not train a probe.
 
+### 🧠 spectral_pencil — The Affine Matrix Pencil Scalar Gate (Issue 676, arXiv:2608.08003)
+
+`f(x) = λk(A₀ + Σ xᵢAᵢ)` — the input enters **linearly** into a symmetric
+matrix; the nonlinearity is reading **one ordered eigenvalue**. Shape by
+construction (k=1 concave, k=d convex via Rayleigh–Ritz; `Aᵢ ⪰ 0` ⇒
+Loewner-monotone per feature), Weyl global influence bounds in closed form,
+exact Hellmann–Feynman attribution `∂f/∂xᵢ = vᵀAᵢv`, canonical-gauge
+commitment bytes, invertible monotone warp, and the γk ≥ ½
+eigengap-guaranteed seeded init (paper Lemma 2).
+
+**GOAT G1–G4 ALL PASS** ([Bench 671](.benchmarks/671_spectral_pencil_goat.md)) —
+tridiag eval (Sturm bisection) **748 ns @ d=8 → 3.71 µs @ d=32** — the
+per-tick path at the 10k NPC × 20 Hz production shape (~15–41% of one
+P-core); dense eval (pinned Jacobi, spawn/GM path) 3.95–166.7 µs;
+`count_below` **51 ns** exact. Determinism policy: f64 accumulation +
+pinned full sweeps — bit-identical per binary.
+
+**Consumers:** `riir_game_sdk::spectral` facade (`spectral_hero_gate`, riir-ai
+Issue 736 B2) → the mmorpg spectral fear-gate + `FusionArm::Spectral` (mmorpg
+Bench 028 — the coupling c is the continuous max↔mean interpolation knob,
+c=0 bit-identical to Max). Opt-in; full narrative:
+[`.docs/02_inference/spectral_pencil.md`](.docs/02_inference/spectral_pencil.md).
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional
