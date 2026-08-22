@@ -68,6 +68,31 @@
 #![cfg(feature = "swir_switch_thinking")]
 #![cfg(test)]
 
+// Issue 682: force-link the katgpt-rs root's debug-only TrackingAllocator.
+// Nothing in this file references root-crate items, so the linker would
+// otherwise drop the rlib member carrying the `#[global_allocator]` shim
+// and the alloc audits below would pass VACUOUSLY (counters never
+// increment). Verified empirically: `nm` on the previously built binary
+// found zero TrackingAllocator symbols.
+extern crate katgpt_rs;
+
+/// Liveness sentinel (Issue 682): FAIL the audit if the TrackingAllocator
+/// is not actually installed (debug builds only).
+#[cfg(debug_assertions)]
+fn assert_alloc_tracking_live() {
+    katgpt_core::alloc::reset_alloc_stats();
+    let _probe: Vec<u8> = vec![0u8; 64];
+    let (count, _) = katgpt_core::alloc::get_alloc_stats();
+    assert!(
+        count >= 1,
+        "TrackingAllocator not installed in this binary — alloc gate is VACUOUS (Issue 682)"
+    );
+    katgpt_core::alloc::reset_alloc_stats();
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_alloc_tracking_live() {}
+
 use katgpt_transformer::swir::{
     StepAction, SwiRConfig, SwiRController, SwiRStrategyAdapter, ThinkMode, entropy_from_logits,
     in_vocab_convex_hull, mix_thinking_signal, shannon_entropy, soft_embedding,
@@ -413,6 +438,7 @@ fn g7_step_zero_allocation_debug() {
     // Run in debug so the library's TrackingAllocator is installed.
     #[cfg(debug_assertions)]
     {
+        assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
         let mut ctrl = SwiRController::new(SwiRConfig {
             w_e_to_l: 4,
@@ -429,6 +455,7 @@ fn g7_step_zero_allocation_debug() {
         // but be conservative in case the constructor's lazy init triggers).
         let _ = ctrl.step(5.0, 0);
 
+        assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
         let mut entropy = 5.0f32;
         for i in 1..1024u32 {
@@ -486,6 +513,7 @@ fn g7_adapter_on_step_allocations_debug() {
         };
         let _ = adapter.on_step(&mut ctx);
 
+        assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
         let n_steps = 64u32;
         let mut soft_steps = 0u32;

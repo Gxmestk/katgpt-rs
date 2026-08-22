@@ -34,6 +34,31 @@
 //! because synthetic data doesn't have real attention structure — the
 //! existing in-module tests (Phase 1–3) enforce the strict thresholds.
 
+// Issue 682: force-link the katgpt-rs root's debug-only TrackingAllocator.
+// Nothing in this file references root-crate items, so the linker would
+// otherwise drop the rlib member carrying the `#[global_allocator]` shim
+// and the alloc audits below would pass VACUOUSLY (counters never
+// increment). Verified empirically: `nm` on the previously built binary
+// found zero TrackingAllocator symbols.
+extern crate katgpt_rs;
+
+/// Liveness sentinel (Issue 682): FAIL the audit if the TrackingAllocator
+/// is not actually installed (debug builds only).
+#[cfg(debug_assertions)]
+fn assert_alloc_tracking_live() {
+    katgpt_core::alloc::reset_alloc_stats();
+    let _probe: Vec<u8> = vec![0u8; 64];
+    let (count, _) = katgpt_core::alloc::get_alloc_stats();
+    assert!(
+        count >= 1,
+        "TrackingAllocator not installed in this binary — alloc gate is VACUOUS (Issue 682)"
+    );
+    katgpt_core::alloc::reset_alloc_stats();
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_alloc_tracking_live() {}
+
 use katgpt_attn_match::{
     beta_fitter::{BetaFitConfig, fit_beta_nnls},
     compact::compact,
@@ -386,6 +411,7 @@ fn g7_no_allocation_in_hot_loops() {
         // Thread-local counters isolate this measurement from concurrent
         // tests on other threads; `per_call` reflects only `pick_backend`
         // allocations on this thread. The real per-call allocation is 0.
+        assert_alloc_tracking_live();
         reset_alloc_stats();
         let n_calls = 1000usize;
         for i in 0..n_calls {

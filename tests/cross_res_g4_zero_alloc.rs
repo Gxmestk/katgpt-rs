@@ -22,6 +22,31 @@
 
 #![cfg(feature = "cross_resolution_transport")]
 
+// Issue 682: force-link the katgpt-rs root's debug-only TrackingAllocator.
+// Nothing in this file references root-crate items, so the linker would
+// otherwise drop the rlib member carrying the `#[global_allocator]` shim
+// and the alloc audits below would pass VACUOUSLY (counters never
+// increment). Verified empirically: `nm` on the previously built binary
+// found zero TrackingAllocator symbols.
+extern crate katgpt_rs;
+
+/// Liveness sentinel (Issue 682): FAIL the audit if the TrackingAllocator
+/// is not actually installed (debug builds only).
+#[cfg(debug_assertions)]
+fn assert_alloc_tracking_live() {
+    katgpt_core::alloc::reset_alloc_stats();
+    let _probe: Vec<u8> = vec![0u8; 64];
+    let (count, _) = katgpt_core::alloc::get_alloc_stats();
+    assert!(
+        count >= 1,
+        "TrackingAllocator not installed in this binary — alloc gate is VACUOUS (Issue 682)"
+    );
+    katgpt_core::alloc::reset_alloc_stats();
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_alloc_tracking_live() {}
+
 use katgpt_core::cross_resolution::{
     CrossResScratch, CrossResolutionBases, transport_cross_resolution_into,
 };
@@ -72,6 +97,7 @@ fn g4_zero_alloc_steady_state() {
         }
         std::hint::black_box(&dst);
 
+        assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
         const MEASURED_ITERS: usize = 1000;
         for _ in 0..MEASURED_ITERS {

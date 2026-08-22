@@ -88,6 +88,31 @@
 #![cfg(feature = "clr")]
 #![cfg(debug_assertions)]
 
+// Issue 682: force-link the katgpt-rs root's debug-only TrackingAllocator.
+// Nothing in this file references root-crate items, so the linker would
+// otherwise drop the rlib member carrying the `#[global_allocator]` shim
+// and the alloc audits below would pass VACUOUSLY (counters never
+// increment). Verified empirically: `nm` on the previously built binary
+// found zero TrackingAllocator symbols.
+extern crate katgpt_rs;
+
+/// Liveness sentinel (Issue 682): FAIL the audit if the TrackingAllocator
+/// is not actually installed (debug builds only).
+#[cfg(debug_assertions)]
+fn assert_alloc_tracking_live() {
+    katgpt_core::alloc::reset_alloc_stats();
+    let _probe: Vec<u8> = vec![0u8; 64];
+    let (count, _) = katgpt_core::alloc::get_alloc_stats();
+    assert!(
+        count >= 1,
+        "TrackingAllocator not installed in this binary — alloc gate is VACUOUS (Issue 682)"
+    );
+    katgpt_core::alloc::reset_alloc_stats();
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_alloc_tracking_live() {}
+
 use fastrand::Rng;
 use katgpt_claim::clr::{
     Claim, ClaimExtractor, ClrConfig, ClrScratch, DirectionVectorSource, FnClaimExtractor,
@@ -197,6 +222,7 @@ fn g4_zero_allocation() {
     //
     // Plus any incidental allocations from the test harness / println.
 
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     let mut scratch = ClrScratch::new(G4_K, G4_M, G4_DIM);
     let warmup_allocs = snap_alloc();
@@ -221,6 +247,7 @@ fn g4_zero_allocation() {
     // Trajectories + directions are built once; their allocations are NOT
     // part of the steady-state measurement.
 
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     let (trajectories, directions) = build_trajectories();
     let data_build_allocs = snap_alloc();
@@ -244,6 +271,7 @@ fn g4_zero_allocation() {
     let outcome_eq = |a: &u8, b: &u8| a == b;
 
     // Batch 1: calls 0..500
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     for _ in 0..500 {
         let (winner, rel) = clr_vote_minimal(
@@ -259,6 +287,7 @@ fn g4_zero_allocation() {
     let batch1_allocs = snap_alloc();
 
     // Batch 2: calls 500..1000
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     for _ in 0..500 {
         let (winner, rel) = clr_vote_minimal(
@@ -298,6 +327,7 @@ fn g4_zero_allocation() {
     // (reliability gate, clustering, tiebreak) allocates nothing beyond what
     // the extractor already does.
 
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     for traj in &trajectories {
         let claims = extractor.extract(traj);
@@ -305,6 +335,7 @@ fn g4_zero_allocation() {
     }
     let extract_only_allocs = snap_alloc();
 
+    assert_alloc_tracking_live();
     reset_alloc_stats();
     let (winner, rel) = clr_vote_minimal(
         &trajectories,

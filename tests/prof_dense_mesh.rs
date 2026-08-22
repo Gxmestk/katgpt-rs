@@ -16,6 +16,31 @@
 #![cfg(feature = "dense_mesh")]
 #![cfg(test)]
 
+// Issue 682: force-link the katgpt-rs root's debug-only TrackingAllocator.
+// Nothing in this file references root-crate items, so the linker would
+// otherwise drop the rlib member carrying the `#[global_allocator]` shim
+// and the alloc audits below would pass VACUOUSLY (counters never
+// increment). Verified empirically: `nm` on the previously built binary
+// found zero TrackingAllocator symbols.
+extern crate katgpt_rs;
+
+/// Liveness sentinel (Issue 682): FAIL the audit if the TrackingAllocator
+/// is not actually installed (debug builds only).
+#[cfg(debug_assertions)]
+fn assert_alloc_tracking_live() {
+    katgpt_core::alloc::reset_alloc_stats();
+    let _probe: Vec<u8> = vec![0u8; 64];
+    let (count, _) = katgpt_core::alloc::get_alloc_stats();
+    assert!(
+        count >= 1,
+        "TrackingAllocator not installed in this binary — alloc gate is VACUOUS (Issue 682)"
+    );
+    katgpt_core::alloc::reset_alloc_stats();
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_alloc_tracking_live() {}
+
 use std::boxed::Box;
 use std::time::{Duration, Instant};
 
@@ -465,6 +490,7 @@ fn prof_dense_mesh_zero_alloc_hot_path() {
     {
         // Allocation audit — global counters are shared across tests, so we
         // measure the *delta* across N forward calls.
+        assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
         let (before_count, _) = katgpt_core::alloc::get_alloc_stats();
         let _ = before_count; // reset gives 0
