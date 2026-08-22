@@ -1,6 +1,6 @@
 ---
 name: feature-gate-audit
-description: Audit feature-gate status claims across the multi-repo stack. Use when a doc/plan/issue/commit-message claims a "promotion discrepancy", "not yet wired", or "Default-off until..." state, when fixing stale feature-gate comments, before promoting or demoting any feature flag, or quarterly as a feature-gate-hygiene gate. Enforces three defenses (1) source-code verification of every wiring claim — grep the production tick path, don't trust the doc; (2) multi-surface grep for stale comments across 5 documentation surfaces (source .rs, lib.rs module doc, Cargo.toml default block, downstream Cargo.toml, .benchmarks/*_promotion_review.md); (3) layer-split awareness — engine-layer DEFAULT-ON + game-layer OPT-IN is a deliberate pattern when each layer gates a different concern (generic runtime vs IP-bearing content), NOT a missed propagation. Sibling to goat-audit + doc-sync.
+description: Audit feature-gate status claims across the multi-repo stack. Use when a doc/plan/issue/commit-message claims a "promotion discrepancy", "not yet wired", or "Default-off until..." state, when fixing stale feature-gate comments, before promoting or demoting any feature flag, or quarterly as a feature-gate-hygiene gate. Enforces four defenses (1) source-code verification of every wiring claim — grep the production tick path, don't trust the doc; (2) multi-surface grep for stale comments across 5 documentation surfaces (source .rs, lib.rs module doc, Cargo.toml default block, downstream Cargo.toml, .benchmarks/*_promotion_review.md); (3) layer-split awareness — engine-layer DEFAULT-ON + game-layer OPT-IN is a deliberate pattern when each layer gates a different concern (generic runtime vs IP-bearing content), NOT a missed propagation; (4) gate-chain resolution — own cfg plus every ancestor mod plus the crate default list, settled by a build not a read. Sibling to goat-audit + doc-sync.
 ---
 
 # feature-gate-audit — Verify feature-gate claims against production code
@@ -34,7 +34,7 @@ landed. Apply them to every feature-gate claim you encounter.
 - Quarterly as a feature-gate-hygiene gate (alongside `doc-sync` and
   `goat-audit`)
 
-## The three defenses
+## The four defenses
 
 ### Defense 1 — Verify every "discrepancy" / "not yet wired" claim against production code
 
@@ -165,6 +165,51 @@ should NOT be propagated.
    both sides to explain the split; do NOT propagate the promotion.
 3. If same concern → it's a real discrepancy. Propagate the promotion
    and update all 5 surfaces per Defense 2.
+
+### Defense 4 — "Is it gated?" is a question about a CHAIN, not a line
+
+A gating claim sourced from a bare `grep 'pub mod X'` is **inadmissible**. The
+matched line almost never carries the whole answer, and each missing link has
+already produced a wrong verdict in this workspace:
+
+| link | what it looks like when missed | real case |
+|---|---|---|
+| the item's own `#[cfg]` | you read line N (`pub mod X;`) and miss line N-1 (`#[cfg(...)]`) | riir-ai Issue 741 / Proposal 041 called `transformer/gemma2_train` **UNGATED** and used "largest AND ungated" to set eviction priority. Line 41 was the `pub mod`; line **40** was `#[cfg(feature = "gemma_lora")]`. It was gated at the exact commit measured. |
+| every **ancestor** `mod` up to `lib.rs` | the item is bare, so you call it ungated — but its parent module is gated | riir-ai Issue 744 §4: `deltanet/{lm_head_lora_train,backward}` are bare, so a first pass claimed "compiled into every build, default included". The parent is `#[cfg(feature = "deltanet_inference")] pub mod deltanet;` (`lib.rs:90`). Never in a default build. |
+| the crate's `default = [...]` | "default build" is assumed to mean "most features on" | `riir-engine` declares **no default features at all**, so a default build excludes far more than it looks like it should. |
+| a consumer's `required-features` / dep-declaration features | you walk the `[features]` table and conclude a feature is unreachable | riir-ai Issue 744 §5: a closure walk of `riir-examples`' `[features]` "proved" `deltanet_ternary_inference` unreachable from `default`. It arrives via the `bonsai-*` rows, and the `riir-engine` dep is `default-features = false`. |
+
+Note the first two are the **same mistake at different depths** — and the second
+one was made *while writing the correction for the first*. That is the signature
+of this defense being skipped rather than applied once.
+
+`grep -B2` is **necessary but not sufficient**: it fixes link 1 and is blind to
+links 2-4.
+
+```bash
+# The admissible form. All four links, for one item.
+F=crates/riir-engine/src/deltanet/lm_head_lora_train.rs
+grep -rnB2 "pub mod lm_head_lora_train;" crates/riir-engine/src/deltanet/mod.rs  # link 1
+grep -rnB2 "pub mod deltanet;"           crates/riir-engine/src/lib.rs           # link 2 (repeat per ancestor)
+python3 -c "import re,io;print(re.search(r'(?m)^default\s*=\s*\[(.*?)\]',io.open('crates/riir-engine/Cargo.toml').read()))"  # link 3
+```
+
+**And the closing rule: settle it with a build, not a read.** Every one of the
+four cases above was a *reading* that survived review and died on first contact
+with `cargo`. A feature matrix is cheap and decisive:
+
+```bash
+# rc=0 on every arm you claim works; the load-bearing arm is the one where the
+# gate is supposed to EXCLUDE something and the crate must still compile.
+for f in "" deltanet_inference deltanet_ternary_inference; do ...; done
+```
+
+Two traps when you do run it, both of which have reported a **false verdict**
+here: `cargo ... 2>&1 | tail` makes `$?` the *tail's* exit, so a failed build
+reports success; and in zsh `args="--features foo"; cargo check $args` passes one
+argv entry (`error: unexpected argument '--features foo'`), so every arm of a
+matrix loop "fails" while the code is fine. Redirect to a file and read `rc`
+from cargo directly; pass flags via `"$@"`.
 
 ## Output format
 
