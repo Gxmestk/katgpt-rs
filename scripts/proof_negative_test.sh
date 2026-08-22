@@ -97,6 +97,16 @@ perturb "Weyl.lean" \
     's/    |eigval hA i - eigval hB i| ≤ ‖A - B‖ := by/    |eigval hA i - eigval hB i| < ‖A - B‖ := by/' \
     "Weyl stated strictly — false at equality (diagonal ground truth)"
 
+echo "P5: ladder spec-test expected gap (5/4 → 7/4)"
+perturb "SpecTests.lean" \
+    's/    = 5 \/ 4 := by/    = 7 \/ 4 := by/' \
+    "T4 spec test expects the wrong perturbed-ladder gap"
+
+echo "P6: diagonal eigenvalue pin sign (d j → -d j)"
+perturb "Eigengap.lean" \
+    's/    eigval (diagonal_isHermitian d) j = d j := by/    eigval (diagonal_isHermitian d) j = -d j := by/' \
+    "antitone-diagonal theorem pins the NEGATED diagonal — false (d = const 5)"
+
 if [ "$fail" -gt 0 ]; then
     echo "✗ $fail perturbation(s) built green — spec-test holes"
     exit 1

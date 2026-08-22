@@ -16,6 +16,14 @@ Second Lean 4 formal-verification instance in the 7-repo stack (katgpt-rs / riir
 | `Ssmax/Asymptotic.lean` | `tendsto_alphaGold_one` | **SSMax asymptotically defeats dilution**: for `s_L · Δ > 0`, `α_gold(N, s_L·log N·Δ) → 1` as `N → ∞` |
 | `Hope/Basic.lean` | (spec only) | `reluSelfKernel γ β = (γ²+β²)·Φ(β/|γ|) + β·|γ|·φ(β/|γ|)` — HOPE Eq 3; `normalCdf` modeled as constant `1/2` (spec simplification, see file doc) |
 | `Hope/SpecTests.lean` | (spec self-tests) | `reluSelfKernel(1,0) = 1/2`; `reluSelfKernel(γ,0) = γ²/2` for γ>0; `reluSelfKernel(γ,β) = reluSelfKernel(-γ,β)` (γ-sign symmetry) |
+| `Pencil/Sym.lean` | `sym_isometry_norm_sq` | `‖sym(v)‖_F² = ‖v‖₂²` for the mirrored-√2 packing — the storage layout of `SymPacked` (Issue 678 T1; Research 495 / arXiv:2608.08003) |
+| `Pencil/RayleighCF.lean` | `cf_ge` / `cf_dual` | Courant–Fischer min–max sandwiches, built from Mathlib's spectral theorem (Mathlib ships neither CF nor Weyl — the load-bearing machinery for T2–T4) |
+| `Pencil/Weyl.lean` | `weyl_lipschitz` | `|λᵢ(A) − λᵢ(B)| ≤ ‖A−B‖₂` — eigenvalues are 1-Lipschitz in the spectral norm (T2; the paper's Cor. 1 global feature-influence bound rides on it) |
+| `Pencil/Loewner.lean` | `loewner_mono` / `mirror_dual` | `B−A ⪰ 0 ⇒ λᵢ(A) ≤ λᵢ(B)` (T3; the shape DSL's soundness core) + `λⱼ(−A) = −λᵢ(A)` at `j = D−1−i` |
+| `Pencil/Eigengap.lean` | `eigengap_ge_half` | a unit eigengap survives `+ E + s·I` with `‖E‖ ≤ ¼` keeping `≥ ½` (T4 analytic core; paper Lemma 2's shift + Weyl argument) |
+| `Pencil/Eigengap.lean` | `eigval_diagonal_antitone` | the antitone-sorted eigenvalue array of a decreasing diagonal is the diagonal itself — the concrete-eigenvalue-pinning substrate (singles are exact eigenvectors; CF on coordinate spans) |
+| `Pencil/Eigengap.lean` | `ladder_unit_gap` | the ladder `diag(1,…,0@k,…,−1)` has `λk − λk₊₁ = 1` exactly — Lemma 2's input gap pinned |
+| `Pencil/Eigengap.lean` | `eigengap_ladder_ge_half` | **T4 final assembly**: the seeded pencil `ladder + E + s·1` keeps `≥ ½` of the unit gap under any Hermitian `‖E‖ ≤ ¼` — the paper's Lemma 2 complete |
 
 The headline theorem is `action_bridge_ranking_preserved`: it proves that `ActionBridge::select_action`'s sigmoid projection preserves dot-product ordering. This is the ∀-form of the empirical `g1_3_bridge_ranking_preservation` test in `crates/katgpt-core/src/micro_belief/tests.rs` (Plan 281 G1.3), which samples only 1000 random triples. The Lean theorem holds for **every** triple.
 
@@ -86,6 +94,13 @@ No `sorry`. No `sorryAx`. Verified by `#print axioms`. These are the same axioms
         ├── DilutionBound.lean            # Theorems: alphaGold strictMono in c + ssmax_dominates_base (Plan 411 S3)
         ├── Asymptotic.lean               # Theorem: alphaGold → 1 as N → ∞ (Plan 411 S3 asymptotic follow-up)
         └── SpecTests.lean                # Spec self-tests on concrete dilution-curve instances (Plan 441)
+    └── Pencil/                            # Spectral pencil (Issue 678 / Research 495, arXiv:2608.08003)
+        ├── Sym.lean                       # T1: the sym-√2 packing isometry
+        ├── RayleighCF.lean                # Courant–Fischer core (built from Mathlib's spectral theorem)
+        ├── Weyl.lean                      # T2: Weyl 1-Lipschitz
+        ├── Loewner.lean                   # T3: Loewner monotonicity + mirror duality
+        ├── Eigengap.lean                  # T4: shift lemma + antitone-diagonal pinning + ladder unit gap + the final assembly
+        └── SpecTests.lean                 # Spec self-tests: T1 packing, T2 Weyl tightness, T3 Loewner, T4 exact perturbed gap
 ```
 
 ## The f32 caveat (and why it doesn't break the theorem)
@@ -130,6 +145,28 @@ If `katgpt-rs/crates/katgpt-core/src/bridge/mod.rs::select_action` or `simd/acti
 - **G1** (Lean builds): ✅ `lake build` succeeds — `Ssmax/Basic.lean` + `Ssmax/DilutionBound.lean` + `Ssmax/Asymptotic.lean`.
 - **G2** (theorem type-checks): ✅ `alphaGold_strictMono_in_c` + `alphaGold_lt_of_c_lt` + `ssmax_dominates_base` + `alphaGold_bounded` + `tendsto_leakage_zero` + `tendsto_alphaGold_one` all compile, no `sorry`, axioms = `{propext, Classical.choice, Quot.sound}`.
 - **G3** (Rust spec matches Lean): ✅ `cargo test --features ssmax_temperature --test ssmax_spec_match` — 8/8 tests pass (now runs by default since `ssmax_temperature` is Phase 13 DEFAULT-ON).
+
+**Issue 678 (Pencil spectral package): COMPLETE 2026-08-22.** All four
+theorems + the concrete-instance spec tests landed:
+
+- **G1** (Lean builds): ✅ 6-module Pencil instance; 38 audited theorems
+  (17 pre-Pencil → 35 core → 38 with the ladder closeout), all within
+  `{propext, Classical.choice, Quot.sound}`, zero `sorry`.
+- **G2** (negative tests): ✅ 6/6 simulated spec typos caught
+  (`scripts/proof_negative_test.sh`) — including the ladder closeout's
+  P5 (wrong expected gap) + P6 (negated diagonal pin).
+- **G3** (Rust spec matches Lean): ✅ `cargo test -p katgpt-core --features
+  spectral_pencil --test pencil_spec_match` — 7/7 (T1 ×3, T2 Weyl,
+  T4 shift, T4 ladder-exact, T4 seeded-jitter).
+
+**The headline of the closeout:** Mathlib ships the spectral theorem but
+neither Courant–Fischer nor Weyl — both were built from scratch (the CF
+sandwiches on the subspace dimension argument), and the ladder-value
+pinning rides a general substrate: `eigval_diagonal_antitone` (a
+decreasing diagonal IS its own antitone eigenvalue array, via CF on
+coordinate spans — the standard singles are the exact eigenvectors of a
+diagonal). The Rust sort-order correspondence (ascending Jacobi vs
+antitone Lean) is pinned in the spec-match header.
 
 **The formal-verification value-add:** the Lean proof *sharpened the plan's
 threshold*. Plan 411 S3 sketched "`s_L = 1, N ≥ 2 ⇒ SSMax ≥ base`", but the

@@ -53,7 +53,10 @@ ALLOWED_AXIOMS=("propext" "Classical.choice" "Quot.sound")
 #        + Weyl T2 (3) + Loewner/mirror T3 (2) + eigengap T4 core (4);
 #        the auxiliary lemmas (mirror-pairing, combo expansion, SDA,
 #        shift, PSD-ray, diagonal-ray) are covered by the audited heads.
-EXPECTED_THEOREMS=35
+#   38 → Pencil ladder closeout (Issue 678): diagonal eigenvalue pinning
+#        (eigval_diagonal_antitone, the singles/CF substrate), the ladder
+#        unit gap, and the T4 final assembly (eigengap_ladder_ge_half).
+EXPECTED_THEOREMS=38
 
 # Bare `axiom` declarations that are allowed to exist, by name. Empty here:
 # KatgptProof declares none, and a new one must be justified in review rather

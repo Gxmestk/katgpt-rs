@@ -18,6 +18,18 @@
 //!   gap-invariant: `A + c·I` has the same eigengaps as `A` (the shift
 //!   lemma `eigval_add_smul_one` on real data).
 //!
+//! * **T4 (Eigengap.lean, ladder closeout)** — the ladder's unit gap is
+//!   EXACT (both sides of the zero: −1→0 and 0→+1), and the seeded
+//!   pencil `A(x) = A₀ + ΣxᵢAᵢ` at ‖x‖∞ ≤ BOX_R keeps the Lean-proven
+//!   slot (`eigengap_ladder_ge_half`: the gap toward the −1 rung) at
+//!   ≥ ½ — Lemma 2 measured on the production constructor.
+//!
+//! Sort-order note: Rust `jacobi_eigen` sorts ASCENDING (`values[0]` =
+//! smallest); the Lean `eigval` array is ANTITONE (decreasing). The
+//! correspondence is `lean eigval i = rust values[D−1−i]`, so the Lean
+//! gap `eigval k₀ − eigval (k₀+1)` (zero minus the −1 below it) reads as
+//! the ASCENDING gap `values[k] − values[k−1]` at the zero's position k.
+//!
 //! If these fail, the Lean spec and the Rust substrate have drifted;
 //! reconcile before merging.
 //!
@@ -31,6 +43,7 @@
 #![cfg(feature = "spectral_pencil")]
 
 use katgpt_core::spectral_pencil::dense::{DenseScratch, jacobi_eigen};
+use katgpt_core::spectral_pencil::init::{seeded_dense, BOX_R};
 use katgpt_core::spectral_pencil::sym::SymPacked;
 
 struct Lcg(u64);
@@ -53,7 +66,7 @@ fn t1_frobenius_norm_matches_full_matrix() {
     let mut rng = Lcg(20260822);
     for _ in 0..128 {
         #[allow(clippy::needless_range_loop)]
-        let mut full = {
+        let full = {
             let mut full = [[0.0_f32; D]; D];
             for i in 0..D {
                 for j in i..D {
@@ -197,6 +210,7 @@ fn t2_weyl_lipschitz_sampled() {
 /// `eigval_add_smul_one` (gap invariance under a scalar shift) on real
 /// Jacobi spectra.
 #[test]
+#[allow(clippy::needless_range_loop)]
 fn t4_shift_preserves_eigengaps() {
     const D: usize = 5;
     let mut rng = Lcg(4711);
@@ -235,5 +249,74 @@ fn t4_shift_preserves_eigengaps() {
                 "trial {trial} gap {k}: {g1} vs {g0}"
             );
         }
+    }
+}
+
+/// T4 (ladder closeout): the pure diagonal ladder's eigengaps are EXACTLY
+/// 1 on both sides of the zero — the input gap of Lemma 2
+/// (`ladder_unit_gap` in Lean). Ascending convention: the Lean-proven
+/// slot (zero minus the −1 below it, `eigval k₀ − eigval (k₀+1)` with
+/// k₀ = D−1−k) reads `values[k] − values[k−1]`.
+#[test]
+#[allow(clippy::needless_range_loop)]
+fn t4_ladder_unit_gap_exact() {
+    const D: usize = 6;
+    let mut s = DenseScratch::<D>::new();
+    for k in 1..D - 1 {
+        // the Rust-orientation ladder: −1 at i<k, 0@k, +1 at i>k
+        let mut ladder = [[0.0_f32; D]; D];
+        for i in 0..D {
+            ladder[i][i] = if i < k { -1.0 } else if i == k { 0.0 } else { 1.0 };
+        }
+        jacobi_eigen(&ladder, false, &mut s);
+        // ascending: −1×k, 0@k, +1×(D−1−k)
+        let gap_below = s.values[k] - s.values[k - 1];
+        let gap_above = s.values[k + 1] - s.values[k];
+        assert!(
+            (gap_below - 1.0).abs() < 1e-5,
+            "k={k} gap toward −1 rung: {gap_below} want 1"
+        );
+        assert!(
+            (gap_above - 1.0).abs() < 1e-5,
+            "k={k} gap toward +1 rung: {gap_above} want 1"
+        );
+        // the zero itself sits exactly at ascending index k
+        assert!((s.values[k] - 0.0).abs() < 1e-5, "k={k} zero moved: {}", s.values[k]);
+    }
+}
+
+/// T4 (ladder closeout, Lemma 2 measured): the seeded dense pencil
+/// `A(x) = A₀ + ΣxᵢAᵢ` (conjugated ladder + `αᵢI + diag(εᵢ)` features)
+/// keeps the Lean-proven slot at ≥ ½ for every sampled input with
+/// `‖x‖∞ ≤ BOX_R` — `eigengap_ladder_ge_half` on the production
+/// constructor (scalar shift = Σxᵢαᵢ, jitter ‖E‖ ≤ R·n·(1/20n) = ¼).
+#[test]
+#[allow(clippy::needless_range_loop)]
+fn t4_seeded_pencil_gap_survives_jitter() {
+    const D: usize = 8;
+    const N: usize = 4;
+    const K: usize = 1; // zero at ascending index 1 (one −1 rung below)
+    let init = seeded_dense::<D, N>(b"pencil-spec-match/ladder-gap", K);
+    let a0 = init.a0.to_full();
+    let mut rng = Lcg(678_678);
+    let mut s = DenseScratch::<D>::new();
+    for trial in 0..64 {
+        let mut ax = a0;
+        for ai in &init.a {
+            let x = rng.next_f32() * BOX_R; // |x| ≤ R
+            let full = ai.to_full();
+            for i in 0..D {
+                for j in 0..D {
+                    ax[i][j] += x * full[i][j];
+                }
+            }
+        }
+        jacobi_eigen(&ax, false, &mut s);
+        // the Lean-proven slot: ascending gap toward the −1 rung
+        let gap = s.values[K] - s.values[K - 1];
+        assert!(
+            gap >= 0.5 - 1e-3,
+            "trial {trial}: jittered gap {gap:.4} < ½ — Lemma 2 violated"
+        );
     }
 }

@@ -94,8 +94,12 @@ open KatgptProof.Pencil
 #print axioms loewner_mono
 #print axioms mirror_dual
 
--- Pencil eigengap (Issue 678 T4): shift lemma + the analytic core.
+-- Pencil eigengap (Issue 678 T4): shift lemma + the analytic core + the
+-- ladder pinning + the final assembly.
 #print axioms eigval_add_smul_one
 #print axioms ray_diagonal
 #print axioms opNorm_diagonal_le
 #print axioms eigengap_ge_half
+#print axioms eigval_diagonal_antitone
+#print axioms ladder_unit_gap
+#print axioms eigengap_ladder_ge_half
