@@ -594,6 +594,53 @@ pub fn crowd_conviction(states: &[f32]) -> f32 {
     }
 }
 
+/// Verdict margin `m = |Σ w_i·v_i| / Σ w_i` with `v_i = sign(s_i)` — the
+/// **one-snapshot crowd-manipulability forecast** (Research 499 /
+/// arXiv:2608.12645 §6.2: baseline jury majority strength is the single
+/// best predictor of which verdicts flip under pressure, |ρ| = 0.59).
+///
+/// This is the *forecast* companion to the two shipped *measurement*
+/// order parameters: [`crowd_conviction`] (instantaneous, direction-blind)
+/// and [`SusceptibilityAccumulator`] (needs a time series before it can say
+/// anything). The margin needs ONE vote reading — `O(n)`, zero alloc — and
+/// answers a different question: not "how committed is this crowd now" but
+/// "how far could a persuader move it". The conviction-gated attack that
+/// consumes this reading (`pressure ∝ 1 − m`) was PoC-validated on this
+/// substrate (riir-ai Issue 745: gated ρ(margin, flips) = **−0.65** vs the
+/// paper's −0.59; gated pressure leaves margin > 0.8 crowds unmoved at
+/// 0.016 flip-fraction while uniform pressure converts them at 0.804).
+///
+/// `weights` are per-entity reliability scores — [`crate::set_attention::
+/// clr_reliability_scores`] is the intended producer (a reliable scout's
+/// vote counts more), but any non-negative slice works; pass all-ones for
+/// the unweighted majority reading. Degenerate inputs return `0.0` (empty
+/// crowd, zero weight total), matching the module's reducer convention.
+///
+/// # Panics
+///
+/// If `weights` and `states` disagree in length (two-slice contract — the
+/// single-slice reducers above have nothing to mismatch).
+///
+/// [`crate::set_attention::clr_reliability_scores`]: crate::set_attention::clr_reliability_scores
+#[must_use]
+pub fn verdict_margin(weights: &[f32], states: &[f32]) -> f32 {
+    assert_eq!(
+        weights.len(),
+        states.len(),
+        "verdict_margin: weights and states must be the same length"
+    );
+    let sum_w: f32 = weights.iter().sum();
+    if sum_w <= 0.0 {
+        return 0.0;
+    }
+    let signed: f32 = weights
+        .iter()
+        .zip(states)
+        .map(|(w, s)| w * s.signum())
+        .sum();
+    (signed / sum_w).abs()
+}
+
 /// Running `Var_t(|n|)` over ticks → susceptibility `χ = N · Var_t(|n|)`.
 ///
 /// Welford in `f64`, so a long rollout does not lose the variance to
@@ -938,5 +985,58 @@ mod tests {
         sample_states_into(&probs, &uniforms, &mut states);
         // 0.5 < 0.9 → +1; 0.5 !< 0.1 → −1; ties resolve to −1 (strict <).
         assert_eq!(states, [1.0, -1.0, -1.0]);
+    }
+
+    // ── verdict_margin (the one-snapshot manipulability forecast) ──
+
+    #[test]
+    fn verdict_margin_uniform_weights_matches_abs_net_opinion() {
+        // 6 for, 2 against on ±1 states → |mean(s)| = 0.5.
+        let states = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0];
+        let weights = [1.0; 8];
+        assert!((verdict_margin(&weights, &states) - net_opinion(&states).abs()).abs() < 1e-6);
+        assert!((verdict_margin(&weights, &states) - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn verdict_margin_uses_stance_sign_not_magnitude() {
+        // Graded stances: only the sign votes.
+        let states = [0.9, 0.05, -0.8, -0.3];
+        let weights = [1.0; 4];
+        assert!((verdict_margin(&weights, &states) - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn verdict_margin_weighted_asymmetry_dominates() {
+        // 7 agents at −1 with weight 1 + 1 reliable scout at +1 with weight 9
+        // → the scout's vote dominates: margin = |(9 − 7)/16| = 0.125.
+        let states = [-1.0; 7];
+        let weights = [1.0; 7];
+        let states = {
+            let mut s = states.to_vec();
+            s.push(1.0);
+            s
+        };
+        let weights = {
+            let mut w = weights.to_vec();
+            w.push(9.0);
+            w
+        };
+        assert!((verdict_margin(&weights, &states) - 0.125).abs() < 1e-6);
+    }
+
+    #[test]
+    fn verdict_margin_degenerate_inputs_return_zero() {
+        // Empty crowd + zero weight total both read 0.0 (the reducer
+        // convention) — not a division error.
+        assert_eq!(verdict_margin(&[], &[]), 0.0);
+        let states = [1.0, -1.0];
+        assert_eq!(verdict_margin(&[0.0, 0.0], &states), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "same length")]
+    fn verdict_margin_length_mismatch_panics() {
+        let _ = verdict_margin(&[1.0, 1.0], &[1.0]);
     }
 }
