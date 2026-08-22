@@ -168,18 +168,9 @@ fn main() {
     const SAMPLES_PER_LT: f64 = LYAPUNOV_TIME_UNITS / DT;
 
     println!("KARC double-scroll GOAT gate G1 (Plan 308, arXiv:2606.19984)");
-    println!(
-        "  params: R1={}, R2={}, R4={}, β={}, I_r={}",
-        R1, R2, R4, BETA, I_R
-    );
-    println!(
-        "  dt={}, N_train={}, K={}, M={}, D={}",
-        DT, N_TRAIN, K, M, D
-    );
-    println!(
-        "  Lyapunov time ≈ {} units ≈ {} samples",
-        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
-    );
+    println!("  params: R1={R1}, R2={R2}, R4={R4}, β={BETA}, I_r={I_R}");
+    println!("  dt={DT}, N_train={N_TRAIN}, K={K}, M={M}, D={D}");
+    println!("  Lyapunov time ≈ {LYAPUNOV_TIME_UNITS} units ≈ {SAMPLES_PER_LT} samples");
 
     // 1. Generate trajectory. 10 RK4 sub-steps per sample for stiff-system
     //    stability (β=11.6 makes sinh(β·ΔV) explosive if the integrator overshoots).
@@ -292,7 +283,7 @@ fn main() {
         // Forecast one step from cur_delay (normalized).
         let mut out_norm = [0.0f32; D];
         let ok = forecaster.forecast_into(&cur_delay, &mut out_norm);
-        debug_assert!(ok, "forecast_into failed at step {}", step);
+        debug_assert!(ok, "forecast_into failed at step {step}");
         // Denormalize for comparison.
         let out_raw = [
             out_norm[0] / scale[0] + offset[0],
@@ -380,16 +371,10 @@ fn main() {
         }
         sum / D as f32
     };
-    println!("  one-step NRMSE (train fit): {:.6e}", one_step_nrmse);
-    println!(
-        "  NRMSE over 1 LT ({} samples): {:.6e}",
-        n_one_lt, nrmse_one_lt
-    );
-    println!(
-        "  threshold (ε=0.1): {} samples = {:.2} LT",
-        thr_sample, thr_lt
-    );
-    println!("  σ(u) mean per-coord: {:.4}", sigma);
+    println!("  one-step NRMSE (train fit): {one_step_nrmse:.6e}");
+    println!("  NRMSE over 1 LT ({n_one_lt} samples): {nrmse_one_lt:.6e}");
+    println!("  threshold (ε=0.1): {thr_sample} samples = {thr_lt:.2} LT");
+    println!("  σ(u) mean per-coord: {sigma:.4}");
     println!();
     println!(
         "  G1 NRMSE   ≤ 1.0e-3 : {}",

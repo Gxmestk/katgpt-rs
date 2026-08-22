@@ -156,29 +156,53 @@ impl CHT {
 
         self.lines.insert(pos, nl);
 
-        // ── Remove dominated interior lines ──────────────────────
+        // ── Remove dominated interior lines + set breakpoints ────
         // An interior line i is dominated when its segment is empty:
         //   intersection(i−1, i) ≥ intersection(i, i+1).
         // First and last lines are never dominated (they extend to ±∞).
-        let mut i = 1;
-        while i + 1 < self.lines.len() {
-            let p_left = Self::line_intersect(&self.lines[i - 1], &self.lines[i]);
-            let p_right = Self::line_intersect(&self.lines[i], &self.lines[i + 1]);
-            if p_left >= p_right {
-                self.lines.remove(i);
-                // Back up to recheck the previous pair after removal.
-                if i > 1 {
-                    i -= 1;
+        //
+        // The breakpoint assignment `lines[j].p = intersect(j, j+1)` is FUSED
+        // into this scan instead of running as a second full pass. Two exact
+        // equivalences make that safe:
+        //
+        // 1. `p_left` is carried over from the previous iteration's `p_right`
+        //    instead of recomputed. `line_intersect` is a pure function of the
+        //    same two `Line`s, so the carried f64 is bit-identical to a fresh
+        //    call — it just skips a division. After a removal the pair changes,
+        //    so `p_left` is recomputed there.
+        // 2. Loop invariant: on entry to each iteration `p_left ==
+        //    intersect(i-1, i)` AND `lines[i-1].p == p_left`. The non-removal
+        //    branch stores `intersect(i, i+1)` into `lines[i].p` before
+        //    advancing, so on exit (`i + 1 == len`) every `j` in `0..len-1` has
+        //    been written with the intersection of its FINAL neighbour pair:
+        //    a removal at index `i` only re-pairs `i-1`, and the loop backs up
+        //    to rewrite exactly that slot; elements below `i-1` keep both their
+        //    neighbour and their stored `p`. So the values written here are the
+        //    same values the old trailing full-array pass wrote — while saving
+        //    a whole 64-bytes-per-`Line` sweep (plus one division per line) on
+        //    every insert, which is the dominant cost when the hull is large
+        //    (parabolic key encoding puts every point on the hull).
+        if self.lines.len() >= 2 {
+            let mut i = 1;
+            let mut p_left = Self::line_intersect(&self.lines[0], &self.lines[1]);
+            self.lines[0].p = p_left;
+            while i + 1 < self.lines.len() {
+                let p_right = Self::line_intersect(&self.lines[i], &self.lines[i + 1]);
+                if p_left >= p_right {
+                    self.lines.remove(i);
+                    // Back up to recheck the previous pair after removal.
+                    if i > 1 {
+                        i -= 1;
+                    }
+                    // The pair (i-1, i) changed: restore the invariant.
+                    p_left = Self::line_intersect(&self.lines[i - 1], &self.lines[i]);
+                    self.lines[i - 1].p = p_left;
+                } else {
+                    self.lines[i].p = p_right;
+                    p_left = p_right;
+                    i += 1;
                 }
-            } else {
-                i += 1;
             }
-        }
-
-        // ── Recompute all breakpoints ────────────────────────────
-        // Ensures monotonically increasing breakpoints for binary search.
-        for j in 0..self.lines.len().saturating_sub(1) {
-            self.lines[j].p = Self::line_intersect(&self.lines[j], &self.lines[j + 1]);
         }
         if let Some(last) = self.lines.last_mut() {
             last.p = Self::INF;

@@ -784,7 +784,7 @@ mod tests {
         // p=0.5, two equal weights: total_w=2, target=1.0. After 1st residual
         // (w=1) acc=1=target → orientation tie-break → average(0,10)=5.
         let q = cal.weighted_quantile(0, 0, 0.5);
-        assert!((q - 5.0).abs() < 1e-6, "orientation tie-break q={}", q);
+        assert!((q - 5.0).abs() < 1e-6, "orientation tie-break q={q}");
     }
 
     #[test]

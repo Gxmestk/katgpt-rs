@@ -644,8 +644,7 @@ mod tests {
         let maxvio_before = compute_balance_violation(&s, m, n, k, &beta_zero);
         assert!(
             maxvio_before > 0.5,
-            "baseline MaxVio should be high on skewed input, got {}",
-            maxvio_before
+            "baseline MaxVio should be high on skewed input, got {maxvio_before}"
         );
 
         let r = quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
@@ -656,9 +655,7 @@ mod tests {
         // achievable on integer-count-constrained small batches.
         assert!(
             maxvio_after <= 0.5 * maxvio_before,
-            "MaxVio after QB ({}) should be ≤ 0.5 × MaxVio before ({})",
-            maxvio_after,
-            maxvio_before
+            "MaxVio after QB ({maxvio_after}) should be ≤ 0.5 × MaxVio before ({maxvio_before})"
         );
     }
 
@@ -682,8 +679,7 @@ mod tests {
         // Input should be perfectly balanced.
         assert!(
             maxvio_before < 1e-6,
-            "test setup: input should be balanced, MaxVio = {}",
-            maxvio_before
+            "test setup: input should be balanced, MaxVio = {maxvio_before}"
         );
 
         let r = quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
@@ -826,11 +822,7 @@ mod tests {
         // On all-equal input, the LP optimum is β = 0 (any other bias would
         // *create* imbalance where there is none).
         for &b in &r.beta {
-            assert!(
-                b.abs() < 1e-6,
-                "β should be ~0 on all-equal input, got {}",
-                b
-            );
+            assert!(b.abs() < 1e-6, "β should be ~0 on all-equal input, got {b}");
         }
     }
 
@@ -846,7 +838,7 @@ mod tests {
 
         let r = quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
         for &b in &r.beta {
-            assert!(b.abs() < 1e-6, "β should be zero when k == n, got {}", b);
+            assert!(b.abs() < 1e-6, "β should be zero when k == n, got {b}");
         }
         assert_eq!(
             r.converged_iter, 0,
@@ -901,22 +893,13 @@ mod tests {
         let median = quantile_in_place(&mut data.clone(), 0.5);
         assert!(
             (median - 3.5).abs() < 1e-6,
-            "median should be 3.5, got {}",
-            median
+            "median should be 3.5, got {median}"
         );
         // q=0.0 → min = 1.0.
         let min = quantile_in_place(&mut data.clone(), 0.0);
-        assert!(
-            (min - 1.0).abs() < 1e-6,
-            "q=0 should be min=1.0, got {}",
-            min
-        );
+        assert!((min - 1.0).abs() < 1e-6, "q=0 should be min=1.0, got {min}");
         // q=1.0 → max = 9.0.
         let max = quantile_in_place(&mut data.clone(), 1.0);
-        assert!(
-            (max - 9.0).abs() < 1e-6,
-            "q=1 should be max=9.0, got {}",
-            max
-        );
+        assert!((max - 9.0).abs() < 1e-6, "q=1 should be max=9.0, got {max}");
     }
 }

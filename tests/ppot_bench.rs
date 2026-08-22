@@ -26,10 +26,7 @@ fn ppot_profile_components() {
     let warmup = 100;
     let iters = 10000;
 
-    println!(
-        "\n🧪 PPoT Component Profile ({} iters, {} warmup)",
-        iters, warmup
-    );
+    println!("\n🧪 PPoT Component Profile ({iters} iters, {warmup} warmup)");
     println!("{}", "═".repeat(70));
 
     // ── Setup: produce marginals + base path ──────────────────────
@@ -45,8 +42,7 @@ fn ppot_profile_components() {
             m.iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                .map(|(i, _)| i)
-                .unwrap_or(0)
+                .map_or(0, |(i, _)| i)
         })
         .collect();
     let positions_entropy = identify_high_entropy_positions(&marginals, 0.5);
@@ -361,7 +357,7 @@ fn ppot_profile_components() {
 
     // ── 8. Full end-to-end comparison ─────────────────────────────
     println!("{}", "─".repeat(70));
-    println!("  Full rescue comparison ({} iters):", iters);
+    println!("  Full rescue comparison ({iters} iters):");
 
     // Greedy baseline
     let mut rng = Rng::new(99);
@@ -400,8 +396,7 @@ fn ppot_profile_components() {
                 m.iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
+                    .map_or(0, |(i, _)| i)
             })
             .collect();
         ppot_rescue(
@@ -427,8 +422,7 @@ fn ppot_profile_components() {
                 m.iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
+                    .map_or(0, |(i, _)| i)
             })
             .collect();
         if ppot_rescue(
@@ -468,8 +462,7 @@ fn ppot_profile_components() {
                 m.iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
+                    .map_or(0, |(i, _)| i)
             })
             .collect();
         ppot_rescue_adaptive(
@@ -497,8 +490,7 @@ fn ppot_profile_components() {
                 m.iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
+                    .map_or(0, |(i, _)| i)
             })
             .collect();
         if ppot_rescue_adaptive(

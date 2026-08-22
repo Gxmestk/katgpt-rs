@@ -85,6 +85,7 @@ const CELL_DESTRUCTIBLE: u8 = 2;
 const CELL_POWERUP: u8 = 3;
 
 /// Convert a [`Cell`] to its token value for the WASM ABI.
+#[inline]
 fn cell_to_token(cell: &Cell) -> u8 {
     match cell {
         Cell::Floor => CELL_FLOOR,
@@ -95,6 +96,7 @@ fn cell_to_token(cell: &Cell) -> u8 {
 }
 
 /// Clamp an `i32` coordinate to `u8` range [0, 255].
+#[inline]
 fn clamp_to_u8(val: i32) -> u8 {
     val.clamp(0, u8::MAX as i32) as u8
 }
@@ -189,6 +191,52 @@ fn write_token(buf: &mut [u8], offset: usize, value: u8) {
     buf[offset..offset + BYTES_PER_TOKEN].copy_from_slice(&token.to_le_bytes());
 }
 
+/// Number of bytes the 13×13 grid occupies in the token buffer.
+const GRID_BYTES: usize = GRID_TOKENS * BYTES_PER_TOKEN;
+
+/// Bytes per grid row in the token buffer.
+const ROW_BYTES: usize = ARENA_W * BYTES_PER_TOKEN;
+
+/// Write the 13×13 grid as u32 LE tokens into `buf[0..GRID_BYTES]`.
+///
+/// Slices the source row and destination row up front so the per-cell
+/// bounds checks hoist out of the inner loop (the previous
+/// `write_token(buf, off, cell_to_token(&grid.cells[y][x]))` form did two
+/// bounds checks per cell on the source plus one range check on the dest,
+/// 169 times per call). Panic semantics are unchanged: a grid with fewer
+/// than `ARENA_H` rows or a row shorter than `ARENA_W` still panics.
+#[inline]
+fn write_grid(buf: &mut [u8; ZEROCOPY_BUF_SIZE], grid: &ArenaGrid) {
+    let grid_dst = &mut buf[..GRID_BYTES];
+    for (y, dst_row) in grid_dst.chunks_exact_mut(ROW_BYTES).enumerate() {
+        let src_row = &grid.cells[y][..ARENA_W];
+        for (cell, slot) in src_row.iter().zip(dst_row.chunks_exact_mut(BYTES_PER_TOKEN)) {
+            slot.copy_from_slice(&u32::from(cell_to_token(cell)).to_le_bytes());
+        }
+    }
+}
+
+/// Write `bomb_count` bombs as 4 u32 LE tokens each, starting at `off`.
+///
+/// Returns the new offset. Slices the destination once so the four
+/// `write_token` range checks per bomb collapse to one.
+#[inline]
+fn write_bombs(
+    buf: &mut [u8; ZEROCOPY_BUF_SIZE],
+    mut off: usize,
+    bombs: &[((i32, i32), u32, u32)],
+) -> usize {
+    for &((bx, by), blast_range, fuse) in bombs {
+        let slot = &mut buf[off..off + TOKENS_PER_BOMB * BYTES_PER_TOKEN];
+        slot[0..4].copy_from_slice(&u32::from(clamp_to_u8(bx)).to_le_bytes());
+        slot[4..8].copy_from_slice(&u32::from(clamp_to_u8(by)).to_le_bytes());
+        slot[8..12].copy_from_slice(&u32::from(blast_range as u8).to_le_bytes());
+        slot[12..16].copy_from_slice(&u32::from(fuse as u8).to_le_bytes());
+        off += TOKENS_PER_BOMB * BYTES_PER_TOKEN;
+    }
+    off
+}
+
 /// Zero-copy serialization of game state into a fixed-size stack buffer.
 ///
 /// Avoids heap allocation by writing u32 LE tokens directly into a
@@ -216,38 +264,24 @@ pub fn serialize_into_buffer(
     let bomb_count = bombs.len().min(MAX_BOMBS);
     let token_count = (HEADER_TOKENS + bomb_count * TOKENS_PER_BOMB) as u32;
     let total_bytes = token_count as usize * BYTES_PER_TOKEN;
-    let mut off = 0usize;
 
     // Grid: 13×13 cells, each as one u32 token (row-major)
-    for y in 0..ARENA_H {
-        for x in 0..ARENA_W {
-            write_token(buf, off, cell_to_token(&grid.cells[y][x]));
-            off += BYTES_PER_TOKEN;
-        }
-    }
+    write_grid(buf, grid);
 
-    // Player position + ID + bomb count
-    write_token(buf, off, clamp_to_u8(player_x));
-    off += BYTES_PER_TOKEN;
-    write_token(buf, off, clamp_to_u8(player_y));
-    off += BYTES_PER_TOKEN;
-    write_token(buf, off, player_id);
-    off += BYTES_PER_TOKEN;
-    write_token(buf, off, bomb_count as u8);
-    off += BYTES_PER_TOKEN;
+    // Player position + ID + bomb count — one slice, four stores.
+    let hdr = &mut buf[GRID_BYTES..GRID_BYTES + 4 * BYTES_PER_TOKEN];
+    hdr[0..4].copy_from_slice(&u32::from(clamp_to_u8(player_x)).to_le_bytes());
+    hdr[4..8].copy_from_slice(&u32::from(clamp_to_u8(player_y)).to_le_bytes());
+    hdr[8..12].copy_from_slice(&u32::from(player_id).to_le_bytes());
+    hdr[12..16].copy_from_slice(&u32::from(bomb_count as u8).to_le_bytes());
 
     // Bombs: each bomb is 4 tokens (x, y, range, fuse).
     // Matches the WASM validator's `get_bomb` stride (Issue 016).
-    for &((bx, by), blast_range, fuse) in &bombs[..bomb_count] {
-        write_token(buf, off, clamp_to_u8(bx));
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, clamp_to_u8(by));
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, blast_range as u8);
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, fuse as u8);
-        off += BYTES_PER_TOKEN;
-    }
+    let off = write_bombs(
+        buf,
+        GRID_BYTES + 4 * BYTES_PER_TOKEN,
+        &bombs[..bomb_count],
+    );
 
     debug_assert_eq!(off, total_bytes);
     (total_bytes, token_count)
@@ -274,32 +308,16 @@ pub fn serialize_grid_only(
     let batch_header = BATCH_OFF_BOMBS; // 170 tokens (169 grid + 1 bomb_count)
     let token_count = (batch_header + bomb_count * TOKENS_PER_BOMB) as u32;
     let total_bytes = token_count as usize * BYTES_PER_TOKEN;
-    let mut off = 0usize;
 
     // Grid: 13×13 cells
-    for y in 0..ARENA_H {
-        for x in 0..ARENA_W {
-            write_token(buf, off, cell_to_token(&grid.cells[y][x]));
-            off += BYTES_PER_TOKEN;
-        }
-    }
+    write_grid(buf, grid);
 
     // Bomb count (at token 169)
-    write_token(buf, off, bomb_count as u8);
-    off += BYTES_PER_TOKEN;
+    write_token(buf, GRID_BYTES, bomb_count as u8);
 
     // Bombs (at tokens 170+): each bomb is 4 tokens (x, y, range, fuse).
     // Matches the WASM validator's `get_bomb` stride (Issue 016).
-    for &((bx, by), blast_range, fuse) in &bombs[..bomb_count] {
-        write_token(buf, off, clamp_to_u8(bx));
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, clamp_to_u8(by));
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, blast_range as u8);
-        off += BYTES_PER_TOKEN;
-        write_token(buf, off, fuse as u8);
-        off += BYTES_PER_TOKEN;
-    }
+    let off = write_bombs(buf, GRID_BYTES + BYTES_PER_TOKEN, &bombs[..bomb_count]);
 
     debug_assert_eq!(off, total_bytes);
     (total_bytes, token_count)

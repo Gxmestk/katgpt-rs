@@ -67,8 +67,7 @@ fn main() {
     let ns_per_call = elapsed.as_nanos() as f64 / iters as f64;
 
     println!(
-        "should_inject: {} calls in {:?} → {:.3} ns/call (sink={})",
-        iters, elapsed, ns_per_call, sink
+        "should_inject: {iters} calls in {elapsed:?} → {ns_per_call:.3} ns/call (sink={sink})"
     );
 
     // 3. Verdict.
@@ -78,10 +77,7 @@ fn main() {
     } else {
         "FAIL ❌ (over 10ns budget)"
     };
-    println!(
-        "\nGOAT gate: {:.3} ns/call vs target <{}ns → {}",
-        ns_per_call, target_ns, verdict
-    );
+    println!("\nGOAT gate: {ns_per_call:.3} ns/call vs target <{target_ns}ns → {verdict}");
 
     // 4. p99-style measurement: 100 batches of 100k, report the slowest batch.
     let batch_size = 100_000;
@@ -100,7 +96,6 @@ fn main() {
     }
     let p99_ns = batch_max_ns as f64 / batch_size as f64;
     println!(
-        "p99 (slowest of {} batches × {} calls): {:.3} ns/call (sink={})",
-        n_batches, batch_size, p99_ns, sink
+        "p99 (slowest of {n_batches} batches × {batch_size} calls): {p99_ns:.3} ns/call (sink={sink})"
     );
 }

@@ -429,8 +429,8 @@ impl TvpAggregator {
 fn max_token_share(probes: &[ProbeOutput]) -> f32 {
     let mut best: u32 = 0;
     let n = probes.len() as u32;
-    for i in 0..probes.len() {
-        let ti = probes[i].token_id;
+    for __elem in probes {
+        let ti = __elem.token_id;
         let mut count: u32 = 0;
         for p in probes {
             if p.token_id == ti {
@@ -448,8 +448,8 @@ fn max_token_share(probes: &[ProbeOutput]) -> f32 {
 fn max_format_share(probes: &[ProbeOutput]) -> f32 {
     let mut best: u32 = 0;
     let n = probes.len() as u32;
-    for i in 0..probes.len() {
-        let fi = probes[i].format_hash;
+    for __elem in probes {
+        let fi = __elem.format_hash;
         let mut count: u32 = 0;
         for p in probes {
             if p.format_hash == fi {
@@ -697,8 +697,7 @@ impl TvpProbeCountBandit {
         Self::K_VALUES
             .iter()
             .position(|&kv| kv == k)
-            .map(|i| self.visits[i] as u64)
-            .unwrap_or(0)
+            .map_or(0, |i| self.visits[i] as u64)
     }
 
     /// Select next K via UCB1. Called at the start of each query.

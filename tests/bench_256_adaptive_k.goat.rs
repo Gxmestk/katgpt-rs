@@ -295,10 +295,7 @@ fn bench_adaptive_k_vs_fixed_k() {
     let adaptive_config = AdaptiveKConfig::new(4, K_FIXED);
 
     // Sanity demo: compute_adaptive_k on synthetic score shapes.
-    println!(
-        "\n── compute_adaptive_k reference (k_min=4, k_max={}) ──",
-        K_FIXED
-    );
+    println!("\n── compute_adaptive_k reference (k_min=4, k_max={K_FIXED}) ──");
     let one_peak: Vec<f32> = (0..64).map(|i| if i == 0 { 5.0 } else { 0.1 }).collect();
     println!(
         "  one_peak (high var)  → k = {}",
@@ -323,8 +320,7 @@ fn bench_adaptive_k_vs_fixed_k() {
         "║ Plan 256 Phase 2 — Adaptive-K vs Fixed-K Block Selection (GOAT gate)                             ║"
     );
     println!(
-        "║ K_FIXED={}, AdaptiveKConfig(k_min=4, k_max={}, w=5.0, b=0.0), HEAD_DIM={}                          ║",
-        K_FIXED, K_FIXED, HEAD_DIM
+        "║ K_FIXED={K_FIXED}, AdaptiveKConfig(k_min=4, k_max={K_FIXED}, w=5.0, b=0.0), HEAD_DIM={HEAD_DIM}                          ║"
     );
     println!(
         "╠════════════════════╦═══════════╦════════════════╦════════════════╦═══════════════════╦══════════════════╣"
@@ -425,14 +421,8 @@ fn bench_adaptive_k_vs_fixed_k() {
     };
     println!();
     println!("── Variance gate behaviour (observed) ──");
-    println!(
-        "  Focused  avg k : {:>5.2}  (one peak  → mathematically HIGH variance)",
-        focused_avg_k
-    );
-    println!(
-        "  Scattered avg k: {:>5.2}  (multimodal → lower variance per query)",
-        scattered_avg_k
-    );
+    println!("  Focused  avg k : {focused_avg_k:>5.2}  (one peak  → mathematically HIGH variance)");
+    println!("  Scattered avg k: {scattered_avg_k:>5.2}  (multimodal → lower variance per query)");
     println!(
         "  Δ (focused - scattered) = {:+.2} blocks",
         focused_avg_k - scattered_avg_k
@@ -468,20 +458,14 @@ fn bench_adaptive_k_vs_fixed_k() {
         N_BLOCKS_CONFIGS.len(),
         count
     );
-    println!(
-        "  Avg k used by adaptive : {:.2} (fixed budget = {})",
-        avg_k_adapt, K_FIXED
-    );
+    println!("  Avg k used by adaptive : {avg_k_adapt:.2} (fixed budget = {K_FIXED})");
     println!(
         "  Compute savings        : {:>5.1}%  (criterion: ≥ 25%)",
         (1.0 - savings_ratio) * 100.0
     );
-    println!("  Adaptive recall        : {:.4}", avg_recall_adapt);
-    println!("  Fixed-k recall         : {:.4}", avg_recall_fixed);
-    println!(
-        "  Recall ratio (ad/fixed): {:.4}  (criterion: ≥ 0.90)",
-        recall_ratio
-    );
+    println!("  Adaptive recall        : {avg_recall_adapt:.4}");
+    println!("  Fixed-k recall         : {avg_recall_fixed:.4}");
+    println!("  Recall ratio (ad/fixed): {recall_ratio:.4}  (criterion: ≥ 0.90)");
 
     // O3 (Issue 015) — precision@adaptive_k + weighted recall aggregates.
     // These reframe the recall result: recall_ratio is capped at adapt_k/32 ≈ 0.625
@@ -499,21 +483,15 @@ fn bench_adaptive_k_vs_fixed_k() {
         0.0
     };
     println!();
+    println!("── O3 (Issue 015): precision@adaptive_k + weighted recall ({o3_n} samples) ──");
     println!(
-        "── O3 (Issue 015): precision@adaptive_k + weighted recall ({} samples) ──",
-        o3_n
+        "  precision@adaptive_k : {o3_avg_precision:.4}  (1.0 = adaptive picks exactly dense top-adapt_k)"
     );
     println!(
-        "  precision@adaptive_k : {:.4}  (1.0 = adaptive picks exactly dense top-adapt_k)",
-        o3_avg_precision
+        "  weighted recall      : {o3_avg_weighted:.4}  (1.0 = adaptive captures all dense-top-32 score mass)"
     );
     println!(
-        "  weighted recall      : {:.4}  (1.0 = adaptive captures all dense-top-32 score mass)",
-        o3_avg_weighted
-    );
-    println!(
-        "  (reframes recall ratio {:.3}: adaptive picks fewer but higher-value blocks)",
-        recall_ratio
+        "  (reframes recall ratio {recall_ratio:.3}: adaptive picks fewer but higher-value blocks)"
     );
     eprintln!(
         "    [O3 aggregate] precision@adapt_k={p:.4}  weighted_recall={w:.4}  \
@@ -544,7 +522,7 @@ fn bench_adaptive_k_vs_fixed_k() {
             ));
         }
         if !pass_recall {
-            reasons.push(format!("recall ratio {:.3} < 0.90", recall_ratio));
+            reasons.push(format!("recall ratio {recall_ratio:.3} < 0.90"));
         }
         println!("GOAT: FAIL — {}", reasons.join("; "));
     }

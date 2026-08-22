@@ -129,7 +129,7 @@ pub fn identify_positions_by_rule_into(
     buf: &mut Vec<usize>,
 ) {
     buf.clear();
-    let vocab_size = marginals.first().map(|m| m.len()).unwrap_or(0);
+    let vocab_size = marginals.first().map_or(0, |m| m.len());
     if vocab_size == 0 {
         return;
     }

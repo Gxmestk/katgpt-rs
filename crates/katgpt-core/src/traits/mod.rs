@@ -74,10 +74,7 @@ pub trait ConstraintPruner: Send + Sync {
     /// Returns 1.0 for valid, 0.0 for invalid by default.
     /// Override for soft scoring (ManifoldE point-to-manifold, Plan 234).
     fn manifold_score(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
-        match self.is_valid(depth, token_idx, parent_tokens) {
-            true => 1.0,
-            false => 0.0,
-        }
+        if self.is_valid(depth, token_idx, parent_tokens) { 1.0 } else { 0.0 }
     }
 
     /// Returns the constraint as a half-space (normal vector, threshold) if available.
@@ -106,10 +103,7 @@ pub trait ConstraintPruner: Send + Sync {
     /// - Range `[0.0, 1.0]` — callers clamp defensively but impls should not rely on it.
     #[inline]
     fn reject_confidence(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
-        match self.is_valid(depth, token_idx, parent_tokens) {
-            true => 0.0,
-            false => 1.0,
-        }
+        if self.is_valid(depth, token_idx, parent_tokens) { 0.0 } else { 1.0 }
     }
 
     /// Batch reject-confidence mirroring [`batch_is_valid`](Self::batch_is_valid)
@@ -364,10 +358,7 @@ pub struct BinaryScreeningPruner<P>(pub P);
 impl<P: ConstraintPruner + Send + Sync> ScreeningPruner for BinaryScreeningPruner<P> {
     #[inline]
     fn relevance(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
-        match self.0.is_valid(depth, token_idx, parent_tokens) {
-            true => 1.0,
-            false => 0.0,
-        }
+        if self.0.is_valid(depth, token_idx, parent_tokens) { 1.0 } else { 0.0 }
     }
 }
 
@@ -437,7 +428,41 @@ pub trait GameState: Clone {
     }
 
     /// Apply action, return successor state. Does NOT mutate `self`.
-    fn advance(&self, action: &Self::Action, player_id: u8) -> Self;
+    ///
+    /// Default implementation clones `self` then calls
+    /// [`advance_inplace()`](Self::advance_inplace). Override `advance_inplace`
+    /// (NOT this method) to make the clone-free path available to callers that
+    /// can mutate in place (MCTS rollouts, tree descent).
+    ///
+    /// Callers that need a fresh owned successor (tree-node expansion, test
+    /// assertions) use this. Callers that discard the parent state should call
+    /// [`advance_inplace()`](Self::advance_inplace) instead.
+    ///
+    /// **Implementor contract (recursion trap):** every concrete impl MUST
+    /// override at least one of `advance` / `advance_inplace`. The defaults
+    /// delegate to each other; an impl that overrides NEITHER infinite-recurses
+    /// (`advance` → `advance_inplace` → `advance` → ...). All existing impls
+    /// define `advance`, so they are safe. Mirrors the
+    /// `available_actions` / `available_actions_into` mutual-default pair.
+    fn advance(&self, action: &Self::Action, player_id: u8) -> Self {
+        let mut next = self.clone();
+        next.advance_inplace(action, player_id);
+        next
+    }
+
+    /// Apply action, mutating `self` in place. The clone-free path.
+    ///
+    /// Default implementation delegates to [`advance()`](Self::advance) (which
+    /// clones). Override this to avoid the allocation when `self` owns heap
+    /// data (e.g. `Vec` fields like `FrameSnapshot::nearby_entities` /
+    /// `threats`). Callers that discard the parent state (MCTS rollouts, path
+    /// descent) should call this instead of `advance`.
+    ///
+    /// **Implementor contract (recursion trap):** see `advance` — every impl
+    /// must override at least one of the pair.
+    fn advance_inplace(&mut self, action: &Self::Action, player_id: u8) {
+        *self = self.advance(action, player_id);
+    }
 
     /// Is the game over?
     fn is_terminal(&self) -> bool;
@@ -596,10 +621,7 @@ impl ActionSpaceLog {
     /// Average action space size across all entries.
     /// O(1) via running total_sum tracked during record().
     pub fn avg_action_space(&self) -> f32 {
-        match self.entries.is_empty() {
-            true => 0.0,
-            false => self.total_sum / self.entries.len() as f32,
-        }
+        if self.entries.is_empty() { 0.0 } else { self.total_sum / self.entries.len() as f32 }
     }
 
     /// Average action space size for a specific player.
@@ -634,16 +656,13 @@ impl ActionSpaceLog {
 
 impl fmt::Display for ActionSpaceLog {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.entries.is_empty() {
-            true => write!(f, "ActionSpaceLog(empty)"),
-            false => write!(
+        if self.entries.is_empty() { write!(f, "ActionSpaceLog(empty)") } else { write!(
                 f,
                 "ActionSpaceLog(entries={}, avg={:.1}, peak={})",
                 self.entries.len(),
                 self.avg_action_space(),
                 self.peak_action_space()
-            ),
-        }
+            ) }
     }
 }
 
@@ -790,10 +809,7 @@ pub trait AllGoalsUpdate {
             .zip(next_q_max.iter())
             .zip(next_lambda_return.iter())
             .zip(done.iter())
-            .map(|(((&r, &q_max), &g_next), &d)| match d {
-                true => r,
-                false => r + gamma * (lambda * g_next + (1.0 - lambda) * q_max),
-            })
+            .map(|(((&r, &q_max), &g_next), &d)| if d { r } else { r + gamma * (lambda * g_next + (1.0 - lambda) * q_max) })
             .collect()
     }
 }

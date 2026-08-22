@@ -295,7 +295,7 @@ fn gate_g1c_ninth_direction_must_interfere() -> GateResult {
                     ),
                 );
             }
-            let conflict = res.conflict_branch.map(|b| b.0).unwrap_or(u32::MAX);
+            let conflict = res.conflict_branch.map_or(u32::MAX, |b| b.0);
             GateResult::pass(
                 "G1c",
                 format!(

@@ -484,8 +484,7 @@ fn test_octree_bridge_mixed_groups() {
     for (g, w) in weights.iter().enumerate().take(8).skip(1) {
         assert!(
             (w - 0.0).abs() < f32::EPSILON,
-            "Group {g} should be 0.0, got {}",
-            w
+            "Group {g} should be 0.0, got {w}"
         );
     }
 
@@ -557,8 +556,7 @@ fn test_tamper_rejection() {
             result,
             Err(PatchRejection::CommitmentMismatch { segment_id: 3 })
         ),
-        "Tampered patch should be rejected with CommitmentMismatch, got {:?}",
-        result
+        "Tampered patch should be rejected with CommitmentMismatch, got {result:?}"
     );
 }
 
@@ -572,8 +570,7 @@ fn test_out_of_range_rejection() {
     let result = LatentPatcher::patch(&mut ctx, &patch);
     assert!(
         matches!(result, Err(PatchRejection::OutOfRange { segment_id: 999 })),
-        "Non-existent segment should be rejected with OutOfRange, got {:?}",
-        result
+        "Non-existent segment should be rejected with OutOfRange, got {result:?}"
     );
 
     // Edge: segment 32 (just past the last valid id 31)
@@ -584,8 +581,7 @@ fn test_out_of_range_rejection() {
             result_edge,
             Err(PatchRejection::OutOfRange { segment_id: 32 })
         ),
-        "Segment 32 should be OutOfRange, got {:?}",
-        result_edge
+        "Segment 32 should be OutOfRange, got {result_edge:?}"
     );
 }
 
@@ -610,8 +606,7 @@ fn test_nan_rejection() {
             result,
             Err(PatchRejection::NonFiniteWeights { segment_id: 5 })
         ),
-        "NaN patch should be rejected with NonFiniteWeights, got {:?}",
-        result
+        "NaN patch should be rejected with NonFiniteWeights, got {result:?}"
     );
 
     // Verify the segment was NOT modified
@@ -643,8 +638,7 @@ fn test_inf_rejection() {
             result,
             Err(PatchRejection::NonFiniteWeights { segment_id: 2 })
         ),
-        "Inf patch should be rejected with NonFiniteWeights, got {:?}",
-        result
+        "Inf patch should be rejected with NonFiniteWeights, got {result:?}"
     );
 
     let neg_inf_weights = [f32::NEG_INFINITY, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -657,8 +651,7 @@ fn test_inf_rejection() {
             result2,
             Err(PatchRejection::NonFiniteWeights { segment_id: 2 })
         ),
-        "NegInf patch should be rejected, got {:?}",
-        result2
+        "NegInf patch should be rejected, got {result2:?}"
     );
 }
 
@@ -730,7 +723,7 @@ fn test_batch_mixed_valid_and_invalid() {
         .map(|r| match r {
             PatchRejection::CommitmentMismatch { segment_id } => *segment_id,
             PatchRejection::NonFiniteWeights { segment_id } => *segment_id,
-            other => panic!("Unexpected rejection type: {:?}", other),
+            other => panic!("Unexpected rejection type: {other:?}"),
         })
         .collect();
     assert!(

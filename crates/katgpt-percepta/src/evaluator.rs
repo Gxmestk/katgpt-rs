@@ -31,7 +31,7 @@
 //!
 //! Reference: `.raw/transformer-vm/transformer_vm/evaluator.py` (404 lines)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::graph::types::{DimId, DimensionKind, Expression, LookUp, LookupId, ProgramGraph};
 use crate::types::TieBreak;
@@ -137,7 +137,7 @@ impl GraphEvaluator {
         dim_order.sort_unstable();
 
         // Initialize cumsum accumulators for all CumSum dimensions
-        let mut cumsum_accum = HashMap::new();
+        let mut cumsum_accum = HashMap::with_capacity(dim_order.len());
         for &dim_id in &dim_order {
             if let Some(dim) = graph.all_dims.get(&dim_id)
                 && matches!(dim.kind, DimensionKind::CumSum { .. })
@@ -181,14 +181,33 @@ impl GraphEvaluator {
     ///
     /// Returns the computed dimension values after processing this token.
     pub fn step(&mut self, token_name: &str) -> Result<HashMap<DimId, f64>, EvalError> {
+        // Split `self` into disjoint field borrows up front. This is the whole
+        // reason the two-phase structure can be collapsed into one pass: the
+        // borrow checker previously forced a "Phase 1" that CLONED every
+        // referenced `Expression` (each one an owned `HashMap<DimId, f64>`) plus
+        // every referenced `LookUp` on EVERY step, just so `&self.graph` was not
+        // held while `&mut self` was needed for the attention cache. With field
+        // borrows the graph can be read in place and zero clones are made.
+        let Self {
+            input_tokens,
+            graph,
+            position,
+            cumsum_accum,
+            attention_entries,
+            dim_order,
+            scratch_vals,
+            scratch_attn_total,
+            ..
+        } = self;
+        let graph = &*graph;
+
         // Look up token embedding
-        let embedding = self
-            .input_tokens
+        let embedding = input_tokens
             .get(token_name)
             .ok_or_else(|| EvalError::UnknownToken(token_name.to_string()))?;
 
         // Reuse scratch buffer for dimension values (avoids re-allocating buckets)
-        let vals = &mut self.scratch_vals;
+        let vals = scratch_vals;
         vals.clear();
 
         // Initialize values from embedding terms
@@ -197,128 +216,57 @@ impl GraphEvaluator {
         }
 
         // Ensure `one` dimension is always 1.0 (used for scalar constants)
-        vals.insert(self.graph.one, 1.0);
+        vals.insert(graph.one, 1.0);
 
         // Set position-based dimensions
-        let pos = self.position as f64;
-        vals.insert(self.graph.position, pos);
-        vals.insert(self.graph.position_sq, pos * pos);
+        let pos = *position as f64;
+        vals.insert(graph.position, pos);
+        vals.insert(graph.position_sq, pos * pos);
         vals.insert(
-            self.graph.inv_log_pos,
+            graph.inv_log_pos,
             1.0 / std::f64::consts::LN_2 - 1.0 / (pos + 2.0).ln(),
         );
 
         // Track already-processed lookups to avoid re-computing within one step.
-        // Local (not a scratch field): self is borrowed mutably for attention ops
-        // in the loop below, so the cache cannot alias a self field. Pre-sized
-        // to the lookup count to avoid rehashing.
+        // Pre-sized to the lookup count to avoid rehashing.
         let mut processed_lookups: HashMap<LookupId, Vec<f64>> =
-            HashMap::with_capacity(self.graph.all_lookups.len());
+            HashMap::with_capacity(graph.all_lookups.len());
 
-        // Phase 1: Collect owned work items from the graph (ends immutable borrow).
-        // This avoids holding an immutable borrow of self.graph while we need
-        // mutable access to self for attention operations.
-        enum DimWorkItem {
-            Input,
-            CumSum {
-                dim_id: DimId,
-                value_expr: Expression,
-            },
-            ReGLU {
-                dim_id: DimId,
-                a_expr: Expression,
-                b_expr: Expression,
-            },
-            Persist {
-                dim_id: DimId,
-                expr: Expression,
-            },
-            LookUp {
-                dim_id: DimId,
-                lookup_id: LookupId,
-                value_index: usize,
-            },
-            Generic,
-        }
-
-        let work_items: Vec<DimWorkItem> = self
-            .dim_order
-            .iter()
-            .filter(|&&dim_id| !vals.contains_key(&dim_id))
-            .filter_map(|&dim_id| {
-                let dim = self.graph.all_dims.get(&dim_id)?;
-                Some(match &dim.kind {
-                    DimensionKind::Input => DimWorkItem::Input,
-                    DimensionKind::CumSum { value_expr } => DimWorkItem::CumSum {
-                        dim_id,
-                        value_expr: value_expr.clone(),
-                    },
-                    DimensionKind::ReGLU { a_expr, b_expr } => DimWorkItem::ReGLU {
-                        dim_id,
-                        a_expr: a_expr.clone(),
-                        b_expr: b_expr.clone(),
-                    },
-                    DimensionKind::Persist { expr } => DimWorkItem::Persist {
-                        dim_id,
-                        expr: expr.clone(),
-                    },
-                    DimensionKind::LookUp {
-                        lookup_id,
-                        value_index,
-                    } => DimWorkItem::LookUp {
-                        dim_id,
-                        lookup_id: *lookup_id,
-                        value_index: *value_index,
-                    },
-                    DimensionKind::Generic => DimWorkItem::Generic,
-                })
-            })
-            .collect();
-
-        // Phase 2: Process work items (may mutate self for attention).
-        // Clone ONLY the lookups actually referenced by LookUp work items.
-        // Previously this cloned every lookup in the graph every step(); now it
-        // clones only the subset needed, cutting per-step allocation.
-        let needed_lookup_ids: HashSet<LookupId> = work_items
-            .iter()
-            .filter_map(|item| match item {
-                DimWorkItem::LookUp { lookup_id, .. } => Some(*lookup_id),
-                _ => None,
-            })
-            .collect();
-        let lookup_data: HashMap<LookupId, LookUp> = needed_lookup_ids
-            .iter()
-            .filter_map(|&id| self.graph.all_lookups.get(&id).map(|lu| (id, lu.clone())))
-            .collect();
-
-        for item in work_items {
-            match item {
-                DimWorkItem::Input => {
-                    // Input dims should already be set via embedding
-                }
-                DimWorkItem::CumSum { dim_id, value_expr } => {
+        // Single pass in `dim_order` (ascending DimId) order — identical to the
+        // prior Phase 1 filter + Phase 2 apply. The `contains_key` skip is still
+        // equivalent because every arm below writes ONLY its own `dim_id`, and
+        // `dim_order` is ascending and unique: when dim `d` is tested, the only
+        // keys added since the start of the step belong to dims `< d`, so the
+        // test sees exactly what the Phase-1 snapshot saw.
+        for &dim_id in dim_order.iter() {
+            if vals.contains_key(&dim_id) {
+                continue;
+            }
+            let Some(dim) = graph.all_dims.get(&dim_id) else {
+                continue;
+            };
+            match &dim.kind {
+                // Input dims are already set via the embedding; Generic dims are
+                // set via the embedding or an explicit assignment.
+                DimensionKind::Input | DimensionKind::Generic => {}
+                DimensionKind::CumSum { value_expr } => {
                     let value = value_expr.evaluate(vals);
-                    let accum = self
-                        .cumsum_accum
+                    let accum = cumsum_accum
                         .get_mut(&dim_id)
                         .expect("cumsum_accum initialized for all CumSum dims");
                     *accum += value;
                     vals.insert(dim_id, *accum);
                 }
-                DimWorkItem::ReGLU {
-                    dim_id,
-                    a_expr,
-                    b_expr,
-                } => {
+                DimensionKind::ReGLU { a_expr, b_expr } => {
                     let a = a_expr.evaluate(vals);
                     let b = b_expr.evaluate(vals);
                     vals.insert(dim_id, a * b.max(0.0));
                 }
-                DimWorkItem::Persist { dim_id, expr } => {
-                    vals.insert(dim_id, expr.evaluate(vals));
+                DimensionKind::Persist { expr } => {
+                    let v = expr.evaluate(vals);
+                    vals.insert(dim_id, v);
                 }
-                DimWorkItem::LookUp {
-                    dim_id,
+                DimensionKind::LookUp {
                     lookup_id,
                     value_index,
                 } => {
@@ -327,29 +275,29 @@ impl GraphEvaluator {
                     // The miss path inserts first, then borrows from the map,
                     // avoiding a redundant `Vec<f64>` clone.
                     use std::collections::hash_map::Entry;
-                    if let Entry::Vacant(e) = processed_lookups.entry(lookup_id) {
-                        let lookup = lookup_data.get(e.key()).expect("lookup_id exists in graph");
+                    if let Entry::Vacant(e) = processed_lookups.entry(*lookup_id) {
+                        let lookup = graph
+                            .all_lookups
+                            .get(e.key())
+                            .expect("lookup_id exists in graph");
                         let result = Self::attention_insert_and_query(
-                            &mut self.attention_entries,
-                            self.position,
-                            &mut self.scratch_attn_total,
+                            attention_entries,
+                            *position,
+                            scratch_attn_total,
                             lookup,
                             vals,
                         );
                         e.insert(result);
                     }
-                    let result = &processed_lookups[&lookup_id];
-                    if let Some(&val) = result.get(value_index) {
+                    let result = &processed_lookups[lookup_id];
+                    if let Some(&val) = result.get(*value_index) {
                         vals.insert(dim_id, val);
                     }
-                }
-                DimWorkItem::Generic => {
-                    // Generic dims are set via embedding or explicit assignment
                 }
             }
         }
 
-        self.position += 1;
+        *position += 1;
         Ok(vals.clone())
     }
 
@@ -527,7 +475,7 @@ impl GraphEvaluator {
         let predicted = self.evaluate(prefix, max_steps);
 
         // Extract output characters from hex bytes after "OUT" token
-        let mut output_chars = Vec::new();
+        let mut output_chars = Vec::with_capacity(predicted.len());
         let mut draining = false;
 
         for tok in &predicted {
@@ -592,8 +540,8 @@ impl GraphEvaluator {
         // Log first mismatch
         let max_len = predicted.len().max(reference.len());
         for i in 0..max_len {
-            let p = predicted.get(i).map(|s| s.as_str()).unwrap_or("<END>");
-            let r = reference.get(i).map(|s| s.as_str()).unwrap_or("<END>");
+            let p = predicted.get(i).map_or("<END>", |s| s.as_str());
+            let r = reference.get(i).map_or("<END>", |s| s.as_str());
             if p != r {
                 log::warn!("MISMATCH at position {i}: predicted={p}, expected={r}");
                 break;
@@ -762,11 +710,7 @@ mod tests {
 
         // Should be sorted highest first
         for window in scores.windows(2) {
-            assert!(
-                window[0].1 >= window[1].1,
-                "scores not sorted: {:?}",
-                scores
-            );
+            assert!(window[0].1 >= window[1].1, "scores not sorted: {scores:?}");
         }
     }
 

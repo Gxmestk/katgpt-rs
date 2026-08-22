@@ -26,10 +26,7 @@ fn main() {
                     w = (i + 1) / 2,
                     c = captured,
                 ),
-                action_description: Some(match i == 50 {
-                    true => "pass".to_string(),
-                    false => format!("place_stone({row},{col})"),
-                }),
+                action_description: Some(if i == 50 { "pass".to_string() } else { format!("place_stone({row},{col})") }),
                 outcome_description: match i {
                     99 => Some("game_over: black_wins_by_2.5".to_string()),
                     _ if captured > 0 => Some(format!(

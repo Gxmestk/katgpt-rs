@@ -207,3 +207,5 @@ sides of the speculative-decoding loop:
 
 See `.research/286_Attention_Drift_Depth_Invariance_Diagnostic.md` and
 `.plans/306_depth_invariance_diagnostic.md` for the drafter-side counterpart.
+
+> **PASS-Redirects (synthesis):** Bertsch et al. [arXiv:2608.10296 "Cracks in the Foundation: Seemingly Minor Architectural Choices Impact Long Context Extension"] — independent external validation of the sink-positive stance: across the 26-model OlmPool, attention-sink mass correlates with long-context performance (R² = 0.38), and QK norm (which suppresses sinks + raises entropy) is the single largest architectural harm to extensibility. Supports this note's "don't blanket-kill sinks" dual-policy and PFlash's `attention_sink` block rule. The compound-degradation recipe landed in riir-train Research 420; nothing to action here.

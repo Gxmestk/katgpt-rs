@@ -62,7 +62,7 @@ fn main() {
         })
         .collect();
     let dt_gram = t_gram.elapsed();
-    println!("Gram build: {:?} ({} experts × {}×{})", dt_gram, n, d, d);
+    println!("Gram build: {dt_gram:?} ({n} experts × {d}×{d})");
     println!();
 
     // "Before" diagnostics (vanilla unconditioned router).
@@ -83,7 +83,7 @@ fn main() {
         &mut scratch,
     );
     let dt_mpi = t_mpi.elapsed();
-    println!("MPI recondition: {:?}", dt_mpi);
+    println!("MPI recondition: {dt_mpi:?}");
     println!();
 
     println!("┌──────────────────────────────────────────────────┐");
@@ -111,9 +111,9 @@ fn main() {
     let t_gate = Instant::now();
     let topk = gate_sigmoid_topk(&x, &r, n, d, cfg.beta_sigmoid, 3, &mut scores);
     let dt_gate = t_gate.elapsed();
-    println!("Sigmoid top-3 gate: {:?} (NEVER softmax — G7)", dt_gate);
+    println!("Sigmoid top-3 gate: {dt_gate:?} (NEVER softmax — G7)");
     println!("  token dot-prod scores: {:?}", &scores);
-    println!("  top-3 expert indices:  {:?}", topk);
+    println!("  top-3 expert indices:  {topk:?}");
     println!();
     println!("total snapshot-swap cost: {:?}", dt_gram + dt_mpi);
     println!("per-token overhead: 0 (router is precomputed — paper §4.2)");

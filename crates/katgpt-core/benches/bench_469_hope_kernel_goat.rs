@@ -278,7 +278,7 @@ fn gate_g2_latency() -> GateResult {
         let headroom = if ratio < 1.0 {
             format!("{:.1}× under", 1.0 / ratio)
         } else {
-            format!("{:.2}× OVER", ratio)
+            format!("{ratio:.2}× OVER")
         };
         println!("  {name:<40} {ns_per_call:>6.2} ns  (target ≤ {target:>4} ns, {headroom})");
     }

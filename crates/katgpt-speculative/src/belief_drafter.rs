@@ -1169,13 +1169,11 @@ mod tests {
             );
             assert!(
                 token.log_prob.is_finite(),
-                "token {} log_prob must be finite",
-                i
+                "token {i} log_prob must be finite"
             );
             assert!(
                 token.entropy >= 0.0,
-                "token {} entropy must be non-negative",
-                i
+                "token {i} entropy must be non-negative"
             );
         }
     }
@@ -1402,13 +1400,11 @@ mod tests {
             );
             assert!(
                 token.log_prob.is_finite(),
-                "token {} log_prob must be finite",
-                i
+                "token {i} log_prob must be finite"
             );
             assert!(
                 token.entropy >= 0.0,
-                "token {} entropy must be non-negative",
-                i
+                "token {i} entropy must be non-negative"
             );
         }
     }

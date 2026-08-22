@@ -160,10 +160,7 @@ fn main() {
 
     println!("\n  Final Q-values:");
     for (arm, &q_val) in q.iter().enumerate() {
-        let marker = match arm == best_arm {
-            true => " ← BEST",
-            false => "",
-        };
+        let marker = if arm == best_arm { " ← BEST" } else { "" };
         println!(
             "    Arm {arm} ({}): Q={q_val:.4}, visits={}{marker}",
             router.policy_name(arm),
@@ -195,9 +192,10 @@ fn main() {
             .filter(|(a, _)| **a == arm)
             .map(|(_, r)| *r)
             .collect();
-        let avg = match rewards.is_empty() {
-            true => 0.0,
-            false => rewards.iter().sum::<f32>() / rewards.len() as f32,
+        let avg = if rewards.is_empty() {
+            0.0
+        } else {
+            rewards.iter().sum::<f32>() / rewards.len() as f32
         };
         println!(
             "    Arm {arm} ({}): avg_reward={avg:.4} (n={})",

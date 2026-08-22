@@ -92,11 +92,10 @@ mod tests {
             let _ = select_backend(5_000, false);
         }
         let overhead = start.elapsed() / 1000;
-        println!("Backend selection overhead: {:?}", overhead);
+        println!("Backend selection overhead: {overhead:?}");
         assert!(
             overhead.as_micros() < 100,
-            "Selection overhead too high: {:?}",
-            overhead
+            "Selection overhead too high: {overhead:?}"
         );
     }
 }

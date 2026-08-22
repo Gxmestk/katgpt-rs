@@ -51,7 +51,7 @@ pub fn expand_all(ctx: &CompressedContext) -> Vec<u32> {
                 original_tokens, ..
             } => result.extend_from_slice(original_tokens),
             crate::mux_latent::context::LatentSegment::Raw { tokens } => {
-                result.extend_from_slice(tokens)
+                result.extend_from_slice(tokens);
             }
         }
     }

@@ -572,6 +572,19 @@ impl WeaverCorrector {
                 if !p.is_finite() {
                     continue;
                 }
+                // O(1) fast reject before the binary search. `top` is sorted
+                // descending, so once it holds K entries any `p` STRICTLY below
+                // the K-th best has `v > p` true for all K entries, which makes
+                // `partition_point` return exactly `k` and the `pos < k` branch
+                // below a no-op. `p == worst` deliberately falls through to the
+                // original path (there `partition_point` returns `k-1` and the
+                // entry does get inserted), so the selected set is unchanged.
+                if top.len() == k
+                    && let Some(&(_, worst)) = top.last()
+                    && p < worst
+                {
+                    continue;
+                }
                 let pos = top.partition_point(|&(_, v)| v > p);
                 if pos < k {
                     top.insert(pos, (vid, p));
@@ -594,7 +607,7 @@ impl WeaverCorrector {
             }
 
             // Build WeaverInput for this single depth.
-            let h_dflash_slice: &[&[f32]] = &h_dflash[di..di + 1];
+            let h_dflash_slice: &[&[f32]] = &h_dflash[di..=di];
             let topk_ids_slice: &[&[u32]] = &[&topk_ids[..]];
             let topk_logits_slice: &[&[f32]] = &[&topk_logits[..]];
 
@@ -721,9 +734,15 @@ impl WeaverCorrector {
                 if !p.is_finite() {
                     continue;
                 }
-                let pos = scratch
-                    .top_pairs
-                    .partition_point(|&(_, v)| v > p);
+                // O(1) fast reject — see `correct_marginals_inplace` for why
+                // `p < worst` (strict) leaves the selected set unchanged.
+                if scratch.top_pairs.len() == k
+                    && let Some(&(_, worst)) = scratch.top_pairs.last()
+                    && p < worst
+                {
+                    continue;
+                }
+                let pos = scratch.top_pairs.partition_point(|&(_, v)| v > p);
                 if pos < k {
                     scratch.top_pairs.insert(pos, (vid, p));
                     if scratch.top_pairs.len() > k {
@@ -745,7 +764,7 @@ impl WeaverCorrector {
             }
 
             // Build WeaverInput for this single depth and run forward_into.
-            let h_dflash_slice: &[&[f32]] = &h_dflash[di..di + 1];
+            let h_dflash_slice: &[&[f32]] = &h_dflash[di..=di];
             let topk_ids_slice: &[&[u32]] = &[&topk_ids[..]];
             let topk_logits_slice: &[&[f32]] = &[&topk_logits[..]];
             let input = WeaverInput {
@@ -2620,7 +2639,7 @@ mod tests {
         assert!(matches!(err, super::WeaverCorrectError::HiddenShape { .. }));
 
         // Depth exceeds max_depth.
-        let too_deep_owned: Vec<Vec<f32>> = (0..(depth + 1)).map(|_| vec![0.3; h]).collect();
+        let too_deep_owned: Vec<Vec<f32>> = (0..=depth).map(|_| vec![0.3; h]).collect();
         let too_deep: Vec<&[f32]> = too_deep_owned.iter().map(|v| v.as_slice()).collect();
         let mut deep_marginals = vec![0.0f32; (depth + 1) * vocab];
         let err = corrector

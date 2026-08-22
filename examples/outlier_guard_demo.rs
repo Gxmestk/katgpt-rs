@@ -19,8 +19,8 @@ fn main() {
                     (x * std::f32::consts::TAU * (layer as f32 + 1.0)).sin() * 0.3
                 })
                 .collect();
-            let d = guard.scan_layer(&weights, layer, &format!("layer{}.ffn.up", layer));
-            println!("  Layer {}: D={:.4}", layer, d);
+            let d = guard.scan_layer(&weights, layer, &format!("layer{layer}.ffn.up"));
+            println!("  Layer {layer}: D={d:.4}");
         }
         let report = guard.report();
         println!(
@@ -48,9 +48,9 @@ fn main() {
                     weights[i] = 512.0;
                 }
             }
-            let d = attack_guard.scan_layer(&weights, layer, &format!("layer{}.ffn.up", layer));
+            let d = attack_guard.scan_layer(&weights, layer, &format!("layer{layer}.ffn.up"));
             let status = if d > 0.15 { "FLAGGED" } else { "OK" };
-            println!("  Layer {}: D={:.4} [{}]", layer, d, status);
+            println!("  Layer {layer}: D={d:.4} [{status}]");
         }
         let report = attack_guard.report();
         println!(

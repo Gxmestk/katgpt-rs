@@ -4,7 +4,7 @@
 > **Date:** 2026-06-27
 > **Status:** Done — GOAT verdict
 > **Classification:** Public
-> **Related Research:** 248 (DeltaTok/DeltaWorld BoM — particle cloud), 260 (MaxProof — population test-time scaling), 263 (Latent Thought Flow — reward-proportional trajectory scorer), 269 (Chiaroscuro — spectral entropy KV routing), 276 (MicroRecurrentBeliefState — attractor kernel, honest null), 284 (Simplicity Bias Sampler), 296 (Stokes/DEC vocabulary crosswalk — Fusion C), 305 (Algorithmic-Probability Sampler)
+> **Related Research:** 248 (DeltaTok/DeltaWorld BoM — particle cloud), 260 (MaxProof — population test-time scaling), 263 (Latent Thought Flow — reward-proportional trajectory scorer), 269 (Chiaroscuro — spectral entropy KV routing), 276 (MicroRecurrentBeliefState — attractor kernel, honest null), 284 (Simplicity Bias Sampler), 296 (Stokes/DEC vocabulary crosswalk — Fusion C), 305 (Algorithmic-Probability Sampler), 466 (CP^(d-1) Symmetric-Space Hopfield — Super-GOAT: this note's Gibbs retrieval on S^n is the GAPLESS vector-alignment family that failed in Plan 276; 466's top-eigenvector recall on CP^(d-1) is the BBP-PROTECTED gapped family that unblocks Plan 276 modellessly. The two are complementary attractor paradigms: Gibbs/energy-weighting vs spiked-matrix/top-eigenvector)
 > **Related Plans:** 129 (OPUS Boltzmann), 180 (SDPG — negative result), 269 (Chiaroscuro spectral entropy), 276 (MicroRecurrentBeliefState — AttractorKernel), 281 (BoMSampler), 301 (subspace_phase_gate), 306 (depth_invariance), 333 (CUCG — `can_freeze` spectral_flatness gate)
 > **Cross-ref (riir-neuron-db):** Research 317 — §3.5 modelless unblock for Plan 276's "needs trained weights" blocker via NeuronShard `style_weights[64]` → `AttractorKernel::W_s` freeze/thaw (Fusion B, future plan).
 
@@ -200,7 +200,7 @@ Re-cast the Gibbs retrieval operator as a latent-to-latent op on each Super-GOAT
 | **`cgsp_runtime/`** | Curiosity = high-entropy particle (exploration); relaxation to attractor = exploitation. Gibbs weighting becomes "how to collapse K curiosity threads into one decision per tick." | Novel application; riir-ai game runtime. |
 | **LatCal** (`riir-chain/src/encoding/`) | The Gibbs weight `1/E²` is a deterministic scalar that crosses `SyncBlock → ChainConsensus` as a raw value. The K hypotheses stay local-latent; only the chosen index + its weight sync. | Sync boundary respected. |
 | **`NeuronShard`** (riir-neuron-db) | `style_weights[64]` = stored attractor pattern. `MerkleFrozenEnvelope` = committed flat minimum. `can_freeze = (spectral_flatness < 0.3)` (Plan 333) IS the paper's "flat minimum ⇒ robust" claim, restated as a freeze gate. CUCG G7 isomorphism: trajectory compaction ≡ shard freeze. | Already shipped — paper is confirmatory. |
-| **DEC** (`katgpt-rs/crates/katgpt-core/src/dec/`) | Flat minimum = harmonic component. `harmonic_projector(belief)` = deterministic basin detector. Stokes `∫_M dω = ∫_∂M ω` ⇒ basin mass via boundary flux (Plan 314). | Fusion C; future Super-GOAT cross-ref. |
+| **DEC** (`katgpt-rs/crates/katgpt-dec/src/`) | Flat minimum = harmonic component. `harmonic_projector(belief)` = deterministic basin detector. Stokes `∫_M dω = ∫_∂M ω` ⇒ basin mass via boundary flux (Plan 314). | Fusion C; future Super-GOAT cross-ref. |
 
 ---
 

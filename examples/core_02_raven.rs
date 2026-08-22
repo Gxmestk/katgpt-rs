@@ -117,10 +117,7 @@ fn part1_frozen_slots() {
     let preserved = (after_write - after_noise).abs() < 1e-6;
 
     println!();
-    println!(
-        "  🌪️  Step 2: {noise_steps} noise updates → slots 0-3 ({:.2?})",
-        elapsed
-    );
+    println!("  🌪️  Step 2: {noise_steps} noise updates → slots 0-3 ({elapsed:.2?})");
 
     println!();
     println!("  🔍 Step 3: Verify slot {passkey_slot}");

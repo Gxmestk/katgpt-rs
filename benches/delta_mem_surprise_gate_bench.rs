@@ -278,7 +278,7 @@ fn main() {
     let stream = build_stream();
     let n_events = stream.iter().filter(|s| s.is_event).count();
     let n_bg = stream.len() - n_events;
-    println!("  events: {}, background: {}", n_events, n_bg);
+    println!("  events: {n_events}, background: {n_bg}");
     println!();
 
     // ── Baseline (no gate) ──────────────────────────────────────────────
@@ -320,8 +320,7 @@ fn main() {
     let recall_pass = recall_loss_pct <= 5.0;
 
     println!(
-        "── G3 Verdict (gated θ={:.2} = default vs baseline) ────────────",
-        DEFAULT_THETA_SURPRISE
+        "── G3 Verdict (gated θ={DEFAULT_THETA_SURPRISE:.2} = default vs baseline) ────────────"
     );
     println!(
         "  write suppression: {:.2}%  (target ≥ 30%)  → {}",

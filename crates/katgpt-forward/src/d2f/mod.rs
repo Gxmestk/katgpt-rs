@@ -110,6 +110,12 @@ pub struct D2fDecodeConfig {
     /// Temperature for sampling during denoising.
     /// Lower = more deterministic, higher = more diverse.
     pub temperature: f32,
+    /// Argmax drafting (Issue 587 / FLARE Eq 21): pick the top-scoring valid
+    /// token deterministically instead of sampling. Makes the drafter's
+    /// proposal law a point mass, which is what the distribution-preserving
+    /// `SoftmaxArgmax` acceptance policy requires for exactness. Consumes no
+    /// RNG for token choice.
+    pub greedy_draft: bool,
     /// Noise schedule type for time step generation.
     pub schedule: ScheduleKind,
     /// Enable DPM-Solver++(2M) multistep logit extrapolation (Plan 078 T10.6).
@@ -134,6 +140,7 @@ impl Default for D2fDecodeConfig {
             block_size: 8,
             max_pipeline_depth: 4,
             temperature: 1.0,
+            greedy_draft: false,
             schedule: ScheduleKind::default(),
             multistep: false,
         }
@@ -541,6 +548,70 @@ pub fn d2f_decode_block_with_prompt_with(
     screener: &dyn ScreeningPruner,
     rng: &mut Rng,
 ) -> D2fBlockResult {
+    d2f_decode_block_prompt_q_core(
+        dctx,
+        weights,
+        config,
+        decode_config,
+        prompt,
+        pruner,
+        screener,
+        rng,
+        None,
+    )
+}
+
+/// [`d2f_decode_block_with_prompt_with`] + draft-time proposal-law capture
+/// (Issue 587, FLARE Eq 8 analog).
+///
+/// `q_out` receives one vocab-sized row per denoised position holding the
+/// **law that actually generated the committed token** at that position:
+/// the normalized (pruned, relevance-weighted, temperature-scaled)
+/// distribution the sampler drew from, or a point mass at the committed token
+/// under `greedy_draft`. Positions still masked when decoding ends get a point
+/// mass at `mask_token`. `q_out.len()` must be `>= block_positions * vocab_size`
+/// (shorter buffers are written up to capacity, never panic).
+///
+/// The out-buffer shape (vs a `D2fBlockResult` field) keeps the hot path
+/// zero-alloc: the caller pre-allocates once and reuses across calls (G4).
+pub fn d2f_decode_block_with_prompt_with_q(
+    dctx: &mut D2fContext,
+    weights: &TransformerWeights,
+    config: &Config,
+    decode_config: &D2fDecodeConfig,
+    prompt: &[usize],
+    pruner: &dyn ConstraintPruner,
+    screener: &dyn ScreeningPruner,
+    rng: &mut Rng,
+    q_out: &mut [f32],
+) -> D2fBlockResult {
+    d2f_decode_block_prompt_q_core(
+        dctx,
+        weights,
+        config,
+        decode_config,
+        prompt,
+        pruner,
+        screener,
+        rng,
+        Some(q_out),
+    )
+}
+
+/// Shared core of the D2F block decode, optionally capturing per-position
+/// proposal laws (Issue 587).
+#[allow(clippy::too_many_arguments, clippy::needless_option_as_deref)]
+fn d2f_decode_block_prompt_q_core(
+    dctx: &mut D2fContext,
+    weights: &TransformerWeights,
+    config: &Config,
+    decode_config: &D2fDecodeConfig,
+    prompt: &[usize],
+    pruner: &dyn ConstraintPruner,
+    screener: &dyn ScreeningPruner,
+    rng: &mut Rng,
+    mut q_out: Option<&mut [f32]>,
+) -> D2fBlockResult {
     // Standalone decode — no persistent KV across calls
     dctx.committed_len = 0;
 
@@ -667,8 +738,22 @@ pub fn d2f_decode_block_with_prompt_with(
                 continue;
             }
 
-            // Temperature-scaled sampling from valid tokens (relevance-weighted)
-            let (chosen_token, chosen_prob) = if temperature > 0.0 && temperature != 1.0 {
+            // Token choice (Issue 587): argmax drafting under `greedy_draft`
+            // (deterministic point-mass proposal law — the exactness
+            // precondition of the SoftmaxArgmax accept policy), else the
+            // historical temperature-scaled / greedy samplers.
+            let (chosen_token, chosen_prob) = if decode_config.greedy_draft {
+                let (tok, weight) = greedy_argmax_weighted(
+                    &sample_exp_buf,
+                    mask,
+                    vocab,
+                    depth,
+                    parent_tokens,
+                    pruner,
+                    screener,
+                );
+                (tok, if sum_exp > 0.0 { weight / sum_exp } else { 0.0 })
+            } else if temperature > 0.0 && temperature != 1.0 {
                 sample_temperatured(
                     logits_p,
                     mask,
@@ -700,6 +785,21 @@ pub fn d2f_decode_block_with_prompt_with(
             if chosen_prob >= tau_conf && chosen_token != mask {
                 tokens[p] = chosen_token;
                 n_confident += 1;
+                // Capture the draft-time proposal law q for this position
+                // (Issue 587, ExactQ policy). Must happen at commit time:
+                // once committed the position is never revisited, so this
+                // is the last moment the generating distribution is at hand.
+                if let Some(q) = q_out.as_deref_mut() {
+                    capture_q_row(
+                        q,
+                        p - block_start,
+                        vocab,
+                        &sample_exp_buf,
+                        chosen_token,
+                        chosen_prob,
+                        decode_config.greedy_draft,
+                    );
+                }
             }
         }
 
@@ -712,6 +812,19 @@ pub fn d2f_decode_block_with_prompt_with(
         if n_confident == denoising_positions {
             converged_step = step;
             break;
+        }
+    }
+
+    // Fill q rows for positions that never committed: the final content is
+    // the still-masked token (deterministic), so the honest proposal law is a
+    // point mass at `mask`. Every row is now rewritten each call — no stale
+    // state leaks across calls (the verifier reuses one buffer).
+    if let Some(q) = q_out.as_deref_mut() {
+        let q_rows = q.len() / vocab;
+        for row in 0..q_rows.min(denoising_positions) {
+            if tokens[block_start + row] == mask {
+                write_q_point_mass(q, row, vocab, mask);
+            }
         }
     }
 
@@ -1051,8 +1164,11 @@ fn sample_temperatured(
     // the pruner/screener gating and accumulates scaled_sum.
     exp_buf.resize(vocab, 0.0);
     let buf = &mut exp_buf[..vocab];
+    // Slice `logits` to `vocab` up front so its bounds check hoists out of the
+    // vocab-length loop (vocab can be 256K on production models).
+    let lg = &logits[..vocab];
     for t in 0..vocab {
-        buf[t] = (logits[t] - max_logit) * inv_temp;
+        buf[t] = (lg[t] - max_logit) * inv_temp;
     }
     simd_exp_inplace(buf);
 
@@ -1071,19 +1187,111 @@ fn sample_temperatured(
         return (mask, 0.0);
     }
 
-    // Sample by cumulative distribution (no exp recompute)
+    // Sample by cumulative distribution (no exp recompute).
+    // Re-slice to `vocab` so the Vec index bounds check hoists out of the scan.
     let r = (rng.next() as f64 / u64::MAX as f64) as f32;
     let inv_scaled = 1.0 / scaled_sum;
     let mut cumsum = 0.0f32;
+    let buf = &exp_buf[..vocab];
     for t in 0..vocab {
-        cumsum += exp_buf[t] * inv_scaled;
+        let p = buf[t] * inv_scaled;
+        cumsum += p;
         if cumsum >= r {
-            return (t, exp_buf[t] * inv_scaled);
+            return (t, p);
         }
     }
 
     // Fallback: return last valid token
     (mask, 0.0)
+}
+
+/// Argmax over valid (pruner-respecting, mask-skipping, relevance-weighted)
+/// tokens. Deterministic — consumes no RNG. Returns `(token, unnormalized
+/// weight)`; the caller divides by `sum_exp` for the distribution probability.
+/// Returns `(mask, 0.0)` when no valid token exists.
+///
+/// Issue 587 (FLARE Eq 21): argmax drafting makes the drafter's proposal law
+/// a point mass, which is the precondition the SoftmaxArgmax acceptance
+/// policy needs for distribution-preserving verification.
+fn greedy_argmax_weighted(
+    exp_buf: &[f32],
+    mask: usize,
+    vocab: usize,
+    depth: usize,
+    parent_tokens: &[usize],
+    pruner: &dyn ConstraintPruner,
+    screener: &dyn ScreeningPruner,
+) -> (usize, f32) {
+    let mut best_tok = mask;
+    let mut best_w = -1.0f32;
+    // Slice once so the per-token bounds check hoists out of the scan.
+    let exp_buf = &exp_buf[..vocab];
+    for t in 0..vocab {
+        if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
+            continue;
+        }
+        let w = exp_buf[t] * screener.relevance(depth, t, parent_tokens);
+        if w > best_w {
+            best_w = w;
+            best_tok = t;
+        }
+    }
+    (best_tok, best_w.max(0.0))
+}
+
+/// Write one captured proposal-law row (Issue 587, ExactQ policy).
+///
+/// `greedy` → point mass at `chosen` (the argmax law is deterministic).
+/// Sampled   → `q[t] = exp_buf[t] / S`, recovering `1/S` from
+///             `chosen_prob = exp_buf[chosen] / S` (avoids re-deriving S).
+///
+/// The captured row is the law the sampler *actually* drew from — for the
+/// temperature path `exp_buf` holds the relevance-weighted exps, for the
+/// temp==1 path the unweighted exps normalized by the relevance-weighted
+/// `sum_exp` (matching `sample_greedy`'s historical behavior exactly).
+#[allow(clippy::too_many_arguments)]
+fn capture_q_row(
+    q_flat: &mut [f32],
+    row: usize,
+    vocab: usize,
+    exp_buf: &[f32],
+    chosen: usize,
+    chosen_prob: f32,
+    greedy: bool,
+) {
+    let start = row * vocab;
+    let end = start + vocab;
+    if end > q_flat.len() {
+        return; // short buffer — write what fits, never panic
+    }
+    let q_row = &mut q_flat[start..end];
+    if greedy {
+        write_q_point_mass(q_row, 0, vocab, chosen);
+        return;
+    }
+    let denom = exp_buf.get(chosen).copied().unwrap_or(0.0);
+    let inv = if denom > 0.0 && chosen_prob > 0.0 {
+        chosen_prob / denom
+    } else {
+        0.0
+    };
+    let exp_buf = &exp_buf[..vocab.min(exp_buf.len())];
+    for t in 0..vocab {
+        q_row[t] = exp_buf.get(t).copied().unwrap_or(0.0) * inv;
+    }
+}
+
+/// Write a point-mass row (deterministic law) at `token` into `q_flat[row]`.
+fn write_q_point_mass(q_flat: &mut [f32], row: usize, vocab: usize, token: usize) {
+    let start = row * vocab;
+    let end = start + vocab;
+    if end > q_flat.len() {
+        return;
+    }
+    q_flat[start..end].fill(0.0);
+    if token < vocab {
+        q_flat[start + token] = 1.0;
+    }
 }
 
 /// Greedy sampling with temperature=1.0 from valid tokens.
@@ -1106,6 +1314,9 @@ fn sample_greedy(
     let r = (rng.next() as f64 / u64::MAX as f64) as f32;
     let inv_sum = if sum_exp > 0.0 { 1.0 / sum_exp } else { 0.0 }; // multiply per token instead of divide
     let mut cumsum = 0.0f32;
+    // Callers always `resize(vocab)` the buffer before calling; slice once so the
+    // per-token bounds check hoists out of the vocab-length scan.
+    let exp_buf = &exp_buf[..vocab];
     for t in 0..vocab {
         if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
             continue;
@@ -1532,9 +1743,14 @@ impl HybridEmbedding {
         let one_minus_pi = 1.0 - pi;
 
         // h̃ = π * e_token + (1 - π) * e_mask
+        // Slice the two inputs to `dim` up front so their bounds checks hoist out
+        // of the loop (the `token_norm`/`mask_norm` reductions below still read
+        // the full input slices, so those keep the original bindings).
+        let te = &token_emb[..dim];
+        let me = &mask_emb[..dim];
         let mut norm_sq = 0.0f32;
         for d in 0..dim {
-            let h_tilde = pi * token_emb[d] + one_minus_pi * mask_emb[d];
+            let h_tilde = pi * te[d] + one_minus_pi * me[d];
             out[d] = h_tilde;
             norm_sq += h_tilde * h_tilde;
         }
@@ -1791,9 +2007,7 @@ pub fn d2f_decode_block_soft(
                 .iter()
                 .copied()
                 .enumerate()
-                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1)).map_or(0, |(i, _)| i);
             tokens[pos] = best;
         }
     }

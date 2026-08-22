@@ -125,8 +125,7 @@ fn bench_individual_leo(c: &mut Criterion) {
                     .copied()
                     .enumerate()
                     .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-                    .map(|(i, _)| i)
-                    .unwrap_or(0);
+                    .map_or(0, |(i, _)| i);
                 results.push(best_action);
             }
             black_box(&results);

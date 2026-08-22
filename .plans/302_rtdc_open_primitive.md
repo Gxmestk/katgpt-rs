@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-22
 **Research:** [katgpt-rs/.research/280_Resolution_Tiered_Deterministic_Commitment.md](../.research/280_Resolution_Tiered_Deterministic_Commitment.md)
-**Companion guide:** [riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md](../../../riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md)
-**Chain-side plan:** [riir-chain/.plans/003_rtdc_quorum_wiring.md](../../../riir-chain/.plans/003_rtdc_quorum_wiring.md)
+**Companion guide:** [riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md](../../riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md)
+**Chain-side plan:** [riir-chain/.plans/003_rtdc_quorum_wiring.md](../../riir-chain/.plans/003_rtdc_quorum_wiring.md)
 **Depends On:** Plan 235 ✅ (SLoD, default-ON), Plan 253 ✅ (Merkle-Octree Curator, opt-in), Plan 258 ✅ (LatCal Fixed, in riir-chain)
 **Target:** `katgpt-rs/crates/katgpt-core/src/rtdc.rs` (new) + feature gate `rtdc`
 **Status:** Phase 1 skeleton shipped (`rtdc.rs`, 1373 LOC, 14 unit tests) + Phase 3 Candidate C (probabilistic `subtree_inclusion`) landed behind `rtdc_subtree_inclusion` — CG6 PASS. Candidate A (Pedersen) research closed dormant; Candidate B (FFT) closed negative. Chain wiring landed in riir-chain (`fac46d5`, `chain_rtdc_subtree` feature). `rtdc` stays opt-in — G1/G2/G4/G6 pending LatCal-backed `DeterministicLeafEncode` impl (riir-chain Plan 003).

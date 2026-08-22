@@ -105,8 +105,8 @@ fn main() {
     assert!(applied, "tilt must apply at step 0 with weight > 0");
 
     println!("── Step 3: tilt_logits (the QGF hot path) ──");
-    println!("  gradient ∇Q from oracle: {:?}", gradient);
-    println!("  tilted logits (after `logits += w · ∇Q`): {:?}", logits);
+    println!("  gradient ∇Q from oracle: {gradient:?}");
+    println!("  tilted logits (after `logits += w · ∇Q`): {logits:?}");
     println!();
     println!("  Note: tilt is an ADDITIVE logit shift, NOT softmax. The caller");
     println!("  is responsible for sampling from the tilted logits afterward.");
@@ -146,8 +146,8 @@ fn main() {
     let rel_gain = (e_after - e_before) / e_before.abs().max(1e-9);
 
     println!("── Step 5: expected Q gain (the QGF headline) ──");
-    println!("  E[Q] (BC reference) = {:.6}", e_before);
-    println!("  E[Q] (QGF guided)   = {:.6}", e_after);
+    println!("  E[Q] (BC reference) = {e_before:.6}");
+    println!("  E[Q] (QGF guided)   = {e_after:.6}");
     println!(
         "  relative gain       = {:.2}%  (clear shift toward Q optimum)",
         rel_gain * 100.0
@@ -260,5 +260,5 @@ fn print_categorical(label: &str, logits: &[f32], q: Option<&[f32]>) {
     for x in &mut p {
         *x /= sum_exp;
     }
-    println!("  {label} softmax → {:?}", p);
+    println!("  {label} softmax → {p:?}");
 }

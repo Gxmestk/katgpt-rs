@@ -67,6 +67,7 @@ pub mod external_regret;
 pub mod heterogeneous;
 pub mod lp;
 pub mod primal_dual;
+pub mod simplex;
 pub mod types;
 
 pub use bregman::{BregmanPotential, Euclidean, Kl};
@@ -76,5 +77,5 @@ pub use lp::{CceLp, CceLpError};
 pub use primal_dual::{CcePrimalDual, ConvergenceReportRaw, StepReport};
 pub use types::{
     ActionSpace, Deviation, DeviationClass, HeterogeneousPayoff, OccupationMeasure,
-    OccupationMeasureError, PayoffTensor, StateSpace,
+    OccupationMeasureError, PayoffTensor, StateSpace, TransitionKernel,
 };

@@ -232,7 +232,7 @@ fn topk_indices(values: &[f32], k: usize) -> Vec<usize> {
     top.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     for (i, &val) in values.iter().enumerate().skip(k) {
-        if val > top.last().map(|&(_, v)| v).unwrap_or(f32::NEG_INFINITY) {
+        if val > top.last().map_or(f32::NEG_INFINITY, |&(_, v)| v) {
             // Find insertion point
             let pos = top.partition_point(|&(_, v)| v > val);
             top.insert(pos, (i, val));
@@ -827,16 +827,13 @@ impl ConstraintPruner for VocabChannelPruner {
 
         // Fallback: per-layer union batch check
         let len = candidates.len().min(results.len());
-        match self.per_layer_union.get(layer) {
-            Some(tokens) => {
-                for i in 0..len {
-                    results[i] = tokens.binary_search(&candidates[i]).is_ok();
-                }
+        if let Some(tokens) = self.per_layer_union.get(layer) {
+            for i in 0..len {
+                results[i] = tokens.binary_search(&candidates[i]).is_ok();
             }
-            None => {
-                // Unknown layer → don't prune
-                results[..len].fill(true);
-            }
+        } else {
+            // Unknown layer → don't prune
+            results[..len].fill(true);
         }
     }
 }
@@ -859,6 +856,15 @@ impl ConstraintPruner for VocabChannelPruner {
 /// ```
 pub struct ComposedPruner {
     pruners: Vec<Box<dyn ConstraintPruner>>,
+    /// Cached balanced AND-tree over the sub-pruner indices.
+    ///
+    /// `pruners` is only ever written in the constructors below (no push/pop/
+    /// mutation anywhere), so the tree shape is invariant after construction —
+    /// building it once here removes an O(n) boxed-node allocation from every
+    /// `batch_is_valid` call (which runs per DDTree node expansion, i.e. per
+    /// token).
+    #[cfg(feature = "lattice_operad")]
+    and_tree: PrunerExpr,
 }
 
 impl ComposedPruner {
@@ -866,14 +872,18 @@ impl ComposedPruner {
     ///
     /// An empty list acts as `NoPruner` (all tokens valid).
     pub fn new(pruners: Vec<Box<dyn ConstraintPruner>>) -> Self {
-        Self { pruners }
+        #[cfg(feature = "lattice_operad")]
+        let and_tree = build_and_tree(pruners.len());
+        Self {
+            pruners,
+            #[cfg(feature = "lattice_operad")]
+            and_tree,
+        }
     }
 
     /// Create a single-pruner composition (no overhead if only one).
     pub fn single(pruner: Box<dyn ConstraintPruner>) -> Self {
-        Self {
-            pruners: vec![pruner],
-        }
+        Self::new(vec![pruner])
     }
 
     /// Number of composed pruners.
@@ -904,15 +914,45 @@ impl ConstraintPruner for ComposedPruner {
         results: &mut [bool],
     ) {
         let len = candidates.len().min(results.len());
-        // Initialize: all valid
-        results[..len].fill(true);
+        if len == 0 {
+            return;
+        }
 
-        // AND-reduce across all pruners (ad-hoc)
-        let mut buf = vec![false; len];
-        for pruner in &self.pruners {
-            pruner.batch_is_valid(depth, candidates, parent_tokens, &mut buf);
+        let mut iter = self.pruners.iter();
+        let Some(first) = iter.next() else {
+            // No pruners → all valid.
+            results[..len].fill(true);
+            return;
+        };
+
+        // First pruner writes straight into `results` (removes the `fill(true)`
+        // pass plus one AND-reduce pass). Sub-pruners clamp to
+        // `candidates.len().min(results.len())`, so handing them `results[..len]`
+        // covers exactly the same indices the old `buf` of length `len` did.
+        first.batch_is_valid(depth, candidates, parent_tokens, &mut results[..len]);
+
+        // Remaining pruners AND-reduce through a scratch buffer. Small batches
+        // (the common case — DDTree fanout) stay on the stack, so the per-token
+        // `vec![false; len]` heap allocation disappears.
+        const STACK_CAP: usize = 128;
+        let mut stack_buf = [false; STACK_CAP];
+        let mut heap_buf: Vec<bool> = if len > STACK_CAP {
+            vec![false; len]
+        } else {
+            Vec::new()
+        };
+        let buf: &mut [bool] = if len > STACK_CAP {
+            &mut heap_buf
+        } else {
+            &mut stack_buf[..len]
+        };
+
+        for pruner in iter {
+            pruner.batch_is_valid(depth, candidates, parent_tokens, &mut *buf);
+            // `&=` on bool is the same value as `&&` (both operands already
+            // evaluated) but branch-free.
             for i in 0..len {
-                results[i] = results[i] && buf[i];
+                results[i] &= buf[i];
             }
         }
     }
@@ -930,26 +970,47 @@ impl ConstraintPruner for ComposedPruner {
         parent_tokens: &[usize],
         results: &mut [bool],
     ) {
-        use crate::lattice_operad::ComposedPruner as LatticeComposedPruner;
+        use crate::lattice_operad::PrunerResult;
 
         let len = candidates.len().min(results.len());
-        if len == 0 {
+        let n_p = self.pruners.len();
+        if len == 0 || n_p == 0 {
             return;
         }
 
-        // Build a balanced AND-tree expression from all sub-pruners
-        let expr = build_and_tree(self.pruners.len());
-        let pruner_refs: Vec<&dyn ConstraintPruner> =
-            self.pruners.iter().map(|p| p.as_ref()).collect();
-        let lattice_pruner = LatticeComposedPruner::from_expr(expr, pruner_refs);
+        // Runs the exact algorithm of `lattice_operad::ComposedPruner::
+        // batch_is_valid` (same per-pruner call order, same flat P×N atom
+        // buffer, same per-candidate `expr.eval`) against the *cached*
+        // AND-tree. This drops three per-call allocations: the boxed
+        // expression tree, the `Vec<&dyn ConstraintPruner>`, and the
+        // `LatticeComposedPruner` wrapper. Results are bit-identical.
+        let mut atom_batch = vec![false; n_p * len];
+        for (pi, pruner) in self.pruners.iter().enumerate() {
+            let row = &mut atom_batch[pi * len..pi * len + len];
+            pruner.batch_is_valid(depth, &candidates[..len], parent_tokens, row);
+        }
 
-        // Delegate to lattice operad's batch eval
-        lattice_pruner.batch_is_valid(
-            depth,
-            &candidates[..len],
-            parent_tokens,
-            &mut results[..len],
-        );
+        // Per-candidate atom row — stack-resident for the realistic pruner
+        // counts, so no heap traffic per token.
+        const STACK_ATOMS: usize = 32;
+        let mut stack_atoms = [false; STACK_ATOMS];
+        let mut heap_atoms: Vec<bool> = if n_p > STACK_ATOMS {
+            vec![false; n_p]
+        } else {
+            Vec::new()
+        };
+        let atom_results: &mut [bool] = if n_p > STACK_ATOMS {
+            &mut heap_atoms
+        } else {
+            &mut stack_atoms[..n_p]
+        };
+
+        for i in 0..len {
+            for pi in 0..n_p {
+                atom_results[pi] = atom_batch[pi * len + i];
+            }
+            results[i] = matches!(self.and_tree.eval(atom_results), PrunerResult::Accept);
+        }
     }
 }
 
@@ -1114,9 +1175,7 @@ pub fn load_cached_pruner(
     }
     if header.vocab_size != expected_vocab_size || header.layer_count != expected_layer_count {
         log::info!(
-            "[vocab_channel] Cache dimension mismatch (expected vocab={}, layers={}), skipping",
-            expected_vocab_size,
-            expected_layer_count,
+            "[vocab_channel] Cache dimension mismatch (expected vocab={expected_vocab_size}, layers={expected_layer_count}), skipping",
         );
         return None;
     }

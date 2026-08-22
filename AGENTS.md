@@ -3,6 +3,24 @@
 The global `~/.agents/` rules apply; this file documents repo-local context
 that supplements them.
 
+## Boundary contract — read `BOUNDARY.md` first
+
+[`BOUNDARY.md`](BOUNDARY.md) is the authoritative per-repo contract: what this
+repo **owns**, what it **does not own** (with the correct home for each), the
+crate-granular **allowlist** of what it may depend on, links to the cross-repo
+rules' one canonical home, and the **drift ledger** of known gaps. On any
+conflict with prose in this file, BOUNDARY.md wins.
+
+- **Domain test:** is this a **modelless inference primitive** with no riir dep (this repo is upstream of everything)? NO → it belongs in another repo; file there.
+- **Read it before** adding any dep, crate, module, System impl, or vocabulary
+  type — and before assuming a concern is yours to implement.
+- **Enforcement** is not prose: `../riir-ai/scripts/ci_boundary_contract.sh`
+  fails on an undeclared cross-repo dep, on a drift row without its open issue,
+  and on a contract row that no longer matches the measured graph. Run boundary
+  checks VIA the `boundary-guard` skill, not as ad-hoc greps.
+- **Found a violation?** File the issue FIRST (`.issues/NNN_boundary_*.md`), add
+  the drift row, then fix. Closing the issue removes the row in the same commit.
+
 ## Modelless-first mandate (the core principle)
 
 **This repo ships modelless inference primitives.** No training, no backprop,
@@ -83,12 +101,59 @@ See `.agents/skills/research/SKILL.md` for the full research workflow:
 paper classification, 7-repo routing, fusion-first distillation, novelty gate,
 GOAT gate, and the mandatory modelless-unblock protocol (§3.5).
 
-> **Repo count:** 7 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
-> `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon` (private).
+## Substrate-First Gate (MANDATORY before implementing)
+
+Before implementing ANY new System impl, trait, perception/cognition/emotion
+pipeline, state management, spatial query, or vocabulary type, run the
+`.agents/skills/substrate-first/SKILL.md` skill. It enforces:
+
+1. **Vocabulary translation** — grep 3+ name variants (concepts ship under
+   operator names like `GenericSpatialBelief`, not English names like "threat
+   field"). A single-vocabulary grep returns ZERO hits even when substrate
+   fully exists.
+2. **Codebase grep** — search `*.rs` source across all 8 repos, not just
+   `.plans`/`.docs`/`.issues`.
+3. **Architectural rule check** — domain classification, two-brain model, sync
+   boundary, bridge pattern.
+4. **Consume vs. build decision** — if substrate exists, consume it; if not,
+   file an issue in the right repo FIRST.
+
+This prevents the recurring drift pattern where an agent builds a parallel
+system that duplicates already-shipped substrate under a different name
+(canonical failures: ThreatField Issue 047, orchard/motivation Issues 490/493).
+
+> **Repo count:** the **product/distillation set is 8** — `katgpt-rs` (public) +
+> `riir-ai`, `riir-chain`, `riir-neuron-db`, `riir-train`, `riir-game-sdk`,
+> `riir-armageddon`, `riir-dapps` (private). That is NOT the repo total: the
+> workspace is **15 repos**, all of which now carry a root `BOUNDARY.md`
+> (add `riir-mmorpg-examples`, `riir-clippy`, `riir-unity`, `riir-viewbridge`,
+> `riir-auth`, `riir-burner`, `katgpt-web`). Measured 2026-08-21 by
+> `../riir-ai/scripts/ci_boundary_contract.sh`, which enumerates the set
+> instead of trusting a prose count — four of those repos had no contract at
+> all until that run, and `riir-armageddon` had been consuming `riir-games` +
+> `katgpt-core` unaudited. Read a count in prose as a claim, not a fact.
 > The historical "5-repo quintet" terminology referred to the 5 distillation
 > targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
 > facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
-> types) were added later. See Research 003 for the canonical boundary.
+> types) were added later, and `riir-dapps` (the dApp layer — game outcome →
+> generic chain settlement) on 2026-08-20. See Research 003 for the canonical
+> boundary.
+>
+> **Two axes, not one.** Research 003's repo table is the *public/private*
+> axis; its §"The Second Axis: Layering (game / dApp / chain)" is the
+> *layering* axis — which private repo a game concern goes in. **Three tests,
+> all must pass** (revised 2026-08-20; the earlier one-question form admitted
+> FAME as "value" and ignored write rate):
+> **(1) Product** — would a commerce customer of the chain want this in their
+> dependency? An NFT is a token, so yes; a quest, no. **(2) Value** — BigInt
+> fungible currency, a token, or an authority binding? FAME / XP / items /
+> reputation are game scalars, not money. **(3) Rate** — does it fit a Glacial
+> tier (≤0.1 Hz)? Binds hardest; `riir-neuron-db` is 1,627× cheaper per write
+> and one chain tx at 10⁵ accounts eats 63% of a 20 Hz hot tick.
+> Canonical failure: game rules (quest / bounty / crafting / reputation, two of
+> them moving no money at all) shipped inside `riir-chain`'s
+> consensus-critical program set — `riir-chain` Issues 096 + 097, closed on the
+> layering side by `riir-dapps`.
 
 ## Numbering Discipline
 

@@ -114,7 +114,7 @@ where
     let actual_post = test.pre.advance(&test.action, test.player_id);
     if actual_post != test.expected_post {
         return Err(TransitionTestFailure::StateMismatch {
-            actual_post_debug: format!("{:?}", actual_post),
+            actual_post_debug: format!("{actual_post:?}"),
             expected_post_debug: format!("{:?}", test.expected_post),
             action_debug: format!("{:?}", test.action),
         });

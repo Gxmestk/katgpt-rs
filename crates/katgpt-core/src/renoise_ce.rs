@@ -225,7 +225,7 @@ where
         match &best {
             None => best = Some((score.drift, P::into_output(candidate))),
             Some((d, _)) if score.drift < *d => {
-                best = Some((score.drift, P::into_output(candidate)))
+                best = Some((score.drift, P::into_output(candidate)));
             }
             _ => {}
         }
@@ -257,6 +257,73 @@ where
         })
         .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(_, c)| P::into_output(c))
+}
+
+/// Best-of-N selection by freedom gain within a drift gate (Issue 665 /
+/// Research 486, arXiv:2608.05423).
+///
+/// Among `n` proposals, drift-score each via renoise-CE (drift = loss, lower
+/// better), keep candidates within `gate` of the best drift, and select the
+/// one whose cell opens the largest Δ-log-extension-count region
+/// ([`crate::extension_count`]). Ties on gain break toward lower drift, then
+/// earlier proposal. The selected cell is recorded into `occupancy` —
+/// caller-owned persistent state across calls (the criterion is a
+/// running-state selection rule; the paper's controller kept a decayed
+/// occupancy table across steps).
+///
+/// Selection-only: no training, no gradient, modelless. The confound control
+/// this mode must beat to promote (Issue 665 T4): random-near-best over the
+/// SAME gate — gain may come from merely relaxing the min-loss choice.
+///
+/// # Allocation
+///
+/// One `Vec` of `(drift, state)` pairs per call (the pool must be revisited
+/// after the best drift is known — proposers may be stochastic, so candidates
+/// cannot be re-drawn). Not a hot-path decode primitive.
+#[allow(clippy::too_many_arguments)] // selection seam mirrors best_of_n_stability + gate/occupancy/classifier (Issue 665)
+#[cfg(feature = "freedom_selection")]
+pub fn best_of_n_freedom<P, O, C>(
+    proposer: &P,
+    operator: &O,
+    config: &RenoiseCeConfig,
+    n: usize,
+    gate: &crate::extension_count::LossGate,
+    occupancy: &mut crate::extension_count::ExtensionOccupancy,
+    cell_of: C,
+    rng: &mut Rng,
+) -> Option<P::Output>
+where
+    P: Proposer<State = O::State>,
+    O: RenoiseCeProbe,
+    C: Fn(&P::State) -> usize,
+{
+    let mut pool: Vec<(f32, P::State)> = Vec::with_capacity(n);
+    for _ in 0..n {
+        let (candidate, _) = proposer.propose();
+        let score = renoise_ce_score(operator, &candidate, config, rng);
+        pool.push((score.drift, candidate));
+    }
+    let best_drift = pool.iter().map(|(d, _)| *d).fold(f32::INFINITY, f32::min);
+
+    // Among gated candidates: max gain, tie → lower drift, tie → earlier index.
+    let mut chosen: Option<(f32, f32, usize)> = None; // (gain, drift, pool idx)
+    for (idx, (drift, state)) in pool.iter().enumerate() {
+        if !gate.admits(*drift, best_drift) {
+            continue;
+        }
+        let gain = occupancy.freedom_gain(cell_of(state));
+        let better = match chosen {
+            None => true,
+            Some((cg, cd, _)) => gain > cg || (gain == cg && *drift < cd),
+        };
+        if better {
+            chosen = Some((gain, *drift, idx));
+        }
+    }
+    let (_, _, idx) = chosen?;
+    let (_, state) = pool.swap_remove(idx);
+    occupancy.record(cell_of(&state));
+    Some(P::into_output(state))
 }
 
 #[cfg(test)]
@@ -592,5 +659,170 @@ mod tests {
             (score.drift - score.per_draw[0]).abs() < 1e-6,
             "k=0 clamped to 1: drift should equal per_draw[0]"
         );
+    }
+
+    // ── best_of_n_freedom (Issue 665 / Research 486) ─────────────────
+    //
+    // Toy: state = (cell, loss); drift = loss (deterministic probe — the
+    // point is the SELECTION rule, not the drift estimator). Partition:
+    // 2 contexts × 2 cells.
+    #[cfg(feature = "freedom_selection")]
+    mod freedom {
+        use super::*;
+
+        /// Candidate state for the freedom toy: (cell, loss). Copy so the pool
+        /// proposer never allocates.
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        struct CellCand {
+            cell: usize,
+            loss: f32,
+        }
+
+        /// Deterministic probe: perturb is a no-op, re_resolve is identity,
+        /// drift = the candidate's loss. The renoise machinery runs but the
+        /// score is exactly the loss — isolating the selection rule.
+        struct CellProbe;
+
+        impl RenoiseCeProbe for CellProbe {
+            type State = CellCand;
+            fn re_resolve(&self, s: &Self::State) -> Self::State {
+                *s
+            }
+            fn perturb(&self, _s: &mut Self::State, _level: f32, _rng: &mut Rng) {}
+            fn drift_ce(c: &Self::State, _r: &Self::State) -> f32 {
+                c.loss
+            }
+        }
+
+        /// Replays a fixed candidate pool (interior-mutability index walk) so all
+        /// arms of a comparison see identical proposals at matched budget.
+        struct FixedPoolProposer<'a> {
+            pool: &'a [CellCand],
+            idx: std::cell::Cell<usize>,
+        }
+
+        impl Proposer for FixedPoolProposer<'_> {
+            type State = CellCand;
+            type Output = CellCand;
+            fn propose(&self) -> (Self::State, usize) {
+                let i = self.idx.get().min(self.pool.len() - 1);
+                self.idx.set(self.idx.get() + 1);
+                (self.pool[i], 1)
+            }
+            fn into_output(s: Self::State) -> Self::Output {
+                s
+            }
+        }
+
+        fn freedom_setup(
+            pool: &'_ [CellCand],
+        ) -> (
+            FixedPoolProposer<'_>,
+            crate::extension_count::ExtensionOccupancy,
+        ) {
+            // 4 cells, contexts [0, 0, 1, 1].
+            let occ = crate::extension_count::ExtensionOccupancy::new(vec![0, 0, 1, 1], 2);
+            (
+                FixedPoolProposer {
+                    pool,
+                    idx: std::cell::Cell::new(0),
+                },
+                occ,
+            )
+        }
+
+        #[test]
+        fn freedom_picks_fresh_cell_within_gate_over_better_occupied() {
+            // Occupancy pre-state: cell 0 (ctx 0) occupied once → fresh cell 1
+            // (same ctx, a=1) has gain ln 3 ≈ 1.0986; cell 0 gain 0.
+            let pool = [
+                CellCand { cell: 0, loss: 1.0 }, // best drift, occupied → gain 0
+                CellCand { cell: 1, loss: 1.3 }, // within gate 0.5, fresh → gain ln 3
+                CellCand { cell: 2, loss: 2.0 }, // outside gate
+            ];
+            let (proposer, mut occ) = freedom_setup(&pool);
+            occ.record(0);
+            let mut rng = Rng::with_seed(7);
+            let out = best_of_n_freedom(
+                &proposer,
+                &CellProbe,
+                &RenoiseCeConfig::K1,
+                pool.len(),
+                &crate::extension_count::LossGate::Absolute(0.5),
+                &mut occ,
+                |s| s.cell,
+                &mut rng,
+            );
+            assert_eq!(out, Some(CellCand { cell: 1, loss: 1.3 }));
+            assert_eq!(occ.cell_count(1), 1, "selected cell recorded");
+            assert_eq!(occ.context_counts(), &[2, 0]);
+        }
+
+        #[test]
+        fn freedom_all_occupied_falls_back_to_min_drift() {
+            // Every candidate in one already-occupied cell → all gains 0 → tie
+            // breaks to lower drift.
+            let pool = [
+                CellCand { cell: 0, loss: 1.2 },
+                CellCand { cell: 0, loss: 1.0 },
+                CellCand { cell: 0, loss: 1.4 },
+            ];
+            let (proposer, mut occ) = freedom_setup(&pool);
+            occ.record(0);
+            let mut rng = Rng::with_seed(7);
+            let out = best_of_n_freedom(
+                &proposer,
+                &CellProbe,
+                &RenoiseCeConfig::K1,
+                pool.len(),
+                &crate::extension_count::LossGate::Absolute(1.0),
+                &mut occ,
+                |s| s.cell,
+                &mut rng,
+            );
+            assert_eq!(out, Some(CellCand { cell: 0, loss: 1.0 }));
+        }
+
+        #[test]
+        fn freedom_empty_pool_returns_none() {
+            let pool: [CellCand; 0] = [];
+            let (proposer, mut occ) = freedom_setup(&pool);
+            let mut rng = Rng::with_seed(7);
+            let out = best_of_n_freedom(
+                &proposer,
+                &CellProbe,
+                &RenoiseCeConfig::K1,
+                0,
+                &crate::extension_count::LossGate::Absolute(0.5),
+                &mut occ,
+                |s| s.cell,
+                &mut rng,
+            );
+            assert_eq!(out, None);
+        }
+
+        #[test]
+        fn freedom_first_activation_dominates_finite_gain() {
+            // cell 3 (ctx 1, EMPTY context) has first-activation gain 2.0 >
+            // cell 1's ln 3 — must win despite worse drift (within gate).
+            let pool = [
+                CellCand { cell: 1, loss: 1.0 }, // fresh in occupied ctx 0 → ln 3
+                CellCand { cell: 3, loss: 1.4 }, // fresh in EMPTY ctx 1 → 2.0
+            ];
+            let (proposer, mut occ) = freedom_setup(&pool);
+            occ.record(0); // ctx 0 has a=1; ctx 1 empty
+            let mut rng = Rng::with_seed(7);
+            let out = best_of_n_freedom(
+                &proposer,
+                &CellProbe,
+                &RenoiseCeConfig::K1,
+                pool.len(),
+                &crate::extension_count::LossGate::Absolute(0.5),
+                &mut occ,
+                |s| s.cell,
+                &mut rng,
+            );
+            assert_eq!(out, Some(CellCand { cell: 3, loss: 1.4 }));
+        }
     }
 }

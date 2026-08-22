@@ -763,14 +763,11 @@ fn solve(game: &StrategicGame) -> Option<Solution> {
     );
     let par_time = par_start.elapsed();
     let total = start.elapsed();
-    eprintln!("   Parallel:   search={:?} total={:?}", par_time, total,);
+    eprintln!("   Parallel:   search={par_time:?} total={total:?}",);
 
     // Benchmark
     let speedup = seq_time.as_secs_f64() / par_time.as_secs_f64().max(0.000001);
-    eprintln!(
-        "   ⚡ Speedup: {:.2}x (seq={:?}, par={:?})",
-        speedup, seq_time, par_time,
-    );
+    eprintln!("   ⚡ Speedup: {speedup:.2}x (seq={seq_time:?}, par={par_time:?})",);
 
     if par_result.is_none() && seq_result.is_some() {
         eprintln!("   ⚠ Sequential found solution but parallel did not!");

@@ -144,8 +144,7 @@ fn g3_batch_is_valid_throughput() {
     let avg_ns = total_ns / N_ITERS as u64;
     let budget_ns = 50_000; // 50μs debug (release ≤ 5μs)
     println!(
-        "G3: batch_is_valid ({} candidates) = {avg_ns}ns (target ≤ {budget_ns}ns debug, ≤ 5μs release)",
-        VOCAB
+        "G3: batch_is_valid ({VOCAB} candidates) = {avg_ns}ns (target ≤ {budget_ns}ns debug, ≤ 5μs release)"
     );
     assert!(
         avg_ns <= budget_ns,

@@ -70,10 +70,10 @@ fn g1_hyperplane_intersection_is_stricter() {
         if b {
             bool_valid += 1;
         }
-        assert_eq!(h, b, "token {}: hyper={} but bool={}", t, h, b);
+        assert_eq!(h, b, "token {t}: hyper={h} but bool={b}");
     }
-    println!("   HyperplanePruner valid count: {}", hyper_valid);
-    println!("   Boolean AND valid count: {}", bool_valid);
+    println!("   HyperplanePruner valid count: {hyper_valid}");
+    println!("   Boolean AND valid count: {bool_valid}");
     assert_eq!(
         hyper_valid, bool_valid,
         "intersection should match boolean AND"
@@ -92,14 +92,12 @@ fn g2_manifold_pruner_soft_scoring() {
     let valid_score = soft.manifold_score(0, 2, &[]);
     let invalid_score = soft.manifold_score(0, 8, &[]);
 
-    println!("   Valid token (2) score: {:.4}", valid_score);
-    println!("   Invalid token (8) score: {:.4}", invalid_score);
+    println!("   Valid token (2) score: {valid_score:.4}");
+    println!("   Invalid token (8) score: {invalid_score:.4}");
 
     assert!(
         valid_score > invalid_score,
-        "valid score {} should > invalid score {}",
-        valid_score,
-        invalid_score
+        "valid score {valid_score} should > invalid score {invalid_score}"
     );
     assert!(valid_score > 0.5, "valid score should be > 0.5");
     assert!(invalid_score < 0.5, "invalid score should be < 0.5");
@@ -125,8 +123,7 @@ fn g3_kernel_scoring_gaussian() {
     );
     assert!(
         distant < 0.01,
-        "distant vectors should score ~0, got {}",
-        distant
+        "distant vectors should score ~0, got {distant}"
     );
 
     let kernel_screener = KernelScreeningPruner::new(
@@ -139,10 +136,7 @@ fn g3_kernel_scoring_gaussian() {
         "perfect relevance kernel should be 1.0"
     );
 
-    println!(
-        "   Identical: {:.4}, Distant: {:.6}, KernelScreener: {:.4}",
-        identical, distant, score
-    );
+    println!("   Identical: {identical:.4}, Distant: {distant:.6}, KernelScreener: {score:.4}");
     println!("   ✅ PASS — kernel scoring produces correct similarity scores");
 }
 
@@ -341,9 +335,9 @@ fn g5_dtree_acceptance_rate_soft_vs_binary() {
         0.0
     };
 
-    println!("   Tokens:       {} (8-dim embeddings)", n_tokens);
-    println!("   Temperature:  {:.2}", temperature);
-    println!("   Threshold:    {:.4}", threshold);
+    println!("   Tokens:       {n_tokens} (8-dim embeddings)");
+    println!("   Temperature:  {temperature:.2}");
+    println!("   Threshold:    {threshold:.4}");
     println!();
     println!("   ── Raw BoundaryPruner ──");
     println!(
@@ -380,13 +374,9 @@ fn g5_dtree_acceptance_rate_soft_vs_binary() {
     );
     println!();
     println!(
-        "   Boundary region (120..199): binary={}, raw_soft>0.5={}, raw_soft>0.3={}",
-        boundary_binary, boundary_soft_050, boundary_soft_030
+        "   Boundary region (120..199): binary={boundary_binary}, raw_soft>0.5={boundary_soft_050}, raw_soft>0.3={boundary_soft_030}"
     );
-    println!(
-        "   Acceptance gain (raw>0.3 vs binary): {:+.2}%",
-        acceptance_gain
-    );
+    println!("   Acceptance gain (raw>0.3 vs binary): {acceptance_gain:+.2}%");
 
     // GOAT promotion gate: gain measured at relaxed threshold
     // (at >0.5, sigmoid(x) > 0.5 ⟺ x > 0, which is binary — no gain possible)
@@ -395,14 +385,10 @@ fn g5_dtree_acceptance_rate_soft_vs_binary() {
     println!();
     if goat_pass {
         println!(
-            "   🟢 GOAT PASS — acceptance gain {:.2}% ≥ 3% → promote to default",
-            acceptance_gain
+            "   🟢 GOAT PASS — acceptance gain {acceptance_gain:.2}% ≥ 3% → promote to default"
         );
     } else {
-        println!(
-            "   🔴 GOAT FAIL — acceptance gain {:.2}% < 3% → keep opt-in",
-            acceptance_gain
-        );
+        println!("   🔴 GOAT FAIL — acceptance gain {acceptance_gain:.2}% < 3% → keep opt-in");
         println!("   NOTE: Soft scoring provides gradient quality, not acceptance gain at >0.5.");
         println!(
             "         sigmoid(dot - threshold) > 0.5 ⟺ dot > threshold ⟺ is_valid() by definition."
@@ -492,7 +478,7 @@ fn g6_kernel_relevance_gaussian_vs_linear() {
         n_relevant,
         n_candidates - n_relevant
     );
-    println!("   Top-K:        {}", top_k);
+    println!("   Top-K:        {top_k}");
     println!(
         "   Linear recall:   {}/{} ({:.0}%)",
         linear_recall,
@@ -506,20 +492,18 @@ fn g6_kernel_relevance_gaussian_vs_linear() {
         gaussian_recall as f64 / top_k as f64 * 100.0
     );
     println!();
-    println!("   Linear top-10:   {:?}", linear_top_k);
-    println!("   Gaussian top-10: {:?}", gaussian_top_k);
+    println!("   Linear top-10:   {linear_top_k:?}");
+    println!("   Gaussian top-10: {gaussian_top_k:?}");
 
     let goat_pass = gaussian_recall >= linear_recall;
     println!();
     if goat_pass {
         println!(
-            "   🟢 GOAT PASS — Gaussian recall ({}) ≥ Linear recall ({})",
-            gaussian_recall, linear_recall
+            "   🟢 GOAT PASS — Gaussian recall ({gaussian_recall}) ≥ Linear recall ({linear_recall})"
         );
     } else {
         println!(
-            "   🔴 GOAT FAIL — Gaussian recall ({}) < Linear recall ({})",
-            gaussian_recall, linear_recall
+            "   🔴 GOAT FAIL — Gaussian recall ({gaussian_recall}) < Linear recall ({linear_recall})"
         );
     }
     println!(
@@ -599,34 +583,21 @@ fn g7_throughput_no_regression() {
         n_tokens,
         n_calls * n_tokens
     );
-    println!(
-        "   Binary:       {:.1} ns/call ({:.2?} total)",
-        binary_ns_per_call, binary_dur
-    );
-    println!(
-        "   Soft:         {:.1} ns/call ({:.2?} total)",
-        soft_ns_per_call, soft_dur
-    );
-    println!("   Overhead:     {:.2}x", overhead_ratio);
+    println!("   Binary:       {binary_ns_per_call:.1} ns/call ({binary_dur:.2?} total)");
+    println!("   Soft:         {soft_ns_per_call:.1} ns/call ({soft_dur:.2?} total)");
+    println!("   Overhead:     {overhead_ratio:.2}x");
 
     let goat_pass = overhead_ratio <= 5.0;
     println!();
     if goat_pass {
-        println!(
-            "   🟢 GOAT PASS — overhead {:.2}x ≤ 5.0x (acceptable)",
-            overhead_ratio
-        );
+        println!("   🟢 GOAT PASS — overhead {overhead_ratio:.2}x ≤ 5.0x (acceptable)");
     } else {
-        println!(
-            "   🔴 GOAT FAIL — overhead {:.2}x > 5.0x (regression)",
-            overhead_ratio
-        );
+        println!("   🔴 GOAT FAIL — overhead {overhead_ratio:.2}x > 5.0x (regression)");
     }
 
     assert!(
         goat_pass,
-        "soft overhead {:.2}x exceeds 5.0x threshold",
-        overhead_ratio
+        "soft overhead {overhead_ratio:.2}x exceeds 5.0x threshold"
     );
     println!("   ✅ PASS — throughput within acceptable bounds");
 }
@@ -776,10 +747,7 @@ fn g8_dtree_manifold_captures_boundary_tokens() {
         .filter(|n| n.token_idx >= boundary_start && n.token_idx < boundary_end)
         .count();
 
-    println!(
-        "   Vocab: {} tokens ({}-dim), {} depths",
-        vocab, dim, depths
-    );
+    println!("   Vocab: {vocab} tokens ({dim}-dim), {depths} depths");
     println!(
         "   Threshold: {:.2}, Gap: {:.2} (is_valid ≥ {:.2})",
         threshold,
@@ -787,44 +755,32 @@ fn g8_dtree_manifold_captures_boundary_tokens() {
         threshold + gap
     );
     println!(
-        "   Boundary tokens: [{}..{}) (manifold_score > 0.5, is_valid = false)",
-        boundary_start, boundary_end
+        "   Boundary tokens: [{boundary_start}..{boundary_end}) (manifold_score > 0.5, is_valid = false)"
     );
     println!();
-    println!(
-        "   Binary tree:   {} nodes, {} boundary",
-        n_binary, boundary_in_binary
-    );
-    println!(
-        "   Manifold tree: {} nodes, {} boundary",
-        n_manifold, boundary_in_manifold
-    );
+    println!("   Binary tree:   {n_binary} nodes, {boundary_in_binary} boundary");
+    println!("   Manifold tree: {n_manifold} nodes, {boundary_in_manifold} boundary");
     println!();
 
     // The manifold tree should capture boundary tokens that binary rejects
     let goat_pass = boundary_in_manifold > boundary_in_binary;
     if goat_pass {
         println!(
-            "   🟢 GOAT PASS — manifold tree has {} boundary nodes vs binary {}",
-            boundary_in_manifold, boundary_in_binary
+            "   🟢 GOAT PASS — manifold tree has {boundary_in_manifold} boundary nodes vs binary {boundary_in_binary}"
         );
     } else {
         println!(
-            "   🔴 GOAT FAIL — manifold tree boundary nodes ({}) ≤ binary ({})",
-            boundary_in_manifold, boundary_in_binary
+            "   🔴 GOAT FAIL — manifold tree boundary nodes ({boundary_in_manifold}) ≤ binary ({boundary_in_binary})"
         );
     }
 
     assert!(
         goat_pass,
-        "manifold tree should capture more boundary tokens than binary: {} vs {}",
-        boundary_in_manifold, boundary_in_binary
+        "manifold tree should capture more boundary tokens than binary: {boundary_in_manifold} vs {boundary_in_binary}"
     );
     assert!(
         n_manifold >= n_binary,
-        "manifold tree should have >= as many nodes as binary: {} vs {}",
-        n_manifold,
-        n_binary
+        "manifold tree should have >= as many nodes as binary: {n_manifold} vs {n_binary}"
     );
     println!("   ✅ PASS — boundary token recovery works");
 }
@@ -869,9 +825,9 @@ fn g9_kernel_score_simd_vs_scalar_benchmark() {
     let si = simd_result / iters as f32;
     assert!((s - si).abs() < 1e-4, "scalar {s} != simd {si}");
 
-    println!("Kernel SIMD vs Scalar (256-dim, {} iters):", iters);
-    println!("  Scalar: {:?}", scalar_time);
-    println!("  SIMD:   {:?}", simd_time);
+    println!("Kernel SIMD vs Scalar (256-dim, {iters} iters):");
+    println!("  Scalar: {scalar_time:?}");
+    println!("  SIMD:   {simd_time:?}");
     println!(
         "  Ratio:  {:.2}x",
         scalar_time.as_secs_f64() / simd_time.as_secs_f64()
@@ -910,17 +866,14 @@ fn g10_bfcp_region_radius_adaptation() {
     }
     let elapsed = start.elapsed();
 
-    println!(
-        "BFCP region_radius throughput ({} iters): {:?}",
-        iters, elapsed
-    );
+    println!("BFCP region_radius throughput ({iters} iters): {elapsed:?}");
     println!(
         "  Per-call: {:.1}ns",
         elapsed.as_nanos() as f64 / iters as f64
     );
-    println!("  Hot radius:   {:.4}", hot_r);
-    println!("  Cold radius:  {:.4}", cold_r);
-    println!("  Default radius: {:.4}", default_r);
+    println!("  Hot radius:   {hot_r:.4}");
+    println!("  Cold radius:  {cold_r:.4}");
+    println!("  Default radius: {default_r:.4}");
 }
 
 // ---------------------------------------------------------------------------

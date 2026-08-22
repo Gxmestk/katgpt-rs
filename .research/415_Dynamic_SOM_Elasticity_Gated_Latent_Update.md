@@ -99,7 +99,7 @@ The DSOM update is a **non-uniform diffusion process** on a lattice. The diffusi
 - The classic SOM is a **uniform diffusion** (fixed σ) with a **decaying diffusion coefficient** (σ(t) → 0) — it freezes over time.
 - DSOM is a **non-uniform, error-modulated diffusion** with a **constant diffusion coefficient** — it never freezes; the diffusion is stronger where the error is higher.
 
-The `graph_laplacian` operator in `katgpt-core/src/dec/` computes uniform Laplacian smoothing. DSOM's insight would make it **error-weighted**: the edge weights in the Laplacian matrix depend on the local error, not just the lattice distance. This is a **weighted codifferential** (δ with position-dependent weights).
+The `graph_laplacian` operator in `katgpt-dec/src/` computes uniform Laplacian smoothing. DSOM's insight would make it **error-weighted**: the edge weights in the Laplacian matrix depend on the local error, not just the lattice distance. This is a **weighted codifferential** (δ with position-dependent weights).
 
 For our codebase, the "lattice" is the **latent-space neighborhood graph**:
 - For `neighbor_heal`: the HLA-similarity graph (shards as vertices, cosine-similarity edges)
@@ -115,7 +115,7 @@ For our codebase, the "lattice" is the **latent-space neighborhood graph**:
 | `neighbor_heal` (Plan 316, Research 298) | `riir-neuron-db/src/neighbor_heal.rs` | Fixed k=5, fixed alpha=0.1, optional `tau`-gated sigmoid weighting of neighbors | DSOM makes k and alpha error-scaled. Also adds structure-matching (uniform support coverage). |
 | `evolve_hla` | `crates/katgpt-sense/src/reconstruction.rs` | Fixed `hla_learning_rate`, fixed update step | DSOM scales the learning rate by `‖observation − current_belief‖`. |
 | `CommittedFieldBlend` (Plan 321, Research 302) | `crates/katgpt-core/src/committed_field_blend.rs` | Per-entity MoE with committed pi weights, fixed tau | DSOM makes the blend weights error-scaled: when the state is far from any archetype, expand the blend (more archetypes contribute). |
-| `graph_laplacian` (Plan 251) | `katgpt-core/src/dec/` | Uniform Laplacian smoothing (fixed edge weights) | DSOM makes edge weights error-dependent (non-uniform diffusion). |
+| `graph_laplacian` (Plan 251) | `katgpt-dec/src/` | Uniform Laplacian smoothing (fixed edge weights) | DSOM makes edge weights error-dependent (non-uniform diffusion). |
 | `BayesianFilterArm` (Plan 370) | `crates/katgpt-core/src/manifold_bandit/mod.rs` | Non-stationary bandit with `filter_drift_rate` | DSOM provides the *update rule* for the filter — how to adapt when drift is detected. Currently the filter detects drift but the update is fixed-step. |
 
 ### 2.4 Fusion

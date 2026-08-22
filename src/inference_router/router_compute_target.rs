@@ -138,23 +138,28 @@ pub fn route_by_module_energy(ffn_frac: f32, attn_frac: f32, qps: u32) -> Comput
     // Branch on QPS band first: groups all qps-dependent rules so each path
     // evaluates at most one ffn/attn comparison instead of up to three.
     match qps {
-        0..=99 => match ffn_frac > 0.70 {
-            // Rule 1 (low QPS half): FFN-heavy → Plasma.
-            true => ComputeTarget::Plasma,
-            // Rule 3: cold-start QPS → ANE.
-            false => ComputeTarget::Ane,
-        },
-        100..=999 => match ffn_frac > 0.70 {
-            // Rule 1 (mid QPS half): FFN-heavy → Plasma.
-            true => ComputeTarget::Plasma,
-            // Rule 4: neither rule applies → Simd.
-            false => ComputeTarget::Simd,
-        },
+        0..=99 => {
+            if ffn_frac > 0.70 {
+                ComputeTarget::Plasma
+            } else {
+                ComputeTarget::Ane
+            }
+        }
+        100..=999 => {
+            if ffn_frac > 0.70 {
+                ComputeTarget::Plasma
+            } else {
+                ComputeTarget::Simd
+            }
+        }
         // qps >= 1000: rule 2 applies, else Simd.
-        _ => match attn_frac > 0.40 {
-            true => ComputeTarget::Gpu,
-            false => ComputeTarget::Simd,
-        },
+        _ => {
+            if attn_frac > 0.40 {
+                ComputeTarget::Gpu
+            } else {
+                ComputeTarget::Simd
+            }
+        }
     }
 }
 
@@ -203,7 +208,7 @@ mod module_energy_route_tests {
         let attn = 0.16;
 
         let mut prev_ord = 0_u8;
-        let mut transitions = Vec::new();
+        let mut transitions = Vec::with_capacity(400 + 1);
         for qps_log in 0..=400 {
             let qps = (10.0_f32 * 10.0_f32.powf(qps_log as f32 / 100.0)) as u32;
             let target = route_by_module_energy(ffn, attn, qps);

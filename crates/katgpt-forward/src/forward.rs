@@ -83,11 +83,13 @@ pub unsafe fn attention_head(
     scale: f32,
 ) {
     // Pass 1: compute Q·K scores into buffer (no per-element scalar max)
+    // `q_slice` is loop-invariant — build it once instead of per-t.
+    // SAFETY: q_head_offset + hd <= n_embd (head_dim * n_head)
+    let q_slice = unsafe { std::slice::from_raw_parts(q.as_ptr().add(q_head_offset), hd) };
     for t in 0..t_n {
         let k_off = t * kv_dim + kv_group_offset;
-        // SAFETY: q_head_offset + hd <= n_embd (head_dim * n_head), k_off + hd <= block_size * kv_dim
+        // SAFETY: k_off + hd <= block_size * kv_dim
         let dot = unsafe {
-            let q_slice = std::slice::from_raw_parts(q.as_ptr().add(q_head_offset), hd);
             let k_slice = std::slice::from_raw_parts(key_cache.as_ptr().add(k_off), hd);
             katgpt_core::simd::simd_dot_f32(q_slice, k_slice, hd)
         };
@@ -116,14 +118,15 @@ pub unsafe fn attention_head(
     katgpt_core::simd::simd_scale_inplace(scores_slice, inv_sum);
     // Zero the output slice before accumulation
     attn_out[q_head_offset..q_head_offset + hd].fill(0.0);
-    // Accumulate: t outer → contiguous value_cache row access
+    // Accumulate: t outer → contiguous value_cache row access.
+    // `out_slice` is loop-invariant — build the raw slice once instead of per-t.
+    let out_slice =
+        unsafe { std::slice::from_raw_parts_mut(attn_out.as_mut_ptr().add(q_head_offset), hd) };
     for t in 0..t_n {
         let s = unsafe { *scores_buf.get_unchecked(t) };
         let v_row = unsafe {
             std::slice::from_raw_parts(value_cache.as_ptr().add(t * kv_dim + kv_group_offset), hd)
         };
-        let out_slice =
-            unsafe { std::slice::from_raw_parts_mut(attn_out.as_mut_ptr().add(q_head_offset), hd) };
         katgpt_core::simd::simd_fused_scale_acc(out_slice, v_row, s, hd);
     }
 }
@@ -322,53 +325,32 @@ pub fn clustered_lm_head(
     // NOTE(078): Cluster tokens are non-contiguous (round-robin assignment), so
     // batched simd_matmul_rows cannot be used directly. Individual simd_dot_f32 calls
     // are optimal here — the function is inlined and dispatch overhead is negligible.
+    //
+    // The per-cluster loop lives in `cluster_head` so this path and the
+    // bound-ranked one (Issue 657) cannot drift apart.
     for &cluster_idx in selected_clusters {
-        let cluster_tokens = &cluster_map[cluster_idx];
-        for &token_idx in cluster_tokens {
-            if token_idx < vocab_size {
-                let row_off = token_idx * n_embd;
-                let dot = katgpt_core::simd::simd_dot_f32(
-                    &lm_head[row_off..row_off + n_embd],
-                    &hidden[..n_embd],
-                    n_embd,
-                );
-                unsafe {
-                    *logits.get_unchecked_mut(token_idx) = dot;
-                }
-            }
-        }
+        crate::cluster_head::fill_cluster_exact(
+            logits,
+            hidden,
+            lm_head,
+            &cluster_map[cluster_idx],
+            vocab_size,
+            n_embd,
+        );
     }
 }
 
-/// Create a round-robin cluster assignment for tokens.
-///
-/// Token `i` is assigned to cluster `i / cluster_size`.
-/// Deterministic, no training needed — simple baseline.
-pub fn cluster_map_round_robin(vocab_size: usize, cluster_size: usize) -> Vec<Vec<usize>> {
-    let num_clusters = vocab_size.div_ceil(cluster_size);
-    let mut map: Vec<Vec<usize>> = (0..num_clusters)
-        .map(|_| Vec::with_capacity(cluster_size))
-        .collect();
-    for token_id in 0..vocab_size {
-        let cluster_id = token_id / cluster_size;
-        map[cluster_id].push(token_id);
-    }
-    map
-}
-
-/// Create cluster assignment from embedding similarity (K-means style).
-///
-/// Groups tokens with similar embeddings together for efficient LM head computation.
-/// Current implementation: round-robin baseline.
-/// TODO: implement actual K-means using embedding cosine similarity (Plan 056: riir-burner).
-pub fn cluster_map_from_embeddings(
-    _wte: &[f32],
-    vocab_size: usize,
-    _n_embd: usize,
-    cluster_size: usize,
-) -> Vec<Vec<usize>> {
-    cluster_map_round_robin(vocab_size, cluster_size)
-}
+// Cluster-map / classifier construction moved to `crate::cluster_build`
+// (Plan 574) — it is load-time work, not forward-pass work, and the k-means
+// implementation would otherwise push this file past its size budget. The
+// former `cluster_map_from_embeddings` stub (which ignored its embeddings and
+// returned round-robin) is now a real k-means; `cluster_map_round_robin`
+// survives there unchanged as the baseline it must beat.
+pub use crate::cluster_build::{
+    ClusterInit, ClusterLayout, LayoutRefusal, TiedPolicy, cluster_classifier_from_map,
+    cluster_layout_from_map, cluster_map_from_embeddings, cluster_map_from_embeddings_with_init,
+    cluster_map_round_robin, cluster_radii_from_map,
+};
 #[allow(clippy::too_many_arguments)] // forward pass: 7 fixed + 1 cfg-gated (domain_latent)
 pub fn forward_base<'a>(
     ctx: &'a mut ForwardContext,

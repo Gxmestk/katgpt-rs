@@ -210,10 +210,9 @@ fn gate_g1_norm_preservation() -> GateResult {
 
     let passed = d8_pass && d64_pass && unit_pass;
     let detail = format!(
-        "max rel drift: D=8 {:.3e}, D=64 {:.3e} (budget {budget:.0e}); \
-         max unit-modulus drift {:.3e} (budget 1e-5); \
-         {pairs_skipped_antipodal} antipodal pairs skipped (covered by G2)",
-        max_rel_drift_d8, max_rel_drift_d64, max_unit_drift
+        "max rel drift: D=8 {max_rel_drift_d8:.3e}, D=64 {max_rel_drift_d64:.3e} (budget {budget:.0e}); \
+         max unit-modulus drift {max_unit_drift:.3e} (budget 1e-5); \
+         {pairs_skipped_antipodal} antipodal pairs skipped (covered by G2)"
     );
 
     if passed {
@@ -491,8 +490,7 @@ fn gate_g5_no_regression() -> GateResult {
     let all_finite = out1.iter().all(|x| x.is_finite()) && out2.iter().all(|x| x.is_finite());
 
     let detail = format!(
-        "double-Slerp drift correction: cos(ħ,μ_T) {:.4} → {:.4} → {:.4} (monotone non-decreasing); all finite: {}",
-        cos_before, cos_mid, cos_after, all_finite
+        "double-Slerp drift correction: cos(ħ,μ_T) {cos_before:.4} → {cos_mid:.4} → {cos_after:.4} (monotone non-decreasing); all finite: {all_finite}"
     );
 
     if monotone && all_finite {

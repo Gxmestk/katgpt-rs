@@ -472,12 +472,15 @@ impl Sr2amPlayer {
                     } else {
                         let mut s = 1.0;
                         // Mild powerup attraction
-                        if let Some(pu) = self
+                        // One pass: `min_by_key` walked the list to find the
+                        // nearest power-up, then the distance it had already
+                        // computed was re-derived. Integer min ⇒ same value.
+                        if let Some(dist) = self
                             .known_powerups
                             .iter()
-                            .min_by_key(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .map(|p| (target.x - p.0).abs() + (target.y - p.1).abs())
+                            .min()
                         {
-                            let dist = (target.x - pu.0).abs() + (target.y - pu.1).abs();
                             s += 0.5 / (dist as f32 + 1.0);
                         }
                         // Penalize being near bombs
@@ -591,8 +594,7 @@ impl BomberPlayer for Sr2amPlayer {
             }
             PlanningDecision::PlanExtend => {
                 // Reuse last_template, recompute hint with current state
-                match self.last_template {
-                    Some(template) => {
+                if let Some(template) = self.last_template {
                         let tid = self.last_template_id.unwrap_or(0);
                         self.round_template_ids.push(tid);
                         let hinted = Self::apply_template_hints(
@@ -603,8 +605,7 @@ impl BomberPlayer for Sr2amPlayer {
                             &opponent_positions,
                         );
                         (hinted, Some(tid))
-                    }
-                    None => {
+                    } else {
                         // No previous template — fall back to PlanNew
                         let (template, tid) = self.template_proposer.select();
                         self.last_template = Some(template);
@@ -619,7 +620,6 @@ impl BomberPlayer for Sr2amPlayer {
                         );
                         (hinted, Some(tid))
                     }
-                }
             }
             PlanningDecision::PlanSkip => {
                 // Skip template entirely — use only heuristic query_scores + Q-values
@@ -738,7 +738,10 @@ impl BomberPlayer for Sr2amPlayer {
                     }
                 }
                 BomberAction::Wait => {
-                    if in_blast_zone(pos, grid, &self.known_bombs) {
+                    // Identical arguments to `currently_in_blast` above and
+                    // `in_blast_zone` is pure — reuse instead of re-walking every
+                    // bomb's wall-aware blast ray a second time each tick.
+                    if currently_in_blast {
                         final_scores[i] = f32::NEG_INFINITY;
                     }
                 }
@@ -774,9 +777,7 @@ impl BomberPlayer for Sr2amPlayer {
             final_scores
                 .iter()
                 .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
-                .map(|(i, _)| ALL_ACTIONS[i])
-                .unwrap_or(BomberAction::Wait)
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal)).map_or(BomberAction::Wait, |(i, _)| ALL_ACTIONS[i])
         };
 
         // Track bomb placement (prevents walking back into own bomb)

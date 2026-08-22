@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/290_latent_field_steering_open_primitive.md](../.research/290_latent_field_steering_open_primitive.md)
 **Source:** Synthesized from CAA + Anthropic Functional Emotions + Gemini "wave interference" reframing
 **Target:** `katgpt-rs/crates/katgpt-core/src/latent_steering.rs` (new module) + Cargo feature `latent_field_steering`
-**Status:** Phase 0–2 COMPLETE (2026-06-23). All 5 GOAT gates PASS — primitive proven, ready for Phase 4 promotion decision. Phase 3 T3.1 DONE (AVX2 SAXPY backend landed, bit-identity verified); T3.2 INCONCLUSIVE — dev host is aarch64 so the AVX2 path is compiled out and the speedup gate cannot be measured here (requires x86_64+AVX2 host). G4 carry-over still PASS (7.1µs with dispatcher). Phase 5 (game integration) deferred to riir-ai Plan 330.
+**Status:** Phase 0–2 COMPLETE (2026-06-23). All 5 GOAT gates PASS — primitive proven, ready for Phase 4 promotion decision. **Phase 3 T3.2 RESOLVED 2026-08-11 (Bench 582, HONEST NEGATIVE):** measured on x86_64+AVX2 — d=8 0.82×, d=16 0.88× vs auto-vectorized scalar. Gate FAILS, T3.1 kept for portability, no perf promotion. G4 carry-over still PASS (6.2µs with dispatcher). Phase 5 (game integration) deferred to riir-ai Plan 330.
 
 ---
 
@@ -28,7 +28,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 ## Phase 0 — Design (COMPLETE)
 
 - [x] T0.1 Research note created ([Research 290](../.research/290_latent_field_steering_open_primitive.md))
-- [x] T0.2 Private guide created ([riir-ai/.research/153](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md))
+- [x] T0.2 Private guide created ([riir-ai/.research/153](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md))
 - [x] T0.3 Plan created (this file)
 - [x] T0.4 Fusion grep complete: zero codebase hits for residual-stream steering on hot path; closest cousins are CNA (neuron-level), EmotionDirections (read-only), FPCG (explicit non-mutation)
 
@@ -149,31 +149,20 @@ Each gate is a standalone file. All must pass to promote from opt-in.
       `len % 8` remainder. Unit test `saxpy_simd_matches_scalar` asserts
       bit-equality at d=8 and d=16 across multiple seeds/alphas — PASSES.
       Clean `cargo clippy` and `cargo check` on katgpt-core with the feature.
-- [-] T3.2 Benchmark SIMD vs scalar on d=8 and d=16. **Gate:** ≥2× speedup at
+- [x] T3.2 Benchmark SIMD vs scalar on d=8 and d=16. **Gate:** ≥2× speedup at
       d=8, ≥1.5× at d=16. Re-run G4 with SIMD path; gate still <1ms.
-      **DEFERRED (2026-06-23) — GATE CANNOT BE EVALUATED ON DEV HOST.**
-      The dev machine is **aarch64 (Apple Silicon)**, so the `#[cfg(target_arch = "x86_64")]`
-      AVX2 backend is compiled out and `apply_latent_steering` routes to the
-      scalar fallback. The bench harness `tests/latent_steering_t3_simd_vs_scalar.rs`
-      runs cleanly but reports scalar-vs-scalar (0.0ns/call at d=8/16 — below timer
-      resolution, NaN speedup) — **these numbers are meaningless and must NOT be
-      used to satisfy the gate.** To get a real verdict, re-run on an x86_64 host
-      with AVX2 (e.g. CI runner, x86 Linux box, or Rosetta-free x86 Mac).
-      **Carry-over gates that DID pass on this host:**
-      - G4 crowd re-run (SIMD dispatcher, 5000×8): p50=7.1µs < 1ms — PASS
-        (dispatcher overhead is invisible at crowd scale).
-      - G1–G5 all still PASS with the dispatcher in place (G4=21.9µs, G5=6.8µs/call).
-      **Honest expectation when measured on x86_64:** the plan author flagged
-      Phase 3 as "likely a no-op" because LLVM already auto-vectorizes the scalar
-      SAXPY at `-O3` (Phase 2 G4 was 19.2µs). A 2× gate at d=8 is unlikely to
-      pass against an auto-vectorizing scalar baseline — manual AVX2 typically
-      only wins when it unlocks instructions the optimizer won't emit (FMA, gather,
-      etc.), and the user explicitly required non-FMA mul+add for bit-identity.
-      Recommendation: treat the SIMD path as a correctness/ portability asset
-      (explicit, no reliance on auto-vec) rather than a perf gate. If the x86_64
-      measurement comes back <2×, do NOT promote T3.2 but keep T3.1 (the code is
-      correct and may help on targets where auto-vec is disabled, e.g.
-      `RUSTFLAGS=-C target-cpu=x86-64` baseline builds).
+      **RESOLVED 2026-08-11 (Bench 582, HONEST NEGATIVE):** measured on the
+      4090 host (x86_64 + AVX2 + FMA, the host Plan 309 was deferred to).
+      d=8: 0.82× (scalar 1.6ns vs SIMD 1.9ns); d=16: 0.88× (scalar 1.7ns vs
+      SIMD 2.0ns). GATE FAILS — explicit AVX2 SAXPY loses to LLVM's
+      auto-vectorized scalar form at small d. The dispatcher overhead
+      (`is_x86_feature_detected!` per call) costs more than the explicit
+      AVX2 saves. G4 carry-over still PASS (6.2µs < 1ms — crowd scale
+      amortizes the dispatcher). **T3.1 stays in place** per the plan's
+      pre-registered recommendation (correctness/portability asset for
+      no-auto-vec builds); T3.2 gate is recorded as honest negative, no
+      perf promotion. The original bench reported 0.0ns/call at d=8/16
+      (below timer resolution — patched to batch 4096 calls per timer read).
 
 ---
 
@@ -200,7 +189,7 @@ Changes:
 ## Phase 5 — Game Integration (DEFERRED to riir-ai)
 
 **Status (2026-06-23):** Phase 2 G1–G2 PASS — primitive proven and promoted to default in katgpt-rs. Game-side wiring deferred to riir-ai Plan 330. See
-[riir-ai/.research/153](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md)
+[riir-ai/.research/153](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md)
 for the integration guide.
 
 - [x] T5.1 HLA post-evolve wiring. **DONE (riir-ai):** `ReconstructionState::hla_mut()` accessor added to katgpt-core (commit `094854e9`); `FieldRegistry` + post-`evolve_hla` steering pass landed in `riir-ai/crates/riir-engine/src/latent_field_wiring.rs` behind `latent_field_wiring` feature (papaya-backed zone→field registry, `apply_to_reconstruction` runs the additive overlay after evolve). 10/10 tests pass.
@@ -213,7 +202,7 @@ for the integration guide.
 ## Cross-Refs
 
 - [katgpt-rs/.research/290_latent_field_steering_open_primitive.md](../.research/290_latent_field_steering_open_primitive.md) — research note
-- [riir-ai/.research/153_latent_field_steering_game_runtime_guide.md](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md) — private guide
+- [riir-ai/.research/153_latent_field_steering_game_runtime_guide.md](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md) — private guide
 - [katgpt-rs/.plans/162_emotion_vector_inference_control.md](162_emotion_vector_inference_control.md) — read-only counterpart
 - [katgpt-rs/.plans/087_cna_contrastive_neuron_attribution.md](087_cna_contrastive_neuron_attribution.md) — neuron-level mutation counterpart
 - [katgpt-rs/.plans/286_functional_attention_spectral_transport.md](286_functional_attention_spectral_transport.md) — F2 fusion target (cross-domain steering)

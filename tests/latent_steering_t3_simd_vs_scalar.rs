@@ -63,16 +63,34 @@ impl Rng {
 
 /// Time `iters` calls to `f`, return median ns/call. `f` must do real work on
 /// `state` each call (otherwise the optimizer hoists it out).
-fn time_median_ns<F: FnMut(&mut [f32])>(state: &mut [f32], iters: usize, mut f: F) -> f64 {
+///
+/// At d=8/16 a single SAXPY is a handful of nanoseconds, well below
+/// `Instant::now()` resolution on most hosts (Windows QPC floor ≈ 100ns,
+/// Linux CLOCK_MONOTONIC ≈ 20ns). The original loop measured one call per
+/// timer read and produced `0.0ns/call` (NaN speedup) — a measurement-floor
+/// artifact, not a real result. The batched variant below runs `batch` calls
+/// per timer read so the per-call cost rises above the timer floor, then
+/// divides back out. `batch` must be large enough that `batch × per_call_ns`
+/// is well above the timer floor.
+fn time_median_ns_batched<F: FnMut(&mut [f32])>(
+    state: &mut [f32],
+    iters: usize,
+    batch: usize,
+    mut f: F,
+) -> f64 {
     // Warmup
     for _ in 0..N_WARMUP {
-        f(state);
+        for _ in 0..batch {
+            f(state);
+        }
     }
     let mut times_ns: Vec<f64> = Vec::with_capacity(iters);
     for _ in 0..iters {
         let t0 = Instant::now();
-        f(state);
-        let dt = t0.elapsed().as_nanos() as f64;
+        for _ in 0..batch {
+            f(state);
+        }
+        let dt = t0.elapsed().as_nanos() as f64 / batch as f64;
         times_ns.push(dt);
     }
     black_box(state.as_ptr());
@@ -125,13 +143,17 @@ fn t3_simd_vs_scalar_throughput() {
         let alpha = 0.3f32;
 
         // ── SIMD path: apply_latent_steering dispatches to AVX2 when available.
-        let ns_simd = time_median_ns(&mut state_simd, N_ITERS, |s| {
+        // Batch = 4096 so per-timer-read work is well above QPC floor (~100ns
+        // on Windows). At d=8 a single call is ~few ns; 4096 calls ≈ 10-20µs
+        // per timer read, comfortably measurable.
+        const BATCH_D8_D16: usize = 4096;
+        let ns_simd = time_median_ns_batched(&mut state_simd, N_ITERS, BATCH_D8_D16, |s| {
             apply_latent_steering(s, &steering);
         });
 
         // ── Scalar baseline: inline scalar SAXPY (matches the pre-T3.1 loop).
         let dir_for_closure = dir.clone();
-        let ns_scalar = time_median_ns(&mut state_scalar, N_ITERS, move |s| {
+        let ns_scalar = time_median_ns_batched(&mut state_scalar, N_ITERS, BATCH_D8_D16, move |s| {
             let p = black_box(s.as_ptr());
             for (si, di) in s.iter_mut().zip(dir_for_closure.iter()) {
                 *si += alpha * di;

@@ -117,6 +117,16 @@ The cost tensor. **Cost convention**: minimize.
 | `gamma0(ρ) -> f32` | Moderator objective `Γ₀`. **Required.** |
 | `gamma0_coeff(s, a) -> f32` (default) | Per-index coefficient of `Γ₀` (default: `= reward_follow`). |
 
+#### `trait TransitionKernel<N, A>` (Plan 569)
+
+MDP transition dynamics for the transition-kernel-constrained CCE. Provides
+`P(s'|s,a)` — the transition kernel. Used by `CceLp::solve_with_dynamics` to
+add balance-equation rows enforcing stationary MDP consistency.
+
+| Method | Description |
+|---|---|
+| `transition(s, a, s') -> f32` | `P(s'\|s,a)` — MUST sum to 1 over `s'` for each `(s, a)`. **Required.** |
+
 ### `ExternalRegret` (`external_regret.rs`)
 
 Stateless regret evaluator. All methods take `&D` and `&P` per call.
@@ -136,15 +146,40 @@ ER(ρ) = max_{κ ∈ D} (γ(ρ) − γ_dev(ρ, κ))
 
 ### `CceLp` (`lp.rs`)
 
-LP-CCE solver via BFS enumeration.
+LP-CCE solver via BFS enumeration + two-phase primal simplex + constraint generation.
 
 | Method | Returns | Notes |
 |---|---|---|
-| `solve(d, p)` | `Result<OccupationMeasure, CceLpError>` | Optimal `ρ⋆ = argmin γ₀`. |
+| `solve(d, p)` | `Result<OccupationMeasure, CceLpError>` | Optimal `ρ⋆ = argmin γ₀`. Auto-selects BFS (small LPs) or simplex (large). |
+| `solve_with_dynamics(d, p, k)` | `Result<OccupationMeasure, CceLpError>` | Transition-kernel-constrained CCE (Plan 569). Adds `N-1` balance rows. |
+| `solve_heterogeneous(game)` | `Result<OccupationMeasure, CceLpError>` | Full heterogeneous LP. Auto-selects BFS or simplex. |
+| `solve_heterogeneous_cg(game)` | `Result<OccupationMeasure, CceLpError>` | **Constraint-generation solver** (Plan 572). Starts with no deviation constraints, iteratively adds the most-violated. Production path for large heterogeneous LPs (e.g., 2-player RPS at NA=81). |
+| `solve_heterogeneous_cg_with_tolerance(game, ε)` | `Result<OccupationMeasure, CceLpError>` | CG with explicit convergence tolerance. |
 | `is_cce(ρ, d, p, ε)` | `bool` | Verify `ER(ρ) ≤ ε`. |
+| `is_heterogeneous_cce(ρ, game, ε)` | `bool` | Verify 2+ player CCE condition. |
 
-**Complexity**: `O(C(N·A + |D|, 1 + |D|) · m³)` where `m = 1 + |D|`. Exact for
-`N·A + |D| ≤ ~25` (emission-abatement N=4,A=4: `C(20, 5) = 15504` candidates, <1ms).
+**Auto-selection**: `solve` and `solve_heterogeneous` compute `C(n_vars, n_cons)`
+and use BFS enumeration if `≤ 50_000` candidates (exact, fast), otherwise the
+two-phase primal simplex (Plan 572). This is transparent — same signature,
+same output contract.
+
+**Constraint generation** (Plan 572): `solve_heterogeneous_cg` is the production
+path for large heterogeneous LPs. It starts with no deviation constraints,
+solves the relaxed LP, finds the most-violated deviation via the external-regret
+separation oracle, adds it, and re-solves. Converges in `O(|active set|)`
+iterations — typically far fewer than `Σ_i |D_i|` because only the binding
+deviations end up active. At NA=81 (2-player RPS), converges in 4 iterations
+(~2 ms).
+
+**Complexity**: BFS is `O(C(N·A + |D|, 1 + |D|) · m³)` where `m = 1 + |D|`.
+Exact for `N·A + |D| ≤ ~25`. The simplex is worst-case exponential (Bland's
+rule) but never observed in practice on CCE-sized LPs. Both are deterministic.
+
+**`solve_with_dynamics`** (Plan 569) adds `N-1` balance-equation rows enforcing
+stationary MDP consistency: `ν(s') = Σ_{s,a} ρ(s,a)·P(s'|s,a)`. This closes the
+free-state-distribution artifact (Issue 574 T4 PASS): on a 2-state MDP with
+action-dependent transitions, the constrained CCE recovers the exact true MDP
+optimum. Requires a `TransitionKernel<N, A>` impl providing `P(s'|s,a)`.
 
 ### `CcePrimalDual` (`primal_dual.rs`)
 
@@ -231,9 +266,9 @@ See `.benchmarks/029_cce_convergence.md` for G2 details, `tests/cce_vs_nash.rs` 
 
 ## Limitations
 
-1. **Player-1-only CCE.** The deviation class `D` models only one player's deviations. Multi-player CCE (both players' constraints) requires extending `D` — deferred to riir-ai Plan 325.
-2. **No dynamics.** The LP treats the state distribution as free. MFG dynamics (occupation-measure flow constraints) are a Plan 325 follow-up.
-3. **BFS enumeration LP.** Exact for `N·A + |D| ≤ ~25`. Larger problems need a real simplex — swap `CceLp::solve` internals when needed.
+1. **Player-1-only CCE.** The deviation class `D` models only one player's deviations. Multi-player CCE (both players' constraints) requires extending `D` — deferred to riir-ai Plan 325. **For zero-sum games** (e.g., RPS), the single-player `solve` produces a trivial artifact that exploits the free state distribution (Issue 573/574/575). The fix is the 2-player CCE path: `is_heterogeneous_cce` with N=9, A=9 (joint recommendation state, joint play action) correctly rejects the artifact because player 2 can profitably deviate (Issue 575 Part B, T5 PASS). The `solve_heterogeneous_cg` constraint-generation solver (Plan 572) now SOLVES the 2-player CCE LP at NA=81 (~2 ms, 4 iterations), closing the verify-only gap. **General-sum 2-player CCE closure (Issue 577):** `solve_heterogeneous_cg` is verified on Chicken + PD (general-sum games with asymmetric per-player cost tensors) via CG-vs-BFS parity + CCE validity + no-profitable-deviation checks. Production consumers should route zero-sum AND general-sum 2-player games to `solve_heterogeneous_cg` + `is_heterogeneous_cce`.
+2. **~~No dynamics~~ Dynamics available via `solve_with_dynamics` (Plan 569).** The base `solve` treats the state distribution as free. The `solve_with_dynamics` variant adds the stationary MDP balance equation (`ν(s') = Σ ρ(s,a)·P(s'|s,a)`), closing the free-state-distribution artifact on games with action-dependent transitions. For games with state-independent transitions (e.g., RPS), the balance equation reduces to a marginal constraint (Issue 573 T4a) and a richer deviation class also fails (Issue 575 Part A — the artifact is a fixed point of best-response). The correct fix for zero-sum games is the 2-player CCE path via `is_heterogeneous_cce` (Issue 575 Part B — player 2's profitable deviation rejects the artifact).
+3. **~~BFS enumeration LP~~ Simplex + constraint generation shipped (Plan 572).** BFS enumeration remains the fast path for `C(n_vars, n_cons) ≤ 50_000`. For larger LPs, `solve` / `solve_heterogeneous` auto-select the two-phase primal simplex (Bland's rule, deterministic). `solve_heterogeneous_cg` adds constraint generation for the production 2-player case. No external LP solver dependency.
 4. **Euclidean Bregman only.** KL potential (entropic mirror descent) is implemented in `bregman.rs` but not wired into `CcePrimalDual`.
 
 ---

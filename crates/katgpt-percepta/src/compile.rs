@@ -528,7 +528,7 @@ fn compile_function(
 ) -> Result<Vec<DispatchEntry>, CompileError> {
     // Build import map: func_index → import name
     let mut func_import_idx = 0usize;
-    let mut import_map: HashMap<usize, &str> = HashMap::new();
+    let mut import_map: HashMap<usize, &str> = HashMap::with_capacity(module.imports.len());
     for imp in &module.imports {
         if imp.kind == ImportKind::Func {
             import_map.insert(func_import_idx, &imp.name);
@@ -663,12 +663,11 @@ fn compile_function(
             let default_label_idx = instr.immediates[n_targets] as usize;
 
             // Temp local for saving the switch index
-            let temp = match global_temp_local {
-                Some(t) => t,
-                None => {
-                    let ti = module.func_type_indices[_local_func_idx] as usize;
-                    module.types[ti].params.len() as i32 + func.num_locals as i32
-                }
+            let temp = if let Some(t) = global_temp_local {
+                t
+            } else {
+                let ti = module.func_type_indices[_local_func_idx] as usize;
+                module.types[ti].params.len() as i32 + func.num_locals as i32
             };
 
             // Save switch index to temp local
@@ -735,15 +734,12 @@ fn compile_function(
         if op == OP_CALL {
             let fi = instr.immediates[0] as usize;
             if fi < num_imports {
-                match import_map.get(&fi) {
-                    Some(&"output_byte") => {
-                        entries.push(("output", 0));
-                    }
-                    _ => {
-                        return Err(CompileError::UnsupportedOpcode(format!(
-                            "CALL to import {fi}"
-                        )));
-                    }
+                if let Some(&"output_byte") = import_map.get(&fi) {
+                    entries.push(("output", 0));
+                } else {
+                    return Err(CompileError::UnsupportedOpcode(format!(
+                        "CALL to import {fi}"
+                    )));
                 }
             } else {
                 entries.push(("call", fi as i32));
@@ -1709,12 +1705,11 @@ mod tests {
 
     #[test]
     fn test_e2e_compile_hello_c() {
-        let _cc = match skip_without_clang() {
-            Some(cc) => cc,
-            None => {
-                eprintln!("skipping: no clang with wasm32");
-                return;
-            }
+        let _cc = if let Some(cc) = skip_without_clang() {
+            cc
+        } else {
+            eprintln!("skipping: no clang with wasm32");
+            return;
         };
 
         let hello_c = r#"
@@ -1772,12 +1767,11 @@ void compute(const char *input) {
 
     #[test]
     fn test_e2e_compile_collatz_c() {
-        let _cc = match skip_without_clang() {
-            Some(cc) => cc,
-            None => {
-                eprintln!("skipping: no clang with wasm32");
-                return;
-            }
+        let _cc = if let Some(cc) = skip_without_clang() {
+            cc
+        } else {
+            eprintln!("skipping: no clang with wasm32");
+            return;
         };
 
         let collatz_c = r#"
@@ -1832,12 +1826,11 @@ void compute(const char *input) {
 
     #[test]
     fn test_e2e_compile_c_to_wasm_only() {
-        let _cc = match skip_without_clang() {
-            Some(cc) => cc,
-            None => {
-                eprintln!("skipping: no clang with wasm32");
-                return;
-            }
+        let _cc = if let Some(cc) = skip_without_clang() {
+            cc
+        } else {
+            eprintln!("skipping: no clang with wasm32");
+            return;
         };
 
         let simple_c = r#"
@@ -1885,12 +1878,11 @@ void compute(const char *input) {
 
     #[test]
     fn test_e2e_compile_no_input_program() {
-        let _cc = match skip_without_clang() {
-            Some(cc) => cc,
-            None => {
-                eprintln!("skipping: no clang with wasm32");
-                return;
-            }
+        let _cc = if let Some(cc) = skip_without_clang() {
+            cc
+        } else {
+            eprintln!("skipping: no clang with wasm32");
+            return;
         };
 
         // A program that doesn't take input

@@ -87,8 +87,10 @@ fn jacobi_eigendecompose(matrix: &[f64], dim: usize) -> (Vec<f32>, Vec<f32>) {
         let mut max_val = 0.0f64;
         let (mut p, mut q) = (0, 1);
         for i in 0..dim {
-            for j in (i + 1)..dim {
-                let val = a[i * dim + j].abs();
+            // Slice the row once so the inner scan is bounds-check free.
+            let row = &a[i * dim..(i + 1) * dim];
+            for (j, &aij) in row.iter().enumerate().skip(i + 1) {
+                let val = aij.abs();
                 if val > max_val {
                     max_val = val;
                     p = i;
@@ -226,9 +228,15 @@ pub fn calibrate_eigenbasis(samples: &[Vec<f32>], head_dim: usize) -> Calibratio
     // we skip mean-centering since KV vectors are typically centered.
     let mut cov = vec![0.0f64; head_dim * head_dim];
     for sample in samples {
+        // Slice the row up front and hoist `sample[i]` out of the inner loop:
+        // the inner loop becomes a bounds-check-free equal-length `axpy` that
+        // auto-vectorizes. Per-element accumulation order is unchanged.
+        let row_src = &sample[..head_dim];
         for i in 0..head_dim {
-            for j in 0..head_dim {
-                cov[i * head_dim + j] += sample[i] as f64 * sample[j] as f64;
+            let si = row_src[i] as f64;
+            let cov_row = &mut cov[i * head_dim..(i + 1) * head_dim];
+            for (c, &sj) in cov_row.iter_mut().zip(row_src.iter()) {
+                *c += si * sj as f64;
             }
         }
     }
@@ -282,15 +290,15 @@ pub fn calibrate_eigenbasis_dual_gram(samples: &[Vec<f32>], head_dim: usize) -> 
     // This matches the standard path which accumulates covariance in f64.
     let mut gram = vec![0.0f64; n_samples * n_samples];
     for i in 0..n_samples {
+        // Hoist the outer sample slice out of the `j` loop and drop the two
+        // unused `enumerate()` counters — the dot product becomes a plain
+        // zipped scan with no per-element index arithmetic.
+        let si = samples[i].as_slice();
         for j in i..n_samples {
+            let sj = samples[j].as_slice();
             let mut dot = 0.0f64;
-            for ((_, sk_i), (_, sk_j)) in samples[i]
-                .iter()
-                .enumerate()
-                .take(head_dim)
-                .zip(samples[j].iter().enumerate().take(head_dim))
-            {
-                dot += *sk_i as f64 * *sk_j as f64;
+            for (&a, &b) in si.iter().take(head_dim).zip(sj.iter().take(head_dim)) {
+                dot += a as f64 * b as f64;
             }
             gram[i * n_samples + j] = dot;
             gram[j * n_samples + i] = dot; // Symmetric

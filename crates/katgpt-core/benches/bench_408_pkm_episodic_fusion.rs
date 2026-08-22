@@ -286,7 +286,7 @@ fn main() {
         DM_RANK,
         DM_RANK * DM_RANK
     );
-    println!("  Pairs: {} (equal write budget for both)", N_PAIRS);
+    println!("  Pairs: {N_PAIRS} (equal write budget for both)");
     println!();
 
     // ── Generate pairs ──────────────────────────────────────────────────────
@@ -311,8 +311,8 @@ fn main() {
     let pkm_mse_uw_k4 = pkm_recall(&pairs, false, 4);
     let t_pkm_uw_k4 = t0.elapsed();
     println!("PKM (unweighted write, k=4):");
-    println!("  recall MSE = {:.6}", pkm_mse_uw_k4);
-    println!("  wall time  = {:?}", t_pkm_uw_k4);
+    println!("  recall MSE = {pkm_mse_uw_k4:.6}");
+    println!("  wall time  = {t_pkm_uw_k4:?}");
     println!();
 
     // ── PKM k=4 weighted ─────────────────────────────────────────────────────
@@ -320,8 +320,8 @@ fn main() {
     let pkm_mse_w_k4 = pkm_recall(&pairs, true, 4);
     let t_pkm_w_k4 = t0.elapsed();
     println!("PKM (weighted write, k=4):");
-    println!("  recall MSE = {:.6}", pkm_mse_w_k4);
-    println!("  wall time  = {:?}", t_pkm_w_k4);
+    println!("  recall MSE = {pkm_mse_w_k4:.6}");
+    println!("  wall time  = {t_pkm_w_k4:?}");
     println!();
 
     // ── PKM k=1 unweighted (minimal collision) ──────────────────────────────
@@ -329,17 +329,17 @@ fn main() {
     let pkm_mse_uw_k1 = pkm_recall(&pairs, false, 1);
     let t_pkm_uw_k1 = t0.elapsed();
     println!("PKM (unweighted write, k=1 — minimal collision):");
-    println!("  recall MSE = {:.6}", pkm_mse_uw_k1);
-    println!("  wall time  = {:?}", t_pkm_uw_k1);
+    println!("  recall MSE = {pkm_mse_uw_k1:.6}");
+    println!("  wall time  = {t_pkm_uw_k1:?}");
     println!();
 
     // ── δ-Mem ───────────────────────────────────────────────────────────────
     let t0 = Instant::now();
     let dm_mse = delta_mem_recall(&pairs);
     let t_dm = t0.elapsed();
-    println!("δ-Mem (rank={}):", DM_RANK);
-    println!("  recall MSE = {:.6}", dm_mse);
-    println!("  wall time  = {:?}", t_dm);
+    println!("δ-Mem (rank={DM_RANK}):");
+    println!("  recall MSE = {dm_mse:.6}");
+    println!("  wall time  = {t_dm:?}");
     println!();
 
     // ── G4 verdict ───────────────────────────────────────────────────────────
@@ -364,8 +364,7 @@ fn main() {
             "❌ FAIL"
         };
         println!(
-            "  {}:  MSE={:.6}  ratio={:.4}  →  {}",
-            label, pkm_mse, ratio, verdict
+            "  {label}:  MSE={pkm_mse:.6}  ratio={ratio:.4}  →  {verdict}"
         );
         if ratio < best_ratio {
             best_ratio = ratio;
@@ -383,8 +382,7 @@ fn main() {
     let (_r, alloc_during) = alloc_delta(|| pkm_recall(&pairs, false, 4));
     let _ = alloc_before;
     println!(
-        "  (informational) PKM unweighted k=4 write+recall allocs: {}",
-        alloc_during
+        "  (informational) PKM unweighted k=4 write+recall allocs: {alloc_during}"
     );
     println!();
 
@@ -392,14 +390,12 @@ fn main() {
     let pass = best_ratio <= G4_MSE_RATIO_TARGET;
     if pass {
         println!(
-            "═══ G4: ✅ PASS — best variant '{}' ratio={:.4} ≤ {} ═══",
-            best_label, best_ratio, G4_MSE_RATIO_TARGET
+            "═══ G4: ✅ PASS — best variant '{best_label}' ratio={best_ratio:.4} ≤ {G4_MSE_RATIO_TARGET} ═══"
         );
         // Exit 0 (cargo bench success).
     } else {
         println!(
-            "═══ G4: ❌ FAIL — best variant '{}' ratio={:.4} > {} ═══",
-            best_label, best_ratio, G4_MSE_RATIO_TARGET
+            "═══ G4: ❌ FAIL — best variant '{best_label}' ratio={best_ratio:.4} > {G4_MSE_RATIO_TARGET} ═══"
         );
         std::process::exit(1);
     }

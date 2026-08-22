@@ -563,25 +563,22 @@ fn test_cross_paradigm_pd_fsm_vs_all() {
     // Grim trigger should be in the top half of PD rankings against CA+TM.
     let gt_rank = fsm_scores.iter().position(|(id, _)| *id == gt_id);
 
-    match gt_rank {
-        Some(rank) => {
-            assert!(
-                rank < fsm_scores.len() / 2,
-                "grim trigger should be in top half of PD vs CA+TM, got rank {rank}/{}",
-                fsm_scores.len()
-            );
-        }
-        None => {
-            // Grim trigger may not be in the enumerated set due to dedup differences.
-            // Verify at least that some cooperative strategy performs well.
-            let best = fsm_scores.first().expect("at least one FSM");
-            let pd_defect_eq = -3.0 * rounds as f64;
-            assert!(
-                best.1 > pd_defect_eq,
-                "best FSM in PD vs CA+TM should beat mutual defection ({pd_defect_eq:.1}), got {:.4}",
-                best.1
-            );
-        }
+    if let Some(rank) = gt_rank {
+        assert!(
+            rank < fsm_scores.len() / 2,
+            "grim trigger should be in top half of PD vs CA+TM, got rank {rank}/{}",
+            fsm_scores.len()
+        );
+    } else {
+        // Grim trigger may not be in the enumerated set due to dedup differences.
+        // Verify at least that some cooperative strategy performs well.
+        let best = fsm_scores.first().expect("at least one FSM");
+        let pd_defect_eq = -3.0 * rounds as f64;
+        assert!(
+            best.1 > pd_defect_eq,
+            "best FSM in PD vs CA+TM should beat mutual defection ({pd_defect_eq:.1}), got {:.4}",
+            best.1
+        );
     }
 
     // Best FSM should beat the always-defect equilibrium (-3.0 per round).

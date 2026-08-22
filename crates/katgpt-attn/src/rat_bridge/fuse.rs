@@ -139,7 +139,7 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
         // Allow: intentional uninit-then-fill to skip the memset.
         #[allow(clippy::uninit_vec)]
         unsafe {
-            weights.set_len(n_kv)
+            weights.set_len(n_kv);
         };
         for (i, k) in kv_keys_dilated.iter().enumerate() {
             let w = sigmoid(katgpt_core::simd::simd_dot_f32(k.as_ref(), query, dim));
@@ -222,10 +222,7 @@ pub fn rat_decode_step_into(
     // 1. Update bridge gate
     state.compute_gate(query, gdn2_readout);
 
-    // 2. Get dilated indices — no clones, just indices into kv_keys/kv_vals.
-    let indices = DilatedKvAccessor::dilated_indices(kv_keys.len(), state.dilation);
-
-    // 3. Gather dilated KV references without cloning. We need &[Vec<f32>]
+    // 2+3. Gather dilated KV references without cloning. We need &[Vec<f32>]
     // to match `bridge_attention_into`'s signature; building it from indices
     // is a small allocation but is `O(n_dilated)` pointers, not `O(n_dilated * dim)` f32s.
     //
@@ -236,8 +233,19 @@ pub fn rat_decode_step_into(
     // For the absolute hottest decode loops, callers can pre-build the
     // dilated slice references themselves and call `bridge_attention_into`
     // directly to skip even this pointer-vec allocation.
-    let keys_dilated: Vec<&Vec<f32>> = indices.iter().map(|&i| &kv_keys[i]).collect();
-    let vals_dilated: Vec<&Vec<f32>> = indices.iter().map(|&i| &kv_vals[i]).collect();
+    //
+    // The intermediate `dilated_indices()` `Vec<usize>` is gone: `step_by`
+    // walks the exact same 0, stride, 2·stride… positions, so the gathered
+    // order (and the `kv_vals[i]` panic-on-short-vals behaviour) is unchanged,
+    // but one heap allocation per decode step disappears and both pointer Vecs
+    // are sized exactly up front instead of growing.
+    let n_dilated = DilatedKvAccessor::dilated_len(kv_keys.len(), state.dilation);
+    let mut keys_dilated: Vec<&Vec<f32>> = Vec::with_capacity(n_dilated);
+    let mut vals_dilated: Vec<&Vec<f32>> = Vec::with_capacity(n_dilated);
+    for i in (0..kv_keys.len()).step_by(state.dilation.stride()) {
+        keys_dilated.push(&kv_keys[i]);
+        vals_dilated.push(&kv_vals[i]);
+    }
 
     bridge_attention_into(
         query,

@@ -149,8 +149,7 @@ fn main() {
         K
     );
     println!(
-        "  LATENCY_ITERS={}, JACCARD_QUERIES={}, ALLOC_ITERS={}",
-        LATENCY_ITERS, JACCARD_QUERIES, ALLOC_ITERS
+        "  LATENCY_ITERS={LATENCY_ITERS}, JACCARD_QUERIES={JACCARD_QUERIES}, ALLOC_ITERS={ALLOC_ITERS}"
     );
     println!("══════════════════════════════════════════════════════════════════\n");
 
@@ -221,13 +220,11 @@ fn main() {
 
     println!("── G1: latency (O(√N) PKM vs O(N) brute-force) ──────────────────");
     println!(
-        "  PKM   p50 = {:>10} ns  (mean {:.0} ns, p99 {:.0} ns)",
-        pkm_p50, pkm_mean, pkm_p99
+        "  PKM   p50 = {pkm_p50:>10} ns  (mean {pkm_mean:.0} ns, p99 {pkm_p99:.0} ns)"
     );
-    println!("  BF    p50 = {:>10} ns  ({} iters)", bf_p50, bf_iters);
+    println!("  BF    p50 = {bf_p50:>10} ns  ({bf_iters} iters)");
     println!(
-        "  Speedup    = {:>7.1}×   (target ≥ {:.0}×)",
-        speedup, G1_SPEEDUP_TARGET
+        "  Speedup    = {speedup:>7.1}×   (target ≥ {G1_SPEEDUP_TARGET:.0}×)"
     );
     println!(
         "  G1 verdict: {}\n",
@@ -251,8 +248,7 @@ fn main() {
 
     println!("── G2: top-k Jaccard vs brute-force ─────────────────────────────");
     println!(
-        "  Mean Jaccard = {:.4}  (min {:.4}, {} queries)",
-        jaccard_mean, jaccard_min, JACCARD_QUERIES
+        "  Mean Jaccard = {jaccard_mean:.4}  (min {jaccard_min:.4}, {JACCARD_QUERIES} queries)"
     );
     println!(
         "  G2 verdict: {}   (target ≥ {:.2})\n",
@@ -343,11 +339,10 @@ fn main() {
     let g3_pass = idw_ratio >= G3_IDW_RATIO_TARGET;
 
     println!("── G3: IDW centroid-ness (intra-cluster-0 access rate) ──────────");
-    println!("  Dot intra-cluster rate = {:.3}", dot_rate);
-    println!("  IDW intra-cluster rate = {:.3}", idw_rate);
+    println!("  Dot intra-cluster rate = {dot_rate:.3}");
+    println!("  IDW intra-cluster rate = {idw_rate:.3}");
     println!(
-        "  IDW / Dot ratio        = {:.3}×   (target ≥ {:.1}×)",
-        idw_ratio, G3_IDW_RATIO_TARGET
+        "  IDW / Dot ratio        = {idw_ratio:.3}×   (target ≥ {G3_IDW_RATIO_TARGET:.1}×)"
     );
     println!(
         "  G3 verdict: {}\n",
@@ -376,8 +371,7 @@ fn main() {
 
     println!("── G4: zero-alloc steady state ──────────────────────────────────");
     println!(
-        "  Allocations over {} query_into calls: {}  (target 0)",
-        ALLOC_ITERS, alloc_delta
+        "  Allocations over {ALLOC_ITERS} query_into calls: {alloc_delta}  (target 0)"
     );
     println!(
         "  G4 verdict: {}\n",

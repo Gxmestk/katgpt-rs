@@ -25,7 +25,7 @@ fn main() {
 
     // GOAT G7: paper-average profile routes to Plasma at qps=500.
     let paper = ModuleEnergyProfile::PAPER_AVERAGE;
-    println!("Paper-average OPD profile: {:?}", paper);
+    println!("Paper-average OPD profile: {paper:?}");
     println!(
         "  total = {:.3} (valid: {})\n",
         paper.total(),
@@ -33,10 +33,7 @@ fn main() {
     );
 
     let target_g7 = route_by_module_energy(paper.ffn, paper.attn, 500);
-    println!(
-        "GOAT G7: route(ffn=0.78, attn=0.16, qps=500) = {:?}",
-        target_g7
-    );
+    println!("GOAT G7: route(ffn=0.78, attn=0.16, qps=500) = {target_g7:?}");
     if target_g7 == ComputeTarget::Plasma {
         println!("  ✅ PASS: matches paper FFN profile → Plasma\n");
     } else {
@@ -52,12 +49,12 @@ fn main() {
         let qps = (10.0_f32 * 10.0_f32.powf(qps_log as f32 / 100.0)) as u32;
         let target = route_by_module_energy(paper.ffn, paper.attn, qps);
         if prev_target != Some(target) {
-            println!("  qps={:>6}: {:?}", qps, target);
+            println!("  qps={qps:>6}: {target:?}");
             prev_target = Some(target);
             transitions += 1;
         }
     }
-    println!("  Total transitions: {}", transitions);
+    println!("  Total transitions: {transitions}");
     if transitions >= 1 {
         println!("  ✅ PASS: monotone, no flapping\n");
     } else {
@@ -102,13 +99,13 @@ fn main() {
     // Header.
     print!("{:<22}", "Profile \\ QPS");
     for &qps in qps_values {
-        print!("{:>10}", qps);
+        print!("{qps:>10}");
     }
     println!();
     println!("{}", "-".repeat(22 + 10 * qps_values.len()));
 
     for &(name, profile) in profiles {
-        print!("{:<22}", name);
+        print!("{name:<22}");
         for &qps in qps_values {
             let target = route_by_module_energy(profile.ffn, profile.attn, qps);
             let short = match target {
@@ -117,7 +114,7 @@ fn main() {
                 ComputeTarget::Gpu => "Gpu",
                 ComputeTarget::Ane => "Ane",
             };
-            print!("{:>10}", short);
+            print!("{short:>10}");
         }
         println!();
     }

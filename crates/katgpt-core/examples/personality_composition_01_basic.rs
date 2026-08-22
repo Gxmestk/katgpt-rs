@@ -127,5 +127,5 @@ fn main() {
 }
 
 fn hex_short(bytes: &[u8; 32]) -> String {
-    bytes[..8].iter().map(|b| format!("{:02x}", b)).collect()
+    bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
 }

@@ -386,7 +386,7 @@ fn goat_block_diagonal_quality_sweep() {
     println!("{}", "─".repeat(110));
 
     for &bits in &bits_list {
-        let mut line = format!("{:<5} │ ", bits);
+        let mut line = format!("{bits:<5} │ ");
 
         // TurboQuant
         #[cfg(feature = "turboquant")]
@@ -427,7 +427,7 @@ fn goat_block_diagonal_quality_sweep() {
                 agg.add(mse_m, cos_m, ip_m);
             }
             let (mse, _, cos, _) = agg.summary();
-            line.push_str(&format!(" {:>10.6} {:>10.6} │", mse, cos));
+            line.push_str(&format!(" {mse:>10.6} {cos:>10.6} │"));
         }
         #[cfg(not(feature = "octopus"))]
         {
@@ -450,7 +450,7 @@ fn goat_block_diagonal_quality_sweep() {
                 agg.add(mse_m, cos_m, ip_m);
             }
             let (mse, _, cos, _) = agg.summary();
-            line.push_str(&format!(" {:>10.6} {:>10.6} │", mse, cos));
+            line.push_str(&format!(" {mse:>10.6} {cos:>10.6} │"));
         }
         #[cfg(not(feature = "planar_quant"))]
         {
@@ -475,7 +475,7 @@ fn goat_block_diagonal_quality_sweep() {
                 agg.add(mse_m, cos_m, ip_m);
             }
             let (mse, _, cos, _) = agg.summary();
-            line.push_str(&format!(" {:>10.6} {:>10.6} │", mse, cos));
+            line.push_str(&format!(" {mse:>10.6} {cos:>10.6} │"));
         }
         #[cfg(not(feature = "iso_quant"))]
         {
@@ -500,7 +500,7 @@ fn goat_block_diagonal_quality_sweep() {
                 agg.add(mse_m, cos_m, ip_m);
             }
             let (mse, _, cos, _) = agg.summary();
-            line.push_str(&format!(" {:>10.6} {:>10.6} │", mse, cos));
+            line.push_str(&format!(" {mse:>10.6} {cos:>10.6} │"));
         }
         #[cfg(not(feature = "iso_quant"))]
         {
@@ -759,16 +759,7 @@ fn goat_rotation_cost_comparison() {
         let tq_iq_ratio = tq_fmas as f64 / iq_full_fmas as f64;
 
         println!(
-            "{:<6} │ {:>10} {:>10} │ {:>10} {:>10} │ {:>10} {:>10} │ {:>10} {:>10}",
-            dim,
-            tq_fmas,
-            tq_params,
-            pq_fmas,
-            pq_params,
-            iq_full_fmas,
-            iq_full_params,
-            iq_fast_fmas,
-            iq_fast_params,
+            "{dim:<6} │ {tq_fmas:>10} {tq_params:>10} │ {pq_fmas:>10} {pq_params:>10} │ {iq_full_fmas:>10} {iq_full_params:>10} │ {iq_fast_fmas:>10} {iq_fast_params:>10}",
         );
         println!(
             "       │ PQ/TQ={:.0}× faster │ IQ-F/TQ={:.0}× faster │ IQ-R/TQ={:.0}× faster",
@@ -850,17 +841,13 @@ fn goat_planar_quant_vs_octopus_head_to_head() {
             let mse_delta = (pq_mse - oct_mse) / oct_mse * 100.0;
             let winner = if pq_mse < oct_mse { "PQ" } else { "OCT" };
             println!(
-                "{:<5} │ {:>10.6} {:>10.6} │ {:>10.6} {:>10.6} │ {:>+9.1}% │ {:>7}",
-                bits, pq_mse, pq_cos, oct_mse, oct_cos, mse_delta, winner,
+                "{bits:<5} │ {pq_mse:>10.6} {pq_cos:>10.6} │ {oct_mse:>10.6} {oct_cos:>10.6} │ {mse_delta:>+9.1}% │ {winner:>7}",
             );
         }
 
         #[cfg(not(all(feature = "planar_quant", feature = "octopus")))]
         {
-            println!(
-                "{:<5} │ (enable both planar_quant and octopus features)",
-                bits
-            );
+            println!("{bits:<5} │ (enable both planar_quant and octopus features)");
         }
     }
     println!();
@@ -932,7 +919,7 @@ fn goat_iso_quant_full_vs_fast() {
         let n_groups = dim.div_ceil(4);
         let full_fmas = n_groups * 32; // 2 Hamilton products × 16
         let fast_fmas = n_groups * 16; // 1 Hamilton product × 16
-        let fmas_delta = format!("{} vs {}", full_fmas, fast_fmas);
+        let fmas_delta = format!("{full_fmas} vs {fast_fmas}");
 
         println!(
             "{:<5} │ {:>10.6} {:>10.6} │ {:>10.6} {:>10.6} │ {:>8}",
@@ -1019,8 +1006,7 @@ fn goat_dimension_scaling() {
         let (iq_mse, iq_cos) = (0.0, 0.0);
 
         println!(
-            "{:<6} │ {:>10.6} {:>10.6} │ {:>10.6} {:>10.6} │ {:>10.6} {:>10.6}",
-            dim, pq_mse, pq_cos, oct_mse, oct_cos, iq_mse, iq_cos,
+            "{dim:<6} │ {pq_mse:>10.6} {pq_cos:>10.6} │ {oct_mse:>10.6} {oct_cos:>10.6} │ {iq_mse:>10.6} {iq_cos:>10.6}",
         );
     }
     println!();
@@ -1111,8 +1097,7 @@ fn goat_three_way_matrix() {
     let iq_mse: f64 = 0.0;
 
     println!(
-        "│ MSE              │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>12.6} │",
-        tq_mse, oct_mse, pq_mse, iq_mse
+        "│ MSE              │ {tq_mse:>12.6} │ {oct_mse:>12.6} │ {pq_mse:>12.6} │ {iq_mse:>12.6} │"
     );
 
     // Cosine row
@@ -1177,8 +1162,7 @@ fn goat_three_way_matrix() {
     let iq_cos: f64 = 0.0;
 
     println!(
-        "│ Cosine           │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>12.6} │",
-        tq_cos, oct_cos, pq_cos, iq_cos
+        "│ Cosine           │ {tq_cos:>12.6} │ {oct_cos:>12.6} │ {pq_cos:>12.6} │ {iq_cos:>12.6} │"
     );
 
     // Rotation cost rows
@@ -1190,12 +1174,10 @@ fn goat_three_way_matrix() {
     let iq_params = dim.div_ceil(4) * 4 * 2;
 
     println!(
-        "│ Rotation FMAs    │ {:>12} │ {:>12} │ {:>12} │ {:>12} │",
-        tq_fmas, tq_fmas, pq_fmas, iq_fmas
+        "│ Rotation FMAs    │ {tq_fmas:>12} │ {tq_fmas:>12} │ {pq_fmas:>12} │ {iq_fmas:>12} │"
     );
     println!(
-        "│ Params           │ {:>12} │ {:>12} │ {:>12} │ {:>12} │",
-        tq_params, tq_params, pq_params, iq_params
+        "│ Params           │ {tq_params:>12} │ {tq_params:>12} │ {pq_params:>12} │ {iq_params:>12} │"
     );
     println!(
         "│ FMAs ratio vs TQ │ {:>12} │ {:>12} │ {:>11.0}× │ {:>11.0}× │",
@@ -1616,10 +1598,7 @@ fn goat_maxsim_late_interaction() {
                 pq_res.rel_errors.push(rel_err);
                 pq_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ PQ       │ {ms:8.4} │ {pct:8.2}% │",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ PQ       │ {ms:8.4} │ {pct:8.2}% │");
             }
 
             // ── IsoQuant Fast ──
@@ -1650,10 +1629,7 @@ fn goat_maxsim_late_interaction() {
                 iqf_res.rel_errors.push(rel_err);
                 iqf_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ IQ-Fast  │ {ms:8.4} │ {pct:8.2}% │",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ IQ-Fast  │ {ms:8.4} │ {pct:8.2}% │");
             }
 
             // ── IsoQuant Full ──
@@ -1684,10 +1660,7 @@ fn goat_maxsim_late_interaction() {
                 iqr_res.rel_errors.push(rel_err);
                 iqr_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ IQ-Full  │ {ms:8.4} │ {pct:8.2}% │",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ IQ-Full  │ {ms:8.4} │ {pct:8.2}% │");
             }
 
             // ── OCTOPUS ──
@@ -1716,10 +1689,7 @@ fn goat_maxsim_late_interaction() {
                 oct_res.rel_errors.push(rel_err);
                 oct_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ OCT      │ {ms:8.4} │ {pct:8.2}% │",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ OCT      │ {ms:8.4} │ {pct:8.2}% │");
             }
 
             // ── TurboQuant ──
@@ -1746,10 +1716,7 @@ fn goat_maxsim_late_interaction() {
                 tq_res.rel_errors.push(rel_err);
                 tq_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ TQ       │ {ms:8.4} │ {pct:8.2}% │",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ TQ       │ {ms:8.4} │ {pct:8.2}% │");
             }
         }
 
@@ -1769,29 +1736,27 @@ fn goat_maxsim_late_interaction() {
         let mut best_err = f64::INFINITY;
 
         for res in &all_results {
-            match res.available {
-                true => {
-                    let (mean, std) = mean_std(&res.rel_errors);
-                    let name = &res.name;
-                    println!(
-                        "    {name:10} rel_err = {mean:.4} ± {std:.4} ({pct:.2}%)",
-                        pct = mean * 100.0
-                    );
-                    if mean < best_err {
-                        best_err = mean;
-                        best_name = res.name.clone();
-                    }
+            if res.available {
+                let (mean, std) = mean_std(&res.rel_errors);
+                let name = &res.name;
+                println!(
+                    "    {name:10} rel_err = {mean:.4} ± {std:.4} ({pct:.2}%)",
+                    pct = mean * 100.0
+                );
+                if mean < best_err {
+                    best_err = mean;
+                    best_name = res.name.clone();
                 }
-                false => {
-                    let name = &res.name;
-                    println!("    {name:10} (not available)");
-                }
+            } else {
+                let name = &res.name;
+                println!("    {name:10} (not available)");
             }
         }
 
-        match best_name.is_empty() {
-            true => println!("    (no backends available)"),
-            false => println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})"),
+        if best_name.is_empty() {
+            println!("    (no backends available)")
+        } else {
+            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})")
         }
         println!();
     }
@@ -2187,10 +2152,7 @@ fn goat_hybrid_maxsim_late_interaction() {
                 hybrid_res.rel_errors.push(rel_err);
                 hybrid_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ Hybrid   │ {pct:10.4}% │ {ms:8.4}",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ Hybrid   │ {pct:10.4}% │ {ms:8.4}");
             }
 
             // ── OCTOPUS ──
@@ -2219,10 +2181,7 @@ fn goat_hybrid_maxsim_late_interaction() {
                 oct_res.rel_errors.push(rel_err);
                 oct_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ OCT      │ {pct:10.4}% │ {ms:8.4}",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ OCT      │ {pct:10.4}% │ {ms:8.4}");
             }
 
             // ── PlanarQuant ──
@@ -2249,10 +2208,7 @@ fn goat_hybrid_maxsim_late_interaction() {
                 pq_res.rel_errors.push(rel_err);
                 pq_res.available = true;
                 let pct = rel_err * 100.0;
-                println!(
-                    "  {:8} │ {:8} │ PQ       │ {pct:10.4}% │ {ms:8.4}",
-                    bits, seed
-                );
+                println!("  {bits:8} │ {seed:8} │ PQ       │ {pct:10.4}% │ {ms:8.4}");
             }
         }
 
@@ -2272,29 +2228,27 @@ fn goat_hybrid_maxsim_late_interaction() {
         let mut best_err = f64::INFINITY;
 
         for res in &all_results {
-            match res.available {
-                true => {
-                    let (mean, std) = mean_std(&res.rel_errors);
-                    let name = &res.name;
-                    println!(
-                        "    {name:10} rel_err = {mean:.4} ± {std:.4} ({pct:.2}%)",
-                        pct = mean * 100.0
-                    );
-                    if mean < best_err {
-                        best_err = mean;
-                        best_name = res.name.clone();
-                    }
+            if res.available {
+                let (mean, std) = mean_std(&res.rel_errors);
+                let name = &res.name;
+                println!(
+                    "    {name:10} rel_err = {mean:.4} ± {std:.4} ({pct:.2}%)",
+                    pct = mean * 100.0
+                );
+                if mean < best_err {
+                    best_err = mean;
+                    best_name = res.name.clone();
                 }
-                false => {
-                    let name = &res.name;
-                    println!("    {name:10} (not available)");
-                }
+            } else {
+                let name = &res.name;
+                println!("    {name:10} (not available)");
             }
         }
 
-        match best_name.is_empty() {
-            true => println!("    (no backends available)"),
-            false => println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})"),
+        if best_name.is_empty() {
+            println!("    (no backends available)")
+        } else {
+            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})")
         }
         println!();
     }

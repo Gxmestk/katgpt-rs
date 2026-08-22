@@ -522,7 +522,7 @@ fn gate_g2_bandit_regret() -> (bool, String) {
     for (i, (name, regrets)) in results.iter().enumerate() {
         let m = mean(regrets);
         let se = stderr(regrets);
-        println!("  {:<20} {:>12.2} {:>12.2}", name, m, se);
+        println!("  {name:<20} {m:>12.2} {se:>12.2}");
         if name == &"UCB1" {
             ucb1_mean = m;
         }
@@ -543,8 +543,7 @@ fn gate_g2_bandit_regret() -> (bool, String) {
 
     let detail = format!(
         "UCB1 mean={ucb1_mean:.1}, Greedy mean={greedy_mean:.1}, \
-         ReMax means={:?}, max|ReMax-Greedy|={max_remax_greedy_diff:.2}",
-        remax_means
+         ReMax means={remax_means:?}, max|ReMax-Greedy|={max_remax_greedy_diff:.2}"
     );
 
     // G2 PASS condition: ReMax is within 1 stderr of Greedy (theorem confirmation).

@@ -78,8 +78,7 @@ mod tests {
         for l in &loss {
             assert!(
                 l.abs() < 1e-5,
-                "UFKL loss should be ~0 when Q=Q_ref, got {}",
-                l
+                "UFKL loss should be ~0 when Q=Q_ref, got {l}"
             );
         }
     }
@@ -105,8 +104,7 @@ mod tests {
         for l in &loss {
             assert!(
                 l.abs() < 1e-5,
-                "URKL loss should be ~0 when Q=Q_ref, got {}",
-                l
+                "URKL loss should be ~0 when Q=Q_ref, got {l}"
             );
         }
     }
@@ -121,8 +119,7 @@ mod tests {
         for l in &loss {
             assert!(
                 l.is_finite(),
-                "URKL loss should be finite near zero, got {}",
-                l
+                "URKL loss should be finite near zero, got {l}"
             );
         }
     }

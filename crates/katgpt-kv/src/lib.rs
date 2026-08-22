@@ -19,6 +19,7 @@
 //! | `targeted_precision` | `targeted_precision` | `src/targeted_precision.rs` | Plan 227 Phase 2 — per-head bit allocation |
 //! | `cache_prune` | `cache_prune` | `src/cache_prune/` | Plan 140 — SAT + rolling hash + sensitivity masking |
 //! | `segment_checkpoint` | `segment_checkpoint` | `src/segment_checkpoint/` | Plan 223b — GRM segment caching |
+//! | `drift_segment` | `drift_segment` | `src/drift_segment/` | Issue 652 / Research 482 — drift-segmented multi-state memory (arXiv:2606.10650 modelless) |
 //! | `async_qdq` | `async_qdq_overlap` | `src/async_qdq.rs` | Plan 227 Phase 6 — double-buffered KV dequantize |
 //!
 //! # Cross-crate deps
@@ -62,5 +63,7 @@ pub mod targeted_precision;
 pub mod async_qdq;
 #[cfg(feature = "cache_prune")]
 pub mod cache_prune;
+#[cfg(feature = "drift_segment")]
+pub mod drift_segment;
 #[cfg(feature = "segment_checkpoint")]
 pub mod segment_checkpoint;

@@ -120,8 +120,7 @@ impl SonltPlayer {
             .ok()
             .filter(|v| v.len() == 6);
 
-        let (lq, lk, lv, lo, lm1, lm2) = match loaded {
-            Some(v) => {
+        let (lq, lk, lv, lo, lm1, lm2) = if let Some(v) = loaded {
                 // Validate each adapter's in/out dims match Config::game() projections.
                 let n = config.n_embd;
                 let kvd = kv_dim(&config);
@@ -135,10 +134,9 @@ impl SonltPlayer {
                     (Some(&v[4]), n, mlp), // mlp1
                     (Some(&v[5]), mlp, n), // mlp2
                 ];
-                let dims_ok = checks.iter().all(|(a, ein, eout)| {
-                    a.map(|ad| ad.in_dim == *ein && ad.out_dim == *eout)
-                        .unwrap_or(false)
-                });
+                let dims_ok = checks
+                    .iter()
+                    .all(|(a, ein, eout)| a.is_some_and(|ad| ad.in_dim == *ein && ad.out_dim == *eout));
                 if dims_ok {
                     let mut it = v.into_iter();
                     let q = it.next().unwrap();
@@ -152,12 +150,10 @@ impl SonltPlayer {
                     eprintln!("SonltPlayer: adapter dims mismatch — falling back to heuristic");
                     (None, None, None, None, None, None)
                 }
-            }
-            None => {
+            } else {
                 eprintln!("SonltPlayer: LoRA load failed or wrong adapter count — heuristic mode");
                 (None, None, None, None, None, None)
-            }
-        };
+            };
 
         let rank = lq.as_ref().map_or(0, |a| a.rank);
         let n = config.n_embd;
@@ -290,9 +286,7 @@ impl SonltPlayer {
         let best_idx = action_logits
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)).map_or(0, |(i, _)| i);
 
         // Map GameAction (0-5) → BomberAction. Detonate (6) not in model vocab.
         Some(game_action_to_bomber(best_idx))

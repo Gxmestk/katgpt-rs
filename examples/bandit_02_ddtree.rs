@@ -325,7 +325,7 @@ fn print_convergence_plot(model: &[EpisodeResult], modelless: &[EpisodeResult], 
     // Draw rows top-to-bottom
     for row in (0..rows).rev() {
         let y_label = (max_val * row as f32 / (rows - 1) as f32) as i32;
-        print!("{:>5} |", y_label);
+        print!("{y_label:>5} |");
 
         for col in 0..cols {
             let m_row = (m_pts[col] / max_val * (rows - 1) as f32).round() as usize;

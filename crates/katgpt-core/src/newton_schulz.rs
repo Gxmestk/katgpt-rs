@@ -510,12 +510,19 @@ pub fn ns_inv_sqrt_psd_into(
             let a_term = a_k * inv_gamma;
             let b_term = b_k * inv_gamma3;
             let c_term = c_k * inv_gamma5;
+            // Row pre-slicing hoists three `i * r + j` multiplies and three
+            // bounds checks per element out of the inner loop. `(i == j) as u32
+            // as f32` yields exactly the same 1.0/0.0 the `if` produced, so the
+            // expression — and its left-to-right evaluation order — is
+            // unchanged (bit-identical), but the inner loop is now branch-free
+            // and vectorizable.
             for i in 0..r {
+                let p_row = &p_cur[i * r..(i + 1) * r];
+                let psq_row = &p_sq_buf[i * r..(i + 1) * r];
+                let w_row = &mut w_mat[i * r..(i + 1) * r];
                 for j in 0..r {
-                    let p_ij = p_cur[i * r + j];
-                    let psq_ij = p_sq_buf[i * r + j];
-                    let identity = if i == j { 1.0 } else { 0.0 };
-                    w_mat[i * r + j] = a_term * identity + b_term * p_ij + c_term * psq_ij;
+                    let identity = (i == j) as u32 as f32;
+                    w_row[j] = a_term * identity + b_term * p_row[j] + c_term * psq_row[j];
                 }
             }
         }
@@ -539,10 +546,22 @@ pub fn ns_inv_sqrt_psd_into(
                 &mut scratch.pw2[..rr],
                 &mut scratch.bt_buf[..rr],
             );
+            // Symmetrization touched every off-diagonal pair twice, computing
+            // `0.5 * (pw2[ij] + pw2[ji])` for one slot and
+            // `0.5 * (pw2[ji] + pw2[ij])` for its mirror. IEEE-754 addition of
+            // two operands is commutative (`a + b` and `b + a` round to the same
+            // bits for all finite inputs), so both slots always received the
+            // identical value — computing it once and writing both halves the
+            // work. `pw2` is also bound once instead of re-projecting the struct
+            // field twice per element.
+            let pw2 = &scratch.pw2[..rr];
             for i in 0..r {
-                for j in 0..r {
-                    let v = 0.5 * (scratch.pw2[i * r + j] + scratch.pw2[j * r + i]);
-                    p_next[i * r + j] = v;
+                let i_row = i * r;
+                p_next[i_row + i] = 0.5 * (pw2[i_row + i] + pw2[i_row + i]);
+                for j in (i + 1)..r {
+                    let v = 0.5 * (pw2[i_row + j] + pw2[j * r + i]);
+                    p_next[i_row + j] = v;
+                    p_next[j * r + i] = v;
                 }
             }
             p_in_a = !p_in_a;
@@ -1224,7 +1243,7 @@ mod tests {
         let mut momentum = vec![0.0f32; 16];
         let mut out = vec![0.0f32; 16];
 
-        let mut norms = Vec::new();
+        let mut norms = Vec::with_capacity(3);
         for _ in 0..3 {
             muon_update(&grad, &mut momentum, 0.9, 4, 4, &mut out);
             // Track the momentum buffer norm (before orthogonalization in next step)
@@ -1340,8 +1359,7 @@ mod tests {
         for i in 0..r * r {
             assert!(
                 (out_alloc[i] - out_scratch[i]).abs() < 1e-6,
-                "Mismatch at {}",
-                i
+                "Mismatch at {i}"
             );
         }
     }

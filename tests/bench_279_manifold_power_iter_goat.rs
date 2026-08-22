@@ -269,10 +269,7 @@ fn g03_zero_per_token_overhead() {
     });
 
     let ratio = t_mpi / t_vanilla.max(1e-9);
-    eprintln!(
-        "G3: gate_vanilla={:.3}us  gate_mpi={:.3}us  ratio={:.3}",
-        t_vanilla, t_mpi, ratio
-    );
+    eprintln!("G3: gate_vanilla={t_vanilla:.3}us  gate_mpi={t_mpi:.3}us  ratio={ratio:.3}");
     // Allow 2× slack for noise — the gate is identical matvec either way.
     gate_check!(
         "G3",
@@ -315,8 +312,7 @@ fn g04_subms_swap_game_scale() {
     let ms_mpi = dt_mpi.as_secs_f64() * 1e3;
     let ms_gram = dt_gram.as_secs_f64() * 1e3;
     eprintln!(
-        "G4: N={}, D={}, gram={:.3}ms (warm, one-time), MPI={:.3}ms (per-swap)",
-        n, d, ms_gram, ms_mpi
+        "G4: N={n}, D={d}, gram={ms_gram:.3}ms (warm, one-time), MPI={ms_mpi:.3}ms (per-swap)"
     );
     // G4 gates the MPI recondition cost (paper §4.2 "zero inference overhead"
     // — the gram build is a one-time warm cost at model load, not per-swap).
@@ -419,7 +415,7 @@ fn g06_dry_non_regression_gauge_rebalance() {
         .zip(abt_after.iter())
         .map(|(x, y)| (x - y).abs())
         .fold(0.0f32, f32::max);
-    eprintln!("G6: gauge_rebalance |ΔA·B^T|_max = {:.2e}", max_diff);
+    eprintln!("G6: gauge_rebalance |ΔA·B^T|_max = {max_diff:.2e}");
     gate_check!(
         "G6.preserves_abt",
         max_diff < 1e-3,
@@ -465,16 +461,10 @@ fn g07_sigmoid_constraint() {
         let delta = (scores_a[i] - scores_b[i]).abs();
         if delta > 1e-7 {
             independent = false;
-            eprintln!(
-                "G7 FAIL: expert {} score drifted by {} after perturbing expert 0",
-                i, delta
-            );
+            eprintln!("G7 FAIL: expert {i} score drifted by {delta} after perturbing expert 0");
         }
     }
-    eprintln!(
-        "G7: scores_a={:?}  scores_b={:?}  independent={}",
-        scores_a, scores_b, independent
-    );
+    eprintln!("G7: scores_a={scores_a:?}  scores_b={scores_b:?}  independent={independent}");
     gate_check!("G7", independent, "sigmoid is not independent per-expert");
 }
 

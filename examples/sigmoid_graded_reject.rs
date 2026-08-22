@@ -144,7 +144,7 @@ fn main() {
         candidates.len(),
         tolerant_rate * 100.0
     );
-    println!("  SoftReject band candidates:  {}", soft_reject_band_count);
+    println!("  SoftReject band candidates:  {soft_reject_band_count}");
     println!(
         "  False-reject reduction:      {:.1}pp (strict − tolerant)",
         (strict_rate - tolerant_rate) * 100.0
@@ -173,10 +173,7 @@ fn main() {
             mismatches += 1;
         }
     }
-    println!(
-        "  Mismatches between is_valid and soft_reject_with_relax: {}",
-        mismatches
-    );
+    println!("  Mismatches between is_valid and soft_reject_with_relax: {mismatches}");
     assert_eq!(
         mismatches, 0,
         "binary pruner must reproduce is_valid exactly"

@@ -99,11 +99,12 @@ pub fn compute_pri(corpus: &[PrimitiveTransitionGraph]) -> PriScores {
     // unavoidable hash work cheap.
     let mut family_to_bit: AHashMap<u32, u32> = AHashMap::with_capacity(64);
     for ptg in corpus {
-        // `entry`-free fast path: most PTGs share a family with a neighbour.
-        if !family_to_bit.contains_key(&ptg.task_family_id) {
-            let idx = family_to_bit.len() as u32;
-            family_to_bit.insert(ptg.task_family_id, idx);
-        }
+        // One hash per PTG instead of two (`contains_key` + `insert`).
+        // `next_idx` is read before the `entry` borrow, and `or_insert` only
+        // stores it when the slot is vacant — so it equals the pre-insert
+        // `len()`, exactly as the two-lookup form did.
+        let next_idx = family_to_bit.len() as u32;
+        family_to_bit.entry(ptg.task_family_id).or_insert(next_idx);
     }
     let n_families = family_to_bit.len();
     if n_families == 0 {
@@ -307,19 +308,19 @@ fn jaccard_multiset(a: &AHashMap<[u8; 32], u32>, b: &AHashMap<[u8; 32], u32>) ->
         return 0.0;
     }
     let mut inter: u64 = 0;
-    let mut union: u64 = 0;
     // Walk the smaller map for intersection, the larger for union extras.
     let (small, large) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    // `union = Σ_k max(a_k, b_k)`, rewritten so the second pass needs NO hash
+    // lookups at all:
+    //   Σ_k max = Σ_{k∈large} c_large + Σ_{k∈small} (max(c_small, c_large) − c_large)
+    // (with `c_large = 0` for keys absent from `large`). The identity is exact
+    // in `u64` — all terms are non-negative `u32` counts. Previously the second
+    // pass did one `contains_key` per entry of the *larger* map.
+    let mut union: u64 = large.values().map(|&c| c as u64).sum();
     for (k, &c_small) in small {
         let c_large = large.get(k).copied().unwrap_or(0);
         inter += c_small.min(c_large) as u64;
-        union += c_small.max(c_large) as u64;
-    }
-    // Add entries only in `large`.
-    for (k, &c_large) in large {
-        if !small.contains_key(k) {
-            union += c_large as u64;
-        }
+        union += (c_small.max(c_large) - c_large) as u64;
     }
     if union == 0 {
         0.0
@@ -400,7 +401,7 @@ mod tests {
         // 70 task families, each containing primitive 0 in exactly one PTG.
         // Primitive 0 should have PRI = 70/70 = 1.0. Primitive 1 only appears
         // in the first family ⇒ PRI = 1/70.
-        let mut corpus = Vec::new();
+        let mut corpus = Vec::with_capacity(70);
         for fam in 0..70u32 {
             corpus.push(build_ptg(fam, &[0]));
         }

@@ -291,8 +291,7 @@ fn proof_5_top1_converged_selects_low_residual() {
         .iter()
         .enumerate()
         .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(0);
+        .map_or(0, |(i, _)| i);
     let min_residual = all_residuals[min_idx];
 
     // Verify Top1Converged actually selects the min-residual rollout

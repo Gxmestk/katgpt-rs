@@ -335,15 +335,12 @@ impl HLPlayer {
     /// Delegates to shared stats when present, else updates local fields.
     #[cfg(feature = "bandit")]
     fn update_arm_q(&mut self, arm: usize, reward: f32) {
-        match &self.shared_stats {
-            Some(stats) => stats.update(arm, reward),
-            None => {
+        if let Some(stats) = &self.shared_stats { stats.update(arm, reward) } else {
                 self.visits[arm] += 1;
                 self.total_pulls += 1;
                 let n = self.visits[arm] as f32;
                 self.q_values[arm] += (reward - self.q_values[arm]) / n;
             }
-        }
     }
 
     #[cfg(not(feature = "bandit"))]
@@ -1003,9 +1000,7 @@ impl BomberPlayer for HLPlayer {
         // Pick best action
         let best = scores
             .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(a, _)| *a)
-            .unwrap_or(BomberAction::Wait);
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)).map_or(BomberAction::Wait, |(a, _)| *a);
 
         // Track own bomb placement (critical: prevents walking back into own bomb)
         if best == BomberAction::Bomb {

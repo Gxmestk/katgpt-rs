@@ -118,8 +118,7 @@ fn bench_real_ar_decode_baseline() {
     let tok_per_sec = n as f64 / elapsed.as_secs_f64();
 
     println!(
-        "bench_real_ar_decode: {} tokens in {:?} ({:.2} µs/tok, {:.0} tok/s)",
-        n, elapsed, us_per_tok, tok_per_sec
+        "bench_real_ar_decode: {n} tokens in {elapsed:?} ({us_per_tok:.2} µs/tok, {tok_per_sec:.0} tok/s)"
     );
     // Debug builds: ~250 µs/tok, release: ~2-5 µs/tok
     assert!(
@@ -192,8 +191,7 @@ fn bench_real_ar_decode_with_regime() {
     let tok_per_sec = n as f64 / elapsed.as_secs_f64();
 
     println!(
-        "bench_real_ar_with_regime: {} tokens in {:?} ({:.2} µs/tok, {:.0} tok/s)",
-        n, elapsed, us_per_tok, tok_per_sec
+        "bench_real_ar_with_regime: {n} tokens in {elapsed:?} ({us_per_tok:.2} µs/tok, {tok_per_sec:.0} tok/s)"
     );
     // Debug builds: ~250 µs/tok, release: ~2-5 µs/tok
     assert!(
@@ -304,11 +302,8 @@ fn bench_regime_overhead_vs_real_decode() {
         regime_us,
         n as f64 / with_regime.as_secs_f64()
     );
-    println!(
-        "  Overhead:    +{:.3} µs/tok ({:.1}%)",
-        overhead_us, overhead_pct
-    );
-    println!("  Per regime check: {:.3} µs", regime_per_check_us);
+    println!("  Overhead:    +{overhead_us:.3} µs/tok ({overhead_pct:.1}%)");
+    println!("  Per regime check: {regime_per_check_us:.3} µs");
     println!("  Tokens per regime check: 5 (amortized)");
 
     assert!(
@@ -316,10 +311,7 @@ fn bench_regime_overhead_vs_real_decode() {
         "Regime overhead too high vs real decode: {overhead_pct:.1}% (baseline={baseline_us:.2}µs, regime={regime_us:.2}µs)"
     );
 
-    println!(
-        "\n  GOAT GATE: overhead = {:.1}% vs real decode",
-        overhead_pct
-    );
+    println!("\n  GOAT GATE: overhead = {overhead_pct:.1}% vs real decode");
     if overhead_pct <= 5.0 {
         println!("  ✅ PASS — overhead ≤ 5% → PROMOTE to default");
     } else {
@@ -419,8 +411,7 @@ fn bench_regime_overhead_across_configs() {
         let overhead_pct = (regime_us - baseline_us) / baseline_us * 100.0;
 
         println!(
-            "  Config::{} — baseline: {:.2} µs/tok, regime: {:.2} µs/tok, overhead: +{:.1}%",
-            name, baseline_us, regime_us, overhead_pct
+            "  Config::{name} — baseline: {baseline_us:.2} µs/tok, regime: {regime_us:.2} µs/tok, overhead: +{overhead_pct:.1}%"
         );
     }
 }

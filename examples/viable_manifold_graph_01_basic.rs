@@ -312,14 +312,14 @@ fn render_ascii(graph: &SafeManifoldGraph) {
     for (r, row) in cell.iter().enumerate() {
         let y_center = Y_HI - (r as f32 + 0.5) * dy;
         let mut line = String::with_capacity(COLS + 8);
-        line.push_str(&format!("{:+.2} |", y_center));
+        line.push_str(&format!("{y_center:+.2} |"));
         for &v in row {
             line.push(if v { '#' } else { '.' });
         }
-        println!("{}", line);
+        println!("{line}");
     }
     let axis: String = "       ".to_string() + &"-".repeat(COLS);
-    println!("{}", axis);
+    println!("{axis}");
     println!(
         "         {:<8}{:<8}{:<8}{:<8}{:<8}",
         -5.0, -2.5, 0.0, 2.5, 5.0
@@ -365,8 +365,7 @@ fn main() {
         gauss_viable += traj.iter().filter(|p| is_viable(**p)).count() as u64;
     }
     println!(
-        "Free Gaussian walk (30 steps from (-2, 0), sigma={}, {} trials):",
-        GAUSS_SIGMA, GAUSS_TRIALS
+        "Free Gaussian walk (30 steps from (-2, 0), sigma={GAUSS_SIGMA}, {GAUSS_TRIALS} trials):"
     );
     println!(
         "  viable: {}/{} = {:.1}%",
@@ -388,10 +387,7 @@ fn main() {
         "BUG: manifold walk visited a non-viable node — graph invariant violated"
     );
     println!("Manifold-constrained walk (30 steps):");
-    println!(
-        "  viable: {}/{} = 100.0%  (by construction)",
-        manifold_total, manifold_total
-    );
+    println!("  viable: {manifold_total}/{manifold_total} = 100.0%  (by construction)");
     println!();
 
     // Geodesic demo: left disk → right disk.
@@ -405,8 +401,5 @@ fn main() {
         "BUG: geodesic path contains a non-viable node"
     );
     let hops = path.len().saturating_sub(1);
-    println!(
-        "Geodesic from left disk to right disk: {} hops, all viable: {}",
-        hops, path_all_viable
-    );
+    println!("Geodesic from left disk to right disk: {hops} hops, all viable: {path_all_viable}");
 }

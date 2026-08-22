@@ -57,7 +57,7 @@ fn print_table_header(label: &str) {
 }
 
 fn print_table_row(label: &str, tps: f64, us: f64, mem: usize) {
-    println!("│ {:<24} {:>10.1} {:>12.2} {:>14} │", label, tps, us, mem);
+    println!("│ {label:<24} {tps:>10.1} {us:>12.2} {mem:>14} │");
 }
 
 fn print_table_footer() {

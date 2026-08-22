@@ -154,32 +154,28 @@ pub fn extract_fol_constraints(prompt: &str, vocab: &[String]) -> Vec<FolConstra
     for &(pattern, token_strings) in RUST_KEYWORD_TABLE {
         let pattern_lower = pattern.to_ascii_lowercase();
 
-        match prompt_lower.contains(&pattern_lower) {
-            false => continue,
-            true => {
-                let is_negation = pattern.starts_with("no ");
-                let resolved = resolve_token_indices(token_strings, vocab);
+        if prompt_lower.contains(&pattern_lower) {
+            let is_negation = pattern.starts_with("no ");
+            let resolved = resolve_token_indices(token_strings, vocab);
 
-                match resolved.is_empty() {
-                    true => continue,
-                    false => {
-                        let confidence = compute_confidence(pattern, &prompt_lower);
+            if resolved.is_empty() {
+                continue;
+            } else {
+                let confidence = compute_confidence(pattern, &prompt_lower);
 
-                        constraints.push(FolConstraint {
-                            depth_range: (0, usize::MAX),
-                            allowed: match is_negation {
-                                true => Vec::new(),
-                                false => resolved.clone(),
-                            },
-                            disallowed: match is_negation {
-                                true => resolved,
-                                false => Vec::new(),
-                            },
-                            confidence,
-                        });
-                    }
-                }
+                constraints.push(FolConstraint {
+                    depth_range: (0, usize::MAX),
+                    allowed: if is_negation {
+                        Vec::new()
+                    } else {
+                        resolved.clone()
+                    },
+                    disallowed: if is_negation { resolved } else { Vec::new() },
+                    confidence,
+                });
             }
+        } else {
+            continue;
         }
     }
 
@@ -195,12 +191,11 @@ fn resolve_token_indices(token_strings: &[&str], vocab: &[String]) -> Vec<usize>
 
     for &token_str in token_strings {
         for (idx, vocab_token) in vocab.iter().enumerate() {
-            match vocab_token == token_str {
-                true => {
-                    indices.push(idx);
-                    break; // first match only per token string
-                }
-                false => continue,
+            if vocab_token == token_str {
+                indices.push(idx);
+                break; // first match only per token string
+            } else {
+                continue;
             }
         }
     }
@@ -253,18 +248,17 @@ impl<P: ConstraintPruner> FolPruner<P> {
     /// Check if a token at a given depth violates any FOL constraint.
     fn is_rejected_by_constraints(&self, depth: usize, token_idx: usize) -> bool {
         for c in &self.constraints {
-            match depth >= c.depth_range.0 && depth < c.depth_range.1 {
-                false => continue,
-                true => {
-                    // If allowed is non-empty, token must be in it
-                    if !c.allowed.is_empty() && !c.allowed.contains(&token_idx) {
-                        return true;
-                    }
-                    // If token is explicitly disallowed, reject
-                    if c.disallowed.contains(&token_idx) {
-                        return true;
-                    }
+            if depth >= c.depth_range.0 && depth < c.depth_range.1 {
+                // If allowed is non-empty, token must be in it
+                if !c.allowed.is_empty() && !c.allowed.contains(&token_idx) {
+                    return true;
                 }
+                // If token is explicitly disallowed, reject
+                if c.disallowed.contains(&token_idx) {
+                    return true;
+                }
+            } else {
+                continue;
             }
         }
         false
@@ -307,13 +301,12 @@ impl<P: ConstraintPruner> ConstraintPruner for FolPruner<P> {
         // Apply FOL constraints in batch
         let len = candidates.len().min(results.len());
         for i in 0..len {
-            match results[i] {
-                false => continue, // already rejected by inner
-                true => {
-                    if self.is_rejected_by_constraints(depth, candidates[i]) {
-                        results[i] = false;
-                    }
+            if results[i] {
+                if self.is_rejected_by_constraints(depth, candidates[i]) {
+                    results[i] = false;
                 }
+            } else {
+                continue;
             }
         }
     }

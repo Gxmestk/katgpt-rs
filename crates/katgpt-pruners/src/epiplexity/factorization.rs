@@ -102,9 +102,10 @@ impl FactorizationScorer {
     pub fn preferred_order(&self, trace: &[f32]) -> FactorizationOrder {
         let forward = self.score_forward(trace);
         let reverse = self.score_reverse(trace);
-        match reverse > forward {
-            true => FactorizationOrder::Reverse,
-            false => FactorizationOrder::Forward,
+        if reverse > forward {
+            FactorizationOrder::Reverse
+        } else {
+            FactorizationOrder::Forward
         }
     }
 

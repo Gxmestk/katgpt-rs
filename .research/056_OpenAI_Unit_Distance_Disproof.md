@@ -5,6 +5,7 @@
 > **Date:** 2025-07
 > **Related:** Plan 090 (unit_distance_goat), Research 21 (G-Zero), Research 37 (REAP), Research 51 (Deep Manifold)
 > **Supersedes:** None — new domain
+> **Related (SUPER-GOAT, revised 2026-08-06):** Barajas & Serra [arXiv:0710.4495 "The Lonely Runner with Seven Runners"] — initially PASS'd as a pure existence theorem (non-constructive, no algorithm). Revised to **Super-GOAT** after game-context reframe: the LRC JUSTIFIES a per-NPC per-tick `phase_separation` scalar (min circular distance on integer-speed phase circle) that is modelless, sync-safe, and theorem-backed (guaranteed-peak property for N≤7). The primitive feeds 5 pillars (Salience Tri-Gate, Sleep-Time, KARC, feeling brain, motivation brain) → "guaranteed solo moments for every NPC". Open primitive: Plan 571. Private guide: `riir-ai/.research/334`. Public distillation: Research 470. Same combinatorial family as this note's "chromatic number lower bounds" pattern (L114-117) — the LRC's regular chromatic number χ_r(D) of distance graphs is the same family; the Super-GOAT value is the *derived scalar + game fusion*, not the theorem itself.
 
 ## Executive Summary
 

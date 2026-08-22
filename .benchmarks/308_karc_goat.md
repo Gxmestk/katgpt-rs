@@ -111,7 +111,10 @@ features (additive per-coordinate) cannot represent. Phase 2's
 16 LT threshold and sub-1e-3 NRMSE.
 
 **TL;DR:** First-order KARC Phase 1: G2/G3/G4 PASS, G1 threshold PASS, G1 NRMSE
-within 5× (documented gap → Phase 2 higher-order features). Feature stays opt-in.
+within 5× (documented gap → Phase 2 higher-order features). Feature was opt-in
+at this point (Phase 1). (Post-Phase-5.3 update, 2026-07-21, Phase 22
+promotion): `karc_forecaster` is DEFAULT-ON under the split-config gate
+contract — see §Phase 5.3 below.
 
 ---
 

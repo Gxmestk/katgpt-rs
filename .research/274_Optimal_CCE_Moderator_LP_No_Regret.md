@@ -1,5 +1,7 @@
 # Research 274: Optimal Coarse Correlated Equilibria (MFG) — LP Relaxation + No-Regret Primal-Dual Moderator
 
+<!-- Related-Paper cross-ref (added 2026-08-06): Wang/Su/Wang/Plotkin PNAS 122(51) e2516535122 "Individual incentives that promote collective intelligence" — Gain. Feedback payoff = CLR shape; niche-expert = Quantile Balance Router + Manifold Bandit; designer Γ₀ = CCE Moderator. See Research 469 + Issue 575. -->
+
 > **Source:** [Optimal Coarse Correlated Equilibria in Mean Field Games: Linear Programming and No-Regret Learning](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas (Bielefeld / Milano), arxiv 2606.20062v1, 18 Jun 2026
 > **Date:** 2026-06-20
 > **Status:** Done
@@ -304,6 +306,17 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 | `riir-ai/crates/riir-chain/src/encoding/latcal*.rs` | LatCal fixed-point bridge — sync commitment of `ζ` |
 | `riir-ai/crates/riir-engine/src/cgsp_runtime/` | CGSP conjecturer pool = deviation class `D` |
 
+> **Endogenous-correlation-device companion (Plan 526, 2026-08-11):** the
+> LP-CCE Moderator uses an *exogenous* designer-set correlation device `ζ`
+> (this note). Plan 526 ships the *endogenous* counterpart —
+> `SimilarityPosterior ω` inferred from joint-action history
+> ([`katgpt-core/src/similarity_inference/`](../crates/katgpt-core/src/similarity_inference/),
+> [Research 471](471_Similarity_Inference_Embedded_Equilibrium.md),
+> [Bench 579](../.benchmarks/579_similarity_inference_goat.md)). The two
+> compose: when crowd `ω` crosses threshold, the moderator's `Γ₀` can switch
+> endogenously. Phases 1-5 GOAT ALL PASS; indirect inference (G5) is the
+> Super-GOAT-capability subset.
+
 ---
 
 ## 8. References
@@ -439,6 +452,6 @@ non-degenerate joint) is deferred Super-GOAT research, tracked separately in
 - Plan 328 GOAT evidence: [`riir-ai/.benchmarks/328_subjective_cce_crowd_goat.md`](../../riir-ai/.benchmarks/328_subjective_cce_crowd_goat.md)
 - Parent issue (closed + removed, riir-ai): `riir-ai/.issues/327_cwm_cce_bayes_fusion.md`
 - Sibling issue (closed + removed, riir-ai): `riir-ai/.issues/328_no_common_prior_bayes_cce.md`
-- Regret sketch: [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/62_bayes_cce_regret_sketch.md) §2
+- Regret sketch: [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/06_self_learn_npcs/cwm_runtime.md) §2
 
 **TL;DR:** Campi et al. give us **optimal Coarse Correlated Equilibria in Mean Field Games via LP relaxation + no-regret primal-dual with Bregman regularization** (`O(N⁻¹ᐟ²)` convergence, no monotonicity assumption). The neural-network parametrization is training-flavored (→ riir-train), but the LP-CCE formulation + primal-dual iterator distill modellessly into `CceLp<N,A>` + `CcePrimalDual` in katgpt-rs. The latent-space reframing — `state` = HLA bucket, `action` = CGSP conjecturer arm, `signal` = zone-mood latent scalar broadcast via HLA channel, sync-committed via LatCal — is the **Super-GOAT**: coordinated emergent population behavior via a latent broadcast signal with a designer-steerable moderator objective, Pareto-dominating any Nash-seeking competitor, at crowd-scale (thousands of NPCs, 20Hz tick) within plasma-tier latency budgets. All 4 novelty-gate questions YES. Mandatory outputs shipped: this note (R274 public), Plan 295 (public primitive), riir-ai R143 (private guide), riir-ai Plan 325 (private runtime).

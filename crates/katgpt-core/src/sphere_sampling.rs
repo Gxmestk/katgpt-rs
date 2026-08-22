@@ -459,9 +459,7 @@ mod tests {
         let v_out_norm = l2_norm(&v_out);
         assert!(
             (v_in_norm - v_out_norm).abs() < 1e-5,
-            "norm not preserved: |v_in|={} |v_out|={}",
-            v_in_norm,
-            v_out_norm
+            "norm not preserved: |v_in|={v_in_norm} |v_out|={v_out_norm}"
         );
         assert!(
             dot(&v_out, &xt).abs() < 1e-5,
@@ -587,15 +585,9 @@ mod tests {
         for &t in &[0.1f32, 0.25, 0.5, 0.75, 1.0] {
             for &omega in &[0.05f32, 0.5, 1.0, 1.5, 2.5, pi - 0.05] {
                 let r = jacobian_logdet_cot_correction(t, omega, d, &x1_dot, &mut out);
-                assert!(r.is_ok(), "t={} omega={} failed: {:?}", t, omega, r);
+                assert!(r.is_ok(), "t={t} omega={omega} failed: {r:?}");
                 for v in &out {
-                    assert!(
-                        v.is_finite(),
-                        "non-finite at t={} omega={}: {}",
-                        t,
-                        omega,
-                        v
-                    );
+                    assert!(v.is_finite(), "non-finite at t={t} omega={omega}: {v}");
                 }
             }
         }
@@ -609,7 +601,7 @@ mod tests {
         let mut out = vec![0.0f32; d];
         jacobian_logdet_cot_correction(1.0, 1.2, d, &x1_dot, &mut out).expect("ok");
         for v in &out {
-            assert!(v.abs() < 1e-5, "expected zero at t=1, got {}", v);
+            assert!(v.abs() < 1e-5, "expected zero at t=1, got {v}");
         }
     }
 
@@ -659,7 +651,7 @@ mod tests {
         let mut out = vec![0.0f32; 3];
         sphere_exp_map_into(&x, &v, &mut out).expect("ok");
         for i in 0..3 {
-            assert!((out[i] - x[i]).abs() < 1e-7, "exp_X(0) != X at {}", i);
+            assert!((out[i] - x[i]).abs() < 1e-7, "exp_X(0) != X at {i}");
         }
     }
 
@@ -677,9 +669,7 @@ mod tests {
             let out_norm = l2_norm(&out);
             assert!(
                 (out_norm - 1.0).abs() < 1e-5,
-                "exp_map broke unit norm at scale={}: {}",
-                scale,
-                out_norm
+                "exp_map broke unit norm at scale={scale}: {out_norm}"
             );
         }
     }
@@ -806,8 +796,7 @@ mod tests {
         let out_norm = l2_norm(&out);
         assert!(
             (out_norm - 1.0).abs() < 1e-5,
-            "Euler–Maruyama step broke unit norm: {}",
-            out_norm
+            "Euler–Maruyama step broke unit norm: {out_norm}"
         );
     }
 }

@@ -137,8 +137,7 @@ mod tests {
         for (d, &out_d) in out.iter().enumerate() {
             assert!(
                 (out_d - 1.0 / 3.0).abs() < 1e-6,
-                "dim {d}: got {}, expected 1/3",
-                out_d
+                "dim {d}: got {out_d}, expected 1/3"
             );
         }
     }

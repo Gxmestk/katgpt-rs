@@ -1130,9 +1130,7 @@ mod tests {
             for h in hypotheses.iter() {
                 assert!(
                     h.abs() <= 1.0 + 1e-5,
-                    "tick {} hypothesis out of [-1,1]: {}",
-                    tick,
-                    h
+                    "tick {tick} hypothesis out of [-1,1]: {h}"
                 );
             }
             kernel.step(&mut state, &obs);
@@ -1160,9 +1158,7 @@ mod tests {
             for h in hypotheses.iter() {
                 assert!(
                     h.abs() <= 1.0 + 1e-5,
-                    "tick {} leaky hypothesis out of [-1,1]: {}",
-                    tick,
-                    h
+                    "tick {tick} leaky hypothesis out of [-1,1]: {h}"
                 );
             }
             kernel.step(&mut state, &obs);
@@ -1220,7 +1216,7 @@ mod tests {
             let mag = (v[0] * v[0] + v[1] * v[1]).sqrt();
             match a {
                 ArenaAction::Hold => assert_eq!(mag, 0.0),
-                _ => assert!((mag - 1.0).abs() < 1e-6, "non-unit evade: {:?}", a),
+                _ => assert!((mag - 1.0).abs() < 1e-6, "non-unit evade: {a:?}"),
             }
         }
     }

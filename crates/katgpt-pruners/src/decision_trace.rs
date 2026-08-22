@@ -73,8 +73,7 @@ impl DecisionTrace {
                 let action_depth = self.rules_applied[0].action.0;
                 let action_token = resolve_token(self.rules_applied[0].action.1, vocab);
                 lines.push(format!(
-                    "Decision trace: \"Chose token at depth {} ('{}') because:",
-                    action_depth, action_token,
+                    "Decision trace: \"Chose token at depth {action_depth} ('{action_token}') because:",
                 ));
                 for (i, rule) in self.rules_applied.iter().enumerate() {
                     lines.push(format!(
@@ -110,16 +109,17 @@ impl DecisionTrace {
             .iter()
             .map(|(depth, tok_idx)| {
                 let token = resolve_token(*tok_idx, vocab);
-                format!("⟨depth={}, token='{}'⟩", depth, token)
+                format!("⟨depth={depth}, token='{token}'⟩")
             })
             .collect();
 
         let action_token = resolve_token(rule.action.1, vocab);
         let action_str = format!("depth={}, token='{}'", rule.action.0, action_token);
 
-        match conditions.is_empty() {
-            true => format!("→ {}", action_str),
-            false => format!("{} → {}", conditions.join(" ∧ "), action_str),
+        if conditions.is_empty() {
+            format!("→ {action_str}")
+        } else {
+            format!("{} → {}", conditions.join(" ∧ "), action_str)
         }
     }
 }
@@ -193,7 +193,7 @@ impl Default for DecisionTraceBuilder {
 fn resolve_token(idx: usize, vocab: &[String]) -> String {
     match vocab.get(idx) {
         Some(s) => s.clone(),
-        None => format!("<idx:{}>", idx),
+        None => format!("<idx:{idx}>"),
     }
 }
 
@@ -232,13 +232,11 @@ mod tests {
 
         assert!(
             output.contains("(no rules applied"),
-            "Empty trace should mention no rules: got\n{}",
-            output,
+            "Empty trace should mention no rules: got\n{output}",
         );
         assert!(
             output.contains("Confidence: 0.00"),
-            "Empty trace should have zero confidence: got\n{}",
-            output,
+            "Empty trace should have zero confidence: got\n{output}",
         );
     }
 
@@ -250,23 +248,19 @@ mod tests {
 
         assert!(
             output.contains("Rule 1:"),
-            "Should show Rule 1: got\n{}",
-            output,
+            "Should show Rule 1: got\n{output}",
         );
         assert!(
             output.contains("score=0.85"),
-            "Should show score: got\n{}",
-            output,
+            "Should show score: got\n{output}",
         );
         assert!(
             output.contains("support=5"),
-            "Should show support: got\n{}",
-            output,
+            "Should show support: got\n{output}",
         );
         assert!(
             output.contains("token='match'"),
-            "Should resolve token name: got\n{}",
-            output,
+            "Should resolve token name: got\n{output}",
         );
     }
 
@@ -313,18 +307,15 @@ mod tests {
 
         assert!(
             output.contains("token='fn'"),
-            "Should map token index 0 → 'fn': got\n{}",
-            output,
+            "Should map token index 0 → 'fn': got\n{output}",
         );
         assert!(
             output.contains("token='Result'"),
-            "Should map token index 1 → 'Result': got\n{}",
-            output,
+            "Should map token index 1 → 'Result': got\n{output}",
         );
         assert!(
             output.contains("token='match'"),
-            "Should map token index 2 → 'match': got\n{}",
-            output,
+            "Should map token index 2 → 'match': got\n{output}",
         );
     }
 
@@ -341,13 +332,11 @@ mod tests {
 
         assert!(
             output.contains("<idx:99>"),
-            "Should fall back to <idx:N> for out-of-range: got\n{}",
-            output,
+            "Should fall back to <idx:N> for out-of-range: got\n{output}",
         );
         assert!(
             output.contains("<idx:100>"),
-            "Should fall back for action token: got\n{}",
-            output,
+            "Should fall back for action token: got\n{output}",
         );
     }
 
@@ -398,13 +387,11 @@ mod tests {
 
         assert!(
             output.contains("no rules applied, alternatives were considered"),
-            "Should mention alternatives only: got\n{}",
-            output,
+            "Should mention alternatives only: got\n{output}",
         );
         assert!(
             output.contains("Alternative 1:"),
-            "Should show Alternative 1: got\n{}",
-            output,
+            "Should show Alternative 1: got\n{output}",
         );
     }
 
@@ -412,22 +399,14 @@ mod tests {
     fn sigmoid_bounded_unit_interval() {
         for x in [-100.0, -10.0, -1.0, 0.0, 1.0, 10.0, 100.0] {
             let s = sigmoid(x);
-            assert!(
-                (0.0..=1.0).contains(&s),
-                "sigmoid({}) = {} not in [0,1]",
-                x,
-                s,
-            );
+            assert!((0.0..=1.0).contains(&s), "sigmoid({x}) = {s} not in [0,1]",);
         }
         // Symmetry check: sigmoid(x) + sigmoid(-x) ≈ 1.0
         for x in [0.5, 1.0, 2.0, 5.0] {
             let sum = sigmoid(x) + sigmoid(-x);
             assert!(
                 (sum - 1.0).abs() < 1e-5,
-                "sigmoid({}) + sigmoid(-{}) = {} ≠ 1.0",
-                x,
-                x,
-                sum,
+                "sigmoid({x}) + sigmoid(-{x}) = {sum} ≠ 1.0",
             );
         }
     }

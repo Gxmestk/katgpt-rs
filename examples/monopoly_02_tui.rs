@@ -893,7 +893,7 @@ fn render_events(f: &mut Frame, game: &RecordedGame, cursor: usize, area: Rect) 
         .iter()
         .rev()
         .find_map(|frame| frame.event_text.as_ref())
-        .map(|_| {
+        .map_or(0, |_| {
             let mut count: usize = 0;
             for (i, frame) in game.frames.iter().enumerate() {
                 if frame.event_text.is_some() {
@@ -904,8 +904,7 @@ fn render_events(f: &mut Frame, game: &RecordedGame, cursor: usize, area: Rect) 
                 }
             }
             count.saturating_sub(1)
-        })
-        .unwrap_or(0);
+        });
 
     let total_events = game.events.len();
     let start = cur_event_idx.saturating_sub(vis / 2);

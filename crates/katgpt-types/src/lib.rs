@@ -82,6 +82,14 @@ pub mod simd;
 pub mod slod;
 pub mod temporal;
 mod ternary;
+/// Ternary `{-1,0,+1}` bit-planes with per-128 f16 group scale — the
+/// `Q2_0_g128` container (Issue 578, `ternary_group_scale` feature).
+#[cfg(feature = "ternary_group_scale")]
+pub mod ternary_group;
+/// Ternary `{-1,0,+1}` packed 5-per-byte in base 3 — the 1.75 bits/weight
+/// footprint tier (Issue 582, `ternary_trit_pack` feature).
+#[cfg(feature = "ternary_trit_pack")]
+pub mod ternary_trit;
 
 #[cfg(test)]
 mod tests_types;
@@ -91,6 +99,15 @@ mod tests_types;
 // underlying items.
 #[cfg(feature = "binary_plasma")]
 pub use binary::{BinaryWeights, GROUP_SIZE};
+#[cfg(feature = "ternary_group_scale")]
+pub use ternary_group::{
+    TernaryBlockAoS, TernaryBlockContiguousWeights, TernaryFfnHook, TernaryGroupWeights,
+    TernaryInputProjHook, TernaryMatvecHook,
+};
+#[cfg(feature = "ternary_trit_pack")]
+pub use ternary_trit::{
+    TRIT_CODE_LIMIT, TRIT_LUT, TRIT_POW3, TRITS_PER_BYTE, TernaryTritWeights,
+};
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]
 pub use domain::DomainLatent;
@@ -100,6 +117,8 @@ pub use enums::DeltaNetLayerType;
 pub use enums::ThinkingBudget;
 #[cfg(feature = "wall_attention")]
 pub use enums::WallConfig;
+#[cfg(feature = "gemma4_inference")]
+pub use enums::Gemma4LayerType;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
     DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
@@ -125,7 +144,7 @@ pub use math::sparse_matmul;
 pub use math::{
     gegelu, gegelu_tanh, matmul, matmul_f16, matmul_f16_f16, matmul_f16_f16_parallel,
     matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, rmsnorm_with_gamma,
-    rmsnorm_with_gamma_eps, sample_token_into, silu, softmax, softmax_scaled, swiglu,
+    rmsnorm_with_gamma_eps, sample_token_into, silu, situ, softmax, softmax_scaled, swiglu,
     swiglu_inplace,
 };
 pub use merkle::{
@@ -139,7 +158,7 @@ pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
 pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]
-pub use ternary::TernaryWeights;
+pub use ternary::{TernaryPackError, TernaryWeights};
 
 // Internal helpers (read_u32_le / read_f32_le / read_u16_le) live in
 // `domain.rs` and are crate-private — not re-exported here. If other modules

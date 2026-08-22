@@ -197,18 +197,29 @@ fn cartesian_top_k<const SQRT_N: usize>(
     }
     // Initialize `out` to sentinel (NEG_INFINITY) so the first K² candidates
     // all enter. We only touch out[..out_k].
-    for entry in out[..out_k].iter_mut() {
-        *entry = (0, f32::NEG_INFINITY);
-    }
+    out[..out_k].fill((0, f32::NEG_INFINITY));
 
     // For each (i, j) in top_1 × top_2, score = s1[i] + s2[j],
     // flat_index = i_idx * SQRT_N + j_idx. Insert into the top-out_k.
+    //
+    // Perf: both input lists are sorted score-descending (documented contract,
+    // guaranteed by `heapselect_top_k_desc`, which never admits NaN). So once
+    // `s1 + s2[j] <= threshold` we can `break` out of the inner loop instead of
+    // `continue`: every later `j` has `s2[j'] <= s2[j]`, hence an even smaller
+    // sum, and the threshold only ever rises. Likewise, once `s1 + s2_max`
+    // fails, no later `i` can succeed either (`s1' <= s1`), so we break the
+    // outer loop. Same output, but the common case visits O(K) of the K²
+    // candidates instead of all of them.
+    let s2_max = top_2[0].1;
     for &(i_idx, s1) in top_1 {
+        if s1 + s2_max <= out[out_k - 1].1 {
+            break;
+        }
         for &(j_idx, s2) in top_2 {
             let combined = s1 + s2;
-            // Skip if not better than the current out_k-th best.
+            // Stop: neither this nor any later `j` beats the out_k-th best.
             if combined <= out[out_k - 1].1 {
-                continue;
+                break;
             }
             let flat = i_idx * SQRT_N + j_idx;
             // Find insertion position.
@@ -276,8 +287,10 @@ impl<const SQRT_N: usize, const D_K: usize, const D_V: usize> ProductKeyMemory<S
         // Steps 2–3: score each codebook into scratch.scores_{1,2}, then
         // heapselect top-K. Reset the top-k buffers first (NEG_INFINITY so
         // every codebook score enters on the first pass).
-        scratch.scores_1.fill(0.0);
-        scratch.scores_2.fill(0.0);
+        //
+        // Perf: `scores_{1,2}` are NOT pre-zeroed — the two scoring loops below
+        // write every one of the `SQRT_N` slots before any read, so the memset
+        // was pure dead work (2·√N stores per query; 2·8 KB at √N=1024).
         scratch.top_1.fill((0, f32::NEG_INFINITY));
         scratch.top_2.fill((0, f32::NEG_INFINITY));
 

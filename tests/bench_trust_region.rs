@@ -48,12 +48,11 @@ mod benches {
         let elapsed = start.elapsed();
         let per_call_us = elapsed.as_nanos() as f64 / runs as f64 / 1000.0;
 
-        eprintln!("blend_sample (vocab=256): {:.2} μs/call", per_call_us);
+        eprintln!("blend_sample (vocab=256): {per_call_us:.2} μs/call");
         // Assert: blend cost < 50μs (generous for non-SIMD; 2μs is the hot-path target)
         assert!(
             per_call_us < 50.0,
-            "blend_sample too slow: {:.2} μs/call (target < 50 μs)",
-            per_call_us
+            "blend_sample too slow: {per_call_us:.2} μs/call (target < 50 μs)"
         );
     }
 
@@ -77,14 +76,10 @@ mod benches {
         let elapsed = start.elapsed();
         let per_call_us = elapsed.as_nanos() as f64 / runs as f64 / 1000.0;
 
-        eprintln!(
-            "find_blend_beta (5 tokens, 10 iters): {:.2} μs/call",
-            per_call_us
-        );
+        eprintln!("find_blend_beta (5 tokens, 10 iters): {per_call_us:.2} μs/call");
         assert!(
             per_call_us < 20.0,
-            "find_blend_beta too slow: {:.2} μs/call (target < 20 μs)",
-            per_call_us
+            "find_blend_beta too slow: {per_call_us:.2} μs/call (target < 20 μs)"
         );
     }
 
@@ -101,11 +96,10 @@ mod benches {
         let elapsed = start.elapsed();
         let per_call_ns = elapsed.as_nanos() as f64 / 1_000_000.0;
 
-        eprintln!("adaptive_window: {:.1} ns/call", per_call_ns);
+        eprintln!("adaptive_window: {per_call_ns:.1} ns/call");
         assert!(
             per_call_ns < 100.0,
-            "adaptive_window too slow: {:.1} ns/call",
-            per_call_ns
+            "adaptive_window too slow: {per_call_ns:.1} ns/call"
         );
     }
 
@@ -122,11 +116,10 @@ mod benches {
         let elapsed = start.elapsed();
         let per_call_ns = elapsed.as_nanos() as f64 / 1_000_000.0;
 
-        eprintln!("TrustTracker::record: {:.1} ns/call", per_call_ns);
+        eprintln!("TrustTracker::record: {per_call_ns:.1} ns/call");
         assert!(
             per_call_ns < 100.0,
-            "TrustTracker::record too slow: {:.1} ns/call",
-            per_call_ns
+            "TrustTracker::record too slow: {per_call_ns:.1} ns/call"
         );
     }
 
@@ -143,11 +136,10 @@ mod benches {
         let elapsed = start.elapsed();
         let per_call_ns = elapsed.as_nanos() as f64 / 100_000.0 / 2.0; // divide by 2 for serialize+deserialize
 
-        eprintln!("TrustArm roundtrip: {:.1} ns/call", per_call_ns);
+        eprintln!("TrustArm roundtrip: {per_call_ns:.1} ns/call");
         assert!(
             per_call_ns < 500.0,
-            "TrustArm roundtrip too slow: {:.1} ns/call",
-            per_call_ns
+            "TrustArm roundtrip too slow: {per_call_ns:.1} ns/call"
         );
     }
 
@@ -174,12 +166,11 @@ mod benches {
         let elapsed = start.elapsed();
         let per_token_us = elapsed.as_nanos() as f64 / 1000.0 / 1000.0;
 
-        eprintln!("TRAS per-token overhead: {:.2} μs/token", per_token_us);
+        eprintln!("TRAS per-token overhead: {per_token_us:.2} μs/token");
         // Acceptable: < 100μs per token (spec decode typically takes 1-5ms per token)
         assert!(
             per_token_us < 100.0,
-            "TRAS overhead too high: {:.2} μs/token",
-            per_token_us
+            "TRAS overhead too high: {per_token_us:.2} μs/token"
         );
     }
 }

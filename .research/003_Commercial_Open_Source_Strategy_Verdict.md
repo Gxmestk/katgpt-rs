@@ -1,6 +1,6 @@
 # Commercial Strategy — Public Routing Rules (trimmed)
 
-**Date:** 2026-06 (revised 2026-07-17 — added `riir-game-sdk` + `riir-armageddon` to Boundary table, 7-repo count; revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
+**Date:** 2026-06 (revised 2026-08-20 — added `riir-dapps` (the dApp layer) + §"The Second Axis: Layering"; 8-repo count; revised 2026-07-17 — added `riir-game-sdk` + `riir-armageddon` to Boundary table; revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
 **Status:** Active (public subset)
 **Purpose:** Let public-research agents self-govern the public/private boundary without needing the sensitive moat doc.
 
@@ -10,7 +10,7 @@
 
 ## The Boundary
 
-Seven repos. The split is absolute.
+Eight repos. The split is absolute.
 
 | Repo | License | Role |
 |------|---------|------|
@@ -20,6 +20,7 @@ Seven repos. The split is absolute.
 | `riir-neuron-db` | Private (internal) | **Neuron-shard leaf crate** — `NeuronShard` weight blob, `ShardIndex`, generic `MerkleTree`/`MerkleProof`, `MerkleFrozenEnvelope`, MAPE-K self-healing, Raven/δ-Mem consolidation, AnyRAG gateway, vibe KG triples. No chain dependency. |
 | `riir-train` | Private (internal) | **Training research** — adapter training methods, training data, trained weights. Know-how vault. |
 | `riir-game-sdk` | Private (internal) | **Game-vocabulary SDK** — facade over `riir-games-shared` (Layer 0 vocabulary) + `riir-games` systems; dev-tool workspace hosting `crates/riir-viz` + `crates/riir-gm-tool`. Consumed by `seal-online-remaster`, `riir-mmorpg-examples`. The dev entry point for the game stack — see `riir-game-sdk/AGENTS.md` facade constraint. |
+| `riir-dapps` | Private (internal) | **dApp layer** — composes game outcomes into generic chain settlements. Depends on the chain side ONLY; the game layer calls *into* it. Game vocabulary in, `Settlement` out; a game predicate crosses as an opaque 32-byte hash so the ledger never learns "quest". See its `AGENTS.md`. |
 | `riir-armageddon` | Private (internal) | **Arena/game-product domain types** — raw-vs-latent boundary for the game-product domain (the arena). Read its README; do not put research, chain code, or training data here. |
 
 **Rule: anything `riir-*` is internal. No exceptions.**
@@ -49,6 +50,130 @@ The actual game-product moat is the **runtime that runs on top of a game** — f
 **The distinguishing test:** *"Could a competitor re-implement this from public rules + generic primitives in a weekend?"* → public. *"Does this encode product-specific tuning, weights, wiring, or design?"* → private.
 
 **Anti-pattern — cross-boundary coupling constants:** A public benchmark domain must not hardcode a constant whose comment says `must match riir_gpu::game::fft_replay::FFT_STATE_VOCAB`. The benchmark's constants are self-contained in the public repo. If a private consumer needs the same value, the private side imports from public (one-way), never the reverse. A cross-reference comment that names a private module path IS a leak, even if the constant value itself is benign.
+
+---
+
+## The Second Axis: Layering (game / dApp / chain)
+
+The table above is the **public/private** axis. It says nothing about *which
+private repo* a game concern goes in, and that gap let game rules land inside
+the chain's consensus-critical program set (`riir-chain/src/programs/`
+quest/bounty/crafting — filed as `riir-chain` Issue 096, 2,294 LOC, one of them
+moving no money at all).
+
+The dApp layer that closes it is **`riir-dapps`** (private, created 2026-08-20,
+`riir-chain` Issue 096 T1 / `riir-dapps` Plan 001) — the 8th repo. It was made a
+separate repo rather than a crate under either end deliberately: under
+`riir-chain` the chain repo would again contain "quest", and under
+`riir-game-sdk`/`riir-ai` the game repo would depend on the ledger — which is
+what `riir-games-civ/src/civ/latcal_wire.rs` already does wrong. A separate repo
+makes the dependency direction checkable, and
+`riir-dapps/scripts/direction_gate.sh` checks it.
+
+**The rule: a layer is defined by what it must agree on, not by what it stores.**
+
+| Layer | Must agree on | Repo | Examples |
+|---|---|---|---|
+| **game** | nothing globally — local rules, content, progress | `riir-game-sdk` (vocabulary + systems), `riir-ai` (`riir-games`) | recipe tables, quest objectives, kill-credit, class balance, loot rules |
+| **store** | durability, not consensus | `riir-neuron-db` | quest progress, experience graph, local KV |
+| **dApp** | how a game outcome becomes a chain instruction | `riir-dapps` (private) | "quest completed → claim escrow", "craft succeeded → mint NFT" |
+| **chain** | value, authority, unmanipulable randomness | `riir-chain` | token transfer, escrow, staking, `FairRng` commit-reveal, AOI reveal filter |
+
+### The test — three questions, all must pass
+
+Revised 2026-08-20: the original one-question form ("does it move value or bind
+authority") was **insufficient**. It admits FAME as "value" and says nothing
+about write rate, which is what actually disqualifies game traffic.
+
+**1. Product.** *Would a customer using the chain for commerce want this in
+their dependency?* Ask this first — it needs no benchmark and reaches the right
+verdict instantly. An NFT: **yes**, an NFT *is* a token, with its own value,
+that trades and settles. A quest, a recipe table, a kill-credit predicate:
+**no**.
+
+**2. Value.** *Is it BigInt fungible currency, a token, or an authority
+binding?* FAME, XP, items, reputation, karma and quest progress are **game
+scalars** — not fungible, not BigInt, not DeFi. A number you can gain and lose
+is not money.
+
+**3. Rate.** *Does the write rate fit a Glacial tier (≤ 0.1 Hz)?* This binds
+hardest: a BigInt currency transfer at 20 Hz is still wrong. Measured —
+`riir-neuron-db` is **1,627× cheaper per write** than the chain (826 ns vs
+1,344.5 µs), and one chain transaction at 10⁵ accounts costs **31.6 ms, 63% of
+an entire 20 Hz hot tick**. `riir-game-sdk`'s `tick_tier_model.md` already
+placed quorum at Glacial and said *"chain heartbeat; never 20Hz"*.
+
+A game system with **no transaction** never belongs in a ledger, however
+naturally it fits the account layout. Storability is not jurisdiction. **And
+most game systems have no transaction** — a free quest ("kill 10 boars, get
+FAME") settles nothing at all, so the paid quest is the exception, not the
+model.
+
+The weights are inverted, which is why one substrate cannot serve both:
+**game = 80 fast / 20 secure** (`riir-neuron-db`: BLAKE3-committed, keyed row
+MACs, Merkle-frozen — fast *and* secure enough), **defi = 20 fast / 80 secure**
+(`riir-chain`: quorum, split-key, determinant audits). A quest turn-in does not
+need Byzantine agreement between mutually distrusting validators; it needs an
+authenticated write.
+
+Note the "quest/economy tuning → `riir-ai`" row in the Decision Rules table
+below already implied the layering; it was routed as *IP secrecy* and read by
+no one as a *layering* constraint, which is exactly how the drift happened.
+
+### When a game feature genuinely needs settlement: split it
+
+The chain gets the game-agnostic half under a game-agnostic name; the game keeps
+the predicate. A "quest reward" is a *multi-claim, deadline-bounded conditional
+escrow* plus a claim predicate the chain must not be able to name — ship the
+escrow, pass the predicate as an opaque 32-byte hash. A chain primitive whose
+doc comment says "kill contract" has already lost the boundary.
+
+Inverse direction, same principle: `FairRng` needs both split-key halves, so an
+unmanipulable roll is a genuine chain **service**. The game layer *calls* it; it
+does not host it — and hosting a recipe table next to it is not justified by
+needing the roll.
+
+### Anti-pattern — a feature gate that hides the impl but not the vocabulary
+
+`riir-chain` gates each game program behind `chain_prog_*`, which looks like it
+keeps a commerce customer clean. It does not: `LatCalIx` is **one
+`#[repr(C, u8)]` enum, 88 variants, zero `cfg` attributes**
+(`grep -c "cfg(feature" src/programs/cpi.rs` → `0`). Enable no program feature
+at all and `QuestCreate` / `CraftingRegister` / `ReputationInit` are still in
+your wire format. **An opt-in gate on the implementation is not a boundary if
+the vocabulary is unconditional.**
+
+*Status: RESOLVED by removal, not gating — riir-chain Issue 096 T4 (bounty,
+quest), T3 (crafting), T7 (reputation, 2026-08-21) retired all four game
+programs outright; no game variant exists in any build and the retired tags
+(45..=48, 54..=57, 58..=61, 68..=71) are pinned undecodable.*
+
+Worse for the fix: the enum has no explicit discriminants and the tag is read
+straight out of the layout, so the wire tag is *declaration order* — removing a
+game variant renumbers unrelated programs. Pin discriminants before deleting
+anything (`riir-chain` Issue 096 T0/T8).
+
+### Anti-pattern — game vocabulary as a chain type name
+
+`ProgramId 13 = CRAFTING`, `BountyProgram`, `QuestCreate`. A wire constant
+naming a game mechanic makes rebalancing content a **protocol change**: the
+instruction set is versioned, proof-gated, and combinatorially CI'd, so a recipe
+tweak pays consensus review costs forever. (Retiring such an ID is itself a
+protocol change — retire, never reuse. All four game IDs — quest 17,
+bounty 11, crafting 13, reputation 14 — were retired 2026-08-21,
+`riir-chain` Issue 096 T3/T4/T7; their tags are dead holes, pinned
+undecodable.) The mirror-image anti-pattern is a chain-vocabulary type in
+a game crate reaching for `LatCalIx` directly, which
+`riir-ai/crates/riir-games-civ/src/civ/latcal_wire.rs` did before 2026-08-21
+— it now composes through `riir-dapps` (`riir-dapps` Plan 001 §3.1), the
+layer built for exactly that call.
+
+**Naming-only exception:** anti-cheat is *chain*, even when it is named for the
+game. `riir-chain`'s `game_trust_flag` / `TrustFlag` is driven by consensus
+anomalies and feeds inclusion probability — misnamed, correctly placed. It was
+renamed to `chain_trust_flag` on 2026-08-20 (`riir-chain` Issue 096 T5); the
+old name remains a deprecated Cargo alias until
+`riir-ai/crates/riir-games` (`game_replay_verify`) migrates off it.
 
 ---
 

@@ -160,7 +160,7 @@ impl<A: Clone + Debug> EventLog<A> {
 
     /// Last event ID (or ZERO if empty).
     pub fn last_id(&self) -> EventId {
-        self.events.last().map(|e| e.id).unwrap_or(EventId::ZERO)
+        self.events.last().map_or(EventId::ZERO, |e| e.id)
     }
 
     /// Fork the log at a given event: clone prefix up to (including) `at`.
@@ -664,9 +664,10 @@ mod query_tests {
         // They differ on a mixed log.
         assert_ne!(first_action.unwrap().id, last_action.unwrap().id);
         // No match → None.
-        assert!(log
-            .first_where(&Predicate::event_type(EventType::HeuristicFire))
-            .is_none());
+        assert!(
+            log.first_where(&Predicate::event_type(EventType::HeuristicFire))
+                .is_none()
+        );
     }
 
     #[test]
@@ -722,7 +723,10 @@ mod query_tests {
         assert_eq!(log.len(), 10);
         assert!(!log.is_empty());
         assert_eq!(log.last_id(), EventId(9));
-        assert_eq!(log.get(EventId(0)).unwrap().event_type, EventType::GameStart);
+        assert_eq!(
+            log.get(EventId(0)).unwrap().event_type,
+            EventType::GameStart
+        );
         assert_eq!(log.iter().count(), 10);
 
         // fork + diff still work.

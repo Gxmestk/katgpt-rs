@@ -89,10 +89,19 @@ pub fn fit_beta_nnls(
     for i in 0..n {
         let row = &a[i * t..(i + 1) * t];
         let mi = m[i];
+        // Split the fused j-loop into (a) the A^T m axpy and (b) the A^T A
+        // triangular update. Each `atm[j]` / `ata[j][k]` cell is still touched
+        // exactly once per `i` and the outer `i` order is unchanged, so every
+        // accumulator sees the same addend sequence → bit-identical. Both
+        // loops now walk pre-sliced rows, so the bounds checks hoist out.
+        for (acc, &r_j) in atm.iter_mut().zip(row.iter()) {
+            *acc += r_j * mi;
+        }
         for j in 0..t {
-            atm[j] += row[j] * mi;
-            for k in 0..=j {
-                ata[j * t + k] += row[j] * row[k];
+            let row_j = row[j];
+            let ata_row = &mut ata[j * t..=j * t + j];
+            for (acc, &r_k) in ata_row.iter_mut().zip(row.iter()) {
+                *acc += row_j * r_k;
             }
         }
     }
@@ -109,34 +118,31 @@ pub fn fit_beta_nnls(
     let mut jitter = 0.0f32;
     let l_mat;
     loop {
-        match cholesky_decompose(&ata, t) {
-            Some(l) => {
-                l_mat = l;
-                break;
-            }
-            None => {
-                // Remove previous jitter before adding the new one.
-                if jitter > 0.0 {
-                    for j in 0..t {
-                        ata[j * t + j] -= jitter;
-                    }
-                }
-                jitter = if jitter == 0.0 { 1e-6 } else { jitter * 10.0 };
+        if let Some(l) = cholesky_decompose(&ata, t) {
+            l_mat = l;
+            break;
+        } else {
+            // Remove previous jitter before adding the new one.
+            if jitter > 0.0 {
                 for j in 0..t {
-                    ata[j * t + j] += jitter;
+                    ata[j * t + j] -= jitter;
                 }
-                if jitter > 1e3 {
-                    // Fall back to a diagonal-only "solution": w = atm[j] / ata[j,j]
-                    for j in 0..t {
-                        let diag = ata[j * t + j];
-                        w[j] = if diag > STABILITY_EPS {
-                            atm[j] / diag
-                        } else {
-                            config.w_lower
-                        };
-                    }
-                    return finalize(w, a, m, n, t, config);
+            }
+            jitter = if jitter == 0.0 { 1e-6 } else { jitter * 10.0 };
+            for j in 0..t {
+                ata[j * t + j] += jitter;
+            }
+            if jitter > 1e3 {
+                // Fall back to a diagonal-only "solution": w = atm[j] / ata[j,j]
+                for j in 0..t {
+                    let diag = ata[j * t + j];
+                    w[j] = if diag > STABILITY_EPS {
+                        atm[j] / diag
+                    } else {
+                        config.w_lower
+                    };
                 }
+                return finalize(w, a, m, n, t, config);
             }
         }
     }
@@ -144,8 +150,10 @@ pub fn fit_beta_nnls(
     let mut z = vec![0.0f32; t];
     for j in 0..t {
         let mut s = atm[j];
-        for k in 0..j {
-            s -= l_mat[j * t + k] * z[k];
+        // Pre-sliced row + zip: same k order (0..j) → bit-identical.
+        let l_row = &l_mat[j * t..j * t + j];
+        for (&l_jk, &z_k) in l_row.iter().zip(z[..j].iter()) {
+            s -= l_jk * z_k;
         }
         z[j] = s / l_mat[j * t + j];
     }
@@ -187,8 +195,10 @@ pub fn fit_beta_nnls(
                 for i in 0..n {
                     let row = &a[i * t..(i + 1) * t];
                     let r_i = aw[i] - m[i];
-                    for j in 0..t {
-                        grad[j] += row[j] * r_i;
+                    // zip over the pre-sliced row: identical j order, no
+                    // per-element bounds check on `grad`/`row`.
+                    for (g, &r_j) in grad.iter_mut().zip(row.iter()) {
+                        *g += r_j * r_i;
                     }
                 }
                 // Step: w ← w - η * grad; clamp to box. Branchless clamp
@@ -268,8 +278,8 @@ fn cholesky_decompose(a: &[f32], t: usize) -> Option<Vec<f32>> {
     for j in 0..t {
         // Diagonal: a[j,j] − Σ_k l[j,k]². Sequential scalar subtraction.
         let mut sum = a[j * t + j];
-        for k in 0..j {
-            sum -= l[j * t + k] * l[j * t + k];
+        for &l_jk in &l[j * t..j * t + j] {
+            sum -= l_jk * l_jk;
         }
         if sum <= 0.0 {
             return None;
@@ -277,12 +287,19 @@ fn cholesky_decompose(a: &[f32], t: usize) -> Option<Vec<f32>> {
         let diag = sum.sqrt();
         l[j * t + j] = diag;
         // Off-diagonal: (a[i,j] − Σ_k l[i,k]·l[j,k]) / diag.
-        for i in (j + 1)..t {
+        // `split_at_mut((j+1)*t)` separates the read-only j-th row from the
+        // mutable i>j rows so both can be pre-sliced. Same scalar k-order
+        // (0..j) and the same subtraction sequence → bit-identical, which is
+        // load-bearing here (see the doc comment above).
+        let (l_head, l_tail) = l.split_at_mut((j + 1) * t);
+        let l_j = &l_head[j * t..j * t + j];
+        for (i_off, l_i) in l_tail.chunks_exact_mut(t).enumerate() {
+            let i = j + 1 + i_off;
             let mut s = a[i * t + j];
-            for k in 0..j {
-                s -= l[i * t + k] * l[j * t + k];
+            for (&l_ik, &l_jk) in l_i[..j].iter().zip(l_j.iter()) {
+                s -= l_ik * l_jk;
             }
-            l[i * t + j] = s / diag;
+            l_i[j] = s / diag;
         }
     }
     Some(l)
@@ -315,16 +332,19 @@ fn estimate_spectral_norm_squared(a: &[f32], n: usize, t: usize, steps: usize) -
         for i in 0..n {
             let row = &a[i * t..(i + 1) * t];
             let aw_i = aw[i];
-            for j in 0..t {
-                new_v[j] += row[j] * aw_i;
+            // zip over the pre-sliced row: identical j order, no bounds check.
+            for (acc, &r_j) in new_v.iter_mut().zip(row.iter()) {
+                *acc += r_j * aw_i;
             }
         }
         v_norm = vector_norm(&new_v);
         if v_norm < STABILITY_EPS {
             return 1.0;
         }
-        for j in 0..t {
-            v[j] = new_v[j] / v_norm;
+        // Kept as a division (not a hoisted reciprocal-multiply) so the
+        // quotient stays bit-identical.
+        for (vj, &nvj) in v.iter_mut().zip(new_v.iter()) {
+            *vj = nvj / v_norm;
         }
     }
     // Rayleigh quotient: ||A v||^2 ≈ lambda where lambda ≈ ||A||^2.

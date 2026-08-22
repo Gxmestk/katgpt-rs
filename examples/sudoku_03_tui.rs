@@ -689,7 +689,7 @@ fn fmt_elapsed(secs: f64) -> String {
     } else if secs < 1.0 {
         format!("{:.1}ms", secs * 1e3)
     } else {
-        format!("{:.2}s", secs)
+        format!("{secs:.2}s")
     }
 }
 

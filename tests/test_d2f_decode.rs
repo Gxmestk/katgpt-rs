@@ -529,10 +529,7 @@ fn test_screening_pruner_biases_sampling() {
     let n_even = non_mask.iter().filter(|&&t| t % 2 == 0).count();
     let n_odd = non_mask.iter().filter(|&&t| t % 2 != 0).count();
 
-    eprintln!(
-        "  Parity screener: non_mask={:?}, even={}, odd={}",
-        non_mask, n_even, n_odd
-    );
+    eprintln!("  Parity screener: non_mask={non_mask:?}, even={n_even}, odd={n_odd}");
 
     // With even-token relevance=1.0 and odd-token relevance=0.1,
     // we expect a strong bias toward even tokens (if tokens were placed)
@@ -655,10 +652,7 @@ fn test_no_repeat_constraint_deduplicates() {
         }
         // Note: with random weights, the constraint may leave tokens masked
         // rather than placing duplicates — both outcomes are valid
-        eprintln!(
-            "  Non-mask tokens: {:?}, has_duplicates: {has_dups}",
-            non_mask
-        );
+        eprintln!("  Non-mask tokens: {non_mask:?}, has_duplicates: {has_dups}");
     }
 }
 

@@ -481,9 +481,7 @@ fn find_primitive_poly(dim_index: u32) -> (u64, u32) {
             // How many polys in this degree?
             let next_cum = DEGREE_CUMULATIVE
                 .iter()
-                .find(|&&(d, _)| d == deg + 1)
-                .map(|&(_, c)| c)
-                .unwrap_or(35);
+                .find(|&&(d, _)| d == deg + 1).map_or(35, |&(_, c)| c);
             let count_in_degree = next_cum - cum;
             skip = dim_index - cum - 1;
             if skip < count_in_degree {
@@ -507,8 +505,7 @@ fn find_primitive_poly(dim_index: u32) -> (u64, u32) {
         }
     }
     panic!(
-        "find_primitive_poly: not enough primitive polynomials for dim_index {} (degree {}, skip {})",
-        dim_index, degree, skip
+        "find_primitive_poly: not enough primitive polynomials for dim_index {dim_index} (degree {degree}, skip {skip})"
     );
 }
 
@@ -729,9 +726,7 @@ pub fn fill_noise_queries_gaussian_qmc(
     // Stack scratch for per-dimension K uniforms (no heap allocation).
     assert!(
         k <= FILL_NOISE_MAX_K,
-        "fill_noise_queries_gaussian_qmc: k {} > FILL_NOISE_MAX_K {} (stack buffer limit)",
-        k,
-        FILL_NOISE_MAX_K
+        "fill_noise_queries_gaussian_qmc: k {k} > FILL_NOISE_MAX_K {FILL_NOISE_MAX_K} (stack buffer limit)"
     );
     let mut col_scratch = [0.0f32; FILL_NOISE_MAX_K];
     for j in 0..dim {

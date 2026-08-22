@@ -7,6 +7,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1](https://github.com/katopz/katgpt-rs/compare/katgpt-core-v0.4.0...katgpt-core-v0.4.1) - 2026-08-22
+
+### Added
+
+- *(680)* signed_coupling_dynamics — signed-graph Glauber dynamics + the three crowd order parameters (GOAT G1-G4 PASS, opt-in)
+- *(736)* spectral_pencil genome Pod — per-NPC genome persistence, merge + Weyl health (riir-ai 736 B3)
+- *(736)* spectral_pencil field adapter — ArchetypeFieldSource + certificate Lipschitz (riir-ai 736 B1)
+- *(676)* spectral_pencil T10-T12 closeout — GOAT PASS (Bench 671), doc, UQ scope-limit; issue complete
+- *(676)* spectral_pencil T8-T9 — canonical gauge + invertible monotone warp
+- *(676)* spectral_pencil T6-T7 — Hellmann-Feynman attribution + shape DSL
+- *(676)* spectral_pencil T1-T5 core substrate — sym isometry, pinned Jacobi + Sturm kernels, seeded γk≥½ init, bounds
+- *(675)* tether primitive — closed-form outcome-fit estimator blend (GOAT G1-G4 PASS, Bench 670)
+- promote contrastive_scope to katgpt-core default (Bench 669 T5 — consumer adopted)
+- Issues 672/673/674 — sterling_primitives + recirculation + contrastive_scope (all opt-in, GOAT'd)
+- *(459-T5)* ignition_schedule primitive — closed-form logistic ignition GOAT G1-G4 PASS (Bench 666)
+- *(entropic_tilt)* hoist KL-budgeted max-seeking advantage tilt to katgpt-core
+- *(670)* widen TreeNode.parent_path u128 -> TreePath [u32;8]
+- *(effective_degree)* close Issue 668 — modelless function-space simplicity metric (Bench 665)
+- *(665)* extension-count (freedom-of-function) selection — T1-T4 PoC PASS
+- Issue 663 — SwitchCostTable modelless primitive (switch_cost feature)
+- Issue 664 — UGC certified-schedule PoC: G1/G1-cert/G4 PASS, G1b FAIL (negative result)
+- *(engram)* counterfactual privilege gating — modelless δ from LOPD (Issue 656)
+- *(core)* 655 — selection-set fixpoint propagation POC (G1-G4 PASS, claim confirmed)
+- *(core)* mop solver one-hot sparse-row fast path (Issue 654) — bit-identical, 1.64-3.35x on zone-KG kernels
+- *(core)* MOP value-iteration primitive (Plan 573) — GOAT G1-G4 PASS
+- *(core)* PkmEpisodicStore TF-IDF write gate (Issue 650) — GOAT G1 +12.5pp
+- operator consistency metric (Issue 586, Research 479) — rule_consistency + regime classification + promotion gate
+- zero-alloc scratch API for DefaultFaithfulnessProbe (Session 42)
+- *(ternary)* row-parallel kernel for the trit tier (582 usability gap)
+- *(ternary)* base-3 trit tier (Issue 582) + retire the scale-fold trick (Issue 583)
+- *(mag)* add MagDirection::from_unit_slice zero-alloc constructor
+- add TernaryInputProjHook trait for fused input projections (Issue 602)
+- add TernaryFfnHook trait for fused FFN dispatch (Issue 601)
+- add TernaryMatvecHook trait for GPU-accelerated ternary matvec (Issue 599)
+- *(337)* AVX2 tropical matvec — closes x86_64 gap (Bench 583)
+- *(plan526)* Similarity Inference Phase 6 — PROMOTED TO DEFAULT-ON
+- *(plan526)* Similarity Inference Phase 5 — G7 UQ floor PASS (119x better calibrated)
+- *(plan526)* Similarity Inference Phase 4 — G4 alloc-free + G6 crowd-scale PASS
+- *(plan526)* Similarity Inference Phase 3 — G5 indirect inference PoC PASS (Super-GOAT capability subset)
+- *(plan526)* Similarity Inference Phase 2 — G2 emergent cooperation PoC PASS + observe_mismatch correctness fix
+- *(plan526)* Similarity Inference Phase 1 — endogenous correlation device skeleton + G1+G8 GOAT PASS
+- *(580)* LIMIT fixture — the modelless 8-D dense leg ranks at chance
+- *(578)* row-parallel ternary group matvec — 7.21x on real Bonsai shapes
+- *(581)* sigmoid argmaxability audit — affect bridge is clean (exhaustive negative)
+- *(579)* ship worst-case retrieval capacity bound (Theorem 1); correct published numbers
+- add ModelArchitecture::BitNet variant + bitnet_inference feature (Plan 333 T2.3)
+- *(578)* TernaryGroupWeights — the Q2_0_g128 container (opt-in)
+- *(mcts)* add MctsSearchBudget — named type for the two coupled search knobs
+- *(core)* add decide_with_nudges to SalienceTriGate (Plan 571 cherry-pick API)
+- *(core)* promote phase_separation to DEFAULT-ON (Plan 571 GOAT gate ALL PASS)
+- *(katgpt-core)* Plan 568 Phase 3 — fused multi-stage LUT dequant+dot kernel (G2 honest negative)
+- rrq_quant Phase 2 — load-time PMR + KS quant-strategy router
+- rrq_quant primitive (Plan 568 Phase 1) — single-checkpoint multi-precision weights via iterated 2-bit RTN residual corrections
+- phase_separation primitive (Plan 571 Phase 1) — LRC-distilled per-entity min circular distance
+- clr_weighted_set_attention (Plan 570) — G8 closure, DEFAULT-ON
+- Plan 572 CCE simplex solver at scale — constraint generation + two-phase primal simplex
+- Plan 569 TransitionKernelCce — solve_with_dynamics ships
+- *(cp_hopfield)* push_memory_bloch — Bloch-vector memory store (Plan 567 Phase 6)
+- *(cp_hopfield)* driven LLG flow for perception-coupled belief (Fusion D)
+- *(cp_hopfield)* CP^(d-1) symmetric-space Hopfield top-eigenvector recall (Plan 567 Phases 1-4)
+- hoist InferenceBackend trait to katgpt-core::prompt_backend (Issue 580)
+- add gemma4_inference Config + ModelArchitecture::Gemma4 (Issue 577)
+- StateMagnitudeEncoder substrate — Issue 571 T1-T5, Bench 019 GOAT G1-G5 PASS
+- T5.6 G5 PASS — cross-model discrimination on real Kimi-K3 + from_states_into zero-alloc + mean-centering fix
+- T5.5 SweTrajectoryFreezer — modelless committed freeze of inference attempt trajectory geometry (P011 Phase 5)
+- add quant_error_lora primitive (Issue 565 / Research 463)
+
+### Fixed
+
+- *(321)* CommittedFieldBlend::lipschitz_bound composes the gated SUM
+- *(676)* spectral_pencil implies karc_forecaster — hebbian's latent linalg gate gap breaks --no-default-features builds
+- *(clippy)* heal member-crate tests/ — 53 files, 787 edits, 8 gate cycles all count-identical
+- clippy heal - root-src slice (36 files/117 edits: 63 uninlined + 25 map_unwrap_or + 14 match_bool + 6 single_match + 5 vec-with-capacity + 2 semicolon + 1 hashmap-with-capacity + 1 manual_unwrap_or) + member-crate semicolon-class residue (17 edits: attn dash_attn 13, kv 2, percepta 2, core causal_id 1, pruners 12) + 4 manual terminal fixes (is_some_and x2 incl self_distilling_bandit:202, context-forced map_or x2 twins step_paged:60+forward step:156); root-src gate map: dllm transitively DEFAULT via dmax_spd; all 8 validation configs count-identical (root default 201 + union 399, attn 193, forward 124, kv 24, percepta 84, core 1897, pruners 587/611); compiler-proof the array-literal guard: map_or(&[],f) E0308s in plain-let position (step_paged:129 reverted w/ in-source comment; forward step:196 stays) - the healer is SAFER than clippy autofix there; rustfmt on 17 fmt-clean files; net -111 lines
+- clippy heal — katgpt-core src slice (135 files, ~1270 edits incl. semicolon_if_nothing_returned discarded-position extension; 1897/0/6 default + 3974/0/13 all-features count-identical; residues = 7 documented divergences: 2 array-literal guard + 5 comment guard; 2 manual is_some_and terminal fixes; rustfmt on 106 fmt-clean files)
+- clippy heal — katgpt-core benches+examples slice (71 files, 990 edits; 19 full pre/post validations, 52 post-only under exact mega-union gates, bench_440 release-validated; 2 proposer divergence classes documented)
+- *(670)* widen TreeNode.parent_path u128/16-bit to TokenPath([u32; 8])
+- *(core)* FeatureHasher project_into asserts features.len() == feature_dim (Issue 669)
+- *(branching)* add sync_anchor_flat method to BranchBank — Issue 636 regression fix
+- drop the bitnet_inference alias — it did not restore compat
+- add bitnet_inference feature alias for riir-engine cross-repo compat
+- resolve clippy warnings + E0063 compile errors across workspace
+- resolve all clippy warnings in katgpt-core + katgpt-attn (--all-features)
+- *(avx2)* _mm_cvtepu8_epi32 → _mm256_cvtepu8_epi32 in simd_lut_dequant gather (E0308 type mismatch — __m128i → __m256i for _mm256_i32gather_ps; was blocking all katgpt-core downstream builds)
+- gate clr_weighted_set_attention functions for feature-consistency
+- re-export clr_weighted_set_attention_into + clr_reliability_scores at crate root
+- *(wasm32)* unblock wasm32-unknown-unknown builds (drop dead uuid dep, per-target ahash RNG)
+- *(avx2)* replace runtime shift with const-compatible intrinsic in simd_lut_dequant
+- resolve clippy warnings from Issue 565 quant-error-LoRA additions
+
+### Other
+
+- *(effective_degree)* fold in the Issue 602 consumer verdict — SCOPE-LIMITED, gate unchanged
+- *(feature-gate-audit)* 2026-08-15 quarterly audit — fix 7 stale gate-status surfaces across 6 promoted primitives
+- *(branching)* Issue 636 — flat anchor cache for BranchRouter, route step -33%
+- *(branching)* FMA-optimize dot + dot_fixed — single-rounding FMA instead of double-rounding mul+add (Bench 636 Phase 4)
+- *(578)* close Q2_0_g128 ternary tier issue — G1-G4 all PASS, opt-in by policy
+- rename bitnet_inference -> ternary_inference, ModelArchitecture::BitNet -> Ternary
+- *(traits)* add GameState::advance_inplace (Plan 527, future-proof fix)
+- use slice fill instead of index loop in simplex tests
+- *(katgpt-core)* Plan 571 Phase 3 — phase_separation LRC example demo (T3.2) + T3.1 audit
+- fix DEC operator path in spectral/differentiation.rs comment
+- round 3 hot-path sweep — hoist invariants, split borrows, SIMD add
+- hot-path optimization sweep across crates/ + src/ (39 files)
+- *(cp_hopfield)* G2/G4/G7 GOAT bench + 5.9x recall speedup (Plan 567 Phase 4)
+- *(latent_trajectory_geometry)* compare squared separation in bifurcation onset scan
+- noise-reduction pass — remove 8 resolved issues + document 3 negative results
+- *(todo)* correct bogus/stale plan references in 4 inline TODOs
+
 ## [0.4.0](https://github.com/katopz/katgpt-rs/compare/katgpt-core-v0.3.1...katgpt-core-v0.4.0) - 2026-07-31
 
 ### Added

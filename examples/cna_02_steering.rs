@@ -158,7 +158,7 @@ fn main() {
         } else {
             "DEGRADED"
         };
-        println!("{:>12.1} {:>16.6} {:>12}", m, rmse, status);
+        println!("{m:>12.1} {rmse:>16.6} {status:>12}");
     }
 
     // ── Cross-layer isolation test ────────────────────────────────

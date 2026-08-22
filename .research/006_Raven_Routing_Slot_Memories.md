@@ -11,6 +11,7 @@
 **Context:** katgpt-rs + anyrag neuro-symbolic architecture
 **Paper:** "Raven: High-Recall Sequence Modeling with Sparse Memory Routing" (Afzal, Bick, Xing, Cevher, Gu — 2025)
 **Source:** https://github.com/goombalab/raven
+**Cross-ref (riir-train, revised 2026-08-07):** Wang et al. "Zero Train-Inference Mismatch — now for linear attention, and under async RL" [blog https://yichuan-w.github.io/blog/GDN-train-inference-mismatch-asyncRL/]. **Verdict revised PASS → Gain** — the model-based track includes FLA-family training (distill_attention.rs: SDPA→HLA/AHLA). Current path is batch-invariant by construction (CPU recurrent); future GPU-batched + async RL will need the paper's batch-invariant GEMM technique. → riir-train/.issues/420, riir-train/.plans/327. See `.research/028` (HLA) for the closer cousin.
 
 ---
 

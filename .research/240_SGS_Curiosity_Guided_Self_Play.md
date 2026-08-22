@@ -14,7 +14,7 @@
 > - ⚠ P3: bounded 13.00 allocs/cycle (NOT zero — optimisation tracked in `.issues/021_cgsp_cycle_allocation_reduction.md` — Issue 021 was closed + removed; resolved).
 > - ⚠ G1 (transfer-to-target) is INFORMATIONAL: the `(1 − solve_rate) · guide_score` reward is curiosity-correct but target-agnostic by design. CGSP is an exploration driver, not a target-seeker.
 >
-> **Promotion decision:** KEEP OPT-IN. The private selling-point guide for the runtime consumer is [`riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`](../../../riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md); promote to default only after [`riir-ai/.plans/299_npc_curiosity_self_play_runtime.md`](../../../riir-ai/.plans/299_npc_curiosity_self_play_runtime.md) validates on real game domains. Runnable demos: [`examples/cgsp_minimal.rs`](../examples/cgsp_minimal.rs), [`examples/cgsp_collapse_recovery.rs`](../examples/cgsp_collapse_recovery.rs).
+> **Promotion decision:** KEEP OPT-IN. The private selling-point guide for the runtime consumer is [`riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`](../../riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md); promote to default only after [`riir-ai/.plans/299_npc_curiosity_self_play_runtime.md`](../../riir-ai/.plans/299_npc_curiosity_self_play_runtime.md) validates on real game domains. Runnable demos: [`examples/cgsp_minimal.rs`](../examples/cgsp_minimal.rs), [`examples/cgsp_collapse_recovery.rs`](../examples/cgsp_collapse_recovery.rs).
 
 ---
 

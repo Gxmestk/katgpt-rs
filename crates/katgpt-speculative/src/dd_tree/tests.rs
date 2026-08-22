@@ -16,14 +16,14 @@ use katgpt_types::Config;
 
 #[test]
 fn test_extract_parent_tokens_roundtrip() {
-    let path_d0 = 3u128;
-    let path_d1 = (path_d0 << 16) | 7;
-    let path_d2 = (path_d1 << 16) | 1;
+    let path_d0 = TreePath::from_tokens(&[3]);
+    let path_d1 = TreePath::from_tokens(&[3, 7]);
+    let path_d2 = TreePath::from_tokens(&[3, 7, 1]);
 
     assert_eq!(extract_parent_tokens(path_d0, 1), vec![3]);
     assert_eq!(extract_parent_tokens(path_d1, 2), vec![3, 7]);
     assert_eq!(extract_parent_tokens(path_d2, 3), vec![3, 7, 1]);
-    let empty: Vec<usize> = extract_parent_tokens(0, 0);
+    let empty: Vec<usize> = extract_parent_tokens(TreePath::default(), 0);
     assert!(empty.is_empty());
 }
 
@@ -53,7 +53,7 @@ fn test_merge_empty_retrieval_noop() {
         score: 1.0,
         depth: 0,
         token_idx: 0,
-        parent_path: 0,
+        parent_path: TreePath::default(),
     }];
     let original_len = tree.len();
 
@@ -186,15 +186,19 @@ fn test_chain_seed_produces_chain_path() {
     assert_eq!(tree[2].token_idx, 3, "chain node depth 2 = argmax token 3");
 
     // Verify chain node parent_paths form contiguous path
-    assert_eq!(tree[0].parent_path, 5, "depth 0 parent_path = token 5");
+    assert_eq!(
+        tree[0].parent_path,
+        TreePath::from_tokens(&[5]),
+        "depth 0 parent_path = token 5"
+    );
     assert_eq!(
         tree[1].parent_path,
-        (5u128 << 16) | 10,
+        TreePath::from_tokens(&[5, 10]),
         "depth 1 parent_path = [5, 10]"
     );
     assert_eq!(
         tree[2].parent_path,
-        ((5u128 << 16) | 10) << 16 | 3,
+        TreePath::from_tokens(&[5, 10, 3]),
         "depth 2 parent_path = [5, 10, 3]"
     );
 
@@ -711,8 +715,7 @@ fn test_deep_argmax_restricts_deep_branching() {
         .collect();
     assert!(
         d0.len() > 1,
-        "depth 0 should have multiple tokens, got {:?}",
-        d0
+        "depth 0 should have multiple tokens, got {d0:?}"
     );
 
     // Depth 1 (> 0): only argmax token 0.
@@ -776,8 +779,7 @@ fn test_deep_argmax_threshold_2_only_restricts_deep() {
         .collect();
     assert!(
         d2.len() > 1,
-        "depth 2 (≤ threshold) should have multiple tokens, got {:?}",
-        d2
+        "depth 2 (≤ threshold) should have multiple tokens, got {d2:?}"
     );
 
     // Depth 3 (> 2): only argmax token 2.
@@ -831,9 +833,9 @@ fn best_path(tree: &[TreeNode]) -> Vec<usize> {
             if n.depth != current_depth {
                 return false;
             }
-            // Check if this node's parent_path, shifted right by 16, matches
-            // our current_path (i.e., this node is a child of our path).
-            n.parent_path >> 16 == target_parent_path
+            // Check if this node's ancestor path (its own token dropped)
+            // matches our current_path (i.e., this node is a child of our path).
+            n.parent_path.parent(n.depth) == target_parent_path
         });
         match next {
             Some(n) => {
@@ -890,7 +892,7 @@ fn test_deep_argmax_acceptance_benchmark() {
     let mv: Vec<&[f32]> = marginals.iter().map(|s| s.as_slice()).collect();
 
     eprintln!("=== Plan 424 T6.2: deep-argmax acceptance benchmark ===");
-    eprintln!("  vocab={}, lookahead={}", vocab, lookahead);
+    eprintln!("  vocab={vocab}, lookahead={lookahead}");
     eprintln!("  marginals: sharp (0.55) at d<4, diluted (0.20) at d>=4");
     eprintln!();
     eprintln!(
@@ -905,10 +907,10 @@ fn test_deep_argmax_acceptance_benchmark() {
             let tree = build_dd_tree_deep_argmax(&mv, &config, threshold);
             let path = best_path(&tree);
             let acc = acceptance_length(&path, &target);
-            let score = tree.first().map(|n| n.score).unwrap_or(f32::NEG_INFINITY);
+            let score = tree.first().map_or(f32::NEG_INFINITY, |n| n.score);
             let label = match threshold {
                 None => "None".to_string(),
-                Some(t) => format!("Some({})", t),
+                Some(t) => format!("Some({t})"),
             };
             eprintln!(
                 "  {:<8} {:<14} {:>5} {:>5} {:>5} {:>10.4}",

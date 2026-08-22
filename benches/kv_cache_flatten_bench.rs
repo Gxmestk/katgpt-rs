@@ -197,15 +197,9 @@ fn main() {
             max_seq_len,
         } = *scale;
 
-        println!("┌─ {} ", name);
-        println!(
-            "│ n_layers={}, kv_dim={}, max_seq_len={}",
-            n_layers, kv_dim, max_seq_len
-        );
-        println!(
-            "│ store/dequant: {} positions, layer 0, {} iters",
-            STORE_POSITIONS, LATENCY_ITERS
-        );
+        println!("┌─ {name} ");
+        println!("│ n_layers={n_layers}, kv_dim={kv_dim}, max_seq_len={max_seq_len}");
+        println!("│ store/dequant: {STORE_POSITIONS} positions, layer 0, {LATENCY_ITERS} iters");
         println!("├──────────────────────────────────────────────────────────────────");
 
         let mut results: Vec<CodecResult> = Vec::new();

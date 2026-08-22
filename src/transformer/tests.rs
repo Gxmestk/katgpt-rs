@@ -2373,12 +2373,30 @@ fn test_forward_base_standard_fallback_no_weights() {
     }
 }
 
+/// Plan 574 changed `cluster_map_from_embeddings` from a round-robin stub into
+/// real k-means, so this no longer asserts equality with round-robin.
+///
+/// With all-identical rows there is no geometry to separate, and k-means
+/// correctly collapses everything into a single cluster. That is the *safe*
+/// degenerate outcome: one cluster means `clustered_lm_head` selects it for any
+/// `topk >= 1` and computes the full vocabulary — no pruning benefit, but no
+/// correctness loss either.
 #[test]
-fn test_cluster_map_from_embeddings_fallback() {
-    let wte = vec![0.0f32; 100 * 32];
-    let map = cluster_map_from_embeddings(&wte, 100, 32, 25);
-    let expected = cluster_map_round_robin(100, 25);
-    assert_eq!(map, expected);
+fn test_cluster_map_from_embeddings_collapses_identical_rows() {
+    let lm_head = vec![0.0f32; 100 * 32];
+    let map = cluster_map_from_embeddings(&lm_head, 100, 32, 25);
+
+    assert_eq!(map.len(), 1, "identical rows cannot be separated");
+    assert_eq!(map[0].len(), 100, "every token must still be covered");
+    assert!(map[0].iter().copied().eq(0..100));
+}
+
+/// A short weight buffer must fall back rather than panic.
+#[test]
+fn test_cluster_map_from_embeddings_short_buffer_falls_back() {
+    let truncated = vec![0.0f32; 4];
+    let map = cluster_map_from_embeddings(&truncated, 100, 32, 25);
+    assert_eq!(map, cluster_map_round_robin(100, 25));
 }
 
 // ── Delta routing stability tests (Plan 134 T2) ─────────────

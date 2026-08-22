@@ -876,6 +876,35 @@ let result = lp.cycle(&target, &mut scratch);
 
 See `examples/cgsp_minimal.rs` and `examples/cgsp_collapse_recovery.rs` for full runnable demos. Implementation lives in `crates/katgpt-core/src/cgsp/` so `riir-engine` (Plan 299) can consume it without depending on the root application crate; `crates/katgpt-core/src/cgsp/mod.rs` is a thin re-export shim preserving the `katgpt_rs::cgsp::*` import path.
 
+## MOP — Maximum Occupancy Principle Value Iteration (`crates/katgpt-core/src/mop/`, Plan 573)
+
+Reward-free optimal policy from a frozen tabular transition model — the paper's Eq. 7 fixed-point map (Ramírez-Ruiz et al., arXiv:2205.10316, Nat. Commun. 15, 6368 (2024), CC-BY 4.0) solved in log-space LSE form. No reward function, no training, no gradient descent: the value IS the entropy of the future action-state path. Absorbing states pin to `V = 0` bit-exact (emergent survival), the optimal policy stays persistently stochastic (π\* is a categorical distribution, not an argmax), and β dials risk appetite on stochastic transitions (the fog-of-war analog).
+
+```rust
+let solver = MopSolver::<N, A>::new(MopConfig::paper_default())?;  // validates α>0, β≥0, γ∈(0,1)
+let sol = solver.solve(&kernel /* p[N][A][N] */, &mask /* [N][A] */, &mut scratch);
+solver.pi_star(&sol, state, &mut out /* [f32; A] */);              // closed-form, stateless
+```
+
+**Composition, not duplication:** entropy helpers consume `cgsp::types::entropy_nats` (hence `mop_path_entropy = ["cgsp"]`) — no duplicate entropy code. The shared arenas (`arenas.rs`: 4-room gridworld N=82, ring N=17) are public and double as riir-ai Plan 538's parity harness.
+
+**Latent/raw boundary:** pure deterministic math on caller-owned arrays — a full solve + 1000 `pi_star` extractions allocate nothing (`MopScratch` caller-owned, `MopSolution` returned by value as const-generic arrays). π\* is a local control policy, never a synced distribution.
+
+**Softmax exemption (house rule):** π\*'s `exp/Z` normalization is the paper's exact Eq. 5 categorical-distribution math — it must sum to 1 over available actions. The "sigmoid, never softmax" rule governs semantic scalar projections (emotion gates, attention boosts), which this is not. Do not "fix" this normalization to sigmoid — it would corrupt the math.
+
+**GOAT gate status** (`.benchmarks/638_mop_primitive_goat.md`, 7 lib tests + `bench_mop_solver`):
+
+| Gate | Measurement | Status |
+|------|-------------|--------|
+| G1 golden parity | structurally-different z-space reference on the 4-room gridworld: relative \|ΔV\| ≤ max(1e-6, 1e-6·\|V_ref\|), max observed 7.6e-6 ≈ few-ulp at V≈55; V(absorbing)=0 bit-exact; ring analytic V\*=α·ln3/(1−γ) ≤1e-5 | ✅ PASS |
+| G2 latency | gridworld full solve 663 µs < 1 ms (PoC-anchored gate); N=256/A=16 = 71 µs/iter ≈ 14 GFLOP/s memory-bound-optimal (SIMD `simd_dot_f32`, 6.5× over scalar) | ✅ PASS |
+| G3 no-regression | default 1887/1887; `--all-features` clean; clippy 0 warnings | ✅ PASS |
+| G4 alloc-free | 0 allocations across 1 full solve + 1000 `pi_star` calls | ✅ PASS |
+
+Two honest gate re-specifications are recorded in the bench: G1's absolute 1e-6 is sub-ulp at this arena's value scale (f32 eps at 55 ≈ 3.3e-6), and G2's original `< 1 ms @ N=256` needs ~375 GFLOP/s — arithmetically infeasible on any CPU for this access pattern; the PoC-anchored gridworld gate is the honest form. UQ floor N/A (no predictive distribution claimed).
+
+**Promotion decision:** STAYS OPT-IN — G1–G4 pass but no in-tree default-path consumer; the consumer is riir-ai `mop_runtime` (Plan 538, opts in via path-dep feature). **The integration gate has now run (2026-08-15): riir-ai Bench 680 G1–G4 PASS + Bench 681 G8 civ-arena ALL PASS** (survival/coverage/entropy margins through the production kernel path) — the primitive's quality evidence is complete end-to-end; any default-on promotion is a separate product decision.
+
 ## SpeculativeVerifier (Strategy Pattern)
 
 Based on [Algorithm 1 from Leviathan et al. 2022](https://arxiv.org/pdf/2211.17192) — the verification strategy is swappable via trait:

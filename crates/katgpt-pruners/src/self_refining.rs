@@ -177,10 +177,7 @@ pub fn compute_threshold_adjustment(
         topology_divergence: 0.0,
         lambda_t,
     };
-    match div.clamp_adjustment(raw) {
-        Some(clamped) => clamped,
-        None => raw,
-    }
+    div.clamp_adjustment(raw).unwrap_or(raw)
 }
 
 // ── Topology Adjustment ─────────────────────────────────────────────

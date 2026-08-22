@@ -209,7 +209,7 @@ fn record_round(
         None
     };
 
-    let total_ticks = snapshots.last().map(|s| s.tick).unwrap_or(0);
+    let total_ticks = snapshots.last().map_or(0, |s| s.tick);
 
     RecordedRound {
         snapshots,
@@ -239,8 +239,7 @@ fn capture_snapshot(world: &mut bevy_ecs::world::World, events: &[GameEvent]) ->
     for (i, &entity) in entity_list.iter().enumerate() {
         player_pos[i] = world
             .get::<GridPos>(entity)
-            .map(|p| (p.x, p.y))
-            .unwrap_or((-1, -1));
+            .map_or((-1, -1), |p| (p.x, p.y));
         player_alive[i] = world.get::<Alive>(entity).is_some();
     }
 
@@ -373,7 +372,7 @@ fn render_scoreboard(
     area: Rect,
 ) {
     let names = ["Random", "Greedy", "Validator", "HL"];
-    let mut lines = Vec::new();
+    let mut lines = Vec::with_capacity(4);
 
     for i in 0..4 {
         let alive = if snap.player_alive[i] { "✓" } else { "✗" };

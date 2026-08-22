@@ -233,18 +233,15 @@ impl AdmgSignature {
         let mut inline: ArrayVec<NodeId, INLINE_SIGNATURE_CAP> = ArrayVec::new();
         let mut heap: Option<Vec<NodeId>> = None;
         for n in iter {
-            match &mut heap {
-                Some(h) => h.push(n),
-                None => {
-                    if inline.is_full() {
-                        let mut h = Vec::with_capacity(inline.len() + 1);
-                        h.extend(inline.drain(..));
-                        h.push(n);
-                        heap = Some(h);
-                    } else {
-                        inline.push(n);
-                    }
-                }
+            if let Some(h) = &mut heap {
+                h.push(n);
+            } else if inline.is_full() {
+                let mut h = Vec::with_capacity(inline.len() + 1);
+                h.extend(inline.drain(..));
+                h.push(n);
+                heap = Some(h);
+            } else {
+                inline.push(n);
             }
         }
         match heap {

@@ -33,9 +33,12 @@ fn make_signal_vectors(n: usize, dim: usize, rng: &mut Rng) -> Vec<Vec<f32>> {
     (0..n)
         .map(|i| {
             (0..dim)
-                .map(|d| match d >= i * block && d < (i + 1) * block {
-                    true => 3.0 + rng.normal() * 0.3,
-                    false => rng.normal() * 0.05,
+                .map(|d| {
+                    if d >= i * block && d < (i + 1) * block {
+                        3.0 + rng.normal() * 0.3
+                    } else {
+                        rng.normal() * 0.05
+                    }
                 })
                 .collect()
         })
@@ -125,16 +128,13 @@ fn run_trial(seed: u64) -> (f32, f32) {
 
         // Remaining: noise + occasional distractor signal (non-query).
         for _ in n_match..LD {
-            match rng.next() % 4 {
-                0 => {
-                    let mut others: Vec<usize> =
-                        (0..N_SIGNAL).filter(|id| !q_sig.contains(id)).collect();
-                    shuffle(&mut others, &mut rng);
-                    doc.extend(make_signal_token(&signals[others[0]], 0.3, &mut rng));
-                }
-                _ => {
-                    doc.extend(make_noise_token(DIM, 0.5, &mut rng));
-                }
+            if rng.next().is_multiple_of(4) {
+                let mut others: Vec<usize> =
+                    (0..N_SIGNAL).filter(|id| !q_sig.contains(id)).collect();
+                shuffle(&mut others, &mut rng);
+                doc.extend(make_signal_token(&signals[others[0]], 0.3, &mut rng));
+            } else {
+                doc.extend(make_noise_token(DIM, 0.5, &mut rng));
             }
         }
 

@@ -44,10 +44,7 @@ fn bench_176_single_token_decode_cpu() {
     let elapsed = start.elapsed();
     let us_per_token = elapsed.as_secs_f64() * 1e6 / n_iters as f64;
 
-    println!(
-        "Bench 176: Single-token decode (CpuBackend): {:.2} µs/token",
-        us_per_token
-    );
+    println!("Bench 176: Single-token decode (CpuBackend): {us_per_token:.2} µs/token");
     assert!(
         us_per_token < 5000.0,
         "single-token decode too slow: {us_per_token} µs"
@@ -83,8 +80,7 @@ fn bench_176_generation_50_tokens_cpu() {
     let us_per_token = us_total / n_tokens as f64;
 
     println!(
-        "Bench 176: Generation 50 tokens (CpuBackend): {:.2} µs total, {:.2} µs/token",
-        us_total, us_per_token
+        "Bench 176: Generation 50 tokens (CpuBackend): {us_total:.2} µs total, {us_per_token:.2} µs/token"
     );
 }
 
@@ -97,10 +93,7 @@ fn bench_176_backend_selection_overhead() {
     let elapsed = start.elapsed();
     let us_per_selection = elapsed.as_secs_f64() * 1e6 / 100.0;
 
-    println!(
-        "Bench 176: Backend selection overhead: {:.2} µs/selection",
-        us_per_selection
-    );
+    println!("Bench 176: Backend selection overhead: {us_per_selection:.2} µs/selection");
     assert!(
         us_per_selection < 100.0,
         "backend selection too slow: {us_per_selection} µs"

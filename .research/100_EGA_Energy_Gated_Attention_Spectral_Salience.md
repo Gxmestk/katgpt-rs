@@ -92,7 +92,7 @@ EGA is **model-based**:
 
 ## GOAT Pillar Assessment
 
-Per [27_mmo_goat_pillars_decision_matrix.md](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md):
+Per [27_mmo_goat_pillars_decision_matrix.md](../../riir-ai/.docs/03_pillars/README.md):
 
 | Criterion | Score | Reasoning |
 |-----------|-------|-----------|

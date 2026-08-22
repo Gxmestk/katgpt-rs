@@ -336,17 +336,16 @@ pub fn boundary_flux_mass_indexed(
         field.dim
     );
 
-    let index = match cx.coboundary_entries(k) {
-        Some(idx) => idx,
-        None => {
-            debug_assert!(
-                false,
-                "boundary_flux_mass_indexed: coboundary index for rank {k} not built. \
+    let index = if let Some(idx) = cx.coboundary_entries(k) {
+        idx
+    } else {
+        debug_assert!(
+            false,
+            "boundary_flux_mass_indexed: coboundary index for rank {k} not built. \
                  Call cx.build_coboundary_index({k}) first. Falling back to full-scan \
                  boundary_flux_mass_only in release builds."
-            );
-            return boundary_flux_mass_only(cx, region_cells, field);
-        }
+        );
+        return boundary_flux_mass_only(cx, region_cells, field);
     };
 
     // Boundary flux = Σ_{c ∈ region} Σ_{(k_cell, sign) ∈ ∂c} sign · field[k_cell]

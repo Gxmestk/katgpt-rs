@@ -449,6 +449,12 @@ impl StepLocalizer<Vec<f32>, f32> for DotProductLocalizer {
 
         // Localize: first tick where r_k < tau_reliable AND the delta projects
         // above the floor onto at least one direction.
+        //
+        // `responsibility` is hoisted out of the loop: every tick that fails the
+        // floor check used to allocate and throw away a `Vec` of
+        // `directions.len()` floats. It is only moved out on the success path
+        // (which returns), so the reuse is sound.
+        let mut responsibility: Vec<f32> = Vec::with_capacity(directions.len());
         for (tick_idx, &score) in trajectory_scores.iter().enumerate() {
             if score >= tau_reliable {
                 continue;
@@ -456,22 +462,34 @@ impl StepLocalizer<Vec<f32>, f32> for DotProductLocalizer {
             let delta = &trajectory_deltas[tick_idx];
 
             // Link: project delta onto each direction.
-            let mut responsibility = Vec::with_capacity(directions.len());
+            responsibility.clear();
             let mut best_idx = 0;
             let mut best_weight = f32::NEG_INFINITY;
+            // Remember the raw projection of the winning direction so the floor
+            // check below does not repeat an O(d) dot product. `j == 0` seeds it
+            // unconditionally, which keeps it in lockstep with `best_idx`'s own
+            // default of 0 even when every weight is NaN (in which case
+            // `weight > best_weight` never fires). `dot` is a pure function of
+            // its inputs, so this is the same bit pattern the recomputation
+            // produced.
+            let mut best_dot_raw = 0.0f32;
             for (j, dir) in directions.iter().enumerate() {
-                let dot = dot(delta, dir);
+                let d = dot(delta, dir);
                 // Numerically stable sigmoid (per AGENTS.md: sigmoid not softmax).
-                let weight = stable_sigmoid(dot);
+                let weight = stable_sigmoid(d);
                 responsibility.push(weight);
+                if j == 0 {
+                    best_dot_raw = d;
+                }
                 if weight > best_weight {
                     best_weight = weight;
                     best_idx = j;
+                    best_dot_raw = d;
                 }
             }
 
             // Floor check: is the best projection above the floor?
-            let best_dot = dot(delta, &directions[best_idx]);
+            let best_dot = best_dot_raw;
             if best_dot.abs() < self.projection_floor {
                 // Weak signal — not actionable, continue searching.
                 continue;

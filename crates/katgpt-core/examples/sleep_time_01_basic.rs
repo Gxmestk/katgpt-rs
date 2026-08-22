@@ -112,7 +112,7 @@ fn main() {
     let c_prime = anticipator.anticipate(&c, &dirs, &mut scratch);
 
     println!("── Step 2: anticipate() → c' artifact (sleep-time compute) ──");
-    println!("  context c = {:?}", c);
+    println!("  context c = {c:?}");
     println!(
         "  c'.blake3 = {}…  (commits all slot bytes)",
         hex_short(&c_prime.blake3)
@@ -166,12 +166,12 @@ fn main() {
 
     let (best_p, gate_p) = consume_gate(&q_predictable, &c_prime, TAU, BETA);
     let out_p = consume(&q_predictable, &c_prime, TAU, BETA, fresh_think);
-    println!("  predictable query q = {:?}", q_predictable);
+    println!("  predictable query q = {q_predictable:?}");
     println!(
         "    best slot i* = {best_p}  predictability p_{{i*}} = {:.6}",
         c_prime.slots[best_p].predictability
     );
-    println!("    gate = {:.6}  (high → use precomputed)", gate_p);
+    println!("    gate = {gate_p:.6}  (high → use precomputed)");
     println!(
         "    out  = {}  ≈ precomputed slot (gate·z + (1−gate)·fresh)",
         fmt_array(&out_p)
@@ -180,12 +180,12 @@ fn main() {
 
     let (best_u, gate_u) = consume_gate(&q_unpredictable, &c_prime, TAU, BETA);
     let out_u = consume(&q_unpredictable, &c_prime, TAU, BETA, fresh_think);
-    println!("  unpredictable query q = {:?}", q_unpredictable);
+    println!("  unpredictable query q = {q_unpredictable:?}");
     println!(
         "    best slot i* = {best_u}  predictability p_{{i*}} = {:.6}",
         c_prime.slots[best_u].predictability
     );
-    println!("    gate = {:.6}  (low → fall through to fresh)", gate_u);
+    println!("    gate = {gate_u:.6}  (low → fall through to fresh)");
     println!("    out  = {}  ≈ fresh_think output", fmt_array(&out_u));
     println!();
     println!("  Note the SMOOTH blend — never a hard argmax switch (AGENTS.md).");
@@ -225,10 +225,7 @@ fn main() {
         let factor = model.amortization_factor(sleep_cost, n, e_gate);
         let should = model.should_pre_compute(sleep_cost, n, e_gate);
         let should_str = if should { "YES" } else { "no" };
-        println!(
-            "  N={n:<20} {:>14.1} {:>14.4} {:>14}",
-            total, factor, should_str
-        );
+        println!("  N={n:<20} {total:>14.1} {factor:>14.4} {should_str:>14}");
     }
     println!();
     println!("  Reading: at N=1, pre-computing barely pays off (or doesn't). At N=10+");
@@ -254,6 +251,6 @@ fn hex_short(b: &[u8; 32]) -> String {
 }
 
 fn fmt_array<const D: usize>(a: &[f32; D]) -> String {
-    let parts: Vec<String> = a.iter().map(|x| format!("{:.3}", x)).collect();
+    let parts: Vec<String> = a.iter().map(|x| format!("{x:.3}")).collect();
     format!("[{}]", parts.join(", "))
 }

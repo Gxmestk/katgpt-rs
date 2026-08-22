@@ -337,8 +337,7 @@ fn main() {
     // ── Verdict table ──
     println!("=== Loop Stability PoC — Defend-Wrong Benchmark ===");
     println!(
-        "Toy transformer: {} layers, d_model={}, {} heads, vocab={}, T={} loops",
-        N_LAYERS, D_MODEL, N_HEADS, VOCAB, T_LOOPS
+        "Toy transformer: {N_LAYERS} layers, d_model={D_MODEL}, {N_HEADS} heads, vocab={VOCAB}, T={T_LOOPS} loops"
     );
     println!();
     println!("┌──────────────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐");
@@ -367,7 +366,7 @@ fn main() {
     }
     println!();
     for tau in 0..T_LOOPS {
-        print!("{:<5} ", tau);
+        print!("{tau:<5} ");
         for r in &results {
             print!("{:>10.4} ", r.norms[tau]);
         }
@@ -383,7 +382,7 @@ fn main() {
     }
     println!();
     for tau in 0..T_LOOPS {
-        print!("{:<5} ", tau);
+        print!("{tau:<5} ");
         for r in &results {
             print!("{:>10.4} ", r.steps[tau]);
         }
@@ -399,7 +398,7 @@ fn main() {
     }
     println!();
     for tau in 0..T_LOOPS {
-        print!("{:<5} ", tau);
+        print!("{tau:<5} ");
         for r in &results {
             print!("{:>10.4} ", r.kls[tau]);
         }
@@ -412,7 +411,7 @@ fn main() {
     let base_us = results[0].us;
 
     println!("Verdict:");
-    println!("- G1 (norm control, keep ratio < 10x initial {:.4}):", init);
+    println!("- G1 (norm control, keep ratio < 10x initial {init:.4}):");
     for r in &results {
         let ratio = r.norms[T_LOOPS - 1] / r.norms[0].max(1e-8);
         let pass = ratio < 10.0;

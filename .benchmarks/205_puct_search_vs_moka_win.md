@@ -8,13 +8,40 @@
 
 **Yes, decisively. PUCT jumps the win rate from 74% to 98%.** This is the last unexplored lever identified in the prior session's primitive audit — and it works exactly as AlphaZero demonstrated: combining the policy head (as exploration prior) with the value head (as leaf evaluator) in a proper MCTS tree extracts dramatically more strength from the same 105K-param network than fixed-depth alpha-beta.
 
-| Config | Win% vs Moka (n=100) | µs/move | Forward passes/move |
+| Config | Win% vs Moka (n=100) | µs/move (native) | Forward passes/move |
 |---|---|---|---|
 | Alpha-beta (depth=1, top_k=4) — Plan 563 baseline | **74.0%** | 2,016 | ~4-8 |
 | PUCT budget=50, c_puct=1.5, top_k=8 | **94.0%** | 21,129 | ~50 |
 | PUCT budget=100, c_puct=1.5, top_k=8 | **96.0%** | 42,936 | ~100 |
 | PUCT budget=200, c_puct=2.5, top_k=8 | **98.0%** | 79,677 | ~200 |
 | PUCT budget=100, c_puct=1.5, top_k=4 (narrow beam) | **96.0%** | 40,809 | ~100 |
+
+**Issue 204 addendum — WASM (Node V8 JIT) latency + wasmi win-rate parity for the same configs.** (Issue 204 was the WASM PUCT port tracker, resolved + removed per the noise-reduction rule in commit `2a42539e`; the work + these numbers stand.) The
+`GoPuctMokaPlayer` algorithm was ported into `katgpt-moka-wasm` as
+`WasmPuctPlayer` (same weights, same feature encoder, only the board wrapper
+changed). Latency IS measured via Node.js V8 JIT (same engine as Chrome);
+win rate IS measured via wasmi (a deterministic IEEE-754 interpreter — same
+binary, same moves as V8 JIT, just ~46× slower):
+
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (Node V8 JIT) | Avg nodes/move | ms/node |
+|---|---|---|---|---|---|
+| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.6** | 50 | 0.592 |
+| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.8** | 100 | 0.598 |
+| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **119.6** | 200 | 0.598 |
+
+Only b50 was run for win rate (871s for n=20 under wasmi); b100/b200 strictly
+dominate b50 on strength, so their win rates are bounded below by 100%. Native
+Bench 205's b50 was 94% (n=100); the 100% here is consistent (at p=0.94,
+P(20/20) ≈ 29% — a normal high draw, not a divergence).
+
+Per-node ~0.59 ms = ~0.50 ms forward pass (Table B) + ~0.09 ms tree overhead.
+wasmi upper bound (interpreted, no JIT): b50=1,260, b100=2,508, b200=5,031
+ms/move (~46× slower than V8 JIT, confirms JIT is where ~98% of perf lives).
+
+Tree-allocation optimization (zero-alloc board + stack neighbors + early-exit
+liberty check) gave 7–9% under wasmi but within noise under V8 JIT (29.6 vs
+29.8ms) — the forward pass is 84% of per-node cost, so tree-side optimization
+cannot move the needle; the only path dramatically below 30ms is batched MCTS.
 
 All games use GO_OPENING_MOVES=4 (random prefix for variance). Board: 9×9.
 

@@ -277,8 +277,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!(
-        "  Crowd: {} NPCs × {} partners = {} pairs/tick, D={}",
-        NPC_COUNT, PARTNERS_PER_NPC, PAIRS_PER_TICK, DIM
+        "  Crowd: {NPC_COUNT} NPCs × {PARTNERS_PER_NPC} partners = {PAIRS_PER_TICK} pairs/tick, D={DIM}"
     );
     println!(
         "  Shifts: {:?} (|S|={}), beta={}, tau={}",
@@ -288,8 +287,7 @@ fn main() {
         TAU
     );
     println!(
-        "  Budget: mean tick < {:.1} ms ({} ticks measured, {} warmup)",
-        TICK_BUDGET_MS, MEASURED_TICKS, WARMUP_TICKS
+        "  Budget: mean tick < {TICK_BUDGET_MS:.1} ms ({MEASURED_TICKS} ticks measured, {WARMUP_TICKS} warmup)"
     );
     println!();
     let _ = io::stdout().flush();
@@ -368,8 +366,7 @@ fn main() {
     println!("  p99 tick:     {:>8.3} ms", p99.as_secs_f64() * 1.0e3);
     println!("  max tick:     {:>8.3} ms", max.as_secs_f64() * 1.0e3);
     println!(
-        "  per-pair:     {:>8.1} ns  ({} pairs/tick)",
-        per_pair_ns, PAIRS_PER_TICK
+        "  per-pair:     {per_pair_ns:>8.1} ns  ({PAIRS_PER_TICK} pairs/tick)"
     );
     println!(
         "  allocs/tick:  {:>8}   (target 0)  {}",
@@ -417,8 +414,7 @@ fn main() {
                 mean_ms / TICK_BUDGET_MS
             );
             println!(
-                "    The workload ({} pairs × ~{:.0} ns/pair) is embarrassingly",
-                PAIRS_PER_TICK, per_pair_ns
+                "    The workload ({PAIRS_PER_TICK} pairs × ~{per_pair_ns:.0} ns/pair) is embarrassingly"
             );
             println!("    parallel; a rayon `par_iter` over NPC rows would recover");
             println!(
@@ -430,8 +426,7 @@ fn main() {
         }
         if !alloc_pass {
             println!(
-                "  → alloc FAIL: {} allocs across {} ticks (expected 0).",
-                alloc_delta, MEASURED_TICKS
+                "  → alloc FAIL: {alloc_delta} allocs across {MEASURED_TICKS} ticks (expected 0)."
             );
             println!("    Scratch buffers must be reused, not reallocated per pair.");
         }

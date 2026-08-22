@@ -181,8 +181,7 @@ fn test_drafter_lora_training_converges() {
     );
 
     eprintln!(
-        "T8 ✓ Loss decreased: {:.4} → {:.4} (best_epoch={:.4})",
-        initial_loss, final_loss, best_loss
+        "T8 ✓ Loss decreased: {initial_loss:.4} → {final_loss:.4} (best_epoch={best_loss:.4})"
     );
 }
 
@@ -230,22 +229,14 @@ fn test_drafter_lora_improves_acceptance() {
     );
 
     eprintln!(
-        "T9 GOAT: baseline={:.3} ({}/{}) \
-         trained={:.3} ({}/{})",
-        baseline_rate,
-        baseline_accepted,
-        baseline_drafted,
-        trained_rate,
-        trained_accepted,
-        trained_drafted
+        "T9 GOAT: baseline={baseline_rate:.3} ({baseline_accepted}/{baseline_drafted}) \
+         trained={trained_rate:.3} ({trained_accepted}/{trained_drafted})"
     );
 
     // LoRA-trained drafter should improve acceptance rate
     assert!(
         trained_rate > baseline_rate,
-        "LoRA-trained acceptance ({:.3}) should exceed baseline ({:.3})",
-        trained_rate,
-        baseline_rate
+        "LoRA-trained acceptance ({trained_rate:.3}) should exceed baseline ({baseline_rate:.3})"
     );
 }
 
@@ -433,7 +424,7 @@ fn benchmark() {
     let train_start = std::time::Instant::now();
     let best_loss = train_drafter_lora(&draft_config, &draft_weights, &mut lora, &pairs, 20, 0.01);
     let train_time = train_start.elapsed();
-    eprintln!("Training: {:?}, best_loss={:.4}", train_time, best_loss);
+    eprintln!("Training: {train_time:?}, best_loss={best_loss:.4}");
 
     // Baseline acceptance rate
     let mut baseline_verifier =
@@ -464,18 +455,12 @@ fn benchmark() {
     );
     let trained_time = trained_start.elapsed();
 
-    eprintln!(
-        "Baseline: rate={:.3}, time={:?}",
-        baseline_rate, baseline_time
-    );
-    eprintln!(
-        "Trained:  rate={:.3}, time={:?}",
-        trained_rate, trained_time
-    );
+    eprintln!("Baseline: rate={baseline_rate:.3}, time={baseline_time:?}");
+    eprintln!("Trained:  rate={trained_rate:.3}, time={trained_time:?}");
     let improvement = if baseline_rate > 0.0 {
         trained_rate / baseline_rate
     } else {
         f32::INFINITY
     };
-    eprintln!("Improvement: +{:.1}× acceptance", improvement);
+    eprintln!("Improvement: +{improvement:.1}× acceptance");
 }

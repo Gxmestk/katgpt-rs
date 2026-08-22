@@ -166,8 +166,7 @@ fn goat_octopus_synthetic_mse_sweep() {
             let _ = cos_std;
 
             println!(
-                "{:<6} {:<5} {:>12.6} {:>12.6} {:>12.6} {:>12.4} {:>12.3}",
-                dim, bits, mse_mean, mse_std, cos_mean, ip_mean, eff_bpc
+                "{dim:<6} {bits:<5} {mse_mean:>12.6} {mse_std:>12.6} {cos_mean:>12.6} {ip_mean:>12.4} {eff_bpc:>12.3}"
             );
         }
         println!();
@@ -244,8 +243,7 @@ fn goat_octopus_joint_vs_simple_rounding() {
         let cos_delta = (cos_j - cos_s) / cos_s * 100.0;
 
         println!(
-            "{:<5} {:>14.6} {:>14.6} {:>9.1}% {:>14.6} {:>14.6} {:>9.1}%",
-            bits, mse_s, mse_j, mse_delta, cos_s, cos_j, cos_delta
+            "{bits:<5} {mse_s:>14.6} {mse_j:>14.6} {mse_delta:>9.1}% {cos_s:>14.6} {cos_j:>14.6} {cos_delta:>9.1}%"
         );
     }
 }
@@ -284,8 +282,7 @@ fn goat_octopus_compression_ratio() {
             let oct_ratio = cache.compression_ratio();
 
             println!(
-                "{:<6} {:<5} {:>10} {:>10} {:>10.3} {:>14.1}× {:>14.3}",
-                dim, bits, flat_bytes, oct_bytes, eff_bpc, oct_ratio, eff_bpc
+                "{dim:<6} {bits:<5} {flat_bytes:>10} {oct_bytes:>10} {eff_bpc:>10.3} {oct_ratio:>14.1}× {eff_bpc:>14.3}"
             );
         }
         println!();
@@ -328,8 +325,7 @@ fn goat_octopus_compression_ratio() {
                 let oct_ratio = oct_cache.compression_ratio();
 
                 println!(
-                    "{:<6} {:<5} {:>10} {:>14} {:>14} {:>10.1}× {:>10.1}×",
-                    dim, bits, flat_bytes, tq_bytes, oct_bytes, tq_ratio, oct_ratio
+                    "{dim:<6} {bits:<5} {flat_bytes:>10} {tq_bytes:>14} {oct_bytes:>14} {tq_ratio:>10.1}× {oct_ratio:>10.1}×"
                 );
             }
             println!();
@@ -426,8 +422,7 @@ fn goat_octopus_vs_spectralquant_quality() {
         let winner = if oct_mse < sq_mse { "OCTOPUS" } else { "SQ" };
 
         println!(
-            "{:<5} {:>10.6} {:>10.6} {:>9.1}% {:>10.6} {:>10.6} {:>9.1}% {:>8}",
-            avg_bits, sq_mse, oct_mse, mse_delta, sq_cos, oct_cos, cos_delta, winner
+            "{avg_bits:<5} {sq_mse:>10.6} {oct_mse:>10.6} {mse_delta:>9.1}% {sq_cos:>10.6} {oct_cos:>10.6} {cos_delta:>9.1}% {winner:>8}"
         );
     }
 }
@@ -505,8 +500,7 @@ fn goat_octopus_vs_turboquant_legacy() {
         let cos_delta = (oct_cos - tq_cos) / tq_cos * 100.0;
 
         println!(
-            "{:<5} {:>12.6} {:>12.6} {:>9.1}% {:>12.6} {:>12.6} {:>9.1}%",
-            bits, tq_mse, oct_mse, mse_delta, tq_cos, oct_cos, cos_delta
+            "{bits:<5} {tq_mse:>12.6} {oct_mse:>12.6} {mse_delta:>9.1}% {tq_cos:>12.6} {oct_cos:>12.6} {cos_delta:>9.1}%"
         );
     }
 }
@@ -562,10 +556,7 @@ fn goat_octopus_quality_by_dimension() {
         let (cos, _) = mean_std(&cos_vals);
         let (ip, _) = mean_std(&ip_vals);
 
-        println!(
-            "{:<6} {:>5} {:>12.6} {:>12.6} {:>12.4} {:>14.3}",
-            dim, n_tri, mse, cos, ip, eff_bpc
-        );
+        println!("{dim:<6} {n_tri:>5} {mse:>12.6} {cos:>12.6} {ip:>12.4} {eff_bpc:>14.3}");
     }
 }
 
@@ -632,10 +623,7 @@ fn goat_octopus_bit_split_sweep() {
         let (mse, _) = mean_std(&mse_vals);
         let (cos, _) = mean_std(&cos_vals);
 
-        println!(
-            "{:<6} {:<6} {:>12} {:>12.6} {:>12.6}",
-            dir_bits, nrm_bits, total_bits, mse, cos
-        );
+        println!("{dir_bits:<6} {nrm_bits:<6} {total_bits:>12} {mse:>12.6} {cos:>12.6}");
     }
 }
 
@@ -809,8 +797,7 @@ fn goat_octopus_vs_spectralquant_maxsim() {
         };
 
         println!(
-            "{:<5} {:>11.2}% {:>11.2}% {:>11.2}% {:>10.6} {:>10.6} {:>8}",
-            bits, sq_ms_err_pct, oct_ms_err_pct, ms_err_delta, sq_cos, oct_cos, winner
+            "{bits:<5} {sq_ms_err_pct:>11.2}% {oct_ms_err_pct:>11.2}% {ms_err_delta:>11.2}% {sq_cos:>10.6} {oct_cos:>10.6} {winner:>8}"
         );
     }
 

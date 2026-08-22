@@ -284,7 +284,7 @@ fn regime_switching(n: usize, seed: u64) -> TrajectoryCorpus {
         }
     }
     TrajectoryCorpus {
-        name: format!("regime_switching_block{}_n{}", block, n),
+        name: format!("regime_switching_block{block}_n{n}"),
         values,
         recommended_warmup: 80,
     }
@@ -489,14 +489,8 @@ fn anticipator_difficulty_correlation_on_regime_switching() {
     let (r_prim, r_floor) = difficulty_correlation(&corpus.values, warmup);
 
     println!("\n=== Difficulty Correlation (regime_switching) ===");
-    println!(
-        "  Anticipator (1−p_best)-derived half-width vs |Δy|:  r = {:.4}",
-        r_prim
-    );
-    println!(
-        "  Floor half-width vs |Δy|:                            r = {:.4}",
-        r_floor
-    );
+    println!("  Anticipator (1−p_best)-derived half-width vs |Δy|:  r = {r_prim:.4}");
+    println!("  Floor half-width vs |Δy|:                            r = {r_floor:.4}");
     println!(
         "  Ratio (prim/floor):                                  {:.4}",
         r_prim / r_floor.max(1e-6)
@@ -517,8 +511,8 @@ fn anticipator_difficulty_correlation_on_seasonal() {
     let (r_prim, r_floor) = difficulty_correlation(&corpus.values, warmup);
 
     println!("\n=== Difficulty Correlation (seasonal) ===");
-    println!("  Anticipator half-width vs |Δy|:  r = {:.4}", r_prim);
-    println!("  Floor half-width vs |Δy|:        r = {:.4}", r_floor);
+    println!("  Anticipator half-width vs |Δy|:  r = {r_prim:.4}");
+    println!("  Floor half-width vs |Δy|:        r = {r_floor:.4}");
 
     assert!(r_prim.is_finite());
     assert!(r_floor.is_finite());
@@ -537,14 +531,11 @@ fn anticipator_full_report_for_benchmark_doc() {
         ("white_noise", white_noise(600, 0xB2)),
         ("regime_switching", regime_switching(800, 0xC3)),
     ] {
-        println!("\n--- Corpus: {} ---", name);
+        println!("\n--- Corpus: {name} ---");
         let mut prim = SleepTimeAnticipatorAdapter::new(1.0, 0.0, 0.05, corpus.recommended_warmup);
         let _report = run_and_print(&mut prim, &corpus, 0.05);
 
         let (r_prim, r_floor) = difficulty_correlation(&corpus.values, corpus.recommended_warmup);
-        println!(
-            "  Difficulty correlation: anticipator r = {:.4}, floor r = {:.4}",
-            r_prim, r_floor
-        );
+        println!("  Difficulty correlation: anticipator r = {r_prim:.4}, floor r = {r_floor:.4}");
     }
 }

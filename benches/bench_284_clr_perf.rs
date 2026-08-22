@@ -201,10 +201,7 @@ fn main() {
         let (mean, p50, p99) = bench_k(k);
         let pass = if mean <= 200.0 { "✅" } else { "❌" };
         let stretch = if mean <= 50.0 { " ✨stretch" } else { "" };
-        println!(
-            "{:>6} {:>12.2} {:>12.2} {:>12.2} {:>10}{}",
-            k, mean, p50, p99, pass, stretch
-        );
+        println!("{k:>6} {mean:>12.2} {p50:>12.2} {p99:>12.2} {pass:>10}{stretch}");
     }
 
     println!();

@@ -296,12 +296,11 @@ impl PlackettLuceRater {
 
         // Use scratch if provided, otherwise allocate fresh.
         let mut owned_scratch;
-        let buf: &mut GibbsScratch = match scratch {
-            Some(s) => s,
-            None => {
-                owned_scratch = GibbsScratch::new();
-                &mut owned_scratch
-            }
+        let buf: &mut GibbsScratch = if let Some(s) = scratch {
+            s
+        } else {
+            owned_scratch = GibbsScratch::new();
+            &mut owned_scratch
         };
         buf.prepare(n);
 

@@ -228,7 +228,7 @@ fn small_amplitude_seasonal(n: usize, seed: u64) -> TrajectoryCorpus {
         values.push(0.8 * phase.sin() + noise);
     }
     TrajectoryCorpus::from_slice(
-        format!("small_amp_seasonal_0p8sigma0p05_n{}", n),
+        format!("small_amp_seasonal_0p8sigma0p05_n{n}"),
         &values,
         48, // 4 periods warmup
     )
@@ -241,7 +241,7 @@ fn small_sigma_white_noise(n: usize, seed: u64) -> TrajectoryCorpus {
     for _ in 0..n {
         values.push(rng.gaussian() * 0.3);
     }
-    TrajectoryCorpus::from_slice(format!("white_noise_sigma0p3_n{}", n), &values, 64)
+    TrajectoryCorpus::from_slice(format!("white_noise_sigma0p3_n{n}"), &values, 64)
 }
 
 // ===== Tests =====
@@ -419,9 +419,8 @@ fn bom_interval_width_is_constant_across_volatility_regimes() {
     let width_ratio = mean_high / mean_low.max(1e-9);
     assert!(
         (0.5..=2.0).contains(&width_ratio),
-        "BoM width ratio {:.3} should be ~1.0 (σ-controlled, not volatility-controlled); \
-         if it were data-driven like the floor, it would be ~15×",
-        width_ratio
+        "BoM width ratio {width_ratio:.3} should be ~1.0 (σ-controlled, not volatility-controlled); \
+         if it were data-driven like the floor, it would be ~15×"
     );
 }
 
@@ -442,7 +441,7 @@ fn bom_sigma_sweep_changes_width_but_not_quality() {
             &corpus.values,
             0.05,
             corpus.recommended_warmup,
-            &format!("seasonal_sigma_{}", sigma),
+            &format!("seasonal_sigma_{sigma}"),
         );
         eprintln!(
             "σ={:.2}: crps_ratio={:.4}, coverage={:.4}, verdict={:?}",

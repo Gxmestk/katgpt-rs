@@ -101,13 +101,11 @@ fn g5_zero_alloc_after_warmup_both_paths() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G5 FAIL: consume() allocated {} times in {} calls (expected 0)",
-            alloc_delta, N_CALLS
+            "G5 FAIL: consume() allocated {alloc_delta} times in {N_CALLS} calls (expected 0)"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G5 FAIL: consume() deallocated {} times in {} calls (expected 0)",
-            dealloc_delta, N_CALLS
+            "G5 FAIL: consume() deallocated {dealloc_delta} times in {N_CALLS} calls (expected 0)"
         );
     }
 
@@ -140,13 +138,11 @@ fn g5_zero_alloc_after_warmup_both_paths() {
 
         assert_eq!(
             alloc_delta, 0,
-            "G5 FAIL: consume_gate() allocated {} times in {} calls",
-            alloc_delta, N_CALLS
+            "G5 FAIL: consume_gate() allocated {alloc_delta} times in {N_CALLS} calls"
         );
         assert_eq!(
             dealloc_delta, 0,
-            "G5 FAIL: consume_gate() deallocated {} times in {} calls",
-            dealloc_delta, N_CALLS
+            "G5 FAIL: consume_gate() deallocated {dealloc_delta} times in {N_CALLS} calls"
         );
     }
 }

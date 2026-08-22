@@ -859,8 +859,7 @@ mod tests {
         let expected = rot2(std::f32::consts::FRAC_PI_2);
         assert!(
             matrices_approx_eq(&r, &expected, TOL),
-            "R mismatch: got {:?}",
-            r
+            "R mismatch: got {r:?}"
         );
         assert!(
             report.residual < TOL,
@@ -906,8 +905,7 @@ mod tests {
         .expect("3D rotation should succeed");
         assert!(
             matrices_approx_eq(&r, &r_expected, 1e-2),
-            "R mismatch: got {:?}",
-            r
+            "R mismatch: got {r:?}"
         );
         assert!(
             report.residual < 1e-2,
@@ -939,7 +937,7 @@ mod tests {
                 assert_eq!(min_anchors, 16); // 2 * d.
                 assert_eq!(d, 8);
             }
-            _ => panic!("wrong error: {:?}", err),
+            _ => panic!("wrong error: {err:?}"),
         }
     }
 
@@ -1044,8 +1042,7 @@ mod tests {
         let identity = [1.0, 0.0, 0.0, 1.0];
         assert!(
             matrices_approx_eq(&r, &identity, 1e-2),
-            "R mismatch: got {:?}",
-            r
+            "R mismatch: got {r:?}"
         );
         assert!(
             report.residual < 1e-2,
@@ -1115,8 +1112,8 @@ mod tests {
         let mut rtr = [0.0_f32; 16];
         for i in 0..4 {
             for j in 0..4 {
-                let r_col_i = [r[0 * 4 + i], r[1 * 4 + i], r[2 * 4 + i], r[3 * 4 + i]];
-                let r_col_j = [r[0 * 4 + j], r[1 * 4 + j], r[2 * 4 + j], r[3 * 4 + j]];
+                let r_col_i = [r[0 * 4 + i], r[4 + i], r[2 * 4 + i], r[3 * 4 + i]];
+                let r_col_j = [r[0 * 4 + j], r[4 + j], r[2 * 4 + j], r[3 * 4 + j]];
                 rtr[i * 4 + j] = simd_dot_f32(&r_col_i, &r_col_j, 4);
             }
         }
@@ -1198,8 +1195,7 @@ mod tests {
         let d3 = determinant_d(&[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0], 3);
         assert!(
             approx_eq(d3, 1.0, 1e-6),
-            "3×3 identity det should be 1, got {}",
-            d3
+            "3×3 identity det should be 1, got {d3}"
         );
     }
 

@@ -40,8 +40,7 @@ impl HeadSensitivityCurve {
         for w in ratios.windows(2) {
             assert!(
                 w[0] <= w[1],
-                "ratios must be sorted ascending (got {:?})",
-                ratios
+                "ratios must be sorted ascending (got {ratios:?})"
             );
         }
         Self {
@@ -127,8 +126,7 @@ mod tests {
         let v = c.interpolate(0.3);
         assert!(
             (v - 0.55).abs() < 1e-6,
-            "interpolate(0.3)={}, expected 0.55",
-            v
+            "interpolate(0.3)={v}, expected 0.55"
         );
     }
 
@@ -164,8 +162,8 @@ mod tests {
         // marginal_gain(0.2, 0.2) = delta(0.2) - delta(0.4) = 0.7 - 0.5 = 0.2
         let c = HeadSensitivityCurve::new(0, vec![0.1, 0.5, 1.0], vec![0.8, 0.4, 0.0]);
         let g = c.marginal_gain(0.2, 0.2);
-        assert!(g > 0.0, "marginal gain should be positive, got {}", g);
-        assert!((g - 0.2).abs() < 1e-5, "marginal gain={}, expected 0.2", g);
+        assert!(g > 0.0, "marginal gain should be positive, got {g}");
+        assert!((g - 0.2).abs() < 1e-5, "marginal gain={g}, expected 0.2");
     }
 
     #[test]

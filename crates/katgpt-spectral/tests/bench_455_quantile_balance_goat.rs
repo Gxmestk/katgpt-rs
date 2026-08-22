@@ -204,7 +204,7 @@ fn g01_mechanics() {
         for &b in &r.beta {
             if !b.is_finite() {
                 all_finite = false;
-                eprintln!("G1 FAIL: non-finite β at shape ({},{},{})", mm, nn, kk);
+                eprintln!("G1 FAIL: non-finite β at shape ({mm},{nn},{kk})");
             }
         }
     }
@@ -269,8 +269,7 @@ fn g03_no_degradation_on_balanced_input() {
     let maxvio_after = res.final_balance_violation;
 
     eprintln!(
-        "G3: MaxVio(s)={:.4}  MaxVio(s−β)={:.4}  (QB must not worsen balance)",
-        maxvio_before, maxvio_after
+        "G3: MaxVio(s)={maxvio_before:.4}  MaxVio(s−β)={maxvio_after:.4}  (QB must not worsen balance)"
     );
     gate_check!(
         "G3",
@@ -303,7 +302,7 @@ fn g04_subms_swap_game_scale() {
     let dt = t0.elapsed();
     let ms = dt.as_secs_f64() * 1e3;
 
-    eprintln!("G4: N={}, M={}, k={} → β compute = {:.3} ms", n, m, k, ms);
+    eprintln!("G4: N={n}, M={m}, k={k} → β compute = {ms:.3} ms");
     if cfg!(debug_assertions) {
         eprintln!("  (debug build — G4 timing gate skipped, run with --release for the real gate)");
         gate_check!("G4", true, "debug build — skipped");
@@ -377,15 +376,11 @@ fn g06_sigmoid_constraint() {
         if delta > 1e-7 {
             independent = false;
             eprintln!(
-                "G6 FAIL: expert {} biased score drifted by {} after perturbing expert 0",
-                i, delta
+                "G6 FAIL: expert {i} biased score drifted by {delta} after perturbing expert 0"
             );
         }
     }
-    eprintln!(
-        "G6: out_a={:?}  out_b={:?}  independent={}",
-        out_a, out_b, independent
-    );
+    eprintln!("G6: out_a={out_a:?}  out_b={out_b:?}  independent={independent}");
     gate_check!(
         "G6",
         independent,
@@ -438,8 +433,7 @@ fn g07_iters5_sufficiency_maxvio_stability() {
     };
 
     eprintln!(
-        "G7: MaxVio(β_5)={:.4}  MaxVio(β_10)={:.4}  Δ={:.4}  β_rel_err(5,10)={:.2e} (NOT gated — drift is expected)",
-        mv5, mv10, mv_delta, beta_rel_err
+        "G7: MaxVio(β_5)={mv5:.4}  MaxVio(β_10)={mv10:.4}  Δ={mv_delta:.4}  β_rel_err(5,10)={beta_rel_err:.2e} (NOT gated — drift is expected)"
     );
     gate_check!(
         "G7",
@@ -495,8 +489,7 @@ fn g08_snapshot_swap_revalidation() {
     let ratio_a = mv_inf_after_a / mv_inf_before_a.abs().max(1e-6);
 
     eprintln!(
-        "G8.A (stationary): MaxVio(S_inf)={:.4}  MaxVio(S_inf−β_cal)={:.4}  ratio={:.4}",
-        mv_inf_before_a, mv_inf_after_a, ratio_a
+        "G8.A (stationary): MaxVio(S_inf)={mv_inf_before_a:.4}  MaxVio(S_inf−β_cal)={mv_inf_after_a:.4}  ratio={ratio_a:.4}"
     );
     gate_check!(
         "G8.A_stationary",
@@ -526,8 +519,7 @@ fn g08_snapshot_swap_revalidation() {
     let ratio_b = mv_inf_after_b / mv_inf_before_b.abs().max(1e-6);
 
     eprintln!(
-        "G8.B (reversed drift): MaxVio(S_inf)={:.4}  MaxVio(S_inf−β_cal)={:.4}  ratio={:.4}  (reported, NOT gated — β_cal is mis-specified by construction)",
-        mv_inf_before_b, mv_inf_after_b, ratio_b
+        "G8.B (reversed drift): MaxVio(S_inf)={mv_inf_before_b:.4}  MaxVio(S_inf−β_cal)={mv_inf_after_b:.4}  ratio={ratio_b:.4}  (reported, NOT gated — β_cal is mis-specified by construction)"
     );
     // No gate on B — honest report only.
 
@@ -557,8 +549,7 @@ fn g08_snapshot_swap_revalidation() {
     let ratio_c = mv_inf_after_c / mv_inf_before_c.abs().max(1e-6);
 
     eprintln!(
-        "G8.C (mild drift ±0.2/expert): MaxVio(S_inf)={:.4}  MaxVio(S_inf−β_cal)={:.4}  ratio={:.4}",
-        mv_inf_before_c, mv_inf_after_c, ratio_c
+        "G8.C (mild drift ±0.2/expert): MaxVio(S_inf)={mv_inf_before_c:.4}  MaxVio(S_inf−β_cal)={mv_inf_after_c:.4}  ratio={ratio_c:.4}"
     );
     // Mild-drift gate: QB-swap should still help (ratio < 1) even under
     // small offset drift. This is the realistic snapshot-swap claim.

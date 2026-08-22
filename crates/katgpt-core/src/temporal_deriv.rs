@@ -49,9 +49,7 @@ mod tests {
         let late_norm = k.surprise_norm();
         assert!(
             late_norm < early_norm * 0.01,
-            "derivative must decay to ~0 on constant signal; early={}, late={}",
-            early_norm,
-            late_norm
+            "derivative must decay to ~0 on constant signal; early={early_norm}, late={late_norm}"
         );
     }
 
@@ -92,9 +90,7 @@ mod tests {
         let late = k.surprise_norm();
         assert!(
             late < peak * 0.1,
-            "derivative must decay to <10% of peak; peak={}, late={}",
-            peak,
-            late
+            "derivative must decay to <10% of peak; peak={peak}, late={late}"
         );
     }
 
@@ -149,9 +145,7 @@ mod tests {
         let got = k.surprise_norm();
         assert!(
             (got - manual).abs() < 1e-5,
-            "surprise_norm={} must match manual L2={}",
-            got,
-            manual
+            "surprise_norm={got} must match manual L2={manual}"
         );
     }
 

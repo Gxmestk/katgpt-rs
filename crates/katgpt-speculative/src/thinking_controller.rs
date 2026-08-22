@@ -82,9 +82,10 @@ impl ThinkingConfig {
     /// Low entropy (high top-1 prob) → bias toward Direct mode.
     #[cfg(feature = "directional_credit")]
     pub fn entropy_bias(&self, top1_prob: f32) -> ThinkingMode {
-        match top1_prob < self.confidence_threshold {
-            true => ThinkingMode::Latent,
-            false => ThinkingMode::Direct,
+        if top1_prob < self.confidence_threshold {
+            ThinkingMode::Latent
+        } else {
+            ThinkingMode::Direct
         }
     }
 }
@@ -467,9 +468,10 @@ impl ThinkingController {
     /// Route thinking to CPU or GPU based on load.
     pub fn route_thinking(&self) -> ThinkingMode {
         let gpu_load = self.gpu_load.load_value();
-        match gpu_load > self.config.gpu_load_threshold {
-            true => ThinkingMode::CpuResample,
-            false => ThinkingMode::Latent,
+        if gpu_load > self.config.gpu_load_threshold {
+            ThinkingMode::CpuResample
+        } else {
+            ThinkingMode::Latent
         }
     }
 

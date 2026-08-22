@@ -437,7 +437,7 @@ fn render_scoreboard(
                 0..=25 => ((b'A' + *c as u8) as char).to_string(),
                 _ => format!("{c}"),
             };
-            format!(" Last: {col_label}{}", r)
+            format!(" Last: {col_label}{r}")
         }
         Some(GoAction::Pass) => " Last: Pass".to_string(),
         None => " Last: —".to_string(),
@@ -637,29 +637,18 @@ fn main() -> io::Result<()> {
     // Print final result
     println!();
     println!("═══ Game {} Result ═══", game_idx + 1);
-    println!(
-        "  {} Black ({}) vs {} White ({})",
-        BLACK_STONE, black_name, WHITE_STONE, white_name
-    );
+    println!("  {BLACK_STONE} Black ({black_name}) vs {WHITE_STONE} White ({white_name})");
     println!("  Board: {}×{}", recorded.board_size, recorded.board_size);
     println!("  Moves: {}", recorded.total_moves);
     println!(
         "  Captures: {} by Black, {} by White",
-        recorded
-            .snapshots
-            .last()
-            .map(|s| s.captured_black)
-            .unwrap_or(0),
-        recorded
-            .snapshots
-            .last()
-            .map(|s| s.captured_white)
-            .unwrap_or(0),
+        recorded.snapshots.last().map_or(0, |s| s.captured_black),
+        recorded.snapshots.last().map_or(0, |s| s.captured_white),
     );
     println!("  Score: {:+.1}", recorded.final_score);
     match recorded.winner {
-        Some(GoCell::Black) => println!("  Winner: {} Black", BLACK_STONE),
-        Some(GoCell::White) => println!("  Winner: {} White", WHITE_STONE),
+        Some(GoCell::Black) => println!("  Winner: {BLACK_STONE} Black"),
+        Some(GoCell::White) => println!("  Winner: {WHITE_STONE} White"),
         None => println!("  Result: Jigo (Draw)"),
         Some(GoCell::Empty) => unreachable!(),
     }

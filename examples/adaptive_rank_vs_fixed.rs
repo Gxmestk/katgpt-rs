@@ -30,14 +30,8 @@ const MAX_RANK: usize = 64;
 
 fn main() {
     println!("=== Plan 264 Phase 3 — Adaptive Rank vs Fixed Rank ===\n");
-    println!(
-        "Synthetic workload: {} adapters, spectrum length {}",
-        N_ADAPTERS, SPECTRUM_LEN
-    );
-    println!(
-        "Rank range: [{}, {}], concentration measured at k={}\n",
-        MIN_RANK, MAX_RANK, RANK_K
-    );
+    println!("Synthetic workload: {N_ADAPTERS} adapters, spectrum length {SPECTRUM_LEN}");
+    println!("Rank range: [{MIN_RANK}, {MAX_RANK}], concentration measured at k={RANK_K}\n");
 
     let mut total_fixed = 0_usize;
     let mut total_adaptive = 0_usize;
@@ -84,17 +78,14 @@ fn main() {
     let c_mean = concentrations.iter().sum::<f32>() / N_ADAPTERS as f32;
 
     println!("Spectral concentration stats:");
-    println!("  min:    {:.4}", c_min);
-    println!("  max:    {:.4}", c_max);
-    println!("  mean:   {:.4}", c_mean);
+    println!("  min:    {c_min:.4}");
+    println!("  max:    {c_max:.4}");
+    println!("  mean:   {c_mean:.4}");
     println!();
 
     println!("Rank allocation:");
-    println!("  Fixed:    avg = {:.1} (total {})", avg_fixed, total_fixed);
-    println!(
-        "  Adaptive: avg = {:.1} (total {})",
-        avg_adaptive, total_adaptive
-    );
+    println!("  Fixed:    avg = {avg_fixed:.1} (total {total_fixed})");
+    println!("  Adaptive: avg = {avg_adaptive:.1} (total {total_adaptive})");
     println!(
         "  Reduction: {:.1}% (savings: {} rank units)",
         rank_reduction * 100.0,
@@ -103,14 +94,8 @@ fn main() {
     println!();
 
     println!("CoT budget allocation:");
-    println!(
-        "  Fixed:    avg = {:.1} (total {})",
-        avg_cot_fixed, total_cot_fixed
-    );
-    println!(
-        "  Adaptive: avg = {:.1} (total {})",
-        avg_cot_adaptive, total_cot_adaptive
-    );
+    println!("  Fixed:    avg = {avg_cot_fixed:.1} (total {total_cot_fixed})");
+    println!("  Adaptive: avg = {avg_cot_adaptive:.1} (total {total_cot_adaptive})");
     println!();
 
     if rank_reduction >= 0.30 {

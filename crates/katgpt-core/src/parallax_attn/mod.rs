@@ -437,16 +437,13 @@ pub fn tiled_attention_parallax_forward_retaining(
 
     // Allocate scratch on demand if caller didn't provide one
     let mut local_scratch;
-    let scratch = match scratch {
-        Some(s) => {
+    let scratch = if let Some(s) = scratch {
             s.ensure_capacity(seq_len, head_dim);
             s
-        }
-        None => {
+        } else {
             local_scratch = ParallaxScratch::new(seq_len, head_dim);
             &mut local_scratch
-        }
-    };
+        };
 
     let d = head_dim;
     let n = seq_len;
@@ -490,13 +487,15 @@ pub fn tiled_attention_parallax_forward_retaining(
     // Phase 1: Compute o_SA and accumulate column sums in one pass
     for i in 0..n {
         let row_off = i * d;
+        // Hoist the Q row slice out of the inner `j` loop: one bounds-check per
+        // query row instead of one per (i, j) pair (n² → n total).
+        let q_row = &q[row_off..row_off + d];
         output[row_off..row_off + d].fill(0.0);
 
         // Compute scores for row i: scores[j] = q_i · k_j * scale
         for j in 0..n {
             let k_off = j * d;
-            scratch.scores[j] =
-                simd::simd_dot_f32(&q[row_off..row_off + d], &k[k_off..k_off + d], d) * scale;
+            scratch.scores[j] = simd::simd_dot_f32(q_row, &k[k_off..k_off + d], d) * scale;
         }
 
         // SSMax: rescale scores by s_L · log(N) before normalization.
@@ -515,15 +514,13 @@ pub fn tiled_attention_parallax_forward_retaining(
         }
 
         // Accumulate output: o_i = Σ_j p_ij · v_j
+        // Hoist the mutable output-row borrow out of the `j` loop — one
+        // bounds-check + reborrow per query row instead of per (i, j) pair.
+        let out_row = &mut output[row_off..row_off + d];
         for j in 0..n {
             let p = scratch.scores[j];
             let v_off = j * d;
-            simd::simd_fused_scale_acc(
-                &mut output[row_off..row_off + d],
-                &v[v_off..v_off + d],
-                p,
-                d,
-            );
+            simd::simd_fused_scale_acc(out_row, &v[v_off..v_off + d], p, d);
         }
 
         // Accumulate column sums: c[j] += softmax(i,j)
@@ -932,12 +929,15 @@ fn tiled_attention_core(
     for i in 0..n {
         let q_off = i * d;
         let out_off = i * d;
+        // Hoist the Q row slice out of the inner `j` loop: one bounds-check per
+        // query row instead of one per (i, j) pair (n² → n total).
+        let q_row = &q[q_off..q_off + d];
         output[out_off..out_off + d].fill(0.0);
 
         // Compute scores for row i
         for (j, score_slot) in scores.iter_mut().enumerate().take(n) {
             let k_off = j * d;
-            *score_slot = simd::simd_dot_f32(&q[q_off..q_off + d], &k[k_off..k_off + d], d) * scale;
+            *score_slot = simd::simd_dot_f32(q_row, &k[k_off..k_off + d], d) * scale;
         }
 
         // SSMax: rescale scores by s_L · log(N) before normalization.
@@ -955,14 +955,12 @@ fn tiled_attention_core(
         }
 
         // Accumulate output: o_i = Σ_j p_ij · v_j
+        // Hoist the mutable output-row borrow out of the `j` loop — one
+        // bounds-check + reborrow per query row instead of per (i, j) pair.
+        let out_row = &mut output[out_off..out_off + d];
         for (j, &p) in scores.iter().enumerate().take(n) {
             let v_off = j * d;
-            simd::simd_fused_scale_acc(
-                &mut output[out_off..out_off + d],
-                &v[v_off..v_off + d],
-                p,
-                d,
-            );
+            simd::simd_fused_scale_acc(out_row, &v[v_off..v_off + d], p, d);
         }
     }
 }

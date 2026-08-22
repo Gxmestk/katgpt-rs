@@ -64,12 +64,36 @@ pub fn compute_codebook(dim: usize, bits: u8) -> TurboQuantCodebook {
 ///
 /// For a unit vector in R^d rotated by a random orthogonal matrix,
 /// each coordinate has marginal density proportional to (1-x²)^((d-3)/2).
+/// One-off convenience form. Hot loops use `beta_pdf_constants` +
+/// `beta_pdf_with` so the `ln_gamma` evaluation is not repeated per sample.
+#[cfg(test)]
+#[allow(dead_code)]
 fn beta_pdf(x: f32, d: usize) -> f32 {
+    let (c, exponent) = beta_pdf_constants(d);
+    beta_pdf_with(x, c, exponent)
+}
+
+/// Pre-computed Beta-PDF constants for a given dimension.
+///
+/// Returns `(C, exponent)` where the PDF is `C · (1-x²)^exponent`.
+/// `gamma_ratio` → two `ln_gamma` (Lanczos, ~10-term series) + `exp` dominates
+/// the per-sample cost; hoisting it out of the Lloyd-Max inner loops removes
+/// ~50 iterations × 2^bits bins × 1001 samples redundant gamma evaluations per
+/// codebook build. Mirrors `octopus::codebook::norm_pdf_constants`.
+#[inline]
+fn beta_pdf_constants(d: usize) -> (f32, f32) {
+    (gamma_ratio(d), ((d - 3) as f32) / 2.0)
+}
+
+/// Evaluate the Beta PDF with pre-computed constants (hot-loop variant).
+///
+/// Arithmetic per element is byte-for-byte the same expression as the original
+/// `beta_pdf` (`c * (1.0 - x * x).powf(exponent)`), so results are bit-identical.
+#[inline]
+fn beta_pdf_with(x: f32, c: f32, exponent: f32) -> f32 {
     if x.abs() >= 1.0 {
         return 0.0;
     }
-    let exponent = ((d - 3) as f32) / 2.0;
-    let c = gamma_ratio(d);
     c * (1.0 - x * x).powf(exponent)
 }
 
@@ -132,6 +156,9 @@ fn compute_centroids(boundaries: &[f32], dim: usize) -> Vec<f32> {
     edges[1..=n - 1].copy_from_slice(boundaries);
     edges[n] = 1.0;
 
+    // Precompute PDF constants ONCE per call (was recomputed per sample).
+    let (c, exponent) = beta_pdf_constants(dim);
+
     for i in 0..n {
         let lo = edges[i];
         let hi = edges[i + 1];
@@ -140,7 +167,7 @@ fn compute_centroids(boundaries: &[f32], dim: usize) -> Vec<f32> {
         let mut sum_xfx = 0.0f64;
         for j in 0..=n_samples {
             let x = lo + dx * j as f32;
-            let pdf = beta_pdf(x, dim);
+            let pdf = beta_pdf_with(x, c, exponent);
             let w = if j == 0 || j == n_samples { 0.5 } else { 1.0 };
             sum_fx += pdf as f64 * w;
             sum_xfx += x as f64 * pdf as f64 * w;
@@ -176,6 +203,9 @@ fn compute_mse(boundaries: &[f32], centroids: &[f32], dim: usize) -> f32 {
     edges[1..=n - 1].copy_from_slice(boundaries);
     edges[n] = 1.0;
 
+    // Precompute PDF constants ONCE per call (was recomputed per sample).
+    let (c, exponent) = beta_pdf_constants(dim);
+
     let n_samples = 500;
     let mut total_mse = 0.0f64;
 
@@ -186,7 +216,7 @@ fn compute_mse(boundaries: &[f32], centroids: &[f32], dim: usize) -> f32 {
         let mut interval_mse = 0.0f64;
         for j in 0..=n_samples {
             let x = lo + dx * j as f32;
-            let pdf = beta_pdf(x, dim);
+            let pdf = beta_pdf_with(x, c, exponent);
             let w = if j == 0 || j == n_samples { 0.5 } else { 1.0 };
             let diff = x as f64 - centroids[i] as f64;
             interval_mse += diff * diff * pdf as f64 * w;

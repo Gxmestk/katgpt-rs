@@ -100,11 +100,10 @@ impl ParallelismGuard {
     /// Returns `Some(reason)` when population is disabled, `None` when
     /// population mode is active. Useful for diagnostic logging.
     pub fn fallback_reason(&self) -> Option<&'static str> {
-        match self.population_enabled {
-            true => None,
-            false => Some(
-                "single-threaded mode: population overhead not justified without parallel agents",
-            ),
+        if self.population_enabled {
+            None
+        } else {
+            Some("single-threaded mode: population overhead not justified without parallel agents")
         }
     }
 }
@@ -117,17 +116,18 @@ impl Default for ParallelismGuard {
 
 impl fmt::Display for ParallelismGuard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.population_enabled {
-            true => write!(
+        if self.population_enabled {
+            write!(
                 f,
                 "ParallelismGuard(population=enabled, threads={})",
                 self.threads
-            ),
-            false => write!(
+            )
+        } else {
+            write!(
                 f,
                 "ParallelismGuard(population=disabled, threads={})",
                 self.threads
-            ),
+            )
         }
     }
 }
@@ -213,9 +213,10 @@ impl fmt::Display for SketchSelectionStrategy {
 /// the population database is beneficial (≥2 threads), otherwise falls back
 /// to [`BasicUcb`](SketchSelectionStrategy::BasicUcb).
 pub fn select_strategy(guard: &ParallelismGuard) -> SketchSelectionStrategy {
-    match guard.should_use_population() {
-        true => SketchSelectionStrategy::PopulationPucb,
-        false => SketchSelectionStrategy::BasicUcb,
+    if guard.should_use_population() {
+        SketchSelectionStrategy::PopulationPucb
+    } else {
+        SketchSelectionStrategy::BasicUcb
     }
 }
 
@@ -277,9 +278,10 @@ mod tests {
     fn guard_display_shows_enabled_when_population_active() {
         let guard = ParallelismGuard::new();
         let display = format!("{guard}");
-        match guard.population_enabled() {
-            true => assert!(display.contains("population=enabled")),
-            false => assert!(display.contains("population=disabled")),
+        if guard.population_enabled() {
+            assert!(display.contains("population=enabled"));
+        } else {
+            assert!(display.contains("population=disabled"));
         }
     }
 
@@ -288,9 +290,10 @@ mod tests {
     #[test]
     fn fallback_reason_none_when_population_enabled() {
         let guard = ParallelismGuard::new();
-        match guard.population_enabled() {
-            true => assert!(guard.fallback_reason().is_none()),
-            false => assert!(guard.fallback_reason().is_some()),
+        if guard.population_enabled() {
+            assert!(guard.fallback_reason().is_none());
+        } else {
+            assert!(guard.fallback_reason().is_some());
         }
     }
 
@@ -324,9 +327,10 @@ mod tests {
     fn select_strategy_returns_population_when_enabled() {
         let guard = ParallelismGuard::new();
         let strategy = select_strategy(&guard);
-        match guard.population_enabled() {
-            true => assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb),
-            false => assert_eq!(strategy, SketchSelectionStrategy::BasicUcb),
+        if guard.population_enabled() {
+            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb);
+        } else {
+            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb);
         }
     }
 

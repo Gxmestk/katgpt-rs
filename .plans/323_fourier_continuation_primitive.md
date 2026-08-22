@@ -8,8 +8,7 @@ Jan 2026), §2.3 Fourier Continuation + §6.1 TFNO spectral loss.
 (candidate plan #1, Gain-tier, 0/4 novelty gate — narrow modelless gap, no
 Super-GOAT).
 
-**Status:** OPEN 2026-06-25. Opt-in until GOAT gate passes; promote to
-default-on if gain is modelless (it is — closed-form least-squares).
+**Status:** ✅ COMPLETE — DEFAULT-ON since 2026-06-25 (Phase 3, all gates green: G1 wrap-discontinuity < 50% of naive, G2 8.9µs < 50µs, G3 passthrough bit-identical, G4 0 allocs). Opt-in to default-on promotion was the modelless closed-form least-squares gain.
 
 ## TL;DR
 

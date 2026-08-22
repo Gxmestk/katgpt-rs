@@ -173,11 +173,10 @@ fn goat1_zero_perf_hurt_noop_baseline() {
 
     // Structural assertion: it should complete 1000 empty folds quickly.
     // We don't assert wall-clock thresholds (CI is variable) but we log it.
-    println!("  GOAT1.4 1000 empty folds in {:?}", elapsed);
+    println!("  GOAT1.4 1000 empty folds in {elapsed:?}");
     assert!(
         elapsed.as_secs() < 5,
-        "GOAT1 FAIL: 1000 empty folds took {:?} — excessive overhead",
-        elapsed
+        "GOAT1 FAIL: 1000 empty folds took {elapsed:?} — excessive overhead"
     );
 }
 
@@ -237,8 +236,7 @@ fn goat2_token_reduction_hard_queries() {
     );
     assert!(
         reduction_pct >= 30.0,
-        "GOAT2 FAIL: expected reduction >= 30%, got {:.1}%",
-        reduction_pct
+        "GOAT2 FAIL: expected reduction >= 30%, got {reduction_pct:.1}%"
     );
 
     // Verify anchors are never folded.
@@ -247,8 +245,7 @@ fn goat2_token_reduction_hard_queries() {
         assert_ne!(
             decisions[anchor_idx],
             FoldDecision::Fold,
-            "GOAT2 FAIL: anchor step {} was folded!",
-            anchor_idx
+            "GOAT2 FAIL: anchor step {anchor_idx} was folded!"
         );
     }
 
@@ -356,16 +353,13 @@ fn goat3_bandit_converges_to_optimal() {
         bandit.total_pulls()
     );
     println!(
-        "  GOAT3 bandit: convergence_pass_rate={:.3} ({}/{}) [last {} pulls]",
-        tail_pass_rate, tail_passes, tail_total, TAIL_WINDOW
+        "  GOAT3 bandit: convergence_pass_rate={tail_pass_rate:.3} ({tail_passes}/{tail_total}) [last {TAIL_WINDOW} pulls]"
     );
 
     // The bandit should converge to arm 2 (budget 0.7) or a nearby arm.
     assert!(
         best == 2 || best == 1 || best == 3,
-        "GOAT3 FAIL: bandit should converge to arm 1-3 (budget 0.5-0.9), got arm {} (budget={:.1})",
-        best,
-        best_budget
+        "GOAT3 FAIL: bandit should converge to arm 1-3 (budget 0.5-0.9), got arm {best} (budget={best_budget:.1})"
     );
 
     // Convergence pass rate (last 100 pulls) should be ≥ 0.95.
@@ -374,13 +368,11 @@ fn goat3_bandit_converges_to_optimal() {
     // of convergence for a 5-armed bandit.
     assert!(
         tail_pass_rate >= 0.95,
-        "GOAT3 FAIL: convergence_pass_rate should be ≥ 0.95, got {:.3}",
-        tail_pass_rate
+        "GOAT3 FAIL: convergence_pass_rate should be ≥ 0.95, got {tail_pass_rate:.3}"
     );
 
     println!(
-        "  GOAT3 ✓ bandit converged to arm {} (budget={:.1}), convergence_rate={:.3}",
-        best, best_budget, tail_pass_rate
+        "  GOAT3 ✓ bandit converged to arm {best} (budget={best_budget:.1}), convergence_rate={tail_pass_rate:.3}"
     );
 }
 
@@ -488,15 +480,11 @@ fn goat4_binary_search_fold_throughput() {
     }
     let elapsed = start.elapsed();
 
-    println!(
-        "  GOAT4.1 1000 folds (20 steps, 200 tokens) in {:?}",
-        elapsed
-    );
+    println!("  GOAT4.1 1000 folds (20 steps, 200 tokens) in {elapsed:?}");
 
     assert!(
         elapsed.as_secs() < 5,
-        "GOAT4 FAIL: 1000 folds took {:?} — structural overhead too high",
-        elapsed
+        "GOAT4 FAIL: 1000 folds took {elapsed:?} — structural overhead too high"
     );
 }
 
@@ -597,13 +585,11 @@ fn goat4_attention_importance_no_redundant_allocations() {
     let elapsed = start.elapsed();
 
     println!(
-        "  GOAT4.4 1000 AttentionImportance::score_steps (20 steps, 200 tokens) in {:?}",
-        elapsed
+        "  GOAT4.4 1000 AttentionImportance::score_steps (20 steps, 200 tokens) in {elapsed:?}"
     );
     assert!(
         elapsed.as_secs() < 3,
-        "GOAT4 FAIL: AttentionImportance scoring too slow: {:?}",
-        elapsed
+        "GOAT4 FAIL: AttentionImportance scoring too slow: {elapsed:?}"
     );
 }
 
@@ -637,8 +623,7 @@ fn goat4_step_boundary_detection() {
     let anchor_count = boundaries.iter().filter(|b| b.is_anchor).count();
     assert!(
         anchor_count >= 3,
-        "GOAT4 FAIL: expected ≥ 3 anchors (pos 0 + 2 think tags), got {}",
-        anchor_count
+        "GOAT4 FAIL: expected ≥ 3 anchors (pos 0 + 2 think tags), got {anchor_count}"
     );
 
     println!(
@@ -678,23 +663,18 @@ fn goat4_fold_thinking_feedback_integration() {
 
     assert!(
         token_ratio > 0.0,
-        "GOAT4 FAIL: token_reduction_ratio should be > 0, got {}",
-        token_ratio
+        "GOAT4 FAIL: token_reduction_ratio should be > 0, got {token_ratio}"
     );
     assert!(
         step_ratio > 0.0,
-        "GOAT4 FAIL: step_reduction_ratio should be > 0, got {}",
-        step_ratio
+        "GOAT4 FAIL: step_reduction_ratio should be > 0, got {step_ratio}"
     );
 
     println!(
         "  GOAT4.6 feedback: tokens_saved={} steps_folded={} budget={:.1}",
         feedback.tokens_saved, feedback.steps_folded, feedback.fold_budget
     );
-    println!(
-        "  GOAT4.6 ratios: token_reduction={:.1} step_reduction={:.1}",
-        token_ratio, step_ratio
-    );
+    println!("  GOAT4.6 ratios: token_reduction={token_ratio:.1} step_reduction={step_ratio:.1}");
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────
@@ -773,7 +753,7 @@ fn summary_goat_195_chain_fold() {
     let goat3_pass = (best == 2 || best == 1 || best == 3) && stats.verification_pass_rate >= 0.98;
 
     println!("\n  GOAT 3: ≤2% accuracy regression");
-    println!("    bandit best_arm={} (budget={:.1})", best, best_budget);
+    println!("    bandit best_arm={best} (budget={best_budget:.1})");
     println!(
         "    verification_pass_rate={:.3}",
         stats.verification_pass_rate
@@ -802,7 +782,7 @@ fn summary_goat_195_chain_fold() {
     let goat4_pass = elapsed.as_secs() < 5;
 
     println!("\n  GOAT 4: Fold overhead < 5%");
-    println!("    1000 folds (20 steps, 200 tokens) in {:?}", elapsed);
+    println!("    1000 folds (20 steps, 200 tokens) in {elapsed:?}");
     println!(
         "    AttentionImportance size={} bytes (zero-cost)",
         std::mem::size_of::<AttentionImportance>()

@@ -145,13 +145,11 @@ fn g3_eval_and_batch_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: eval_into allocated {} times in {} calls",
-        alloc_delta, N_CALLS
+        "G3 FAIL: eval_into allocated {alloc_delta} times in {N_CALLS} calls"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: eval_into deallocated {} times in {} calls",
-        dealloc_delta, N_CALLS
+        "G3 FAIL: eval_into deallocated {dealloc_delta} times in {N_CALLS} calls"
     );
 
     // ── Part 2: eval_batch_into zero-alloc ──────────────────────────────────
@@ -191,12 +189,10 @@ fn g3_eval_and_batch_zero_alloc_after_warmup() {
 
     assert_eq!(
         alloc_delta, 0,
-        "G3 FAIL: eval_batch_into allocated {} times in {} batches of {}",
-        alloc_delta, N_BATCHES, BATCH
+        "G3 FAIL: eval_batch_into allocated {alloc_delta} times in {N_BATCHES} batches of {BATCH}"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G3 FAIL: eval_batch_into deallocated {} times in {} batches of {}",
-        dealloc_delta, N_BATCHES, BATCH
+        "G3 FAIL: eval_batch_into deallocated {dealloc_delta} times in {N_BATCHES} batches of {BATCH}"
     );
 }

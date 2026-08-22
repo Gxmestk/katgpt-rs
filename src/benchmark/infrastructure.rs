@@ -268,7 +268,7 @@ pub fn bench_raven_vs_flat_cache(_config: &Config) -> (BenchResult, BenchResult)
     };
 
     let raven_br = BenchResult {
-        label: format!("forward_raven ({} slots)", num_slots),
+        label: format!("forward_raven ({num_slots} slots)"),
         throughput: iters as f64 * steps_per_iter / elapsed_raven.as_secs_f64(),
         time_per_step_us: elapsed_raven.as_micros() as f64 / (iters as f64 * steps_per_iter),
         avg_acceptance_len: 0.0,

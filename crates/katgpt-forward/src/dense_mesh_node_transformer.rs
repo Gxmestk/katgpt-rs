@@ -62,8 +62,7 @@ use katgpt_transformer::{MultiLayerKVCache, TransformerWeights};
 /// unique slot per worker in the common case.
 fn default_pool_size() -> usize {
     std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1)
+        .map_or(1, |n| n.get())
         .max(1)
 }
 
@@ -330,8 +329,7 @@ mod tests {
             for (a, b) in first.rows().iter().zip(out.rows().iter()) {
                 assert!(
                     (a - b).abs() < 1e-6,
-                    "parallel forward outputs diverged at worker {} (a={a}, b={b})",
-                    i
+                    "parallel forward outputs diverged at worker {i} (a={a}, b={b})"
                 );
             }
         }

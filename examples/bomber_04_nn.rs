@@ -93,27 +93,24 @@ fn main() {
     // ── WASM Loading ───────────────────────────────────────────
 
     // Create NNPlayer — silently falls back to native if WASM fails
-    let nn_player: Box<dyn BomberPlayer> = match wasm_path {
-        Some(path) => {
-            let start = Instant::now();
-            let player = NNPlayer::new_with_wasm(2, path);
-            let elapsed = start.elapsed();
-            let loaded = player.name() == "NN-WASM";
-            if loaded {
-                println!(
-                    "✅ WASM validator loaded: {path} ({:.2}ms)",
-                    elapsed.as_secs_f64() * 1000.0
-                );
-            } else {
-                eprintln!("⚠️  WASM load failed: {path}");
-                eprintln!("   Falling back to native safety rules.");
-            }
-            Box::new(player)
+    let nn_player: Box<dyn BomberPlayer> = if let Some(path) = wasm_path {
+        let start = Instant::now();
+        let player = NNPlayer::new_with_wasm(2, path);
+        let elapsed = start.elapsed();
+        let loaded = player.name() == "NN-WASM";
+        if loaded {
+            println!(
+                "✅ WASM validator loaded: {path} ({:.2}ms)",
+                elapsed.as_secs_f64() * 1000.0
+            );
+        } else {
+            eprintln!("⚠️  WASM load failed: {path}");
+            eprintln!("   Falling back to native safety rules.");
         }
-        None => {
-            println!("ℹ️  No WASM path provided — using native safety rules.");
-            Box::new(NNPlayer::new_native(2))
-        }
+        Box::new(player)
+    } else {
+        println!("ℹ️  No WASM path provided — using native safety rules.");
+        Box::new(NNPlayer::new_native(2))
     };
     let wasm_loaded = nn_player.name() == "NN-WASM";
 
@@ -371,9 +368,9 @@ fn run_round(
 
     // Compute scores from events
     let mut scores = [0i32; 4];
-    let mut deaths = Vec::new();
-    let mut kills = Vec::new();
-    let mut powerups = Vec::new();
+    let mut deaths = Vec::with_capacity(round_events.len());
+    let mut kills = Vec::with_capacity(round_events.len());
+    let mut powerups = Vec::with_capacity(round_events.len());
     let mut survivors = Vec::new();
 
     for event in &round_events {

@@ -24,7 +24,7 @@
 use std::collections::HashSet;
 
 use crate::dd_tree::{build_dd_tree_screened, extract_parent_tokens_into};
-use crate::{ScreeningPruner, TreeNode};
+use crate::{ScreeningPruner, TreeNode, TreePath};
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -464,6 +464,9 @@ pub fn build_dd_tree_screened_synonyms(
     let mut heap = std::collections::BinaryHeap::<TreeNode>::new();
     let mut tree: Vec<TreeNode> = Vec::with_capacity(config.tree_budget);
     let mut parent_tokens_buf = vec![0usize; config.draft_lookahead + 1];
+    // Lazily-filled per-depth log-marginal cache for the Phase C expansion loop
+    // (see the fill site for the bit-identity argument).
+    let mut log_marginals: Vec<Vec<f32>> = vec![Vec::new(); marginals.len()];
 
     // Track explored clusters per depth
     let mut explored_clusters: Vec<HashSet<ClusterId>> = (0..=config.draft_lookahead)
@@ -472,15 +475,35 @@ pub fn build_dd_tree_screened_synonyms(
 
     let context_dim = synonym_map.context_dim.max(3);
 
-    // Helper: compute a lightweight state from path info for cluster lookup
-    let state_from_path = |depth: usize, token_idx: usize, parent_path: u128| -> Vec<f32> {
-        let mut state = vec![0.0f32; context_dim];
-        state[0] = depth as f32;
-        state[1] = token_idx as f32;
-        // Hash parent path into a single f32
-        state[2] = (parent_path & 0xFFFFFF) as f32;
-        state
-    };
+    // Reusable state scratch for cluster lookup. Only slots 0..3 are ever
+    // written, so slots 3.. keep the 0.0 they were allocated with — exactly the
+    // `vec![0.0; context_dim]` the prior per-candidate allocation produced. This
+    // removes one heap allocation per candidate per expansion (the previous
+    // `state_from_path` returned a fresh `Vec<f32>` every call).
+    let mut state_buf = vec![0.0f32; context_dim];
+
+    // Helper: write a lightweight state from path info for cluster lookup.
+    // `path_len` = number of meaningful tokens in `parent_path`; the hash
+    // folds the leaf + low 8 bits of its parent, mirroring the old packed
+    // representation's low 24 bits (truncated at vocab > 65,536 — the feature
+    // was always lossy there).
+    let fill_state =
+        |state: &mut [f32], depth: usize, token_idx: usize, parent_path: TreePath, path_len: usize| {
+            state[0] = depth as f32;
+            state[1] = token_idx as f32;
+            // Hash parent path into a single f32
+            let leaf = if path_len > 0 {
+                parent_path.token_at(path_len - 1) & 0xFFFF
+            } else {
+                0
+            };
+            let above = if path_len > 1 {
+                (parent_path.token_at(path_len - 2) & 0xFF) << 16
+            } else {
+                0
+            };
+            state[2] = (leaf | above) as f32;
+        };
 
     // Helper: check if cluster at depth is already explored, if not mark it
     let check_and_mark =
@@ -498,7 +521,7 @@ pub fn build_dd_tree_screened_synonyms(
     if chain_seed {
         // Phase A: Build greedy chain backbone
         let mut cumulative_score: f32 = 0.0;
-        let mut parent_path: u128 = 0;
+        let mut parent_path = TreePath::default();
         let mut chain_parent_tokens: Vec<usize> = Vec::with_capacity(config.draft_lookahead);
 
         for (depth, marginal) in marginals.iter().enumerate() {
@@ -527,16 +550,12 @@ pub fn build_dd_tree_screened_synonyms(
             }
 
             // Synonym check for chain backbone
-            let state = state_from_path(depth, token_idx, parent_path);
-            let cluster = synonym_map.lookup(&state);
+            fill_state(&mut state_buf, depth, token_idx, parent_path, depth);
+            let cluster = synonym_map.lookup(&state_buf);
             let _ = check_and_mark(cluster, depth, &mut explored_clusters);
 
             cumulative_score += prob.ln() + relevance.ln();
-            let node_path = if depth == 0 {
-                token_idx as u128
-            } else {
-                (parent_path << 16) | (token_idx as u128)
-            };
+            let node_path = parent_path.push(token_idx as u32, depth);
 
             tree.push(TreeNode {
                 score: cumulative_score,
@@ -560,8 +579,8 @@ pub fn build_dd_tree_screened_synonyms(
                     continue;
                 }
 
-                let state = state_from_path(0, i, i as u128);
-                let cluster = synonym_map.lookup(&state);
+                fill_state(&mut state_buf, 0, i, TreePath::root(i as u32), 1);
+                let cluster = synonym_map.lookup(&state_buf);
                 if !check_and_mark(cluster, 0, &mut explored_clusters) {
                     continue; // Cluster already explored
                 }
@@ -570,7 +589,7 @@ pub fn build_dd_tree_screened_synonyms(
                     score: prob.ln() + relevance.ln(),
                     depth: 0,
                     token_idx: i,
-                    parent_path: i as u128,
+                    parent_path: TreePath::root(i as u32),
                 });
             }
         }
@@ -588,8 +607,8 @@ pub fn build_dd_tree_screened_synonyms(
             }
 
             // Synonym check
-            let state = state_from_path(0, i, i as u128);
-            let cluster = synonym_map.lookup(&state);
+            fill_state(&mut state_buf, 0, i, TreePath::root(i as u32), 1);
+            let cluster = synonym_map.lookup(&state_buf);
             if !check_and_mark(cluster, 0, &mut explored_clusters) {
                 continue; // Cluster already explored at this depth
             }
@@ -598,7 +617,7 @@ pub fn build_dd_tree_screened_synonyms(
                 score: prob.ln() + relevance.ln(),
                 depth: 0,
                 token_idx: i,
-                parent_path: i as u128,
+                parent_path: TreePath::root(i as u32),
             });
         }
     }
@@ -650,7 +669,25 @@ pub fn build_dd_tree_screened_synonyms(
                 &mut parent_tokens_buf,
             );
 
-            for (i, &prob) in marginals[next_depth].iter().enumerate() {
+            // Per-depth log-marginal cache, filled on first expansion of this
+            // depth. `prob.ln()` in the inner loop depends only on
+            // `(next_depth, i)`, never on the popped node, so a 32K vocab and a
+            // 64-node budget paid ~2M redundant `ln()` calls per build.
+            //
+            // The fill predicate is the EXACT negation of the read guard
+            // (`prob <= 0.0` → skip), so it also reproduces `ln()` of a NaN
+            // prob (which `prob <= 0.0` does not filter out) rather than
+            // substituting a 0.0 filler.
+            let marginal = marginals[next_depth];
+            let log_m = &mut log_marginals[next_depth];
+            if log_m.is_empty() {
+                log_m.reserve(marginal.len());
+                for &p in marginal {
+                    log_m.push(if p <= 0.0 { 0.0 } else { p.ln() });
+                }
+            }
+
+            for (i, &prob) in marginal.iter().enumerate() {
                 if prob <= 0.0 {
                     continue;
                 }
@@ -660,15 +697,16 @@ pub fn build_dd_tree_screened_synonyms(
                 }
 
                 // Synonym pruning: skip branches in already-explored clusters
-                let child_path = (best.parent_path << 16) | (i as u128);
-                let state = state_from_path(next_depth, i, child_path);
-                let cluster = synonym_map.lookup(&state);
+                let child_path = best.parent_path.push(i as u32, next_depth);
+                fill_state(&mut state_buf, next_depth, i, child_path, next_depth + 1);
+                let cluster = synonym_map.lookup(&state_buf);
                 if !check_and_mark(cluster, next_depth, &mut explored_clusters) {
                     continue; // Cluster already explored — skip this branch
                 }
 
                 heap.push(TreeNode {
-                    score: best.score + prob.ln() + relevance.ln(),
+                    // `log_m[i]` == `prob.ln()` here (guard: `!(prob <= 0.0)`).
+                    score: best.score + log_m[i] + relevance.ln(),
                     depth: next_depth,
                     token_idx: i,
                     parent_path: child_path,

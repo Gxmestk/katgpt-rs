@@ -50,8 +50,7 @@ mod tests {
         let score = kernel.relevance(0, 0, &[]);
         assert!(
             (score - 1.0).abs() < 1e-5,
-            "perfect relevance should be 1.0, got {}",
-            score
+            "perfect relevance should be 1.0, got {score}"
         );
     }
 
@@ -60,11 +59,7 @@ mod tests {
         let inner = ConstantScreener { val: 0.0 };
         let kernel = KernelScreeningPruner::new(inner, KernelKind::Gaussian { sigma: 1.0 });
         let score = kernel.relevance(0, 0, &[]);
-        assert!(
-            score < 0.5,
-            "distant relevance should be low, got {}",
-            score
-        );
+        assert!(score < 0.5, "distant relevance should be low, got {score}");
     }
 
     #[test]
@@ -81,8 +76,7 @@ mod tests {
         // (0.5 + 1.0)^2 = 2.25
         assert!(
             (score - 2.25).abs() < 1e-5,
-            "polynomial score should be 2.25, got {}",
-            score
+            "polynomial score should be 2.25, got {score}"
         );
     }
 }

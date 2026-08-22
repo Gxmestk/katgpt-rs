@@ -176,8 +176,7 @@ fn bench_go_mcts() {
         let nodes_per_sec = budget as f64 * searches_per_sec;
 
         println!(
-            "  {:>8} {:>12.1} {:>12.0} {:>14.0}",
-            budget, us_per_search, actions_per_sec, nodes_per_sec
+            "  {budget:>8} {us_per_search:>12.1} {actions_per_sec:>12.0} {nodes_per_sec:>14.0}"
         );
     }
     println!();
@@ -323,10 +322,7 @@ fn bench_player_scaling() {
         let total = wins + losses + draws;
         let win_rate = wins as f64 / total as f64 * 100.0;
 
-        println!(
-            "  {},{},{},{},{},{:.1}",
-            player_name, opponent_name, wins, losses, draws, win_rate
-        );
+        println!("  {player_name},{opponent_name},{wins},{losses},{draws},{win_rate:.1}");
 
         all_results.push((
             player_name.to_string(),
@@ -350,10 +346,7 @@ fn bench_player_scaling() {
     );
     println!("  ────────────── ───── ───── ───── ────────");
     for (player, _opp, wins, losses, draws, wr) in &all_results {
-        println!(
-            "  {:<14} {:>5} {:>5} {:>5} {:>7.1}%",
-            player, wins, losses, draws, wr
-        );
+        println!("  {player:<14} {wins:>5} {losses:>5} {draws:>5} {wr:>7.1}%");
     }
     println!();
 }
@@ -368,14 +361,13 @@ fn bench_go_api() {
     println!("═══════════════════════════════════════════════════════════════");
     println!();
 
-    let api_url = match env::var("GO_API_URL") {
-        Ok(url) => url,
-        Err(_) => {
-            println!("  ⏭  Skipped (set GO_API_URL to enable)");
-            println!("     e.g. GO_API_URL=http://localhost:5000");
-            println!();
-            return;
-        }
+    let api_url = if let Ok(url) = env::var("GO_API_URL") {
+        url
+    } else {
+        println!("  ⏭  Skipped (set GO_API_URL to enable)");
+        println!("     e.g. GO_API_URL=http://localhost:5000");
+        println!();
+        return;
     };
 
     use katgpt_rs::pruners::go::AutoGoClient;

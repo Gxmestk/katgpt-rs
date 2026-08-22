@@ -515,12 +515,11 @@ impl ConstraintPruner for LodestarPruner {
                 results[i] = false;
                 continue;
             }
-            let next = match self.automaton.transition(state, token) {
-                Some(ns) => ns,
-                None => {
-                    results[i] = false;
-                    continue;
-                }
+            let next = if let Some(ns) = self.automaton.transition(state, token) {
+                ns
+            } else {
+                results[i] = false;
+                continue;
             };
             results[i] = match budget_remaining {
                 Some(br) => {
@@ -1228,7 +1227,7 @@ mod tests {
         config.vocab_size = 5;
         config.tree_budget = 32;
 
-        // Max 8 tokens in u128 parent_path (16 bits each).
+        // Max 8 tokens in a TreePath (one u32 slot per level).
         let seq_len = 8;
         let row = vec![0.2f32; 5];
         let marginals: Vec<&[f32]> = (0..seq_len).map(|_| row.as_slice()).collect();

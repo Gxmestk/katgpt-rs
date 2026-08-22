@@ -218,15 +218,12 @@ pub fn calibrate_from_scores(scores: &[f32], config: &RtTurboConfig) -> HeadCali
     let mut local_set = Vec::with_capacity(n_heads - n_retrieval);
 
     for (rank, &(head_idx, score)) in indexed.iter().enumerate() {
-        let role = match rank < n_retrieval {
-            true => {
-                retrieval_set.push(head_idx);
-                RetrievalHeadRole::Retrieval
-            }
-            false => {
-                local_set.push(head_idx);
-                RetrievalHeadRole::Local
-            }
+        let role = if rank < n_retrieval {
+            retrieval_set.push(head_idx);
+            RetrievalHeadRole::Retrieval
+        } else {
+            local_set.push(head_idx);
+            RetrievalHeadRole::Local
         };
 
         classifications.push(HeadClassification {

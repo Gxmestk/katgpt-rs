@@ -535,32 +535,29 @@ impl WasmTestGate {
         // Step 4: Validate indices are within [0, max_actions).
         // Byte 3 of the game state header encodes the action space size.
         let max_actions = tc.input[3] as usize;
-        match max_actions {
-            0 => {
-                // max_actions == 0: only empty expected_valid is acceptable.
-                if !tc.expected_valid.is_empty() {
+        if max_actions == 0 {
+            // max_actions == 0: only empty expected_valid is acceptable.
+            if !tc.expected_valid.is_empty() {
+                return (
+                    false,
+                    SandboxVerdict::OutOfRange,
+                    Some(format!(
+                        "{}: expected_valid non-empty but max_actions=0",
+                        tc.description
+                    )),
+                );
+            }
+        } else {
+            for &idx in &tc.expected_valid {
+                if idx >= max_actions {
                     return (
                         false,
                         SandboxVerdict::OutOfRange,
                         Some(format!(
-                            "{}: expected_valid non-empty but max_actions=0",
-                            tc.description
+                            "{}: index {} >= max_actions {}",
+                            tc.description, idx, max_actions
                         )),
                     );
-                }
-            }
-            _ => {
-                for &idx in &tc.expected_valid {
-                    if idx >= max_actions {
-                        return (
-                            false,
-                            SandboxVerdict::OutOfRange,
-                            Some(format!(
-                                "{}: index {} >= max_actions {}",
-                                tc.description, idx, max_actions
-                            )),
-                        );
-                    }
                 }
             }
         }
@@ -585,12 +582,13 @@ impl PrunerTestGate for WasmTestGate {
 
         for tc in test_cases {
             let (ok, _verdict, reason) = self.sandbox_check(tc);
-            match ok {
-                true => passed_count += 1,
-                false => match reason {
+            if ok {
+                passed_count += 1;
+            } else {
+                match reason {
                     Some(msg) => failures.push(msg),
                     None => failures.push(format!("{}: unknown sandbox failure", tc.description)),
-                },
+                }
             }
         }
 

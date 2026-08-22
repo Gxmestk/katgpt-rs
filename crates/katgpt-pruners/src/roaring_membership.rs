@@ -163,10 +163,13 @@ impl BitmapContainer {
 
         if set_indices.len() >= ARRAY_MAX_CARDINALITY {
             let mut bits = Box::new([0u64; 1024]);
+            // `set_indices` comes from `enumerate().filter()`, so its entries are
+            // strictly increasing and hence unique — the cardinality is exactly
+            // its length. Avoids a second 8 KB scan + 1024 popcounts.
+            let count = set_indices.len() as u64;
             for lo in set_indices {
                 bits[lo as usize / 64] |= 1u64 << (lo as usize % 64);
             }
-            let count = bits.iter().map(|w| w.count_ones() as u64).sum();
             BitmapContainer::Bits(bits, count)
         } else {
             // Already sorted by construction.
@@ -237,8 +240,7 @@ impl CompactBitmap {
 
         self.containers
             .binary_search_by_key(&hi, |(k, _)| *k)
-            .map(|pos| self.containers[pos].1.contains(lo))
-            .unwrap_or(false)
+            .is_ok_and(|pos| self.containers[pos].1.contains(lo))
     }
 
     /// Total number of set bits. O(containers).
@@ -536,9 +538,7 @@ mod tests {
 
         assert!(
             bm_mem < bool_mem,
-            "CompactBitmap ({} B) should be smaller than Vec<bool> ({} B)",
-            bm_mem,
-            bool_mem
+            "CompactBitmap ({bm_mem} B) should be smaller than Vec<bool> ({bool_mem} B)"
         );
         // Expect at least 2× reduction for 30% fill.
         assert!(
@@ -633,8 +633,7 @@ mod tests {
         let elapsed = start.elapsed();
         assert!(
             elapsed.as_micros() < 1000,
-            "128K × 50 regions batch ops took {:?}, expected < 1ms",
-            elapsed
+            "128K × 50 regions batch ops took {elapsed:?}, expected < 1ms"
         );
 
         // Sanity: reject count should be non-trivial.
@@ -671,7 +670,7 @@ mod tests {
         assert_eq!(bm.len(), 5000);
         // Verify all inserted values are still present.
         for i in 0u32..5000 {
-            assert!(bm.contains(i), "should contain {}", i);
+            assert!(bm.contains(i), "should contain {i}");
         }
         assert!(!bm.contains(5001));
     }

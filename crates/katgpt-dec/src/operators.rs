@@ -20,7 +20,9 @@ use crate::types::{CellComplex, CochainField, GridDims, MAX_RANK};
 /// The actual Hodge star is a diagonal matrix; on uniform grids every
 /// diagonal entry is the same, so we return that single scalar.
 ///
-/// TODO: Non-uniform grids need actual metric tensor — see Plan 251 T10.
+/// TODO: Non-uniform grids need actual metric tensor. Plan 251 T10 shipped
+/// this identity placeholder as the deliverable for uniform grids; non-uniform
+/// support is standalone future work — file a plan before implementing.
 pub fn hodge_star(_cx: &CellComplex, _rank: u8) -> f32 {
     1.0f32
 }
@@ -75,27 +77,19 @@ pub fn exterior_derivative_into(cx: &CellComplex, input: &CochainField, output: 
     //   output[col] += sign * input[row]
     let entries = cx.boundary_entries(k);
 
-    // Hoist invariant chunk geometry out of the loop.
-    let chunks = dim / 4;
-    let remainder = dim % 4;
-
-    // T11: SIMD hint — process inner dim loop with explicit chunking
-    // so LLVM can see the unrolled 4-wide pattern for auto-vectorization.
+    // T11: slice both rows up front so the two bounds checks hoist out of the
+    // inner dim loop entirely. The remaining loop is a plain equal-length
+    // `axpy` over slices, which LLVM auto-vectorizes reliably (and it keeps
+    // the per-element accumulation order byte-identical to the unrolled form).
     for &(src_cell, dst_cell, sign) in entries {
         let src_start = src_cell * dim;
         let dst_start = dst_cell * dim;
         let sign_f = sign as f32;
 
-        for c in 0..chunks {
-            let off = c * 4;
-            output.data[dst_start + off] += sign_f * input.data[src_start + off];
-            output.data[dst_start + off + 1] += sign_f * input.data[src_start + off + 1];
-            output.data[dst_start + off + 2] += sign_f * input.data[src_start + off + 2];
-            output.data[dst_start + off + 3] += sign_f * input.data[src_start + off + 3];
-        }
-        for d in 0..remainder {
-            let off = chunks * 4 + d;
-            output.data[dst_start + off] += sign_f * input.data[src_start + off];
+        let src_row = &input.data[src_start..src_start + dim];
+        let dst_row = &mut output.data[dst_start..dst_start + dim];
+        for (o, &i) in dst_row.iter_mut().zip(src_row.iter()) {
+            *o += sign_f * i;
         }
     }
 }
@@ -150,25 +144,18 @@ pub fn codifferential_into(cx: &CellComplex, input: &CochainField, output: &mut 
     // (Note: Bₖ maps (k)-cells to (k-1)-cells, so we iterate its entries directly)
     let entries = cx.boundary_entries(k - 1);
 
-    // Hoist invariant chunk geometry; branch-free sign via f32 multiply (matches exterior_derivative).
-    let chunks = dim / 4;
-    let remainder = dim % 4;
-
+    // Slice both rows up front (see `exterior_derivative_into`): the bounds
+    // checks hoist out of the inner dim loop and the resulting equal-length
+    // `axpy` auto-vectorizes. Branch-free sign via f32 multiply.
     for &(dst_cell, src_cell, sign) in entries {
         let src_start = src_cell * dim;
         let dst_start = dst_cell * dim;
         let sign_f = sign as f32;
 
-        for c in 0..chunks {
-            let off = c * 4;
-            output.data[dst_start + off] += sign_f * input.data[src_start + off];
-            output.data[dst_start + off + 1] += sign_f * input.data[src_start + off + 1];
-            output.data[dst_start + off + 2] += sign_f * input.data[src_start + off + 2];
-            output.data[dst_start + off + 3] += sign_f * input.data[src_start + off + 3];
-        }
-        for d in 0..remainder {
-            let off = chunks * 4 + d;
-            output.data[dst_start + off] += sign_f * input.data[src_start + off];
+        let src_row = &input.data[src_start..src_start + dim];
+        let dst_row = &mut output.data[dst_start..dst_start + dim];
+        for (o, &i) in dst_row.iter_mut().zip(src_row.iter()) {
+            *o += sign_f * i;
         }
     }
 }
@@ -821,8 +808,7 @@ mod tests {
                 .fold(0.0f32, f32::max);
             assert!(
                 max_val < 1e-4,
-                "div(curl(grad(f))) should be ~0, got max {}",
-                max_val
+                "div(curl(grad(f))) should be ~0, got max {max_val}"
             );
         }
     }

@@ -7,6 +7,8 @@
 > **Related Plans:** 306 (this — open `DepthInvarianceDiagnostic` primitive), 217 (BeliefDrafter — diagnostic target), 276 (MicroBelief attractor — already-shipped fix pattern), 304 (GainCostLoopHalter — root-cause signal extension)
 > **Cross-ref (riir-ai):** Research 151 (`Recursive_Latent_State_Magnitude_Hygiene_Guide` — private selling-point guide), Plan 331 (kernel audits + runtime fixes)
 > **Classification:** Public (katgpt-rs engine slot)
+>
+> **PASS-Redirects (synthesis):** Faramarzi, Lamb, Rish [arXiv:2607.03580 "When Geometry Aligns: Dihedral Hidden-State Transformations in UNet, ViT, and DiT Architectures"] — introduces SCS/AMS/Drift activation-level diagnostics measuring spatial drift from hidden-state geometric interventions (D4 reflections on 2D feature maps). These are the *spatial-2D* cousins of this note's *magnitude-growth* diagnostic: both measure whether a hidden-state intervention introduced unintended drift. The paper's diagnostics apply to 2D spatial feature maps in vision/diffusion models; ours apply to recursive latent-state chains in text/game AI (including our dLLM stack — D2F, DiffusionBlocks, DiffusionGemma R277 — where denoising steps ARE a recursive latent chain). The diagnostic *pattern* (measure drift, classify failure mode) is already shipped here; the D4-specific transformation doesn't apply because D4 is a 2D-spatial group and our text/latent representations are 1D sequences / vectors with no natural D4 action.
 
 ---
 

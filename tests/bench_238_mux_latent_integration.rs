@@ -92,8 +92,7 @@ fn compress_then_expand_roundtrip() {
             let seg = expand_segment(&ctx, seg_id as u32);
             assert!(
                 seg.is_some(),
-                "X{ratio:?}: expand_segment({}) returned None",
-                seg_id
+                "X{ratio:?}: expand_segment({seg_id}) returned None"
             );
             let seg = seg.unwrap();
             assert_eq!(seg.segment_id, seg_id as u32);
@@ -102,8 +101,7 @@ fn compress_then_expand_roundtrip() {
             assert_eq!(
                 seg.tokens,
                 tokens[start..end],
-                "X{ratio:?}: segment {} tokens mismatch",
-                seg_id
+                "X{ratio:?}: segment {seg_id} tokens mismatch"
             );
         }
     }

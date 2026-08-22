@@ -57,7 +57,7 @@ fn main() {
         let kind = if c.head_id % 2 == 0 { "steep" } else { "flat" };
         print!("  head {:>2} [{}]: ", c.head_id, kind);
         for (r, d) in c.ratios.iter().zip(c.deltas.iter()) {
-            print!("({:.2}→{:.3}) ", r, d);
+            print!("({r:.2}→{d:.3}) ");
         }
         println!();
     }
@@ -78,7 +78,7 @@ fn main() {
         let layer = i / num_heads;
         let head = i % num_heads;
         let mult = s / target_ratio;
-        println!("  {:>10} {:>10} {:>12.4} {:>12.2}x", layer, head, s, mult);
+        println!("  {layer:>10} {head:>10} {s:>12.4} {mult:>12.2}x");
     }
 
     let avg: f32 = shares.iter().sum::<f32>() / shares.len() as f32;
@@ -96,7 +96,7 @@ fn main() {
 
     // Verify local optimality.
     let optimal = solver.is_locally_optimal(&shares);
-    println!("  locally optimal (no improving single swap): {}", optimal);
+    println!("  locally optimal (no improving single swap): {optimal}");
 
     // 4. Wrap in a schedule, serialize, round-trip, verify.
     println!();
@@ -132,7 +132,7 @@ fn main() {
 fn hex_short(hash: &[u8; 32]) -> String {
     let mut s = String::with_capacity(16);
     for b in &hash[..7] {
-        s.push_str(&format!("{:02x}", b));
+        s.push_str(&format!("{b:02x}"));
     }
     s.push('…');
     s

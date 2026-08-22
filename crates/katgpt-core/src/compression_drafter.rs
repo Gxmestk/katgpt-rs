@@ -340,6 +340,17 @@ pub fn beam_search<S: MatchScorer>(
     let max_candidates = beam_width * alphabet.len();
     let mut candidates: Vec<(usize, u8, i32)> = Vec::with_capacity(max_candidates);
 
+    // Double buffer for the next generation plus a recycle pool of retired beam
+    // byte-buffers. Previously each step allocated a fresh outer `Vec` and one
+    // exact-capacity `Vec<u8>` per survivor (`.clone()` on a `Vec` allocates
+    // exactly `len` bytes, so it never reuses spare capacity). Recycling the
+    // retired parents' buffers makes the steady state allocation-free: each
+    // step retires <= beam_width buffers and claims <= beam_width. The bytes
+    // written are identical — only the buffers' capacities differ, which is
+    // unobservable through the returned `Vec<u8>`.
+    let mut next_beams: Vec<(Vec<u8>, i32)> = Vec::with_capacity(beam_width);
+    let mut recycle: Vec<Vec<u8>> = Vec::with_capacity(beam_width);
+
     for _ in 0..horizon {
         candidates.clear();
 
@@ -371,14 +382,19 @@ pub fn beam_search<S: MatchScorer>(
 
         // Materialize ONLY the surviving beams: beam_width clones, not
         // beams.len() × alphabet.len().
-        let mut new_beams: Vec<(Vec<u8>, i32)> = Vec::with_capacity(candidates.len());
         for &(beam_idx, byte, score) in &candidates {
-            // Clone parent once, append the winning byte.
-            let mut new_beam = beams[beam_idx].0.clone();
+            // Copy parent into a recycled buffer, append the winning byte.
+            let mut new_beam = recycle.pop().unwrap_or_default();
+            new_beam.clear();
+            new_beam.extend_from_slice(&beams[beam_idx].0);
             new_beam.push(byte);
-            new_beams.push((new_beam, score));
+            next_beams.push((new_beam, score));
         }
-        beams = new_beams;
+        // Retire the parent generation's buffers into the pool, then swap. After
+        // the drain `beams` is empty, so post-swap `next_beams` is the empty
+        // vector ready to receive the following generation.
+        recycle.extend(beams.drain(..).map(|(b, _)| b));
+        std::mem::swap(&mut beams, &mut next_beams);
     }
 
     // Return the highest-scoring beam.
@@ -421,9 +437,7 @@ mod tests {
         // The repeated one should still win.
         assert!(
             score_seen >= score_unseen,
-            "repeated pattern should score >= unseen: {} vs {}",
-            score_seen,
-            score_unseen
+            "repeated pattern should score >= unseen: {score_seen} vs {score_unseen}"
         );
     }
 
@@ -441,9 +455,7 @@ mod tests {
         let score_unseen_byte = d.score(ctx, b"zzzzzzzzzzz"); // 11 bytes, 'z' not in corpus
         assert!(
             score_corpus_pattern > score_unseen_byte,
-            "corpus pattern 'guard needs' should score higher than unseen 'zzzzzzzzzzz': {} vs {}",
-            score_corpus_pattern,
-            score_unseen_byte
+            "corpus pattern 'guard needs' should score higher than unseen 'zzzzzzzzzzz': {score_corpus_pattern} vs {score_unseen_byte}"
         );
     }
 
@@ -470,11 +482,7 @@ mod tests {
         assert_eq!(batch.len(), single.len());
         // lz4_flex is deterministic — scores must match exactly.
         for (i, (b, s)) in batch.iter().zip(single.iter()).enumerate() {
-            assert_eq!(
-                b, s,
-                "batch vs single mismatch at index {}: {} vs {}",
-                i, b, s
-            );
+            assert_eq!(b, s, "batch vs single mismatch at index {i}: {b} vs {s}");
         }
     }
 
@@ -538,8 +546,7 @@ mod tests {
         let ml = scorer.suffix_match_len(b"", b"guard needs");
         assert!(
             ml >= 11,
-            "should find the full 'guard needs' substring, got {}",
-            ml
+            "should find the full 'guard needs' substring, got {ml}"
         );
     }
 

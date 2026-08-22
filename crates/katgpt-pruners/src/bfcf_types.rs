@@ -45,9 +45,10 @@ impl HalfSpace {
     #[inline]
     pub fn contains(&self, logits: &[f32]) -> bool {
         let val = logits.get(self.dim as usize).copied().unwrap_or(0.0);
-        match self.above {
-            true => val >= self.threshold,
-            false => val < self.threshold,
+        if self.above {
+            val >= self.threshold
+        } else {
+            val < self.threshold
         }
     }
 }
@@ -105,10 +106,8 @@ impl BorelRegion {
     /// Intersect this region with another, combining constraints.
     /// Returns `None` if the intersection is empty (contradictory constraints).
     pub fn intersect(&self, other: &Self) -> Option<Self> {
-        let mut combined: Vec<HalfSpace> = self.constraints.to_vec();
-        combined.extend_from_slice(&other.constraints);
-
-        // Check for contradictions: same dim, same above flag, incompatible thresholds
+        // Check for contradictions FIRST — the `None` path then allocates nothing.
+        // Same dim, same above flag, incompatible thresholds.
         for a in self.constraints.iter() {
             for b in other.constraints.iter() {
                 if a.dim == b.dim && a.above != b.above {
@@ -122,6 +121,12 @@ impl BorelRegion {
                 }
             }
         }
+
+        // Exact capacity up front — `to_vec()` + `extend` grew twice.
+        let mut combined: Vec<HalfSpace> =
+            Vec::with_capacity(self.constraints.len() + other.constraints.len());
+        combined.extend_from_slice(&self.constraints);
+        combined.extend_from_slice(&other.constraints);
 
         // Label: intersect of accept+accept=accept, reject+anything=reject, else maybe
         let label = match (self.label, other.label) {
@@ -147,6 +152,11 @@ pub struct BFCP {
     accept_count: usize,
     reject_count: usize,
     maybe_count: usize,
+    /// Cached `Σ token_count`, updated in `from_regions`. `token_count` is
+    /// immutable after construction AND label-independent, so this stays exact
+    /// even across `precision_smooth` relabeling (unlike the per-label sums,
+    /// which is why only the total is cached).
+    total_tokens: usize,
 }
 
 impl BFCP {
@@ -157,28 +167,29 @@ impl BFCP {
             accept_count: 0,
             reject_count: 0,
             maybe_count: 0,
+            total_tokens: 0,
         }
     }
 
     /// Create a partition from a vector of regions.
     pub fn from_regions(regions: Vec<BorelRegion>) -> Self {
-        let accept_count = regions
-            .iter()
-            .filter(|r| r.label == RegionLabel::Accept)
-            .count();
-        let reject_count = regions
-            .iter()
-            .filter(|r| r.label == RegionLabel::Reject)
-            .count();
-        let maybe_count = regions
-            .iter()
-            .filter(|r| r.label == RegionLabel::Maybe)
-            .count();
+        // Single fused pass — was three separate `filter().count()` scans.
+        let (mut accept_count, mut reject_count, mut maybe_count) = (0usize, 0usize, 0usize);
+        let mut total_tokens = 0usize;
+        for r in &regions {
+            total_tokens += r.token_count;
+            match r.label {
+                RegionLabel::Accept => accept_count += 1,
+                RegionLabel::Reject => reject_count += 1,
+                RegionLabel::Maybe => maybe_count += 1,
+            }
+        }
         Self {
             regions,
             accept_count,
             reject_count,
             maybe_count,
+            total_tokens,
         }
     }
 
@@ -187,9 +198,10 @@ impl BFCP {
         self.regions.len()
     }
 
-    /// Total tokens across all regions.
+    /// Total tokens across all regions (cached O(1)).
+    #[inline]
     pub fn total_tokens(&self) -> usize {
-        self.regions.iter().map(|r| r.token_count).sum()
+        self.total_tokens
     }
 
     /// Check if the partition covers the full vocabulary (sum of token_counts matches).

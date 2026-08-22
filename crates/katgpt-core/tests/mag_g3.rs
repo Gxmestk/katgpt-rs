@@ -45,16 +45,14 @@ fn g3_linear_shift_recon_error_near_zero() {
 
     let (recon, cos) = reconstruction_error(&with, &without, &v, alpha).unwrap();
 
-    println!("G3 linear shift: ϵ_Q = {:.8}, cos = {:.6}", recon, cos);
+    println!("G3 linear shift: ϵ_Q = {recon:.8}, cos = {cos:.6}");
     assert!(
         recon < 1e-5,
-        "G3 FAIL: linear shift should give ϵ_Q ≈ 0, got {:.8}",
-        recon
+        "G3 FAIL: linear shift should give ϵ_Q ≈ 0, got {recon:.8}"
     );
     assert!(
         cos > 0.9999,
-        "G3 FAIL: linear shift cos should be ≈ 1.0, got {:.6}",
-        cos
+        "G3 FAIL: linear shift cos should be ≈ 1.0, got {cos:.6}"
     );
 }
 
@@ -81,14 +79,10 @@ fn g3_zero_shift_recon_error_is_one() {
 
     let (recon, _cos) = reconstruction_error(&with, &data, &v, alpha).unwrap();
 
-    println!(
-        "G3 zero shift: ϵ_Q = {:.6} (expected 1.0 by convention)",
-        recon
-    );
+    println!("G3 zero shift: ϵ_Q = {recon:.6} (expected 1.0 by convention)");
     assert!(
         (recon - 1.0).abs() < 1e-6,
-        "G3 FAIL: zero shift should give ϵ_Q = 1.0 by convention, got {:.6}",
-        recon
+        "G3 FAIL: zero shift should give ϵ_Q = 1.0 by convention, got {recon:.6}"
     );
 }
 
@@ -118,11 +112,10 @@ fn g3_overshoot_recon_error_gt_one() {
 
     let (recon, cos) = reconstruction_error(&with, &without, &v, alpha).unwrap();
 
-    println!("G3 overshoot (α=3×): ϵ_Q = {:.6}, cos = {:.6}", recon, cos);
+    println!("G3 overshoot (α=3×): ϵ_Q = {recon:.6}, cos = {cos:.6}");
     assert!(
         recon > 1.0,
-        "G3 FAIL: overshoot should give ϵ_Q > 1.0, got {:.6}",
-        recon
+        "G3 FAIL: overshoot should give ϵ_Q > 1.0, got {recon:.6}"
     );
 }
 
@@ -154,13 +147,9 @@ fn g3_mine_then_recon_roundtrip() {
     // calibrate_alpha would give alpha = shift_scale (for unit-norm dir).
     let (recon, cos) = reconstruction_error(&with, &without, dir.as_slice(), shift_scale).unwrap();
 
-    println!(
-        "G3 roundtrip: ϵ_Q = {:.8}, cos = {:.6} (mined direction, calibrated alpha)",
-        recon, cos
-    );
+    println!("G3 roundtrip: ϵ_Q = {recon:.8}, cos = {cos:.6} (mined direction, calibrated alpha)");
     assert!(
         recon < 1e-4,
-        "G3 FAIL: mined direction with calibrated alpha should give ϵ_Q ≈ 0, got {:.8}",
-        recon
+        "G3 FAIL: mined direction with calibrated alpha should give ϵ_Q ≈ 0, got {recon:.8}"
     );
 }

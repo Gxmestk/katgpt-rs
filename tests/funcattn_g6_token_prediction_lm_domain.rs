@@ -808,8 +808,7 @@ fn g6_token_prediction_lm_domain() {
 
     eprintln!("\n=== G6: FUNCATTN vs SDPA on masked-token LM prediction ===");
     eprintln!(
-        "model: V={}, D={}, N={}, K={}, steps={} (FD-SGD, LR={}, FD_EPS={}, α={}, τ={})",
-        V, D, N, K, STEPS, LR, FD_EPS, ALPHA, TEMPERATURE
+        "model: V={V}, D={D}, N={N}, K={K}, steps={STEPS} (FD-SGD, LR={LR}, FD_EPS={FD_EPS}, α={ALPHA}, τ={TEMPERATURE})"
     );
     eprintln!(
         "params: funcattn={} (W_emb+W_pos+W_basis+3·D²+W_head), sdpa={} (W_emb+W_pos+3·D²+W_head)",
@@ -817,8 +816,7 @@ fn g6_token_prediction_lm_domain() {
         SdpaPredictor::n_params(),
     );
     eprintln!(
-        "init:   funcattn loss={:.4} acc={:.3}   sdpa loss={:.4} acc={:.3}",
-        fa_init_loss, fa_init_acc, sd_init_loss, sd_init_acc,
+        "init:   funcattn loss={fa_init_loss:.4} acc={fa_init_acc:.3}   sdpa loss={sd_init_loss:.4} acc={sd_init_acc:.3}",
     );
 
     // ── Train ───────────────────────────────────────────────────────────
@@ -867,7 +865,7 @@ fn g6_token_prediction_lm_domain() {
     );
     eprintln!();
     let acc_delta = fa_acc - sd_acc;
-    eprintln!("  accuracy delta (fa − sd) = {:+.4}", acc_delta);
+    eprintln!("  accuracy delta (fa − sd) = {acc_delta:+.4}");
     eprintln!();
     eprintln!("  Plan 286 T4.4 promotion gate (hard, not asserted in this test):");
     eprintln!(
@@ -915,15 +913,11 @@ fn g6_token_prediction_lm_domain() {
 
     assert!(
         !fa_finite || fa_last_loss < fa_init_loss,
-        "G6 sanity: FUNCATTN did not reduce loss ({} ≥ init {})",
-        fa_last_loss,
-        fa_init_loss,
+        "G6 sanity: FUNCATTN did not reduce loss ({fa_last_loss} ≥ init {fa_init_loss})",
     );
     assert!(
         !sd_finite || sd_last_loss < sd_init_loss,
-        "G6 sanity: SDPA did not reduce loss ({} ≥ init {})",
-        sd_last_loss,
-        sd_init_loss,
+        "G6 sanity: SDPA did not reduce loss ({sd_last_loss} ≥ init {sd_init_loss})",
     );
 
     // ── Surface promotion-decision verdict ──────────────────────────────

@@ -1,0 +1,101 @@
+# KatgptProof — the Lean proof gate, run by CI rather than by habit.
+#
+# Before this workflow the proofs in `.proofs/` were enforced by nothing: they
+# type-checked on the machine of whoever last touched them. Anyone without a
+# local Lean toolchain could merge a proof with a `sorry`, a `native_decide`,
+# or a theorem quietly dropped from the axiom audit, and CI would be green.
+# `scripts/proof_gate.sh` is the assertion; this runs it strictly.
+#
+# The `.proofs/` directory is a standalone `lake` project — no Rust, no sibling
+# repositories, no cargo. Its one external dependency is Mathlib, pulled as
+# prebuilt oleans via `lake exe cache get`.
+name: Lean proofs
+
+on:
+  push:
+    branches: [main, develop]
+    # NOTE: duplicated rather than shared via a YAML anchor — GitHub Actions
+    # does not support anchors. Keep the two lists in sync.
+    paths:
+      - '.proofs/**'
+      - 'scripts/proof_gate.sh'
+      - '.github/workflows/lean_proofs.yml'
+  pull_request:
+    paths:
+      - '.proofs/**'
+      - 'scripts/proof_gate.sh'
+      - '.github/workflows/lean_proofs.yml'
+  workflow_dispatch:
+
+jobs:
+  proofs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # elan reads `.proofs/lean-toolchain` and fetches the pinned version
+      # (leanprover/lean4:v4.32.0-rc1).
+      - name: Cache elan toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: elan-${{ runner.os }}-${{ hashFiles('.proofs/lean-toolchain') }}
+
+      # Keyed on the .lean sources: any proof edit misses the cache and forces
+      # a real rebuild. That is load-bearing for Layer 2 of the gate — the
+      # ``declaration uses `sorry` `` warning only appears on a build that
+      # actually recompiled. (The gate also scans the source, which holds
+      # regardless of cache state, but this keeps both nets live.)
+      - name: Cache Lean build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .proofs/.lake
+          key: lake-${{ runner.os }}-${{ hashFiles('.proofs/lean-toolchain') }}-${{ hashFiles('.proofs/**/*.lean') }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('.proofs/lean-toolchain') }}-
+
+      # `set -o pipefail` is load-bearing, not hygiene. In `curl ... | sh`, the
+      # pipeline's exit status is `sh`'s; if curl fails (bad host, network
+      # blip) it exits non-zero but `sh` reading empty input exits 0 — so the
+      # step would report SUCCESS having installed nothing, and the failure
+      # would surface later as a confusing "lake not installed".
+      #
+      # The explicit `command -v lake` afterwards is the belt to that braces:
+      # this step must not be able to pass while leaving the toolchain absent.
+      - name: Install elan
+        run: |
+          set -euo pipefail
+          if [ ! -x "$HOME/.elan/bin/lake" ]; then
+            curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y
+          fi
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.elan/bin:$PATH"
+          command -v lake >/dev/null || {
+            echo "✗ elan install reported success but 'lake' is not on PATH"
+            exit 1
+          }
+          lake --version
+
+      # Mathlib is a dependency of these proofs, and building it from source
+      # takes hours. `lake exe cache get` downloads Mathlib's prebuilt `.olean`
+      # files from the community cache — without it this job would time out.
+      - name: Cache Mathlib olean downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mathlib
+          key: mathlib-${{ runner.os }}-${{ hashFiles('.proofs/lake-manifest.json') }}
+          restore-keys: |
+            mathlib-${{ runner.os }}-
+
+      - name: Fetch Mathlib build cache
+        run: |
+          set -euo pipefail
+          cd .proofs
+          lake exe cache get
+
+      # Strict: no --allow-missing-lean. If Lean is unavailable, CI fails
+      # rather than passing with the proofs unchecked — a skipped gate that
+      # looks green is the exact failure this workflow exists to prevent.
+      - name: Proof gate (type-check + no sorry + no native_decide + axiom budget, 17 theorems)
+        run: ./scripts/proof_gate.sh

@@ -59,9 +59,10 @@ impl FeatureExtractor for DefaultFeatureExtractor {
         parents: &[usize],
         inner_scores: &[f32],
     ) -> Vec<f32> {
-        let mean_score = match inner_scores.is_empty() {
-            true => 0.0,
-            false => inner_scores.iter().sum::<f32>() / inner_scores.len() as f32,
+        let mean_score = if inner_scores.is_empty() {
+            0.0
+        } else {
+            inner_scores.iter().sum::<f32>() / inner_scores.len() as f32
         };
 
         let max_score = inner_scores
@@ -157,8 +158,7 @@ impl<P: ScreeningPruner> ExpressionPruner<P> {
                 mappings
                     .iter()
                     .find(|m| m.variable == raw)
-                    .map(|m| m.semantic.clone())
-                    .unwrap_or_else(|| raw.to_string())
+                    .map_or_else(|| raw.to_string(), |m| m.semantic.clone())
             })
             .collect();
 
@@ -249,9 +249,7 @@ mod tests {
         let expected = 0.5 * 1.0 + 0.5 * sigmoid(0.0_f32);
         assert!(
             (result - expected).abs() < 1e-5,
-            "result={} expected={}",
-            result,
-            expected
+            "result={result} expected={expected}"
         );
     }
 
@@ -311,9 +309,7 @@ mod tests {
             let result = pruner.relevance(depth, 0, &[]);
             assert!(
                 (0.0..=1.0).contains(&result),
-                "relevance out of [0,1]: depth={} result={}",
-                depth,
-                result
+                "relevance out of [0,1]: depth={depth} result={result}"
             );
         }
     }
@@ -383,7 +379,7 @@ mod tests {
         // inner = 0.0, blend = 0.5 * 0.0 + 0.5 * sigmoid(3.0)
         let result = pruner.relevance(0, 0, &[]);
         let expected = 0.5 * sigmoid(3.0_f32);
-        assert!((result - expected).abs() < 1e-5, "result={}", result);
+        assert!((result - expected).abs() < 1e-5, "result={result}");
     }
 
     // ── Helper ─────────────────────────────────────────────────
@@ -511,8 +507,7 @@ mod tests {
             // (depends on whether there's a mapping for it)
             assert!(
                 grounded.contains("depth") || grounded.contains("top-level"),
-                "Grounded expression should reference the feature, got '{}'",
-                grounded
+                "Grounded expression should reference the feature, got '{grounded}'"
             );
         }
 
@@ -546,8 +541,7 @@ mod tests {
             // Should fall back to raw name since TemplateGrounding won't have it
             assert!(
                 grounded.contains("totally_unknown_feature"),
-                "Should fall back to raw feature name, got '{}'",
-                grounded
+                "Should fall back to raw feature name, got '{grounded}'"
             );
         }
 
@@ -631,8 +625,7 @@ mod tests {
                     || grounded.contains("score_mean")
                     || grounded.contains("syntax_validity")
                     || grounded.contains("bandit_q"),
-                "Grounded output should contain feature names, got '{}'",
-                grounded
+                "Grounded output should contain feature names, got '{grounded}'"
             );
         }
     }

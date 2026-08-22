@@ -437,7 +437,7 @@ fn print_q_values(strategies: &[StrategyResult]) {
         print!("{s:<12}");
         for strategy in &bandit_strategies {
             let q = strategy.final_q_values.get(symbol).copied().unwrap_or(0.0);
-            print!("  {:>12.4}", q);
+            print!("  {q:>12.4}");
         }
         println!();
     }
@@ -493,7 +493,7 @@ fn print_convergence(strategies: &[StrategyResult], episodes: usize) {
                 .map(|r| r.reward)
                 .sum::<f32>()
                 / window as f32;
-            print!("  {:>12.4}", avg);
+            print!("  {avg:>12.4}");
         }
         println!();
     }
@@ -507,8 +507,7 @@ fn print_verdict(strategies: &[StrategyResult]) {
     let random_total: f32 = strategies
         .iter()
         .find(|s| s.name == "Random")
-        .map(|s| s.results.iter().map(|r| r.reward).sum())
-        .unwrap_or(0.0);
+        .map_or(0.0, |s| s.results.iter().map(|r| r.reward).sum());
 
     let mut all_outperform = true;
 

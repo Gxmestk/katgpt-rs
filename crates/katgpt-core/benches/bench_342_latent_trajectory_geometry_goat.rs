@@ -130,7 +130,7 @@ fn bench_bifurcation(a_refs: &[&[f32]], b_refs: &[&[f32]]) -> Duration {
 fn format_duration(d: Duration) -> String {
     let ns = d.as_nanos();
     if ns < 1_000 {
-        format!("{:>5} ns", ns)
+        format!("{ns:>5} ns")
     } else if ns < 1_000_000 {
         format!("{:>5.2} µs", ns as f64 / 1_000.0)
     } else {
@@ -145,10 +145,7 @@ fn main() {
     println!("║  Plan 342 — Latent Trajectory Geometry GOAT Gate (G2 perf)  ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "Config: {} timed runs (median), {} warmup, seed=42",
-        TIMED_RUNS, WARMUP
-    );
+    println!("Config: {TIMED_RUNS} timed runs (median), {WARMUP} warmup, seed=42");
     println!();
 
     // ── G2: from_states latency ─────────────────────────────────────────

@@ -4,7 +4,7 @@
 > **Date:** 2026-07-01
 > **Status:** Active — GOAT (modelless distillation + fusion Super-GOAT TBD, tracked in `.issues/011_lieflow_fusion_super_goat_investigation.md` (Issue 011 was closed + removed; investigation complete))
 > **Related Research:** 279 (subspace phase gate — the linear-algebraic cousin), 299 (Clifford wedge — rotational recovery gate), 305 (phase rotation — deterministic 2D rotation), 314 (f-divergence group invariance — theoretical cousin), 321 (tropical equivariant operators), [riir-ai 166](../../riir-ai/.research/166_SE2_Equivariant_Game_Maps_Guide.md) (SE(2) lifting — the APPLY-known-group sibling), [riir-ai 020](../../riir-ai/.research/020_Orbit_OFT_Adapter_First_RL.md) (OFT — orthogonal adapter, redirects to riir-train)
-> **Related Plans:** 301 (subspace phase gate — shipped), 319 (Clifford wedge — shipped, default-on), 322 (phase rotation — shipped), [riir-ai 354](../../riir-ai/.plans/354_se2_equivariant_substrate.md) (SE(2) substrate — pending), [riir-neuron-db 002](../../riir-neuron-db/.plans/002_phase_transition_subspace_phase_gate.md) (can_freeze two-sided gate — shipped)
+> **Related Plans:** 301 (subspace phase gate — shipped), 319 (Clifford wedge — shipped, default-on), 322 (phase rotation — shipped), [riir-ai 354](../../riir-ai/.plans/354_se2_equivariant_substrate.md) (SE(2) substrate — pending), [riir-neuron-db 002](../../riir-neuron-db/.plans/002_phase_transition_consolidation_gate.md) (can_freeze two-sided gate — shipped)
 > **Classification:** Public
 
 ---

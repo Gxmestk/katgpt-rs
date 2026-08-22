@@ -312,10 +312,7 @@ fn bench_build_time() {
         let da_kb = datrie.inner_bytes() as f64 / 1024.0;
         let build_ratio = da_us as f64 / hm_us.max(1) as f64;
 
-        println!(
-            "  {:>8} {:>12} {:>12} {:>12.1} {:>7.1}×",
-            vocab_size, hm_us, da_us, da_kb, build_ratio
-        );
+        println!("  {vocab_size:>8} {hm_us:>12} {da_us:>12} {da_kb:>12.1} {build_ratio:>7.1}×");
     }
     println!();
 }

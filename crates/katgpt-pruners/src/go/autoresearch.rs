@@ -501,9 +501,10 @@ impl GoPlayer for ResearchPlayer {
     }
 
     fn name(&self) -> &'static str {
-        match self.use_mcts {
-            true => "Research-MCTS",
-            false => "Research-Greedy",
+        if self.use_mcts {
+            "Research-MCTS"
+        } else {
+            "Research-Greedy"
         }
     }
 

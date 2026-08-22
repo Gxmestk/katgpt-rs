@@ -219,9 +219,9 @@ fn section_2_forward_decoder(adapter: &PoincareAdapter) {
         }
     }
     let r2 = 1.0 - ss_res / ss_tot.max(1e-12);
-    println!("  ...  ({} total samples)", N_SAMPLES);
+    println!("  ...  ({N_SAMPLES} total samples)");
     println!();
-    println!("  R² = {:.4}  (1.0 = perfect recovery of the linear map)", r2);
+    println!("  R² = {r2:.4}  (1.0 = perfect recovery of the linear map)");
     println!();
     println!("  → The forward decoder W·φ(z) reconstructs the ground-truth targets.");
     println!("    Small |z| (≈0.1) keeps tanh ≈ identity; ridge α=0.01 avoids");
@@ -357,11 +357,11 @@ fn section_4_multi_step(adapter: &PoincareAdapter) {
         .sum::<f32>()
         .sqrt();
 
-    println!("  z_src         = {:?}", z_src);
-    println!("  Δtarget       = {:?}", delta_target);
-    println!("  n_steps       = {}", n_steps);
-    println!("  z_out (5-step)= {:?}", z_out_a);
-    println!("  |z_out - z_src| = {:.4}", displacement);
+    println!("  z_src         = {z_src:?}");
+    println!("  Δtarget       = {delta_target:?}");
+    println!("  n_steps       = {n_steps}");
+    println!("  z_out (5-step)= {z_out_a:?}");
+    println!("  |z_out - z_src| = {displacement:.4}");
     println!();
     println!("  Determinism: two runs bit-identical? {}", if bit_identical { "✓ YES" } else { "✗ NO" });
     println!();
@@ -402,7 +402,7 @@ fn section_5_freeze_thaw(adapter: &PoincareAdapter) {
             println!("    W† match:        {}", if wpinv_match { "✓" } else { "✗" });
             println!("    verify():        {}", if verify_ok { "✓" } else { "✗" });
         }
-        Err(e) => println!("  from_bytes FAILED: {:?}", e),
+        Err(e) => println!("  from_bytes FAILED: {e:?}"),
     }
     println!();
 
@@ -420,7 +420,7 @@ fn section_5_freeze_thaw(adapter: &PoincareAdapter) {
         Err(PoincareFitError::MalformedBuffer) => {
             println!("  Tampered buffer: from_bytes rejected (MalformedBuffer) ✓");
         }
-        Err(e) => println!("  Tampered buffer: unexpected error {:?}", e),
+        Err(e) => println!("  Tampered buffer: unexpected error {e:?}"),
     }
     println!();
     println!("  → The BLAKE3 commitment makes the adapter tamper-evident. Frozen");
@@ -450,5 +450,5 @@ fn main() {
 
 // Helper: first 8 hex chars of a BLAKE3 hash for compact display.
 fn hex_prefix(hash: &[u8; 32]) -> String {
-    hash.iter().take(4).map(|b| format!("{:02x}", b)).collect()
+    hash.iter().take(4).map(|b| format!("{b:02x}")).collect()
 }

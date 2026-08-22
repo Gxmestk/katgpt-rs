@@ -137,12 +137,13 @@ pub trait ProcedureGameState: ProcedureGraph {
             .state_to_node(&state)
             .ok_or_else(|| BridgeError::NoMatchingNode(format!("{desc:?}")))?;
 
-        match recovered == node {
-            true => Ok(()),
-            false => Err(BridgeError::RoundTripFailed {
+        if recovered == node {
+            Ok(())
+        } else {
+            Err(BridgeError::RoundTripFailed {
                 original_node: format!("{node:?}"),
                 recovered_node: format!("{recovered:?}"),
-            }),
+            })
         }
     }
 
@@ -210,14 +211,11 @@ impl<'a, B: ProcedureGameState> TrajectoryValidator<'a, B> {
                     let edges = self.bridge.edges_from(from);
                     let edge_exists = edges.iter().any(|(next, _)| *next == to);
 
-                    match edge_exists {
-                        true => {}
-                        false => {
-                            return Err(BridgeError::NoMatchingState(format!(
-                                "No edge from {:?} to {:?}",
-                                from, to
-                            )));
-                        }
+                    if edge_exists {
+                    } else {
+                        return Err(BridgeError::NoMatchingState(format!(
+                            "No edge from {from:?} to {to:?}"
+                        )));
                     }
                 }
                 Ok(())

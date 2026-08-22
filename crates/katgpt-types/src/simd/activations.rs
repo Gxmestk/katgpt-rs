@@ -37,7 +37,7 @@ pub fn simd_exp_inplace(x: &mut [f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_exp_inplace(x) }
         } else {
-            scalar_exp_inplace(x)
+            scalar_exp_inplace(x);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -50,7 +50,7 @@ pub fn simd_exp_inplace(x: &mut [f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_exp_inplace(x)
+        scalar_exp_inplace(x);
     }
 }
 
@@ -106,7 +106,7 @@ pub fn simd_reciprocal_inplace(x: &mut [f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_reciprocal_inplace(x) }
         } else {
-            scalar_reciprocal_inplace(x)
+            scalar_reciprocal_inplace(x);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -119,7 +119,7 @@ pub fn simd_reciprocal_inplace(x: &mut [f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_reciprocal_inplace(x)
+        scalar_reciprocal_inplace(x);
     }
 }
 
@@ -330,7 +330,7 @@ pub fn simd_tanh_inplace(x: &mut [f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_tanh_inplace(x) }
         } else {
-            scalar_tanh_inplace(x)
+            scalar_tanh_inplace(x);
         }
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -343,7 +343,7 @@ pub fn simd_tanh_inplace(x: &mut [f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_tanh_inplace(x)
+        scalar_tanh_inplace(x);
     }
 }
 
@@ -498,9 +498,8 @@ pub fn simd_sigmoid_tanh_clamp_inplace(out: &mut [f32], a: &[f32], q: &[f32], cl
         if is_avx2_fma_available() {
             unsafe { avx2_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp) }
         } else {
-            scalar_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp)
+            scalar_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp);
         }
-        return;
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
@@ -512,7 +511,7 @@ pub fn simd_sigmoid_tanh_clamp_inplace(out: &mut [f32], a: &[f32], q: &[f32], cl
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp)
+        scalar_sigmoid_tanh_clamp(&mut out[..len], &a[..len], &q[..len], clamp);
     }
 }
 
@@ -558,9 +557,8 @@ pub fn simd_sigmoid_inplace(x: &mut [f32]) {
         if is_avx2_fma_available() {
             unsafe { avx2_sigmoid_inplace(x) }
         } else {
-            scalar_sigmoid_inplace(x)
+            scalar_sigmoid_inplace(x);
         }
-        return;
     }
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
@@ -572,7 +570,7 @@ pub fn simd_sigmoid_inplace(x: &mut [f32]) {
         all(target_arch = "wasm32", target_feature = "simd128")
     )))]
     {
-        scalar_sigmoid_inplace(x)
+        scalar_sigmoid_inplace(x);
     }
 }
 

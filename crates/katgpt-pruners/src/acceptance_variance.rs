@@ -79,9 +79,10 @@ impl AcceptanceVarianceTracker {
     /// Returns 0.0 if fewer than `min_samples` observations have been recorded.
     /// For boolean data: RV ∈ [0.0, 0.25] where 0.25 = maximum variance (p=0.5).
     pub fn rv(&self) -> f64 {
-        match self.count < self.min_samples {
-            true => 0.0,
-            false => self.ema_rv,
+        if self.count < self.min_samples {
+            0.0
+        } else {
+            self.ema_rv
         }
     }
 

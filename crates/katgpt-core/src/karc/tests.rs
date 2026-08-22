@@ -37,7 +37,7 @@ fn fourier_basis_is_bounded() {
     for &x in &[0.0, 0.25, 0.5, 0.75, 1.0, -1.0, 3.7] {
         basis.eval_into(x, &mut out);
         for &v in &out {
-            assert!(v.abs() <= 1.0 + 1e-5, "Fourier value out of [-1,1]: {}", v);
+            assert!(v.abs() <= 1.0 + 1e-5, "Fourier value out of [-1,1]: {v}");
         }
     }
 }
@@ -63,9 +63,7 @@ fn bspline_partition_of_unity() {
         let sum: f32 = out.iter().sum();
         assert!(
             approx_eq(sum, 1.0, 1e-3),
-            "B-spline sum at x={} = {}",
-            x,
-            sum
+            "B-spline sum at x={x} = {sum}"
         );
     }
 }
@@ -185,8 +183,7 @@ fn higher_order_r1_matches_feature_expand() {
         assert_eq!(
             out_first[i].to_bits(),
             out_higher[i].to_bits(),
-            "R=1 mismatch at idx {}",
-            i
+            "R=1 mismatch at idx {i}"
         );
     }
 }
@@ -359,10 +356,7 @@ fn low_rank_fit_r_equals_d_recovers_forecast_quality() {
     // freedom + float precision leaves some residual. We check <15% relative.
     assert!(
         rel < 0.15,
-        "low-rank A·B diverges from Wout: max_diff={}, max_w={}, rel={:.4}",
-        max_diff,
-        max_w,
-        rel
+        "low-rank A·B diverges from Wout: max_diff={max_diff}, max_w={max_w}, rel={rel:.4}"
     );
     // Also verify forecasts match within a looser tolerance (Chebyshev
     // expansion amplifies weight differences).
@@ -390,8 +384,7 @@ fn low_rank_fit_r_equals_d_recovers_forecast_quality() {
     }
     assert!(
         max_rel_err < 0.15,
-        "low-rank forecast diverges from full-rank: max_rel_err={:.4}",
-        max_rel_err
+        "low-rank forecast diverges from full-rank: max_rel_err={max_rel_err:.4}"
     );
 }
 
@@ -429,10 +422,10 @@ fn low_rank_fit_is_deterministic() {
     );
     assert_eq!(n1, n2, "iteration count must match");
     for i in 0..d_out * r {
-        assert_eq!(a1[i].to_bits(), a2[i].to_bits(), "A bit mismatch at {}", i);
+        assert_eq!(a1[i].to_bits(), a2[i].to_bits(), "A bit mismatch at {i}");
     }
     for i in 0..r * d_h {
-        assert_eq!(b1[i].to_bits(), b2[i].to_bits(), "B bit mismatch at {}", i);
+        assert_eq!(b1[i].to_bits(), b2[i].to_bits(), "B bit mismatch at {i}");
     }
 }
 
@@ -513,8 +506,7 @@ fn frozen_a_fit_b_step_is_valid_ridge_solution() {
         .fold(0.0f64, f64::max);
     assert!(
         max_resid < 1e-9,
-        "frozen-A B does not satisfy normal equation: max residual = {:e}",
-        max_resid
+        "frozen-A B does not satisfy normal equation: max residual = {max_resid:e}"
     );
 }
 
@@ -558,16 +550,14 @@ fn frozen_a_fit_forecaster_method_works() {
         assert_eq!(
             a.to_bits(),
             f.a_low_rank[i].to_bits(),
-            "frozen A modified at idx {}",
-            i
+            "frozen A modified at idx {i}"
         );
     }
     // B must be non-trivial (not all zeros — the fit found a solution).
     let b_norm: f32 = f.b_low_rank.iter().map(|v| v * v).sum::<f32>().sqrt();
     assert!(
         b_norm > 1e-6,
-        "frozen-A B is all zeros: b_norm={:e}",
-        b_norm
+        "frozen-A B is all zeros: b_norm={b_norm:e}"
     );
     // Forecast must produce finite values at several probe points.
     let mut max_abs = 0.0f32;
@@ -582,7 +572,7 @@ fn frozen_a_fit_forecaster_method_works() {
         let mut out = [0.0f32; 2];
         assert!(f.forecast_low_rank_into(&delay, &mut out));
         for o in out.iter() {
-            assert!(o.is_finite(), "non-finite forecast at probe {}", probe_t);
+            assert!(o.is_finite(), "non-finite forecast at probe {probe_t}");
             max_abs = max_abs.max(o.abs());
         }
     }
@@ -659,16 +649,14 @@ fn warm_start_with_game_a_factors_converges_to_valid_solution() {
         assert_eq!(
             a_ws[i].to_bits(),
             a_ref[i].to_bits(),
-            "max_iters=0 warm-start must copy A unchanged at {}",
-            i
+            "max_iters=0 warm-start must copy A unchanged at {i}"
         );
     }
     for i in 0..r * d_h {
         assert_eq!(
             b_ws[i].to_bits(),
             b_ref[i].to_bits(),
-            "max_iters=0 warm-start must copy B unchanged at {}",
-            i
+            "max_iters=0 warm-start must copy B unchanged at {i}"
         );
     }
 
@@ -730,7 +718,6 @@ fn warm_start_with_game_a_factors_converges_to_valid_solution() {
     }
     assert!(
         max_diff < 1e-3,
-        "warm-start from perturbation must converge to same Wout fixed point (max_diff={:e})",
-        max_diff
+        "warm-start from perturbation must converge to same Wout fixed point (max_diff={max_diff:e})"
     );
 }

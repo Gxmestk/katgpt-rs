@@ -126,6 +126,18 @@ peira_distill = ["katgpt-core/peira_distill"]
 # path is preserved via the root re-export.
 hla_eigenbasis_recovery = ["uuid", "blake3"]
 
+# ICA Lens — FastICA Non-Gaussian Direction Mining + ERF Diagnostic (Plan 475,
+# arXiv:2606.11722, 2026-08-11). Training-free interpretability primitive
+# that finds maximally non-Gaussian directions in activation windows via
+# FastICA after centering + whitening. Consumes `EigenbasisScratch` as the
+# whitening substrate. Sibling to `hla_eigenbasis_recovery` — ICA is the
+# non-Gaussianity-maximizing rotation that complements PCA's
+# variance-maximization. All 5 GOAT gates PASS (2026-08-11): G1 390µs ≤ 1ms
+# (offline corpus fit), G2(a) 4.33× + G2(b) 6.26× kurtosis ratio vs PCA,
+# G4 0 bytes alloc-free, G5 bit-identical determinism. Promoted to DEFAULT-ON
+# at the root crate level (see root Cargo.toml `default` list).
+ica_lens = ["hla_eigenbasis_recovery"]
+
 # Spectral Rewiring — weight delta purification via base SVD projection
 # (Plan 423, Research 406 — Zhang et al. arXiv:2607.03065). Projects ΔW onto
 # W₀'s top-rank SVD subspace, extracting the compact rewiring matrix M = U_rᵀΔWV_r
@@ -162,3 +174,12 @@ harness = false
 name = "bench_455_phase3_head_to_head"
 path = "tests/bench_455_phase3_head_to_head.rs"
 required-features = ["quantile_balance_router", "manifold_power_iter_router"]
+
+# Plan 475 — ICA Lens FastICA GOAT gate (G1 latency, G2 quality, G4 alloc,
+# G5 determinism). The load-bearing gate is G2: FastICA directions must be
+# more non-Gaussian than PCA + kurtosis-ranking.
+[[bench]]
+name = "bench_475_ica_lens_goat"
+path = "benches/bench_475_ica_lens_goat.rs"
+required-features = ["ica_lens"]
+harness = false

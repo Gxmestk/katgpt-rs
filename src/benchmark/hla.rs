@@ -167,8 +167,7 @@ pub fn bench_hla_memory(_config: &Config) -> BenchResult {
         let savings = (1.0 - ahla_bytes as f64 / flat_bytes as f64) * 100.0;
 
         println!(
-            "\u{2502} {:<12} {:>7} B {:>7} B {:>9} B {:>6.1}% \u{2502}",
-            name, flat_bytes, hla_bytes, ahla_bytes, savings
+            "\u{2502} {name:<12} {flat_bytes:>7} B {hla_bytes:>7} B {ahla_bytes:>9} B {savings:>6.1}% \u{2502}"
         );
 
         total_flat += flat_bytes;

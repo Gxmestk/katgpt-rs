@@ -144,8 +144,7 @@ fn main() {
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 410 — Linking-Fold GOAT gate (G1 smoke / G2 perf / G5 det)");
     println!(
-        "  D_HLA={}, D_SHARD={}, N_DETECTOR={}, FOLD_ITERS={}",
-        D_HLA, D_SHARD, N_DETECTOR, FOLD_ITERS
+        "  D_HLA={D_HLA}, D_SHARD={D_SHARD}, N_DETECTOR={N_DETECTOR}, FOLD_ITERS={FOLD_ITERS}"
     );
     println!("══════════════════════════════════════════════════════════════════\n");
 
@@ -219,7 +218,7 @@ fn verdict(pass: bool) -> &'static str {
 // ── G1: correctness smoke at bench scale ───────────────────────────────────
 
 fn gate_g1_correctness_smoke() -> bool {
-    println!("── G1: correctness smoke (n={}) ──", N_DETECTOR);
+    println!("── G1: correctness smoke (n={N_DETECTOR}) ──");
     let cfg = LinkingDetectorConfig::default();
 
     // Hopf link → link = ±1.
@@ -271,16 +270,13 @@ struct DetectorResult {
 
 fn gate_g2_detector_cold_path() -> DetectorResult {
     println!(
-        "\n── G2: detector cold-path (n=2×{}, d={}, {} runs, median) ──",
-        N_DETECTOR, D_HLA, DETECTOR_ITERS
+        "\n── G2: detector cold-path (n=2×{N_DETECTOR}, d={D_HLA}, {DETECTOR_ITERS} runs, median) ──"
     );
     println!(
-        "   audit-cadence budget: {:.0}ms @ n=2×{}, d={}",
-        DETECTOR_AUDIT_BUDGET_MS, N_DETECTOR, D_HLA
+        "   audit-cadence budget: {DETECTOR_AUDIT_BUDGET_MS:.0}ms @ n=2×{N_DETECTOR}, d={D_HLA}"
     );
     println!(
-        "   (orig plan budget {:.0}ms @ n=2×1000 was unreachable; the detector is O(β²).)",
-        DETECTOR_ORIG_BUDGET_MS
+        "   (orig plan budget {DETECTOR_ORIG_BUDGET_MS:.0}ms @ n=2×1000 was unreachable; the detector is O(β²).)"
     );
     let (x, y) = thickened_hopf_link_d(N_DETECTOR, 0.05, D_HLA);
     let cfg = LinkingDetectorConfig::default();
@@ -326,10 +322,7 @@ struct FoldResult {
 
 #[allow(clippy::type_complexity)]
 fn gate_g2_fold_hot_path() -> (FoldResult, FoldResult, FoldResult, FoldResult) {
-    println!(
-        "\n── G2: fold hot-path ({} iters/case, median of last 80%) ──",
-        FOLD_ITERS
-    );
+    println!("\n── G2: fold hot-path ({FOLD_ITERS} iters/case, median of last 80%) ──");
 
     let r_hla_abs = bench_fold(D_HLA, FoldVariant::Abs);
     let r_hla_gelu = bench_fold(D_HLA, FoldVariant::Gelu);
@@ -454,10 +447,7 @@ fn gate_g5_determinism() -> bool {
             break;
         }
     }
-    println!(
-        "   fold_projection_into: bit-identical across 100 runs = {}",
-        fold_ok
-    );
+    println!("   fold_projection_into: bit-identical across 100 runs = {fold_ok}");
 
     det_ok && fold_ok
 }

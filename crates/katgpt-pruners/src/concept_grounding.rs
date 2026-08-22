@@ -223,9 +223,10 @@ impl ConceptGrounding for TemplateGrounding {
         let mut chain = Vec::with_capacity(mappings.len() + 1);
 
         // Template: "Token at depth {depth} was {action} because {reason}"
-        let action = match state.accepted {
-            true => "accepted",
-            false => "rejected",
+        let action = if state.accepted {
+            "accepted"
+        } else {
+            "rejected"
         };
         let reason = match state.depth {
             0 => "top-level declaration — always evaluated",
@@ -242,8 +243,7 @@ impl ConceptGrounding for TemplateGrounding {
         for (name, score) in &state.pruner_scores {
             let interpretation = Self::interpret_score(*score);
             chain.push(format!(
-                "Pruner '{}' scored {:.2} ({})",
-                name, score, interpretation
+                "Pruner '{name}' scored {score:.2} ({interpretation})"
             ));
         }
 
@@ -251,14 +251,12 @@ impl ConceptGrounding for TemplateGrounding {
         if !state.pruner_scores.is_empty() {
             let combined: f32 = state.pruner_scores.iter().map(|(_, s)| *s).sum::<f32>()
                 / state.pruner_scores.len() as f32;
-            let decision = match state.accepted {
-                true => "accepted",
-                false => "rejected",
+            let decision = if state.accepted {
+                "accepted"
+            } else {
+                "rejected"
             };
-            chain.push(format!(
-                "Combined relevance: {:.2} → {}",
-                combined, decision
-            ));
+            chain.push(format!("Combined relevance: {combined:.2} → {decision}"));
         }
 
         // Append mapping-driven insights
@@ -300,8 +298,7 @@ impl ConceptGrounding for TemplateGrounding {
         let depth_desc = mappings
             .iter()
             .find(|m| m.variable == "depth")
-            .map(|m| m.semantic.as_str())
-            .unwrap_or("unknown depth");
+            .map_or("unknown depth", |m| m.semantic.as_str());
 
         format!(
             "Decision at {} ({}): {}. {} reasoning steps.",

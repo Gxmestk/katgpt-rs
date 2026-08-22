@@ -124,7 +124,7 @@ fn part1_routing_decisions() {
 
         if snapshot_points.contains(&req) {
             let (direct, cot) = routing_summary(&router);
-            println!("  Request {:>3}: Direct={direct:>2}  CoT={cot:>2}", req);
+            println!("  Request {req:>3}: Direct={direct:>2}  CoT={cot:>2}");
         }
     }
 
@@ -304,7 +304,7 @@ fn part5_convergence_plot() {
         }
 
         if sampled_idx < sample_points.len() && req == sample_points[sampled_idx] {
-            print!("  req {:>3}  ", req);
+            print!("  req {req:>3}  ");
             for pos in 0..NUM_POSITIONS {
                 let ch = if router.should_think(pos) { 'T' } else { 'D' };
                 print!(" {ch}");

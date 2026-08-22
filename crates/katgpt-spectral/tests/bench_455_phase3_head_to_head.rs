@@ -130,9 +130,7 @@ fn build_router(n: usize, d: usize, theta: f32) -> Vec<f32> {
     // Need d >= 2*n so that e_{i+N} indices are valid (positions N..2N).
     assert!(
         d >= 2 * n,
-        "D must be >= 2*N for the fixture, got D={}, N={}",
-        d,
-        n
+        "D must be >= 2*N for the fixture, got D={d}, N={n}"
     );
     let mut r = vec![0.0f32; n * d];
     let ct = theta.cos();
@@ -246,10 +244,7 @@ fn head_to_head_decision_matrix() {
     eprintln!();
     eprintln!("═══════════════════════════════════════════════════════════════════════");
     eprintln!("  Plan 455 Phase 3 — Head-to-Head Decision Matrix");
-    eprintln!(
-        "  Fixture: N={}, D={}, M={}, k={}, θ={:.3} rad",
-        N, D, M, K, THETA
-    );
+    eprintln!("  Fixture: N={N}, D={D}, M={M}, k={K}, θ={THETA:.3} rad");
     eprintln!("═══════════════════════════════════════════════════════════════════════");
     eprintln!(
         "  {:<22} {:>10}  {:>12}  {:>10}",
@@ -290,15 +285,13 @@ fn head_to_head_decision_matrix() {
     // If either axis is already good, the head-to-head is meaningless.
     assert!(
         lambda_v < 0.85,
-        "PRECONDITION FAIL: vanilla λ = {:.4} must be < 0.85 (low alignment for MPI to fix). \
-         Fixture is broken — θ may be too small.",
-        lambda_v
+        "PRECONDITION FAIL: vanilla λ = {lambda_v:.4} must be < 0.85 (low alignment for MPI to fix). \
+         Fixture is broken — θ may be too small."
     );
     assert!(
         maxvio_v > 1.0,
-        "PRECONDITION FAIL: vanilla MaxVio_load = {:.4} must be > 1.0 (high imbalance for QB to \
-         fix). Fixture is broken — hot-direction signal too weak.",
-        maxvio_v
+        "PRECONDITION FAIL: vanilla MaxVio_load = {maxvio_v:.4} must be > 1.0 (high imbalance for QB to \
+         fix). Fixture is broken — hot-direction signal too weak."
     );
 
     // ── Case determination ─────────────────────────────────────────────
@@ -340,8 +333,7 @@ fn head_to_head_decision_matrix() {
         (lambda_comp - lambda_mpi).abs()
     );
     eprintln!(
-        "    G-P3-4  Comp reduces MaxVio:   {}  (MaxVio_comp {:.4} vs MaxVio_mpi {:.4})",
-        comp_reduces_maxvio_vs_mpi, maxvio_comp, maxvio_mpi
+        "    G-P3-4  Comp reduces MaxVio:   {comp_reduces_maxvio_vs_mpi}  (MaxVio_comp {maxvio_comp:.4} vs MaxVio_mpi {maxvio_mpi:.4})"
     );
     eprintln!(
         "    G-P3-5  Comp > QB on λ:        {}  (λ_comp {:.4} vs λ_qb {:.4}, Δ=+{:.4})",
@@ -403,14 +395,12 @@ fn head_to_head_decision_matrix() {
     );
     assert!(
         comp_reduces_maxvio_vs_mpi,
-        "G-P3-4 FAIL: QB on MPI-conditioned scores did not halve MaxVio (got {:.4} → {:.4}).",
-        maxvio_mpi, maxvio_comp
+        "G-P3-4 FAIL: QB on MPI-conditioned scores did not halve MaxVio (got {maxvio_mpi:.4} → {maxvio_comp:.4})."
     );
     assert!(
         comp_beats_qb_on_lambda,
         "G-P3-5 FAIL: Composition doesn't beat QB-only on λ by ≥ 0.1 \
-         (λ_comp {:.4} vs λ_qb {:.4}).",
-        lambda_comp, lambda_qb
+         (λ_comp {lambda_comp:.4} vs λ_qb {lambda_qb:.4})."
     );
 
     // ── Strict Pareto dominance (composed > either alone) ──────────────

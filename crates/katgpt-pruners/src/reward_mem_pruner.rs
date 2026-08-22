@@ -445,10 +445,7 @@ mod tests {
 
         assert!(
             gain >= 0.1,
-            "reward propagation gain {:.3} < 0.1 (good={:.3}, bad={:.3})",
-            gain,
-            after_good,
-            after_bad
+            "reward propagation gain {gain:.3} < 0.1 (good={after_good:.3}, bad={after_bad:.3})"
         );
         assert!(
             after_good > 0.9,

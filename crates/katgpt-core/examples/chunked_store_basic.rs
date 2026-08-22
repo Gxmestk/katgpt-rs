@@ -20,7 +20,7 @@ use katgpt_core::{BlobId, ChunkedContentStore, FixedSizeChunker, InMemoryChunked
 /// Hex-encode the first 8 bytes of a BlobId for compact printing.
 fn short_hex(id: &BlobId) -> String {
     let bytes = &id.as_bytes()[..8];
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn main() {
@@ -60,10 +60,7 @@ fn main() {
     sword_variant.extend_from_slice(&blade);
     sword_variant.extend_from_slice(&handle_v2);
 
-    println!(
-        "Blob layout: chunk_size = {} bytes; each sword = 2 chunks = 64 bytes",
-        chunk_size
-    );
+    println!("Blob layout: chunk_size = {chunk_size} bytes; each sword = 2 chunks = 64 bytes");
     println!(
         "sword_base    = [blade | handle_v1]   ({} bytes)",
         sword_base.len()
@@ -133,18 +130,14 @@ fn main() {
     // (browser, curator, anti-cheat) can verify the chunk is part of the
     // blob with ONLY the proof + the chunk it already has. No store access.
     let verified = InMemoryChunkedStore::verify_proof(&proof, &leaf_0_hash);
-    println!(
-        "Light-client verify_proof(blade_hash, proof) = {}  [G4: no &self]\n",
-        verified
-    );
+    println!("Light-client verify_proof(blade_hash, proof) = {verified}  [G4: no &self]\n");
     assert!(verified, "verify_proof must succeed for the correct leaf");
 
     // --- Negative control: wrong leaf hash must fail ----------------------
     let wrong_leaf_hash: [u8; 32] = blake3::hash(&handle_v2).into();
     let rejected = InMemoryChunkedStore::verify_proof(&proof, &wrong_leaf_hash);
     println!(
-        "Negative control: verify_proof(handle_v2_hash, proof_for_leaf_0) = {}  [must be false]",
-        rejected
+        "Negative control: verify_proof(handle_v2_hash, proof_for_leaf_0) = {rejected}  [must be false]"
     );
     assert!(!rejected, "wrong leaf hash must NOT verify");
 

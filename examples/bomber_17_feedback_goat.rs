@@ -107,44 +107,41 @@ fn update_elo_after_game(
     winner: Option<usize>,
     calc: &EloCalculator,
 ) {
-    match winner {
-        Some(w) => {
-            let w_name = player_names[w].clone();
-            let w_rating = elos[&w_name];
-            let mut w_delta = 0.0;
-            let mut loser_deltas: Vec<(String, f64)> = Vec::with_capacity(3);
+    if let Some(w) = winner {
+        let w_name = player_names[w].clone();
+        let w_rating = elos[&w_name];
+        let mut w_delta = 0.0;
+        let mut loser_deltas: Vec<(String, f64)> = Vec::with_capacity(3);
 
-            for (i, name) in player_names.iter().enumerate() {
-                if i == w {
-                    continue;
-                }
-                let l_rating = elos[name];
-                let expected_w = calc.expected(w_rating, l_rating);
-                w_delta += calc.k * (1.0 - expected_w);
-                loser_deltas.push((name.clone(), -calc.k * expected_w));
+        for (i, name) in player_names.iter().enumerate() {
+            if i == w {
+                continue;
             }
+            let l_rating = elos[name];
+            let expected_w = calc.expected(w_rating, l_rating);
+            w_delta += calc.k * (1.0 - expected_w);
+            loser_deltas.push((name.clone(), -calc.k * expected_w));
+        }
 
-            *elos.get_mut(&w_name).unwrap() += w_delta;
-            for (name, delta) in loser_deltas {
-                *elos.get_mut(&name).unwrap() += delta;
+        *elos.get_mut(&w_name).unwrap() += w_delta;
+        for (name, delta) in loser_deltas {
+            *elos.get_mut(&name).unwrap() += delta;
+        }
+    } else {
+        let n = player_names.len();
+        let mut all_deltas = vec![0.0f64; n];
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let ri = elos[&player_names[i]];
+                let rj = elos[&player_names[j]];
+                let expected_i = calc.expected(ri, rj);
+                let delta = calc.k * (0.5 - expected_i);
+                all_deltas[i] += delta;
+                all_deltas[j] -= delta;
             }
         }
-        None => {
-            let n = player_names.len();
-            let mut all_deltas = vec![0.0f64; n];
-            for i in 0..n {
-                for j in (i + 1)..n {
-                    let ri = elos[&player_names[i]];
-                    let rj = elos[&player_names[j]];
-                    let expected_i = calc.expected(ri, rj);
-                    let delta = calc.k * (0.5 - expected_i);
-                    all_deltas[i] += delta;
-                    all_deltas[j] -= delta;
-                }
-            }
-            for (i, name) in player_names.iter().enumerate() {
-                *elos.get_mut(name).unwrap() += all_deltas[i];
-            }
+        for (i, name) in player_names.iter().enumerate() {
+            *elos.get_mut(name).unwrap() += all_deltas[i];
         }
     }
 }
@@ -366,19 +363,16 @@ fn main() {
                 matchup_wins[w] += 1;
             }
             // Survival proxy: non-winner = death in bomber
-            match game.winner {
-                Some(w) => {
-                    for (i, d) in matchup_deaths.iter_mut().enumerate() {
-                        if i != w {
-                            *d += 1;
-                        }
-                    }
-                }
-                None => {
-                    // Draw: all dead
-                    for d in &mut matchup_deaths {
+            if let Some(w) = game.winner {
+                for (i, d) in matchup_deaths.iter_mut().enumerate() {
+                    if i != w {
                         *d += 1;
                     }
+                }
+            } else {
+                // Draw: all dead
+                for d in &mut matchup_deaths {
+                    *d += 1;
                 }
             }
         }

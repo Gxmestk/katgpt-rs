@@ -210,7 +210,7 @@ fn main() {
         "   Avg regret:      {:.3}",
         cumulative_regret / EPISODES as f32
     );
-    println!("   Compressed arms: {:?}", compressed,);
+    println!("   Compressed arms: {compressed:?}",);
     println!();
 
     // Compression timeline

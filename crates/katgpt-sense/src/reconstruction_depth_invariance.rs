@@ -99,10 +99,13 @@ impl ReconstructionState {
             // kind_activations does).
             let activations = match stimulus {
                 AuditStimulus::Constant { activations } => activations,
-                AuditStimulus::AlternatingSign { positive, negative } => match t % 2 == 0 {
-                    true => positive,
-                    false => negative,
-                },
+                AuditStimulus::AlternatingSign { positive, negative } => {
+                    if t % 2 == 0 {
+                        positive
+                    } else {
+                        negative
+                    }
+                }
             };
             self.set_kind_activations(activations);
 
@@ -274,10 +277,13 @@ mod tests {
         states.extend_from_slice(state.belief());
         for t in 0..AUDIT_K {
             let activations = match alternating_stimulus() {
-                AuditStimulus::AlternatingSign { positive, negative } => match t % 2 == 0 {
-                    true => positive,
-                    false => negative,
-                },
+                AuditStimulus::AlternatingSign { positive, negative } => {
+                    if t % 2 == 0 {
+                        positive
+                    } else {
+                        negative
+                    }
+                }
                 _ => unreachable!("fixture returns AlternatingSign"),
             };
             state.set_kind_activations(activations);
@@ -343,10 +349,7 @@ mod tests {
 
         for t in 0..(EVENT_TICKS + RELAX_TICKS) {
             // Drive only during the event window; zero drive afterward (relax).
-            let activations: [f32; 6] = match t < EVENT_TICKS {
-                true => STIM,
-                false => [0.0; 6],
-            };
+            let activations: [f32; 6] = if t < EVENT_TICKS { STIM } else { [0.0; 6] };
             raw.set_kind_activations(activations);
             reg.set_kind_activations(activations);
             raw.evolve_belief();
@@ -433,9 +436,6 @@ mod tests {
             nb += b[i] * b[i];
         }
         let denom = (na * nb).sqrt();
-        match denom > 1e-12 {
-            true => dot / denom,
-            false => 0.0,
-        }
+        if denom > 1e-12 { dot / denom } else { 0.0 }
     }
 }

@@ -105,10 +105,7 @@ fn main() {
     // Iterative refinement
     let mut iter_partition = bfcp.clone();
     let refined_count = refine_partition(&mut iter_partition, &[], &pruner, 100, 3);
-    println!(
-        "  Iterative refinement (max 3 rounds): {} maybe regions refined",
-        refined_count,
-    );
+    println!("  Iterative refinement (max 3 rounds): {refined_count} maybe regions refined",);
 
     // ── Phase 3: PWC Bandit Arms ──────────────────────────────
     println!("\nPhase 3: PWC Bandit Arms");
@@ -134,7 +131,7 @@ fn main() {
     for r in 0..5 {
         let best = bandit.select(r);
         let q = bandit.q_value(best, r);
-        println!("    Region {}: best arm={}, Q-value={:.3}", r, best, q);
+        println!("    Region {r}: best arm={best}, Q-value={q:.3}");
     }
 
     // PWC closure verification (Theorem 2)
@@ -184,7 +181,7 @@ fn main() {
     );
 
     // Complex partition
-    let mut complex_regions = Vec::new();
+    let mut complex_regions = Vec::with_capacity(30);
     for i in 0..30 {
         let label = match i % 3 {
             0 => RegionLabel::Accept,

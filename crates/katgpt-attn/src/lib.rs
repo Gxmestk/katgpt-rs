@@ -16,6 +16,8 @@
 //! | [`diagonal_gate`] | `diagonal_gate` | Shared DiagonalGate abstraction (GDN2 + Wall). |
 //! | [`static_cal`] | `static_cal_tables` | Pre-computed per-head attention scales. |
 //! | [`funcattn_compose`] | `funcattn_freeze_thaw` / `funcattn_spectral_pre_rotate` / `funcattn_chiar_blend` | FuncAttn composition layer (Plan 286 Phase 5). |
+//! | [`mla`] | `mla_attention` | Multi-head Latent Attention (DeepSeek-V2 §2.1) with Kimi-K3 output gate (Proposal 032 Phase 2). |
+//! | [`gdn2::kda_forward`] | `kda_linear` | KDA (Kimi Delta Attention) linear attention forward layer (Kimi Linear, Proposal 032 Phase 4, Research 329). Reuses the gdn2 kernel with `Gdn2GateConfig::Kda`. |
 //!
 //! # Relationship to katgpt-core
 //!
@@ -59,3 +61,16 @@ pub mod funcattn_compose;
 // katgpt-core; this module only owns the forward composition that needs entmax.
 #[cfg(all(feature = "hga", feature = "dash_attn"))]
 pub mod hga_forward;
+
+// MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
+// Decoupled-RoPE latent attention with Kimi-K3 output-gate extension.
+// Proposal 032 Phase 2, Research 327.
+#[cfg(feature = "mla_attention")]
+pub mod mla;
+
+// MLA analytic backward pass (Plan 318 Phase C C4). CPU reference for the
+// GPU backward. Gated behind `mla_backward` (implies `mla_attention`).
+// katgpt-rs is modelless-by-mandate; this is the training-time reference
+// consumed by riir-train, never on the production inference path.
+#[cfg(feature = "mla_backward")]
+pub mod mla_backward;

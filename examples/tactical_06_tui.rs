@@ -366,7 +366,7 @@ fn solve(pruner: &TacticalPruner) -> Solution {
         expand_to_segments(pruner, &target_sequence).expect("Segment expansion should succeed");
 
     // Flatten actions
-    let mut flat_actions = Vec::new();
+    let mut flat_actions = Vec::with_capacity(segments.len());
     for seg in &segments {
         flat_actions.extend_from_slice(&seg.path_actions);
         if seg.has_attack {
@@ -709,7 +709,7 @@ fn draw_map(f: &mut Frame, area: Rect, app: &App) {
     let path_set = app.remaining_path();
     let target_pos = app.current_target_pos();
 
-    let mut lines = Vec::new();
+    let mut lines = Vec::with_capacity(pruner.grid.len());
     for r in 0..pruner.grid.len() {
         let mut spans = Vec::new();
         for c in 0..pruner.grid[0].len() {

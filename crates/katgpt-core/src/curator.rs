@@ -74,12 +74,11 @@ impl CuratorVerifier {
     pub fn verify_module(&self, module: &SenseModule, tree: &MerkleOctree) -> CuratorVerdict {
         // 1. KG consistency: dot-product of direction[0] with itself.
         //    Self-similarity = ||dir||² in ternary sign space.
-        let kg_consistency = match module.n_directions {
-            0 => 0.0,
-            _ => {
-                let dir = &module.directions[0];
-                Self::ternary_dot_self(dir)
-            }
+        let kg_consistency = if module.n_directions == 0 {
+            0.0
+        } else {
+            let dir = &module.directions[0];
+            Self::ternary_dot_self(dir)
         };
 
         // 2. Spectral flatness: variance of leaf hashes (first 8 bytes LE as u64).
@@ -346,9 +345,10 @@ impl CuratorBandit {
     /// GOAT target: < 50ns.
     pub fn update(&mut self, curator_id: usize, correct: bool) {
         if let Some(arm) = self.arms.get_mut(curator_id) {
-            match correct {
-                true => arm.alpha += 1.0,
-                false => arm.beta += 1.0,
+            if correct {
+                arm.alpha += 1.0
+            } else {
+                arm.beta += 1.0
             }
         }
     }
@@ -591,15 +591,13 @@ mod tests {
         let rep_0 = bandit.reputation(0);
         assert!(
             rep_0 > 0.75,
-            "after 100 correct updates, reputation should be > 0.75, got {}",
-            rep_0,
+            "after 100 correct updates, reputation should be > 0.75, got {rep_0}",
         );
 
         let rep_1 = bandit.reputation(1);
         assert!(
             rep_1 < 0.5,
-            "after 20 failures, reputation should be < 0.5, got {}",
-            rep_1,
+            "after 20 failures, reputation should be < 0.5, got {rep_1}",
         );
     }
 
@@ -615,8 +613,7 @@ mod tests {
         let rep = bandit.reputation(0);
         assert!(
             rep < 0.5,
-            "after 50 failures, reputation should be < 0.5, got {}",
-            rep,
+            "after 50 failures, reputation should be < 0.5, got {rep}",
         );
 
         let weight = verification_weight(rep);
@@ -718,8 +715,7 @@ mod tests {
             let s = bandit.sample(0);
             assert!(
                 (0.0..=1.0).contains(&s),
-                "sample should be in [0,1], got {}",
-                s,
+                "sample should be in [0,1], got {s}",
             );
         }
     }

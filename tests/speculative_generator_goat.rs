@@ -100,8 +100,7 @@ fn test_speculative_generator_goat_equivalence() {
     let path_spec = extract_best_path(&tree_spec);
     assert_eq!(
         path_standard, path_spec,
-        "best path differs: standard={:?}, speculative={:?}",
-        path_standard, path_spec,
+        "best path differs: standard={path_standard:?}, speculative={path_spec:?}",
     );
 
     // Same token indices and scores (float tolerance)
@@ -243,8 +242,8 @@ fn test_speculative_generator_goat_overhead() {
         * 100.0;
 
     println!("\n── GOAT Overhead ({n_iters} iterations) ──");
-    println!("   Standard:  {:?}", elapsed_standard);
-    println!("   Speculative: {:?}", elapsed_spec);
+    println!("   Standard:  {elapsed_standard:?}");
+    println!("   Speculative: {elapsed_spec:?}");
     println!("   Overhead: {overhead_pct:.1}%");
 
     // The speculative path does meaningful extra work per iteration

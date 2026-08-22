@@ -156,10 +156,7 @@ mod tests {
                     .sum();
                 assert!(
                     dot.abs() < 0.01,
-                    "rows {} and {} not orthogonal: dot = {}",
-                    i,
-                    j,
-                    dot
+                    "rows {i} and {j} not orthogonal: dot = {dot}"
                 );
             }
         }
@@ -189,8 +186,7 @@ mod tests {
         let ratio = proj_dist / orig_dist;
         assert!(
             ratio > 0.001 && ratio < 10.0,
-            "JL distance ratio out of range: {}",
-            ratio
+            "JL distance ratio out of range: {ratio}"
         );
     }
 

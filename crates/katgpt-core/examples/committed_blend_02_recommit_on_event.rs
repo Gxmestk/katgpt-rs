@@ -184,7 +184,7 @@ fn make_direction_vectors() -> [[f32; 32]; 3] {
 }
 
 fn hex_short(bytes: &[u8; 32]) -> String {
-    bytes[..8].iter().map(|b| format!("{:02x}", b)).collect()
+    bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn main() {

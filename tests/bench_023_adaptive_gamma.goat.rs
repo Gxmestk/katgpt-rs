@@ -309,22 +309,14 @@ fn t5_adaptive_gamma_throughput_gate() {
         baseline.total_accepted, adaptive.total_accepted
     );
     println!("╠══════════════════════════════════════╩══════════════════╩═══════════╣");
-    println!(
-        "║ Throughput gain: {:+.2}%                                                ║",
-        gain_pct
-    );
-    println!(
-        "║ Output-dist KL (ON vs OFF): {:.6} nats                                 ║",
-        kl
-    );
+    println!("║ Throughput gain: {gain_pct:+.2}%                                                ║");
+    println!("║ Output-dist KL (ON vs OFF): {kl:.6} nats                                 ║");
     println!("╠══════════════════════════════════════════════════════════════════════╣");
     println!(
-        "║ Cost model: C_draft={:.1}μs/tok C_verify={:.1}μs/step(batched)        ║",
-        C_DRAFT_PER_TOKEN_US, C_VERIFY_BATCHED_US
+        "║ Cost model: C_draft={C_DRAFT_PER_TOKEN_US:.1}μs/tok C_verify={C_VERIFY_BATCHED_US:.1}μs/step(batched)        ║"
     );
     println!(
-        "║              C_fixed={:.1}μs/step  Vocab={} Steps={}                    ║",
-        C_FIXED_PER_STEP_US, VOCAB_SIZE, N_STEPS
+        "║              C_fixed={C_FIXED_PER_STEP_US:.1}μs/step  Vocab={VOCAB_SIZE} Steps={N_STEPS}                    ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();

@@ -145,12 +145,26 @@ pub fn forward_set_causal_positions(
     let mut hidden = vec![0.0f32; config.mlp_hidden];
     let mut x_mlp = vec![0.0f32; n];
     let mut xr2_buf = vec![0.0f32; n];
+    // Eligible-key index list for the current query, materialised once per `q`.
+    // The eligibility predicate `position_order[t] <= q_gen_step` depends ONLY on
+    // (q, t) — it is invariant across heads, yet the old code re-evaluated it in
+    // four separate `t` loops for every head (4 × n_head × seq_len predicate
+    // evaluations + branches per query). Hoisting it to one O(seq_len) scan per
+    // query turns all four inner loops into dense walks over just the eligible
+    // set. Allocated once outside the `q` loop and `clear()`ed per query, so no
+    // per-query heap traffic.
+    let mut eligible: Vec<usize> = Vec::with_capacity(seq_len);
 
     for q in 0..seq_len {
         x_buf.copy_from_slice(&x_norm2_all[q * n..(q + 1) * n]);
         matmul(&mut q_buf, &layer.attn_wq, &x_buf, n, n);
 
         let q_gen_step = position_order[q];
+        // Ascending `t`, so every loop below still visits the eligible positions
+        // in exactly the original order — the `max_score` scan and the `sum_exp`
+        // reduction see the identical sequence of values, hence bit-identical.
+        eligible.clear();
+        eligible.extend((0..seq_len).filter(|&t| position_order[t] <= q_gen_step));
 
         // Per-head masked attention. attn_out_buf accumulates across heads
         // (same layout as attention_forward_safe_into's output).
@@ -159,24 +173,28 @@ pub fn forward_set_causal_positions(
             let kv_group = h * config.n_kv_head / config.n_head;
             let q_off = h * hd;
             let kv_off = kv_group * hd;
+            // Loop-invariant across `t`: slice (and bounds-check) once per head.
+            let q_head = &q_buf[q_off..q_off + hd];
+
+            // Ineligible slots must read back as exactly 0.0 (the old pass 1 and
+            // pass 2 both wrote 0.0 there and passes 3/4 skipped them). One `fill`
+            // establishes that up front; the loops below only touch eligible slots.
+            scores_buf[..seq_len].fill(0.0);
 
             // Pass 1: compute raw scores for ELIGIBLE positions only, find max.
             // (Position q itself is always eligible since position_order[q] <= q_gen_step,
             // so max_score is guaranteed to advance past -inf.)
             let mut max_score = f32::NEG_INFINITY;
-            for t in 0..seq_len {
-                if position_order[t] <= q_gen_step {
-                    let dot = simd::simd_dot_f32(
-                        &q_buf[q_off..q_off + hd],
-                        &k_cache[t * kvd + kv_off..t * kvd + kv_off + hd],
-                        hd,
-                    );
-                    scores_buf[t] = dot * scale;
-                    if scores_buf[t] > max_score {
-                        max_score = scores_buf[t];
-                    }
-                } else {
-                    scores_buf[t] = 0.0; // placeholder, never contributes
+            for &t in &eligible {
+                let dot = simd::simd_dot_f32(
+                    q_head,
+                    &k_cache[t * kvd + kv_off..t * kvd + kv_off + hd],
+                    hd,
+                );
+                let s = dot * scale;
+                scores_buf[t] = s;
+                if s > max_score {
+                    max_score = s;
                 }
             }
 
@@ -185,22 +203,16 @@ pub fn forward_set_causal_positions(
             // non-contiguous and we must not feed garbage to the polynomial exp.
             // Uses Cephes-backed `fast_exp` instead of libm `.exp()`.
             let mut sum_exp = 0.0f32;
-            for t in 0..seq_len {
-                if position_order[t] <= q_gen_step {
-                    let e = simd::fast_exp(scores_buf[t] - max_score);
-                    scores_buf[t] = e;
-                    sum_exp += e;
-                } else {
-                    scores_buf[t] = 0.0;
-                }
+            for &t in &eligible {
+                let e = simd::fast_exp(scores_buf[t] - max_score);
+                scores_buf[t] = e;
+                sum_exp += e;
             }
 
             // Normalize over eligible positions.
             let inv_sum = 1.0 / sum_exp;
-            for t in 0..seq_len {
-                if position_order[t] <= q_gen_step {
-                    scores_buf[t] *= inv_sum;
-                }
+            for &t in &eligible {
+                scores_buf[t] *= inv_sum;
             }
 
             // Persist weights for inspection/debugging. Ineligible positions
@@ -209,12 +221,17 @@ pub fn forward_set_causal_positions(
             all_attn_weights[attn_base..attn_base + seq_len]
                 .copy_from_slice(&scores_buf[..seq_len]);
 
-            // Weighted value sum over eligible positions only.
-            for t in 0..seq_len {
+            // Weighted value sum over eligible positions only. The `s > 0.0`
+            // guard is retained: it previously also filtered the ineligible
+            // (exactly-0.0) slots, and it still filters eligible slots whose
+            // normalised weight underflowed to 0.0 — same set of skipped terms,
+            // same ascending order, so the accumulation is bit-identical.
+            let out_head = &mut attn_out_buf[q_off..q_off + hd];
+            for &t in &eligible {
                 let s = scores_buf[t];
                 if s > 0.0 {
                     let v_row = &v_cache[t * kvd + kv_off..t * kvd + kv_off + hd];
-                    simd::simd_fused_scale_acc(&mut attn_out_buf[q_off..q_off + hd], v_row, s, hd);
+                    simd::simd_fused_scale_acc(out_head, v_row, s, hd);
                 }
             }
         }

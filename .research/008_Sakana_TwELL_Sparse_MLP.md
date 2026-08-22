@@ -267,3 +267,5 @@ Implementation status (all complete):
 - katgpt-rs GPU MLP: `riir-ai/crates/riir-gpu/src/forward/mod.rs` — `dispatch_layer()` lines 555-585
 - Raven RSM: `.research/006_Raven_Routing_Slot_Memories.md`
 - Screening Pruner: `.research/007_Screening_Absolute_Relevance.md`
+
+> **PASS-Redirects (synthesis):** Glorot, Bordes & Bengio [ICML 2011, PMLR v15 "glorot11a" — "Deep Sparse Rectifier Neural Networks"] — the 2011 origin of the ReLU-sparsity property this note exploits: trained rectifier nets show 50-75% hard zeros (increasing with depth) without any regularization. Our default-on `sparse_mlp` feature is the direct in-stack descendant; the paper's measured sparsity range (25-50% alive) sits well under the `sparse_threshold = 0.8` fallback bound, validating the auto-detect design. Nothing new to action.

@@ -6,6 +6,8 @@
 > **Related Research:** 131 (UNSL — sibling scaling-law theory), 222 (Spectral Scaling Laws of Muon — direct predecessor, *empirical* power laws by layer; this paper is the *mechanistic* companion), 295 (AC-GPT — explicitly defers the sigmoid-vs-softmax justification to here), 240 (CGSP — confirms sigmoid scaling as codebase default)
 > **Related Plans:** 254 (Spectral Budget Router — already implements Research 222's coefficient-space navigation), 297 (PersonalityWeightedComposition — coefficient-space drift), 321 (CommittedFieldBlend — coefficient-space commit)
 > **Classification:** Public (katgpt-rs — modelless inference justification)
+>
+> **PASS-Redirects (synthesis):** Skaling / Videau et al. [arXiv:2608.07222 "Skaling: Chinchilla's Exponents Meet Kaplan's Coupling"] — provides the actual coupled functional form `L(N,D)=(A·N^-α+B·D^-β)^k+E` (single coupling exponent k ≈ 0.31–0.45 empirically) + L-shape sparse profiling (~10× compute saving for scaling-law fitting) that this note's §4 "Not a Chinchilla-style compute-optimal allocation recipe" explicitly defers. → riir-train: applicable ONLY if/when we run multi-config (N,D) scaling-law sweeps — we currently don't (Plan 318 is single-shot 4B training on one 4090, not a Farseer-style 404-config grid; Plans 059/066/501–505 are all single-model pipelines). The sigmoid escape valve + coefficient-space navigation (this note's actual modelless contribution) is unaffected — Skaling operates on the training-side loss surface, not on inference-time blend gates. PASS not because the form is wrong (it's a genuine 1.5–3× MAPE improvement over Chinchilla) but because we have no multi-run scaling-law-fitting workflow to apply it to.
 
 ---
 
@@ -99,7 +101,7 @@ Re-cast the paper's mechanism on each Super-GOAT factory module:
 - **`cgsp_runtime/`**: Curiosity signals drive exploration. The exploration-exploitation tradeoff has its own scaling, but the paper's softmax-fixed 1/3 exponent does not bind it — curiosity-driven exploration is not softmax-saturated training.
 - **LatCal fixed-point** (`riir-chain/src/encoding/latcal*.rs`): LatCal is deterministic fixed-point arithmetic, not a softmax-trained model. It has no exponent in the paper's sense. **It is the canonical raw-scalar bridge at the sync boundary** (per AGENTS.md latent-vs-raw rules) — coefficients only, no exponents.
 - **`NeuronShard` / `MerkleFrozenEnvelope`** (`riir-neuron-db/src/`): Frozen snapshots are coefficient-space points, not exponent-space moves. Freezing/thawing navigates coefficient space atomically. Consolidation (Raven/δ-Mem) moves shards along a coefficient trajectory; the paper's frame says this is the right thing to be doing.
-- **DEC Stokes operators** (`katgpt-rs/crates/katgpt-core/src/dec/`): `d∘d=0` is exact linear-algebra identity, no exponent. The DEC substrate is pure structure; the coefficient variation lives in the cochain values, not in operator dynamics.
+- **DEC Stokes operators** (`katgpt-rs/crates/katgpt-dec/src/`): `d∘d=0` is exact linear-algebra identity, no exponent. The DEC substrate is pure structure; the coefficient variation lives in the cochain values, not in operator dynamics.
 
 **The pattern:** every modelless inference primitive we ship either operates on coefficient space directly (blend, route, freeze) or is structurally outside the paper's universality class entirely (sigmoid gates, linear DEC operators, deterministic LatCal). The paper's "exponents are fixed" claim therefore does not constrain anything we actually do — and the "coefficients are actionable" claim endorses everything we already do.
 
@@ -166,7 +168,8 @@ If softmax gives 1/3 and the paper's argument is "nonlinearity fixes exponent", 
 - **katgpt-rs/.plans/297_personality_weighted_composition.md** — coefficient-space navigation at the personality-weight layer (shipped, GOAT).
 - **katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md** — coefficient-space navigation at the archetype-commitment layer (shipped, GOAT).
 - **riir-neuron-db/src/freeze.rs** (`MerkleFrozenEnvelope`) — atomic coefficient-space snapshot swap.
-- **riir-chain/src/encoding/latcal*.rs** — deterministic fixed-point raw-scalar bridge; no exponent in the paper's sense (pure coefficient space).
+- `riir-chain/src/encoding/latcal*.rs` — deterministic fixed-point raw-scalar bridge; no exponent in the paper's sense (pure coefficient space).
+- **riir-train/.research/422_Neural_Quadratic_Forms_LoRA_Ignition_Width.md** — the time-axis sequel (same first-author lineage): Liu Ziyin, Yizhou Xu, Tomaso Poggio, Isaac Chuang [arXiv:2608.13335 "Neural Quadratic Forms: A Unified Minimal Model for Sudden Learning and Scaling Laws"] derive the loss-vs-TIME exponent from the data spectrum (`E(τ) = Θ(τ^-(α1-1)/α2)`) — the mechanism this note's "first kind" law lacked; complementary to (not contradicting) the scale-exponent universality argued here. Distilled in riir-train (LoRA ignition times + width-from-effective-rank + `rank_one_spectral` GOAT framing); verdict Gain, POC filed as riir-train Issue 459.
 
 ---
 

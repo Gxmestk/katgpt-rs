@@ -586,8 +586,7 @@ impl SyntheticScm {
                 .iter()
                 .enumerate()
                 .max_by_key(|&(_, c)| c)
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
             out.push(if dom == query_task { 1.0 } else { 0.0 });
             start = end;
         }

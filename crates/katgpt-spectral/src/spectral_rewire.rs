@@ -889,9 +889,7 @@ mod tests {
         let m_true_norm = fro_norm(&m_true);
         assert!(
             (m_norm - m_true_norm).abs() / m_true_norm < 1e-3,
-            "‖M‖_F should match ‖M_true‖_F, got {} vs {}",
-            m_norm,
-            m_true_norm
+            "‖M‖_F should match ‖M_true‖_F, got {m_norm} vs {m_true_norm}"
         );
     }
 

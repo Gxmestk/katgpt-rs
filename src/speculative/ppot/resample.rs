@@ -125,10 +125,7 @@ fn sample_different_value(
     } else {
         // All mass was on original — sample uniformly from non-original tokens
         let fallback = (rng.next() as usize) % len;
-        match fallback == original_token && len > 1 {
-            true => (fallback + 1) % len,
-            false => fallback,
-        }
+        if fallback == original_token && len > 1 { (fallback + 1) % len } else { fallback }
     }
 }
 
@@ -646,13 +643,16 @@ pub fn ppot_rescue_adaptive<P: ScreeningPruner>(
         rng,
     );
 
-    // 5. Validate and collect results
-    let mut valid_variants = Vec::new();
-    let mut valid_indices = Vec::new();
+    // 5. Validate and collect results.
+    // `accepted` flags are recorded first so the accepted variants can be MOVED
+    // out of `variants` afterwards — the old code cloned every accepted variant
+    // here and cloned the winner again at the end.
+    let mut accepted_flags: Vec<bool> = Vec::with_capacity(variants.len());
     let strategies_len = TokenRule::STRATEGIES.len();
 
     for (idx, variant) in variants.iter().enumerate() {
         let accepted = is_path_valid(variant, pruner);
+        accepted_flags.push(accepted);
 
         // Cycle rule lookup — hoist len out of the loop.
         let rule = TokenRule::STRATEGIES
@@ -673,12 +673,15 @@ pub fn ppot_rescue_adaptive<P: ScreeningPruner>(
                 });
             }
         }
-
-        if accepted {
-            valid_variants.push(variant.clone());
-            valid_indices.push(idx);
-        }
     }
+
+    // Move the accepted variants out — preserves their original relative order,
+    // so `rank_by_consistency` sees exactly the same input as before.
+    let mut valid_variants: Vec<Vec<usize>> = variants
+        .into_iter()
+        .zip(accepted_flags)
+        .filter_map(|(v, ok)| ok.then_some(v))
+        .collect();
 
     // 6. Select best variant
     match valid_variants.len() {
@@ -686,11 +689,11 @@ pub fn ppot_rescue_adaptive<P: ScreeningPruner>(
         1 => Some(valid_variants.into_iter().next().unwrap()),
         _ => {
             // Multiple valid: rank by self-consistency
-            let ranked = rank_by_consistency(&valid_variants);
-            ranked
+            let best = rank_by_consistency(&valid_variants)
                 .into_iter()
                 .next()
-                .map(|(idx, _)| valid_variants[idx].clone())
+                .map(|(idx, _)| idx);
+            best.map(|idx| valid_variants.swap_remove(idx))
         }
     }
 }

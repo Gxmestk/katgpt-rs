@@ -177,20 +177,19 @@ impl TftFFTPlayer {
             Class::Archer => {
                 // Attack weakest enemy in range, else move toward nearest enemy
                 let enemies = state.targets_in_range(unit.pos, unit.stats.range, enemy_team);
-                match weakest_target(state, &enemies) {
-                    Some(target) => Action {
+                if let Some(target) = weakest_target(state, &enemies) {
+                    Action {
                         action_type: ActionType::Attack,
                         target_id: Some(target),
                         move_to: None,
-                    },
-                    None => {
-                        let move_to = nearest_enemy_pos(state, unit.pos, unit.team)
-                            .and_then(|ep| move_toward(&reachable, ep));
-                        Action {
-                            action_type: ActionType::Defend,
-                            target_id: None,
-                            move_to,
-                        }
+                    }
+                } else {
+                    let move_to = nearest_enemy_pos(state, unit.pos, unit.team)
+                        .and_then(|ep| move_toward(&reachable, ep));
+                    Action {
+                        action_type: ActionType::Defend,
+                        target_id: None,
+                        move_to,
                     }
                 }
             }
@@ -266,20 +265,19 @@ impl TftFFTPlayer {
                     .iter()
                     .min_by_key(|&&id| unit.pos.manhattan(state.units[id as usize].pos))
                     .copied();
-                match nearest {
-                    Some(target) => Action {
+                if let Some(target) = nearest {
+                    Action {
                         action_type: ActionType::Attack,
                         target_id: Some(target),
                         move_to: None,
-                    },
-                    None => {
-                        let move_to = nearest_enemy_pos(state, unit.pos, unit.team)
-                            .and_then(|ep| move_toward(&reachable, ep));
-                        Action {
-                            action_type: ActionType::Defend,
-                            target_id: None,
-                            move_to,
-                        }
+                    }
+                } else {
+                    let move_to = nearest_enemy_pos(state, unit.pos, unit.team)
+                        .and_then(|ep| move_toward(&reachable, ep));
+                    Action {
+                        action_type: ActionType::Defend,
+                        target_id: None,
+                        move_to,
                     }
                 }
             }

@@ -234,16 +234,13 @@ pub fn delta_gated_co_evolve(
         let delta = (mutant_payoff - current_payoff) as f32;
 
         // Accept only if δ meets threshold (positive and meaningful)
-        match delta >= config.delta_threshold {
-            true => {
+        if delta >= config.delta_threshold {
                 current = mutant;
                 current_payoff = mutant_payoff;
                 accepted += 1;
-            }
-            false => {
+            } else {
                 rejected += 1;
             }
-        }
 
         if generation % 10 == 0 || generation == generations {
             history.push((generation, current_payoff));

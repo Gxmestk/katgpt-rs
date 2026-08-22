@@ -167,37 +167,23 @@ fn g1_g1b_extended_detection_rate_at_least_99_percent() {
         / (n_trials_faithful + n_trials_unfaithful) as f32;
 
     eprintln!(
-        "G1/G1b: faithful={:.4} ({}/{}), unfaithful={:.4} ({}/{}), overall={:.4}",
-        faithful_rate,
-        faithful_correct,
-        n_trials_faithful,
-        unfaithful_rate,
-        unfaithful_correct,
-        n_trials_unfaithful,
-        overall
+        "G1/G1b: faithful={faithful_rate:.4} ({faithful_correct}/{n_trials_faithful}), unfaithful={unfaithful_rate:.4} ({unfaithful_correct}/{n_trials_unfaithful}), overall={overall:.4}"
     );
 
     // G1: faithful detection ≥ 99%.
     assert!(
         faithful_rate >= 0.99,
-        "G1 FAIL: faithful detection rate = {:.4} ({}/{}) < 0.99",
-        faithful_rate,
-        faithful_correct,
-        n_trials_faithful
+        "G1 FAIL: faithful detection rate = {faithful_rate:.4} ({faithful_correct}/{n_trials_faithful}) < 0.99"
     );
     // G1b: unfaithful detection ≥ 99%.
     assert!(
         unfaithful_rate >= 0.99,
-        "G1b FAIL: unfaithful detection rate = {:.4} ({}/{}) < 0.99",
-        unfaithful_rate,
-        unfaithful_correct,
-        n_trials_unfaithful
+        "G1b FAIL: unfaithful detection rate = {unfaithful_rate:.4} ({unfaithful_correct}/{n_trials_unfaithful}) < 0.99"
     );
     // Combined ≥99%.
     assert!(
         overall >= 0.99,
-        "G1+G1b combined FAIL: overall = {:.4} < 0.99",
-        overall
+        "G1+G1b combined FAIL: overall = {overall:.4} < 0.99"
     );
 }
 
@@ -350,16 +336,11 @@ fn g2_attribution_spearman_rho_at_least_0p8_across_50_segments() {
 
     let rho = spearman_rho(&reference_norms, &estimated_norms);
 
-    eprintln!(
-        "G2 (n_segments={}, dim={}): Spearman \u{03c1} = {:.4}",
-        n_segments, dim, rho
-    );
+    eprintln!("G2 (n_segments={n_segments}, dim={dim}): Spearman \u{03c1} = {rho:.4}");
 
     assert!(
         rho >= 0.8,
-        "G2 FAIL: Spearman ρ = {:.4} < 0.8 (reference vs finite-difference attribution across {} segments)",
-        rho,
-        n_segments
+        "G2 FAIL: Spearman ρ = {rho:.4} < 0.8 (reference vs finite-difference attribution across {n_segments} segments)"
     );
 }
 
@@ -394,14 +375,10 @@ fn g2_attribution_spearman_rho_monotonic_stronger_segments() {
     }
 
     let rho = spearman_rho(&reference_norms, &estimated_norms);
-    eprintln!(
-        "G2 monotonic sanity (n_segments={}): Spearman \u{03c1} = {:.4}",
-        n_segments, rho
-    );
+    eprintln!("G2 monotonic sanity (n_segments={n_segments}): Spearman \u{03c1} = {rho:.4}");
     assert!(
         rho >= 0.95,
-        "G2 monotonic sanity FAIL: \u{03c1} = {:.4} < 0.95 (expected near-perfect separation)",
-        rho
+        "G2 monotonic sanity FAIL: \u{03c1} = {rho:.4} < 0.95 (expected near-perfect separation)"
     );
 }
 
@@ -494,25 +471,18 @@ fn g3_triggered_injection_skips_at_least_50pct_with_quality_parity() {
     let quality_delta = (mean_gated - mean_always).abs();
 
     eprintln!(
-        "G3 (n_events={}, alpha={}): skip_rate={:.4} ({} skipped), quality_delta={:.6} (always={:.6}, gated={:.6})",
-        n_events, alpha, skip_rate, skip_count, quality_delta, mean_always, mean_gated
+        "G3 (n_events={n_events}, alpha={alpha}): skip_rate={skip_rate:.4} ({skip_count} skipped), quality_delta={quality_delta:.6} (always={mean_always:.6}, gated={mean_gated:.6})"
     );
 
     // G3a: skip rate ≥ 50% (gate correctly identifies saturated regime).
     assert!(
         skip_rate >= 0.50,
-        "G3a FAIL: skip rate = {:.4} < 0.50 ({}/{} skipped)",
-        skip_rate,
-        skip_count,
-        n_events
+        "G3a FAIL: skip rate = {skip_rate:.4} < 0.50 ({skip_count}/{n_events} skipped)"
     );
     // G3b: quality parity within ±2%.
     assert!(
         quality_delta <= 0.02,
-        "G3b FAIL: quality delta = {:.6} > 0.02 (always={:.6}, gated={:.6})",
-        quality_delta,
-        mean_always,
-        mean_gated
+        "G3b FAIL: quality delta = {quality_delta:.6} > 0.02 (always={mean_always:.6}, gated={mean_gated:.6})"
     );
 }
 
@@ -566,13 +536,11 @@ fn g3_triggered_injection_quality_floor() {
     }
 
     eprintln!(
-        "G3 quality floor (n_events={}, alpha={}): min cosine = {:.6}",
-        n_events, alpha, min_quality
+        "G3 quality floor (n_events={n_events}, alpha={alpha}): min cosine = {min_quality:.6}"
     );
     assert!(
         min_quality >= 0.98,
-        "G3 quality floor FAIL: min cosine = {:.6} < 0.98 in saturated regime",
-        min_quality
+        "G3 quality floor FAIL: min cosine = {min_quality:.6} < 0.98 in saturated regime"
     );
 }
 

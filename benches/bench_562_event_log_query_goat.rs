@@ -241,7 +241,7 @@ fn assert_eq_option<T: std::fmt::Debug + PartialEq>(label: &str, actual: Option<
 // ─── G2: Perf — filter / query_window / count_where / first/last_where ───────
 
 fn g2_perf() -> bool {
-    println!("\n── G2: Perf (10K-event log, {} iters steady-state) ──", ITERS);
+    println!("\n── G2: Perf (10K-event log, {ITERS} iters steady-state) ──");
     let log = build_test_log(LOG_SIZE);
     let mut pass = true;
 
@@ -294,8 +294,7 @@ fn g2_perf() -> bool {
     let t_count = t_start.elapsed();
     let count_ns = t_count.as_nanos() as f64 / ITERS as f64;
     println!(
-        "  count_where:       {:>10?} total | {:.2} ns/call (10K-event scan) → ✅ (no target — grep -c analog)",
-        t_count, count_ns
+        "  count_where:       {t_count:>10?} total | {count_ns:.2} ns/call (10K-event scan) → ✅ (no target — grep -c analog)"
     );
 
     // first_where: early exit (first Action is at id 1, so ~2 iterations)

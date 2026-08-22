@@ -202,7 +202,7 @@ fn construct_spectral_lora(
         w2_b,
         rank,
         alpha: 8.0,
-        name: format!("spectral 1/λ_max (λ={:.3})", lambda_max),
+        name: format!("spectral 1/λ_max (λ={lambda_max:.3})"),
     }
 }
 
@@ -377,7 +377,7 @@ fn construct_scaled_identity_lora(
         w2_b,
         rank,
         alpha: 8.0,
-        name: format!("scaled-identity α={:.1}", scale_factor),
+        name: format!("scaled-identity α={scale_factor:.1}"),
     }
 }
 
@@ -541,7 +541,7 @@ fn bench_483_ahla_mlp_modelless_goat() {
         "Config: n_embd={}, n_layer={}, mlp_hidden={}, vocab={}",
         config.n_embd, config.n_layer, config.mlp_hidden, config.vocab_size
     );
-    println!("Tokens: {:?}", tokens);
+    println!("Tokens: {tokens:?}");
     println!();
 
     // ── Baseline: AHLA without any LoRA ──
@@ -617,11 +617,11 @@ fn bench_483_ahla_mlp_modelless_goat() {
         "  G1 (stability):  all logits finite = {}",
         if all_g1_pass { "✅ PASS" } else { "❌ FAIL" }
     );
-    println!("  G2 (KL gap):     baseline KL = {:.4}", baseline_kl);
-    println!("  G3 (cosine):     baseline cos = {:.4}", baseline_cos);
+    println!("  G2 (KL gap):     baseline KL = {baseline_kl:.4}");
+    println!("  G3 (cosine):     baseline cos = {baseline_cos:.4}");
     println!("  G4 (no modelless fix > 20%):");
-    println!("    best variant:  {} (KL={:.4})", best_name, best_kl);
-    println!("    improvement:   {:.1}%", improvement_pct);
+    println!("    best variant:  {best_name} (KL={best_kl:.4})");
+    println!("    improvement:   {improvement_pct:.1}%");
     println!(
         "    G4 verdict:    {}",
         if g4_pass {
@@ -655,10 +655,7 @@ fn bench_483_ahla_mlp_modelless_goat() {
     } else {
         println!("── Verdict ───────────────────────────────────────────────────────");
         println!("  The aHLA MLP gap IS modelless-correctable!");
-        println!(
-            "  Variant '{}' improved KL by {:.1}%.",
-            best_name, improvement_pct
-        );
+        println!("  Variant '{best_name}' improved KL by {improvement_pct:.1}%.");
         println!("  → T7.3: NOT needed — modelless construction suffices.");
     }
 
@@ -675,8 +672,5 @@ fn bench_483_ahla_mlp_modelless_goat() {
     // The key assertion: if G4 passes, the MLP gap is not modelless-correctable
     // This is the expected outcome (the hypothesis is confirmed)
     println!();
-    println!(
-        "Assert: G4 = {} (expected: PASS — MLP gap not modelless-correctable)",
-        g4_pass
-    );
+    println!("Assert: G4 = {g4_pass} (expected: PASS — MLP gap not modelless-correctable)");
 }

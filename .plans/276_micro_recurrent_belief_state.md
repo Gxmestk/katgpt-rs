@@ -9,7 +9,7 @@
 
 **Date:** 2026-06-15
 **Research:** [katgpt-rs/.research/242_Topological_State_Tracking_Recurrent_Belief.md](../.research/242_Topological_State_Tracking_Recurrent_Belief.md)
-- **Private guide:** [`riir-ai/.research/127_*.md`](../../../riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md) — **reframed as GOAT design context** (verdict revised from Super-GOAT after `evolve_hla` prior-art check)
+- **Private guide:** [`riir-ai/.research/127_*.md`](../../riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md) — **reframed as GOAT design context** (verdict revised from Super-GOAT after `evolve_hla` prior-art check)
 **Source paper:** [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer, Siddiqui, Liu (DeepMind, Jun 2026), "The Topological Trouble With Transformers"
 **Target:** Extend `katgpt-rs/crates/katgpt-core/src/sense/` (refactor `evolve_hla` into a trait + add attractor family) + new `micro_belief/` submodule for the trait + snapshot + bridge + Cargo feature `micro_belief`
 **Status:** COMPLETE ✅ (with deferrals + negative result) — All phases done. Verdict Super-GOAT → GOAT (prior-art check found `evolve_hla` already implements Family C). Shippable output: trait unification + `LeakyIntegrator` wrapper (zero-behavior-change refactor, byte-identical to `evolve_hla`). Attractor family G2.1 FAILS (569× more flip-flops than leaky on coherence bench) and G1.4 latency FAILS (~270ns vs 100ns target, Issue 024) — demoted to Gain, stays behind `micro_belief` flag. `LatentThoughtKernel` ships as opt-in experiment. Cross-plan composability test (Plan 136) deferred. See `.benchmarks/276_micro_belief_goat.md` + `.issues/024`.
@@ -276,7 +276,7 @@ katgpt-rs/crates/katgpt-core/src/
 ## Cross-references
 
 - **Research:** [`katgpt-rs/.research/242_*.md`](../.research/242_Topological_State_Tracking_Recurrent_Belief.md) (open primitive)
-- **Private guide:** [`riir-ai/.research/127_*.md`](../../../riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md) (Super-GOAT selling point)
+- **Private guide:** [`riir-ai/.research/127_*.md`](../../riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md) (Super-GOAT selling point)
 - **Source paper:** [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer et al., DeepMind, Jun 2026
 - **Closest cousins:** Research 097 (training-free loop), 192 (NextLat belief dynamics), 070 (Gated DeltaNet-2); Plans 108 (LT2), 136 (Training-Free Loop), 217 (NextLat drafter), 255 (ANE-Latent NPC Brain), 262 (Latent Physics — upgrade target), 275 (SwiR switch-thinking)
 - **Commercial strategy:** [`katgpt-rs/.research/003_*.md`](../.research/003_Commercial_Open_Source_Strategy_Verdict.md) §Super-GOAT Capture Protocol

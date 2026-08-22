@@ -75,10 +75,7 @@ fn main() {
     let test = &series[n_train..];
 
     println!("=== Conformal AirPassengers CRPS (Plan 340 T1.12) ===");
-    println!(
-        "n_total = {} (proxy), n_train = {}, h_forecast = {}, m = {}",
-        n, n_train, h_forecast, m
-    );
+    println!("n_total = {n} (proxy), n_train = {n_train}, h_forecast = {h_forecast}, m = {m}");
     println!();
 
     // --- Conformal overlay on SeasonalPoolForecaster ---
@@ -184,24 +181,12 @@ fn main() {
 
     println!("Metric                  | Conformal Overlay | Seasonal-Naive ±2σ");
     println!("------------------------|-------------------|--------------------");
-    println!(
-        "Empirical coverage (α=.05) | {:>17.4} | {:>18.4}",
-        conf_cov, base_cov
-    );
-    println!(
-        "Mean interval CRPS      | {:>17.4} | {:>18.4}",
-        conf_crps, base_crps
-    );
-    println!(
-        "Mean Winkler score      | {:>17.4} | {:>18.4}",
-        conf_winkler, base_winkler
-    );
-    println!(
-        "Point-forecast RMSE     | {:>17.4} | {:>18.4}",
-        conf_rmse, base_rmse
-    );
+    println!("Empirical coverage (α=.05) | {conf_cov:>17.4} | {base_cov:>18.4}");
+    println!("Mean interval CRPS      | {conf_crps:>17.4} | {base_crps:>18.4}");
+    println!("Mean Winkler score      | {conf_winkler:>17.4} | {base_winkler:>18.4}");
+    println!("Point-forecast RMSE     | {conf_rmse:>17.4} | {base_rmse:>18.4}");
     println!();
-    println!("Training residual σ     = {:.4}", std_res);
+    println!("Training residual σ     = {std_res:.4}");
     println!(
         "Per-step CRPS (conformal) min/mean/max = {:.4} / {:.4} / {:.4}",
         conf_crps_values
@@ -225,24 +210,20 @@ fn main() {
     let base_cov_err = (base_cov - target_coverage).abs();
     if conf_cov_err < base_cov_err {
         println!(
-            "✅ Conformal overlay coverage ({:.4}) is closer to target ({:.4}) than ±2σ baseline ({:.4})",
-            conf_cov, target_coverage, base_cov
+            "✅ Conformal overlay coverage ({conf_cov:.4}) is closer to target ({target_coverage:.4}) than ±2σ baseline ({base_cov:.4})"
         );
     } else {
         println!(
-            "⚠ Conformal overlay coverage ({:.4}) is NOT closer to target ({:.4}) than ±2σ baseline ({:.4}) — investigate",
-            conf_cov, target_coverage, base_cov
+            "⚠ Conformal overlay coverage ({conf_cov:.4}) is NOT closer to target ({target_coverage:.4}) than ±2σ baseline ({base_cov:.4}) — investigate"
         );
     }
     if conf_crps <= 2.0 * base_crps {
         println!(
-            "✅ Conformal CRPS ({:.4}) is within 2× of baseline ({:.4}) — Report-the-Floor gate holds",
-            conf_crps, base_crps
+            "✅ Conformal CRPS ({conf_crps:.4}) is within 2× of baseline ({base_crps:.4}) — Report-the-Floor gate holds"
         );
     } else {
         println!(
-            "⚠ Conformal CRPS ({:.4}) exceeds 2× baseline ({:.4}) — investigate",
-            conf_crps, base_crps
+            "⚠ Conformal CRPS ({conf_crps:.4}) exceeds 2× baseline ({base_crps:.4}) — investigate"
         );
     }
 }

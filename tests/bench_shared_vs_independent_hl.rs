@@ -106,9 +106,9 @@ fn run_game(players: &mut [Box<dyn BomberPlayer>], rng: &mut Rng) -> GameResult 
 
     // Compute scores from events
     let mut scores = [0i32; NUM_PLAYERS];
-    let mut _deaths = Vec::new();
-    let mut kills = Vec::new();
-    let mut powerups = Vec::new();
+    let mut _deaths = Vec::with_capacity(all_events.len());
+    let mut kills = Vec::with_capacity(all_events.len());
+    let mut powerups = Vec::with_capacity(all_events.len());
     let mut survivors = Vec::new();
 
     for event in &all_events {

@@ -94,10 +94,7 @@ fn bench_game_lora_acceptance() {
     let train_start = Instant::now();
     let best_loss = train_drafter_lora(&draft_config, &draft_weights, &mut lora, &pairs, 20, 0.01);
     let train_time = train_start.elapsed();
-    println!(
-        "║  Training: {:>6?} best_loss={:.4}                       ║",
-        train_time, best_loss
-    );
+    println!("║  Training: {train_time:>6?} best_loss={best_loss:.4}                       ║");
 
     // Baseline acceptance rate (no LoRA)
     let mut baseline_verifier =
@@ -129,12 +126,10 @@ fn bench_game_lora_acceptance() {
     println!("║  │ Mode      │ Rate     │ Accepted  │                           ║");
     println!("║  ├───────────┼──────────┼───────────┤                           ║");
     println!(
-        "║  │ Baseline  │ {:.4}   │ {:>3}/{:<3}     │                           ║",
-        baseline_rate, baseline_accepted, baseline_drafted
+        "║  │ Baseline  │ {baseline_rate:.4}   │ {baseline_accepted:>3}/{baseline_drafted:<3}     │                           ║"
     );
     println!(
-        "║  │ LoRA-20ep │ {:.4}   │ {:>3}/{:<3}     │                           ║",
-        trained_rate, trained_accepted, trained_drafted
+        "║  │ LoRA-20ep │ {trained_rate:.4}   │ {trained_accepted:>3}/{trained_drafted:<3}     │                           ║"
     );
     println!("║  └───────────┴──────────┴───────────┘                           ║");
 
@@ -143,10 +138,7 @@ fn bench_game_lora_acceptance() {
     } else {
         f32::INFINITY
     };
-    println!(
-        "║  Improvement: +{:.1}× acceptance                                 ║",
-        improvement
-    );
+    println!("║  Improvement: +{improvement:.1}× acceptance                                 ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 }
 
@@ -181,10 +173,7 @@ fn bench_bpe_lora_throughput() {
     let train_start = Instant::now();
     let best_loss = train_drafter_lora(&draft_config, &draft_weights, &mut lora, &pairs, 20, 0.01);
     let train_time = train_start.elapsed();
-    println!(
-        "║  Training: {:>6?} best_loss={:.4}                       ║",
-        train_time, best_loss
-    );
+    println!("║  Training: {train_time:>6?} best_loss={best_loss:.4}                       ║");
 
     // Measure throughput: tokens/round
     let n_rounds = 20usize;
@@ -220,34 +209,13 @@ fn bench_bpe_lora_throughput() {
     println!("║  ┌──────────────────────────┬─────────────────────┐             ║");
     println!("║  │ Metric                   │ Value               │             ║");
     println!("║  ├──────────────────────────┼─────────────────────┤             ║");
-    println!(
-        "║  │ Rounds                   │ {:>18}  │             ║",
-        n_rounds
-    );
-    println!(
-        "║  │ Total tokens             │ {:>18}  │             ║",
-        total_tokens
-    );
-    println!(
-        "║  │ Avg tokens/round         │ {:>18.2}  │             ║",
-        avg_tokens
-    );
-    println!(
-        "║  │ Min tokens/round         │ {:>18}  │             ║",
-        min_tokens
-    );
-    println!(
-        "║  │ Max tokens/round         │ {:>18}  │             ║",
-        max_tokens
-    );
-    println!(
-        "║  │ Decode time              │ {:>16?}  │             ║",
-        decode_time
-    );
-    println!(
-        "║  │ Throughput (tokens/sec)  │ {:>18.0}  │             ║",
-        tokens_per_sec
-    );
+    println!("║  │ Rounds                   │ {n_rounds:>18}  │             ║");
+    println!("║  │ Total tokens             │ {total_tokens:>18}  │             ║");
+    println!("║  │ Avg tokens/round         │ {avg_tokens:>18.2}  │             ║");
+    println!("║  │ Min tokens/round         │ {min_tokens:>18}  │             ║");
+    println!("║  │ Max tokens/round         │ {max_tokens:>18}  │             ║");
+    println!("║  │ Decode time              │ {decode_time:>16?}  │             ║");
+    println!("║  │ Throughput (tokens/sec)  │ {tokens_per_sec:>18.0}  │             ║");
     println!("║  └──────────────────────────┴─────────────────────┘             ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 }
@@ -296,8 +264,7 @@ fn bench_topk_candidate_coverage() {
         let coverage_pct = covered_tokens as f32 / vocab_size as f32 * 100.0;
 
         println!(
-            "║  │ K={:<5}  │ {:>9}   │ {:>10}   │ {:>9.1}%   │       ║",
-            k, covered_tokens, min_expected, coverage_pct
+            "║  │ K={k:<5}  │ {covered_tokens:>9}   │ {min_expected:>10}   │ {coverage_pct:>9.1}%   │       ║"
         );
 
         // Assert: Top-K covers >= K * cluster_size tokens
@@ -315,23 +282,18 @@ fn bench_topk_candidate_coverage() {
     let top1_tokens = results
         .iter()
         .find(|&&(k, _)| k == 1)
-        .map(|&(_, t)| t)
-        .unwrap_or(0);
+        .map_or(0, |&(_, t)| t);
     let top8_tokens = results
         .iter()
         .find(|&&(k, _)| k == 8)
-        .map(|&(_, t)| t)
-        .unwrap_or(0);
+        .map_or(0, |&(_, t)| t);
     let coverage_ratio = if top1_tokens > 0 {
         top8_tokens as f32 / top1_tokens as f32
     } else {
         0.0
     };
 
-    println!(
-        "║  Top-8/Top-1 coverage ratio: {:.2}×                             ║",
-        coverage_ratio
-    );
+    println!("║  Top-8/Top-1 coverage ratio: {coverage_ratio:.2}×                             ║");
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 }
 
@@ -418,8 +380,7 @@ fn bench_output_length_gating() {
     let mtp_active = saw_multi;
 
     println!(
-        "║  │ pos={}, remaining={}      │ avg_tokens={:.2}, mtp={}   │       ║",
-        pos_above, remaining_above, avg_tokens_above, mtp_active
+        "║  │ pos={pos_above}, remaining={remaining_above}      │ avg_tokens={avg_tokens_above:.2}, mtp={mtp_active}   │       ║"
     );
     println!("║  └───────────────────────────┴──────────────────────────┘       ║");
 
@@ -432,8 +393,7 @@ fn bench_output_length_gating() {
     println!("║                                                                  ║");
     println!("║  ✅ Gating below threshold: gated to 1 token                     ║");
     println!(
-        "║  ✅ MTP above threshold: avg {:.2} tokens/round                    ║",
-        avg_tokens_above
+        "║  ✅ MTP above threshold: avg {avg_tokens_above:.2} tokens/round                    ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════╝\n");
 }

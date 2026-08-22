@@ -125,25 +125,17 @@ fn g2_variable_length_control() {
     // G2a: Tight threshold produces fewer tokens on average
     assert!(
         avg_tight <= avg_loose,
-        "G2: tight threshold ({:.2} avg tokens) should produce ≤ loose ({:.2} avg tokens)",
-        avg_tight,
-        avg_loose
+        "G2: tight threshold ({avg_tight:.2} avg tokens) should produce ≤ loose ({avg_loose:.2} avg tokens)"
     );
 
     // G2b: Both produce at least 1 token (guaranteed by implementation)
     assert!(
         total_loose_tokens >= iterations,
-        "G2: loose threshold should produce at least {} tokens across {} iterations, got {}",
-        iterations,
-        iterations,
-        total_loose_tokens
+        "G2: loose threshold should produce at least {iterations} tokens across {iterations} iterations, got {total_loose_tokens}"
     );
     assert!(
         total_tight_tokens >= iterations,
-        "G2: tight threshold should produce at least {} tokens across {} iterations, got {}",
-        iterations,
-        iterations,
-        total_tight_tokens
+        "G2: tight threshold should produce at least {iterations} tokens across {iterations} iterations, got {total_tight_tokens}"
     );
 
     // G2c: Total time scales roughly linearly with draft steps
@@ -153,9 +145,7 @@ fn g2_variable_length_control() {
     // Allow 10× slack — timing is noisy, but gross violations indicate issues
     assert!(
         ratio_time < ratio_tokens * 10.0,
-        "G2: time ratio ({:.2}) should not be wildly disproportionate to token ratio ({:.2})",
-        ratio_time,
-        ratio_tokens
+        "G2: time ratio ({ratio_time:.2}) should not be wildly disproportionate to token ratio ({ratio_tokens:.2})"
     );
 }
 
@@ -169,8 +159,7 @@ fn g3_pruner_zero_impact_when_unobserved() {
     let rel = pruner.relevance(0, 0, &[]);
     assert!(
         (rel - 0.5).abs() < 1e-6,
-        "G3: uninitialized pruner should return 0.5, got {}",
-        rel
+        "G3: uninitialized pruner should return 0.5, got {rel}"
     );
 
     // G3b: is_initialized() is false
@@ -199,9 +188,7 @@ fn g3_cache_empty_overhead_near_zero() {
     // is negligible relative to actual decode work (seconds), not absolute time.
     assert!(
         elapsed.as_millis() < 100,
-        "G3: {} cache misses should complete in <100ms (debug), took {:?}",
-        iterations,
-        elapsed
+        "G3: {iterations} cache misses should complete in <100ms (debug), took {elapsed:?}"
     );
 }
 
@@ -280,16 +267,14 @@ fn g5_pruner_zero_length_hidden_states() {
     let rel = pruner.relevance(0, 0, &[]);
     assert!(
         (rel - 0.5).abs() < 1e-6,
-        "G5: pruner should return 0.5 after ignored observe, got {}",
-        rel
+        "G5: pruner should return 0.5 after ignored observe, got {rel}"
     );
 
     // Flatness with wrong dimension returns 0.5
     let f = pruner.flatness(&short_h);
     assert!(
         (f - 0.5).abs() < 1e-6,
-        "G5: flatness with wrong dimension should return 0.5, got {}",
-        f
+        "G5: flatness with wrong dimension should return 0.5, got {f}"
     );
 }
 
@@ -458,9 +443,7 @@ fn g8_cached_faster_than_uncached() {
 
     assert!(
         cached_us < uncached_us / 2.0,
-        "G8: cache ({:.0}µs) should be at least 2× faster than MLP ({:.0}µs)",
-        cached_us,
-        uncached_us
+        "G8: cache ({cached_us:.0}µs) should be at least 2× faster than MLP ({uncached_us:.0}µs)"
     );
 }
 

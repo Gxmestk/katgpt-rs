@@ -217,7 +217,127 @@ fn mcts_search_impl<S: GameState>(
     action_buf[best_action_idx].clone()
 }
 
+// ── Search Budget ─────────────────────────────────────────────
+
+/// The two numeric knobs that size an MCTS search, as one named value.
+///
+/// [`mcts_search`] / [`mcts_search_informed`] take `budget` and `rollout_depth`
+/// as adjacent positional `usize` args in a 6–7 argument signature, where they
+/// are silently transposable — swapping them degrades search quality without
+/// any error. Construct this with named fields to make that impossible:
+///
+/// ```
+/// use katgpt_core::mcts::MctsSearchBudget;
+///
+/// let b = MctsSearchBudget { budget: 512, rollout_depth: 40 };
+/// assert_eq!(b, MctsSearchBudget::default());
+/// ```
+///
+/// # The two knobs are coupled, not independent
+///
+/// `budget` caps total `advance()` calls across expansion *and* rollout — not
+/// tree iterations. Because both loops draw on that one cap, `rollout_depth`
+/// decides how the budget is *spent*: on cheap `advance()` steps, or on the
+/// expensive root→leaf `select_inline` walk that lengthens as the tree grows.
+///
+/// The consequence is counterintuitive and measured (Bench 578): at fixed
+/// `budget`, **deeper rollouts are cheaper**, ~2.5× from depth 5 to depth 80,
+/// with the knee at 40. Tuning these two as if they were independent — "lower
+/// the depth to go faster" — makes the search both slower and worse. That
+/// coupling is why they belong in one struct rather than two `const`s.
+///
+/// # Not controlled here
+///
+/// `RUSTFLAGS="-C target-cpu=native"` (unlocks AVX2/AVX-512/NEON) is a build
+/// flag, not runtime state. Do **not** enable katgpt-core's `hga` feature as a
+/// "fast path" — Plan 397 G2 measured it as a loss against DashAttention and
+/// it stays opt-in only as a documented negative result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MctsSearchBudget {
+    /// Max `advance()` calls during expansion + rollout.
+    ///
+    /// This is the latency knob. Cost scales ~`budget^1.05` for [`mcts_search`]
+    /// — close enough to linear below ~1000 to budget against directly.
+    ///
+    /// A search also stops at `MAX_TREE_SIZE` (10,000) nodes regardless of this
+    /// value, so budgets far above that silently under-deliver.
+    pub budget: usize,
+    /// Max ticks per rollout before falling back to the heuristic.
+    ///
+    /// Higher is *cheaper* at fixed `budget` (see the struct docs), so this is
+    /// a quality knob that happens to pay for itself — until the state's own
+    /// terminal horizon cuts rollouts short, past which raising it does nothing.
+    pub rollout_depth: usize,
+}
+
+impl MctsSearchBudget {
+    /// Construct from an explicit `(budget, rollout_depth)` pair.
+    ///
+    /// Prefer the struct literal (`MctsSearchBudget { budget, rollout_depth }`)
+    /// at call sites you control — this constructor has the same transposable
+    /// argument order as the raw search functions, and exists for adapters
+    /// that already receive the two values positionally.
+    #[inline]
+    pub const fn new(budget: usize, rollout_depth: usize) -> Self {
+        Self {
+            budget,
+            rollout_depth,
+        }
+    }
+}
+
+impl Default for MctsSearchBudget {
+    /// `budget = 512`, `rollout_depth = 40` — the real-time game-server profile.
+    ///
+    /// Derived from Bench 578 (`riir-engine/benches/bench_578_mcts_budget_sweep.rs`,
+    /// 2026-08-07, ±10%): ~12.5 µs per NPC at 24.5 ns/advance, i.e. 6.3% of a
+    /// 200 ms Warm-tier tick at 1,000 NPCs. `rollout_depth = 40` sits at the
+    /// knee of the depth curve — 2.33× cheaper than depth 5, while depth 80
+    /// buys only 6% more.
+    ///
+    /// Three conditions on that number, all load-bearing:
+    ///
+    /// 1. **It is an upper bound.** The measured `advance()` was a few integer
+    ///    ops — the cheapest plausible forward model. Scale `budget` down by
+    ///    your own state's per-advance cost; a 10× costlier `advance()` means
+    ///    `budget = 51`, not 512.
+    /// 2. **`rollout_depth = 40` assumes a terminal horizon beyond 40.** If the
+    ///    state terminates sooner, rollouts truncate and you pay the depth-5
+    ///    cost profile at 2.3× the price.
+    /// 3. **Transposition-table search wants ~1.8× less budget** for the same
+    ///    latency (~44 ns/advance measured vs ~24.5 plain).
+    #[inline]
+    fn default() -> Self {
+        Self::new(512, 40)
+    }
+}
+
 // ── MCTS Search — Public API ──────────────────────────────────
+
+/// Run MCTS search with UCB1 selection + random rollouts, sized by a
+/// [`MctsSearchBudget`].
+///
+/// Identical to [`mcts_search`] but takes the two search knobs as one named
+/// value instead of two transposable positional `usize`s.
+///
+/// # Panics
+/// Panics if no actions are available.
+pub fn mcts_search_with<S: GameState>(
+    state: &S,
+    player_id: u8,
+    search: MctsSearchBudget,
+    heuristic: &dyn Fn(&S, u8) -> f32,
+    rng: &mut Rng,
+) -> S::Action {
+    mcts_search(
+        state,
+        player_id,
+        search.budget,
+        search.rollout_depth,
+        heuristic,
+        rng,
+    )
+}
 
 /// Run MCTS search with UCB1 selection + random rollouts.
 ///
@@ -349,9 +469,13 @@ fn select_inline<S: GameState>(
             })
             .expect("children non-empty");
 
-        // Advance state to the selected child using parent's action list
+        // Advance state to the selected child using parent's action list.
+        // `advance_inplace` is safe here: `state` is owned + the previous value
+        // is discarded as the descent continues. Avoids the clone that `advance`
+        // would do (Issue 571) — matters for `FrameSnapshot`-like impls with
+        // `Vec` fields.
         let action_idx = nodes[best_child].action_index.unwrap();
-        state = state.advance(&action_buf[action_idx], player_id);
+        state.advance_inplace(&action_buf[action_idx], player_id);
         state.available_actions_into(player_id, action_buf);
         idx = best_child;
     }
@@ -445,13 +569,18 @@ fn rollout<S: GameState>(
         }
 
         let pick = policy.select(&current, action_buf, player_id, rng);
-        current = current.advance(&action_buf[pick], player_id);
+        // `advance_inplace` is safe here: `current` is owned + the previous
+        // state is discarded each iteration. This is the hot rollout path
+        // (Issue 571) — avoiding the clone saves ~63 ns/call on `FrameSnapshot`
+        // (~315 µs over a 10K-tick run).
+        current.advance_inplace(&action_buf[pick], player_id);
         *fm_calls += 1;
     }
 
-    match current.is_terminal() {
-        true => current.reward(player_id),
-        false => heuristic(&current, player_id),
+    if current.is_terminal() {
+        current.reward(player_id)
+    } else {
+        heuristic(&current, player_id)
     }
 }
 
@@ -481,13 +610,12 @@ fn backpropagate(nodes: &mut [MCTSNode], mut idx: usize, reward: f32) {
 #[cfg(test)]
 #[inline]
 fn ucb1_score(total_reward: f32, visits: usize, parent_visits: usize) -> f32 {
-    match visits {
-        0 => f32::INFINITY,
-        _ => {
-            let exploit = total_reward / visits as f32;
-            let explore = UCB1_C * (parent_visits as f32).ln().sqrt() / (visits as f32).sqrt();
-            exploit + explore
-        }
+    if visits == 0 {
+        f32::INFINITY
+    } else {
+        let exploit = total_reward / visits as f32;
+        let explore = UCB1_C * (parent_visits as f32).ln().sqrt() / (visits as f32).sqrt();
+        exploit + explore
     }
 }
 
@@ -525,9 +653,10 @@ mod tests {
         type Action = bool;
 
         fn available_actions(&self, _player_id: u8) -> Vec<Self::Action> {
-            match self.acted {
-                true => vec![], // terminal, no actions
-                false => vec![false, true],
+            if self.acted {
+                vec![]
+            } else {
+                vec![false, true]
             }
         }
 
@@ -843,6 +972,74 @@ mod tests {
         assert!(
             action,
             "informed search should prefer rewarding action in deep state"
+        );
+    }
+
+    // ── MctsSearchBudget Tests ─────────────────────────────────
+
+    #[test]
+    fn search_budget_default_is_the_measured_warm_tier_profile() {
+        // Bench 578 (2026-08-07): budget=512 → ~12.5 µs/NPC, 6.3% of a 200 ms
+        // Warm tick at 1,000 NPCs; rollout_depth=40 is the knee of the depth
+        // curve. Pinned so a future edit to Default has to restate the basis.
+        let b = MctsSearchBudget::default();
+        assert_eq!(b.budget, 512);
+        assert_eq!(b.rollout_depth, 40);
+        assert!(
+            b.budget < MAX_TREE_SIZE,
+            "a default budget above MAX_TREE_SIZE would silently under-deliver"
+        );
+    }
+
+    #[test]
+    fn search_budget_with_matches_positional_search() {
+        // The call-through must be a pure re-spelling — same seed, same action.
+        let state = DeepState {
+            tick: 0,
+            max_tick: 8,
+            cumulative: 0.0,
+        };
+        let heuristic = |s: &DeepState, _: u8| s.cumulative / 8.0;
+        let search = MctsSearchBudget {
+            budget: 300,
+            rollout_depth: 12,
+        };
+
+        let mut rng_a = Rng::with_seed(7);
+        let positional = mcts_search(&state, 0, 300, 12, &heuristic, &mut rng_a);
+
+        let mut rng_b = Rng::with_seed(7);
+        let bundled = mcts_search_with(&state, 0, search, &heuristic, &mut rng_b);
+
+        assert_eq!(positional, bundled);
+    }
+
+    #[test]
+    fn search_budget_transposition_is_a_real_hazard() {
+        // The defect the struct exists to prevent: swapping the two positionals
+        // is silent — no panic, no error, just a materially weaker search. This
+        // asserts the hazard is real, so the named-field API has a reason to
+        // exist beyond taste.
+        let state = DeepState {
+            tick: 0,
+            max_tick: 60,
+            cumulative: 0.0,
+        };
+        let heuristic = |s: &DeepState, _: u8| s.cumulative / 60.0;
+        let correct = MctsSearchBudget::default();
+
+        let mut rng_a = Rng::with_seed(11);
+        let _ = mcts_search_with(&state, 0, correct, &heuristic, &mut rng_a);
+
+        // Transposed: budget=40, rollout_depth=512. Runs happily, searches ~13×
+        // less. Nothing in the type system or at runtime flags it.
+        let mut rng_b = Rng::with_seed(11);
+        let transposed = MctsSearchBudget::new(correct.rollout_depth, correct.budget);
+        let _ = mcts_search_with(&state, 0, transposed, &heuristic, &mut rng_b);
+
+        assert_ne!(
+            correct, transposed,
+            "the two knobs are distinct values, so order matters"
         );
     }
 }

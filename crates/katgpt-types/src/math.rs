@@ -87,11 +87,18 @@ pub fn gegelu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         crate::simd::simd_add_scalar_inplace(&mut buf, 1.0);
         // Vectorized reciprocal: buf = sigmoid = 1/(1+exp(-1.702*gate))
         crate::simd::simd_reciprocal_inplace(&mut buf);
-        // Fused: hidden = gate * up, then scale-multiply by sigmoid
-        for j in 0..CHUNK {
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // Fused: hidden = gate * up, then scale-multiply by sigmoid.
+        // Slice all three up front so the CHUNK-length bounds checks hoist out
+        // of the inner loop and LLVM can vectorize the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
@@ -129,20 +136,35 @@ pub fn gegelu_tanh(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         // Compute denominator (exp + 1) via SIMD, then SIMD tanh + fused mul
         buf2[..CHUNK].copy_from_slice(&buf);
         crate::simd::simd_add_scalar_inplace(&mut buf2, 1.0); // buf2 = exp + 1
-        // hidden = gate * up, then hidden *= tanh(inner)
-        for j in 0..CHUNK {
-            // Branch-free tanh: exp(2x) / (exp(2x) + 1) via division
-            buf[j] /= buf2[j];
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // hidden = gate * up, then hidden *= tanh(inner).
+        // Slice up front so the CHUNK-length bounds checks hoist out of the
+        // inner loop and LLVM can vectorize both the divide and the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                // Branch-free tanh: exp(2x) / (exp(2x) + 1) via division
+                buf[j] /= buf2[j];
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
+    // NOTE: uses standard `tanh`, NOT `fast_tanh`. The analytic backward
+    // (`gemma2_train::gegelu_backward_into`) also uses standard `tanh`, so they
+    // MUST match for FD gradient checks to pass. The chunked path above
+    // computes tanh exactly via exp(2x)/(exp(2x)+1), which also matches.
+    // `fast_tanh` (Padé [2/2], ~2.5% worst-case) was a perf shortcut that
+    // broke analytic-vs-FD agreement on the scalar path; the scalar path is
+    // cold in production (mlp_hidden is always a multiple of 64) so this
+    // costs nothing.
     for i in i..hidden.len() {
         let g = gate[i];
         let inner = SQRT_2_OVER_PI * (g + 0.044715 * g * g * g);
-        let gelu_val = 0.5 * g * (1.0 + crate::simd::fast_tanh(inner));
+        let gelu_val = 0.5 * g * (1.0 + inner.tanh());
         hidden[i] = gelu_val * up[i];
     }
 }
@@ -196,11 +218,18 @@ pub fn swiglu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
         crate::simd::simd_add_scalar_inplace(&mut buf, 1.0);
         // Vectorized reciprocal: buf = sigmoid = 1/(1+exp(-gate))
         crate::simd::simd_reciprocal_inplace(&mut buf);
-        // Fused: hidden = gate * up, then scale-multiply by sigmoid
-        for j in 0..CHUNK {
-            hidden[i + j] = gate[i + j] * up[i + j];
+        // Fused: hidden = gate * up, then scale-multiply by sigmoid.
+        // Slice all three up front so the CHUNK-length bounds checks hoist out
+        // of the inner loop and LLVM can vectorize the multiply.
+        {
+            let h = &mut hidden[i..i + CHUNK];
+            let g = &gate[i..i + CHUNK];
+            let u = &up[i..i + CHUNK];
+            for j in 0..CHUNK {
+                h[j] = g[j] * u[j];
+            }
+            crate::simd::simd_scale_mul_inplace(h, &buf, 1.0);
         }
-        crate::simd::simd_scale_mul_inplace(&mut hidden[i..i + CHUNK], &buf, 1.0);
         i += CHUNK;
     }
     // Scalar remainder
@@ -221,13 +250,68 @@ pub fn swiglu_inplace(hidden: &mut [f32], up: &[f32]) {
     swiglu(hidden, gate, up);
 }
 
+/// SiTU (SiLU-with-Tail) gated activation from Kimi-K3.
+///
+/// Formula (reference: `SituAndMul` in `modeling_kimi_k3_linear.py`):
+/// ```text
+/// situ_a = beta * tanh(gate / beta) * sigmoid(gate)
+/// up_t   = linear_beta * tanh(up / linear_beta)   (when linear_beta is Some)
+/// up_t   = up                                      (when linear_beta is None)
+/// hidden = situ_a * up_t
+/// ```
+///
+/// The `beta` parameter bounds the gate's contribution (tanh saturates at
+/// ±beta), while `linear_beta` applies a soft clamp on the up-path to prevent
+/// explosion at large magnitudes. For Kimi-K3-0.40B: beta=4.0, linear_beta=25.0.
+///
+/// Uses exact `.exp()` / `.tanh()` (not the approximate `fast_*` intrinsics) to
+/// match the PyTorch reference within f32 precision. SIMD-vectorization via
+/// `simd_exp_inplace` is deferred to Phase 6 when end-to-end perf becomes a
+/// gate (Proposal 032).
+#[inline(always)]
+pub fn situ(
+    hidden: &mut [f32],
+    gate: &[f32],
+    up: &[f32],
+    beta: f32,
+    linear_beta: Option<f32>,
+) {
+    debug_assert!(beta > 0.0, "situ beta must be positive");
+    let inv_beta = 1.0 / beta;
+    // Slice the read-only inputs to the output length up front so the per-element
+    // bounds checks on `gate`/`up` hoist out of the inner loop (same panic
+    // condition as the previous indexed form, just checked once).
+    let n = hidden.len();
+    let gate = &gate[..n];
+    let up = &up[..n];
+    if let Some(lb) = linear_beta {
+        debug_assert!(lb > 0.0, "situ linear_beta must be positive");
+        let inv_lb = 1.0 / lb;
+        for i in 0..n {
+            let g = gate[i];
+            // Exact sigmoid: 1 / (1 + exp(-g)) — handles large |g| via exp saturation
+            let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
+            let gate_tanh = (g * inv_beta).tanh();
+            let up_t = lb * (up[i] * inv_lb).tanh();
+            hidden[i] = beta * gate_tanh * gate_sigmoid * up_t;
+        }
+    } else {
+        for i in 0..n {
+            let g = gate[i];
+            let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
+            let gate_tanh = (g * inv_beta).tanh();
+            hidden[i] = beta * gate_tanh * gate_sigmoid * up[i];
+        }
+    }
+}
+
 /// RMSNorm with learnable gamma (gain) vector.
 /// Gemma 2 stores gamma as (gamma-1), so +1 is added during load.
 /// `x` is normalized in-place then scaled by `gamma[i]`:
 ///   `x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)`
 #[inline(always)]
 pub fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32]) {
-    rmsnorm_with_gamma_eps(x, gamma, 1e-5)
+    rmsnorm_with_gamma_eps(x, gamma, 1e-5);
 }
 
 /// RMSNorm with learnable gamma and configurable epsilon.

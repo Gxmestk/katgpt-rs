@@ -90,8 +90,11 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             parallax_gate_scale: 0.0,
             parallax_zero_init: true,
             emotion_desperation_threshold: 0.5,
+            #[cfg(feature = "rim_slots")]
             rim_block_count: 0,
+            #[cfg(feature = "rim_slots")]
             rim_tokens_per_block: 2,
+            #[cfg(feature = "rim_slots")]
             rim_buffer_token: 0,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: vec![],
@@ -107,6 +110,8 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             deltanet_linear_n_heads: 0,
             #[cfg(feature = "deltanet_inference")]
             deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            rope_dimension_count: 0,
             #[cfg(feature = "wall_attention")]
             wall_config: None,
             #[cfg(feature = "collapse_aware_thinking")]
@@ -117,6 +122,18 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             belief_drafter_entropy_threshold: 2.0,
             #[cfg(feature = "loop_stability_fix")]
             loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: vec![],
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -142,7 +159,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
         "LDT_THETA_ELIM constant should be 1/9"
     );
 
-    println!("  θ_elim = 1/(1+8) = {:.3} ✓", LDT_THETA_ELIM);
+    println!("  θ_elim = 1/(1+8) = {LDT_THETA_ELIM:.3} ✓");
     println!(
         "  LdtPruneConfig default: enabled={}, theta={:.3} ✓",
         ldt_config.enabled, ldt_config.theta_elim
@@ -156,8 +173,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
         "LDT threshold should be more conservative (lower) than default"
     );
     println!(
-        "  LDT θ_elim ({:.3}) < default threshold ({:.3}) → more conservative ✓",
-        ldt_threshold, default_threshold
+        "  LDT θ_elim ({ldt_threshold:.3}) < default threshold ({default_threshold:.3}) → more conservative ✓"
     );
 
     // ── T1 Proof: DDTree with LDT threshold retains more candidates ─
@@ -223,7 +239,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
     let normal_conflict = detector.is_conflicted(&normal_marginals, 2, 10);
     let normal_latency = t_start.elapsed();
     assert!(!normal_conflict, "Normal state should not be conflicted");
-    println!("  Normal state: no conflict ✓ ({:?})", normal_latency);
+    println!("  Normal state: no conflict ✓ ({normal_latency:?})");
 
     // Case 2: High prune rate (conflict)
     let high_prune_conflict = detector.is_conflicted(&normal_marginals, 8, 10);
@@ -267,10 +283,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
     }
     let bench_latency = t_start.elapsed();
     let per_call_ns = bench_latency.as_nanos() as f64 / bench_iters as f64;
-    println!(
-        "  Conflict detection: {:.0} ns/call ({} iterations) ✓",
-        per_call_ns, bench_iters
-    );
+    println!("  Conflict detection: {per_call_ns:.0} ns/call ({bench_iters} iterations) ✓");
     assert!(
         per_call_ns < 5_000.0,
         "Conflict detection should be < 5µs per call, got {per_call_ns:.0} ns"
@@ -466,10 +479,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
         after_commit <= maze_paths.len(),
         "Target should narrow after commit"
     );
-    println!(
-        "  Position 1 candidates: before commit=all, after={} (narrowing) ✓",
-        after_commit
-    );
+    println!("  Position 1 candidates: before commit=all, after={after_commit} (narrowing) ✓");
 
     // Prove: α-target never includes impossible tokens
     let mut maze_tracker = AlphaTarget::new(maze_len, maze_paths.clone());
@@ -561,11 +571,8 @@ fn bench_ldt_lattice_deduction_goat_proof() {
 
     let savings_pct =
         (1.0 - expansions_with_cutoff as f64 / expansions_without_cutoff as f64) * 100.0;
-    println!("  Without cutoff: {} expansions", expansions_without_cutoff);
-    println!(
-        "  With cutoff: {} expansions ({:.1}% savings)",
-        expansions_with_cutoff, savings_pct
-    );
+    println!("  Without cutoff: {expansions_without_cutoff} expansions");
+    println!("  With cutoff: {expansions_with_cutoff} expansions ({savings_pct:.1}% savings)");
     assert!(
         expansions_with_cutoff <= expansions_without_cutoff,
         "Cutoff should never increase expansions"
@@ -577,7 +584,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
 
     // Verify constants are correct
     assert!((LDT_THETA_ELIM - 0.11111).abs() < 0.001);
-    println!("  LDT_THETA_ELIM = {:.5} ✓", LDT_THETA_ELIM);
+    println!("  LDT_THETA_ELIM = {LDT_THETA_ELIM:.5} ✓");
 
     // Verify default config
     let default_config = LdtPruneConfig::default();
@@ -609,10 +616,7 @@ fn bench_ldt_lattice_deduction_goat_proof() {
     // ── Summary ─────────────────────────────────────────────────
     println!("\n═══════════════════════════════════════════════════════════");
     println!("  GOAT PROOF COMPLETE — All 7 tasks verified");
-    println!(
-        "  T1: θ_elim = {:.3} (conservative threshold) ✓",
-        LDT_THETA_ELIM
-    );
+    println!("  T1: θ_elim = {LDT_THETA_ELIM:.3} (conservative threshold) ✓");
     println!("  T2: EntropyConflictDetector < 5µs/call ✓");
     println!("  T3: α-operator progressive narrowing ✓");
     println!("  T4: Sudoku-style: LDT retains ≥ baseline tokens ✓");

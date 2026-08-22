@@ -38,8 +38,7 @@ const BENCH_ITERS: usize = 10_000;
 fn main() {
     println!("=== Plan 294 Phase 5 G4 — BranchingDetector hot-path cost ===");
     println!(
-        "K={}, action_dim={}, warmup={}, timed={}",
-        K_TRAJECTORIES, ACTION_DIM, WARMUP_ITERS, BENCH_ITERS
+        "K={K_TRAJECTORIES}, action_dim={ACTION_DIM}, warmup={WARMUP_ITERS}, timed={BENCH_ITERS}"
     );
     println!("Target: ≤ 50µs per observe_and_detect_into call.\n");
 
@@ -115,14 +114,8 @@ fn main() {
         "mean µs", "p50 µs", "p99 µs", "max µs", "verdict"
     );
     let verdict = if mean <= 50.0 { "PASS" } else { "FAIL" };
-    println!(
-        "{:>12.3} {:>12.3} {:>12.3} {:>12.3} {:>12}",
-        mean, p50, p99, max, verdict
-    );
-    println!(
-        "\nG4 {}: mean {:.2}µs, p50 {:.2}µs, p99 {:.2}µs (target ≤ 50µs).",
-        verdict, mean, p50, p99
-    );
+    println!("{mean:>12.3} {p50:>12.3} {p99:>12.3} {max:>12.3} {verdict:>12}");
+    println!("\nG4 {verdict}: mean {mean:.2}µs, p50 {p50:.2}µs, p99 {p99:.2}µs (target ≤ 50µs).");
 
     // Exit code: 0 on PASS, non-zero on FAIL (so CI can pick it up).
     std::process::exit(if mean <= 50.0 { 0 } else { 1 });

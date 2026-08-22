@@ -16,12 +16,7 @@ fn test_rho_zero_init() {
     compute_rho(&r_proj, &x, &mut rho);
 
     for (i, &v) in rho.iter().enumerate() {
-        assert!(
-            v == 0.0,
-            "rho[{}] should be 0.0 with zero R_proj, got {}",
-            i,
-            v
-        );
+        assert!(v == 0.0, "rho[{i}] should be 0.0 with zero R_proj, got {v}");
     }
 }
 
@@ -43,10 +38,7 @@ fn test_correction_identity() {
         let expected = r;
         assert!(
             (c - expected).abs() < 1e-5,
-            "correction[{}] should be {} (identity sigma), got {}",
-            i,
-            expected,
-            c
+            "correction[{i}] should be {expected} (identity sigma), got {c}"
         );
     }
 }
@@ -108,10 +100,7 @@ fn test_parallax_recovers_softmax_gate_zero() {
     for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
         assert!(
             (a - b).abs() < 1e-5,
-            "output[{}]: parallax ({}) should match softmax ({}) with gate_scale=0",
-            i,
-            a,
-            b
+            "output[{i}]: parallax ({a}) should match softmax ({b}) with gate_scale=0"
         );
     }
 }
@@ -174,10 +163,7 @@ fn test_parallax_recovers_softmax_zero_r() {
     for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
         assert!(
             (a - b).abs() < 1e-5,
-            "output[{}]: parallax ({}) should match softmax ({}) with zero R",
-            i,
-            a,
-            b
+            "output[{i}]: parallax ({a}) should match softmax ({b}) with zero R"
         );
     }
 }
@@ -198,13 +184,7 @@ fn test_compute_rho_correct() {
 
     let expected = [1.0f32, 2.0, 3.0, 4.0];
     for (i, (&r, &e)) in rho.iter().zip(expected.iter()).enumerate() {
-        assert!(
-            (r - e).abs() < 1e-5,
-            "rho[{}] should be {}, got {}",
-            i,
-            e,
-            r
-        );
+        assert!((r - e).abs() < 1e-5, "rho[{i}] should be {e}, got {r}");
     }
 }
 
@@ -226,10 +206,7 @@ fn test_correction_known_sigma() {
     for (i, (&c, &e)) in correction.iter().zip(expected.iter()).enumerate() {
         assert!(
             (c - e).abs() < 1e-5,
-            "correction[{}] should be {}, got {}",
-            i,
-            e,
-            c
+            "correction[{i}] should be {e}, got {c}"
         );
     }
 }
@@ -291,10 +268,7 @@ fn test_parallax_sigmoid_recovers_base() {
     for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
         assert!(
             (a - b).abs() < 1e-5,
-            "output[{}]: sigmoid parallax ({}) should match base sigmoid ({}) with gate_scale=0",
-            i,
-            a,
-            b
+            "output[{i}]: sigmoid parallax ({a}) should match base sigmoid ({b}) with gate_scale=0"
         );
     }
 }
@@ -325,7 +299,7 @@ fn test_sigmoid_weights_normalized() {
 
     // Output should be finite (no NaN/Inf from numerical issues)
     for (i, &v) in output.iter().enumerate() {
-        assert!(v.is_finite(), "output[{}] should be finite, got {}", i, v);
+        assert!(v.is_finite(), "output[{i}] should be finite, got {v}");
     }
 }
 
@@ -597,7 +571,7 @@ fn plan289_retained_attn_matches_per_row_sigmoid() {
     );
 
     for i in 0..(n * n) {
-        assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Sigmoid)", i);
+        assert_eq!(am_actual[i], am_expected[i], "am[{i}] mismatch (Sigmoid)");
     }
 }
 
@@ -650,7 +624,7 @@ fn plan289_retained_attn_matches_per_row_softmax() {
     );
 
     for i in 0..(n * n) {
-        assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Softmax)", i);
+        assert_eq!(am_actual[i], am_expected[i], "am[{i}] mismatch (Softmax)");
     }
 }
 
@@ -731,8 +705,7 @@ mod sink_aware_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_vanilla[i], out_uniform[i],
-                "output[{}] differs (Uniform path)",
-                i
+                "output[{i}] differs (Uniform path)"
             );
         }
     }
@@ -812,8 +785,7 @@ mod sink_aware_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_wrapper[i], out_manual[i],
-                "output[{}] differs (DualPolicy path)",
-                i
+                "output[{i}] differs (DualPolicy path)"
             );
         }
     }
@@ -872,11 +844,7 @@ mod sink_aware_tests {
             &mut sink_scratch,
             None,
         );
-        assert!(
-            matches!(kind, SinkKind::Nop),
-            "expected Nop, got {:?}",
-            kind
-        );
+        assert!(matches!(kind, SinkKind::Nop), "expected Nop, got {kind:?}");
 
         // NOP-gated output must equal σ(gate_scale) × ungated output.
         let sigma = 1.0 / (1.0 + (-gate_scale).exp());
@@ -949,15 +917,13 @@ mod sink_aware_tests {
         );
         assert!(
             matches!(kind, SinkKind::Broadcast),
-            "expected Broadcast, got {:?}",
-            kind
+            "expected Broadcast, got {kind:?}"
         );
 
         for i in 0..(n * d) {
             assert_eq!(
                 out_uniform[i], out_dp[i],
-                "Broadcast output[{}] must equal Uniform",
-                i
+                "Broadcast output[{i}] must equal Uniform"
             );
         }
     }
@@ -1032,8 +998,7 @@ mod sink_aware_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_a[i], out_b[i],
-                "cached NOP output[{}] must match audit output",
-                i
+                "cached NOP output[{i}] must match audit output"
             );
         }
     }
@@ -1109,8 +1074,7 @@ mod ssmax_composition_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_base[i], out_none[i],
-                "ssmax=None must be bit-identical at [{}]",
-                i
+                "ssmax=None must be bit-identical at [{i}]"
             );
         }
     }
@@ -1396,8 +1360,7 @@ mod ssmax_sink_aware_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_two[i], out_three[i],
-                "3-way(None) must match 2-way at [{}]",
-                i
+                "3-way(None) must match 2-way at [{i}]"
             );
         }
     }
@@ -1468,8 +1431,7 @@ mod ssmax_sink_aware_tests {
         for i in 0..(n * d) {
             assert_eq!(
                 out_a[i], out_b[i],
-                "3-way(Some) must match config-injected at [{}]",
-                i
+                "3-way(Some) must match config-injected at [{i}]"
             );
         }
     }

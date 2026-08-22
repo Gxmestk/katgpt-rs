@@ -229,29 +229,22 @@ pub fn gold_share_flat(
     debug_assert_eq!(
         attn_weights.len(),
         n_heads * n_kv,
-        "gold_share: attn_weights must be (n_heads={}, n_kv={}) flat",
-        n_heads,
-        n_kv
+        "gold_share: attn_weights must be (n_heads={n_heads}, n_kv={n_kv}) flat"
     );
     debug_assert_eq!(
         values.len(),
         n_kv * d_head,
-        "gold_share: values must be (n_kv={}, d_head={}) flat",
-        n_kv,
-        d_head
+        "gold_share: values must be (n_kv={n_kv}, d_head={d_head}) flat"
     );
     debug_assert_eq!(
         gold_mask.len(),
         n_kv,
-        "gold_share: gold_mask must be (n_kv={},) flat",
-        n_kv
+        "gold_share: gold_mask must be (n_kv={n_kv},) flat"
     );
     debug_assert_eq!(
         w_o.len(),
         concat_len * d_model,
-        "gold_share: w_o must be (n_heads*d_head={}, d_model={}) flat",
-        concat_len,
-        d_model
+        "gold_share: w_o must be (n_heads*d_head={concat_len}, d_model={d_model}) flat"
     );
 
     scratch.ensure_capacity(concat_len, d_model);

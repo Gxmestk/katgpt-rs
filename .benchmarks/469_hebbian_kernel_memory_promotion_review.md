@@ -135,7 +135,7 @@ The private bridge remains opt-in until its own G2/G4 gates close.
 - Research: [katgpt-rs/.research/455](../.research/455_Hebbian_Kernel_Memory_Fact_Storing_MLP.md)
 - Phase 1 GOAT bench: `crates/katgpt-core/benches/bench_559_hebbian_kernel_memory_goat.rs`
 - Phase 2 G5 PoC (three-competitor): [riir-neuron-db/.benchmarks/462](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md)
-- Phase 2 G5 issue (closed): [riir-neuron-db/.issues/027](../../riir-neuron-db/.issues/027_hebbian_construction_quality_poc.md)
+- Phase 2 G5 issue (closed): [riir-neuron-db/.issues/027](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md)
 - Private Super-GOAT guide: [riir-neuron-db/.research/303](../../riir-neuron-db/.research/303_Hebbian_Fact_Storing_Shard_SuperGOAT_Guide.md)
 - Private bridge plan: [riir-neuron-db/.plans/322](../../riir-neuron-db/.plans/322_hebbian_fact_storing_shard_bridge.md)
 - Feature-gate-audit skill: [katgpt-rs/.agents/skills/feature-gate-audit/SKILL.md](../.agents/skills/feature-gate-audit/SKILL.md)

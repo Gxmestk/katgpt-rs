@@ -235,7 +235,7 @@ fn bench_483_mtp_projection_goat() {
     // Spectral analysis of Wq (for informational purposes)
     let wq = &weights.layers[0].attn_wq;
     let wq_lambda = spectral_norm(wq, n_embd, 50);
-    println!("  Spectral analysis: λ_max(Wq layer 0) = {:.6}", wq_lambda);
+    println!("  Spectral analysis: λ_max(Wq layer 0) = {wq_lambda:.6}");
     println!();
 
     // Build projection variants
@@ -337,13 +337,11 @@ fn bench_483_mtp_projection_goat() {
     let identity_kl = results
         .iter()
         .find(|r| r.name.starts_with("Identity"))
-        .map(|r| r.kl_div)
-        .unwrap_or(0.0);
+        .map_or(0.0, |r| r.kl_div);
     let none_kl = results
         .iter()
         .find(|r| r.name.starts_with("None"))
-        .map(|r| r.kl_div)
-        .unwrap_or(0.0);
+        .map_or(0.0, |r| r.kl_div);
 
     // G1: Does any non-identity/non-None deterministic construction achieve
     // KL within 10% of identity? Since identity KL≈0, "within 10%" is
@@ -361,14 +359,8 @@ fn bench_483_mtp_projection_goat() {
 
     // Analysis
     println!("── Analysis ──────────────────────────────────────────────────");
-    println!(
-        "  Identity baseline KL = {:.6} (perfect when same model)",
-        identity_kl
-    );
-    println!(
-        "  None (truncate/pad) KL = {:.6} (same as identity when dims match)",
-        none_kl
-    );
+    println!("  Identity baseline KL = {identity_kl:.6} (perfect when same model)");
+    println!("  None (truncate/pad) KL = {none_kl:.6} (same as identity when dims match)");
     println!();
     println!("  When target and drafter share the same model + same dims:");
     println!("    - None/Identity = lossless copy → KL ≈ 0");

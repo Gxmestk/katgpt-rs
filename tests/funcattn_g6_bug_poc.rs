@@ -533,16 +533,13 @@ fn probe_a_degenerate_dataset() {
     let eval_nd = generate_pattern_dataset_reject_degenerate(&mut rng2, 16, N, EFFECTIVE_VOCAB);
     let eval_samples_nd = make_eval_samples(&eval_nd);
     let n_degen_nd = count_degenerate(&eval_nd);
-    eprintln!(
-        "\n  after rejecting a==b: degenerate={} (should be 0)",
-        n_degen_nd
-    );
+    eprintln!("\n  after rejecting a==b: degenerate={n_degen_nd} (should be 0)");
 
     // Use the same hyperparams as G6 (K=8, 600 steps, LR=0.05, FD_EPS=1e-2).
     // Smaller step count for debug builds.
     let steps = if cfg!(debug_assertions) { 40 } else { 600 };
     let acc = train_and_eval_fa(&train_nd, &eval_samples_nd, 8, steps, 0.05, 1e-2, 1);
-    eprintln!("  FUNCATTN acc on non-degenerate eval set: {:.4}", acc);
+    eprintln!("  FUNCATTN acc on non-degenerate eval set: {acc:.4}");
     eprintln!("  (G6 original verdict on admit-degenerate set: 0.969)");
     if acc >= 0.999 {
         eprintln!("  *** Probe-A FLIPS the verdict — degenerate `a==b` was the artifact. ***");
@@ -725,7 +722,7 @@ fn probe_d_primitive_vs_wrapper_drift() {
             max_diff = d;
         }
     }
-    eprintln!("  max |out_primitive - out_wrapper| = {:.2e}", max_diff);
+    eprintln!("  max |out_primitive - out_wrapper| = {max_diff:.2e}");
     assert!(
         max_diff < 1e-6,
         "primitive and wrapper disagree — implementation drift!"

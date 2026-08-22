@@ -36,9 +36,10 @@ impl<NodeId: Copy + Eq + std::fmt::Debug> Sample<NodeId> {
 
     /// Number of alternative actions that were available but not chosen.
     pub fn alternative_count(&self) -> usize {
-        match self.valid_next_actions.contains(&self.chosen_action) {
-            true => self.valid_next_actions.len().saturating_sub(1),
-            false => self.valid_next_actions.len(),
+        if self.valid_next_actions.contains(&self.chosen_action) {
+            self.valid_next_actions.len().saturating_sub(1)
+        } else {
+            self.valid_next_actions.len()
         }
     }
 
@@ -170,7 +171,7 @@ impl<'a, G: ProcedureGraph> PathSampler<'a, G> {
         graph: &G,
         filter: &SampleFilter,
     ) -> Vec<Sample<G::NodeId>> {
-        let mut samples = Vec::new();
+        let mut samples = Vec::with_capacity(trajectory.path.len().saturating_sub(1));
 
         // Each turn is a decision point: at node i, we chose to go to node i+1
         for turn_index in 0..trajectory.path.len().saturating_sub(1) {

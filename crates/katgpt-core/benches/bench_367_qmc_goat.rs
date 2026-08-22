@@ -174,8 +174,7 @@ fn gate_g1_marginal_exactness() -> bool {
         let mut observed = vec![vec![vec![0u64; VOCAB]; T]; K];
 
         for batch in 0..N_BATCHES {
-            match src_idx {
-                Some(idx) => {
+            if let Some(idx) = src_idx {
                     let mut src = make_source(idx, 1000 + idx as u64 * 1000 + batch as u64);
                     let mut uniforms = vec![0.0f32; K];
                     let mut rollouts: Vec<Vec<usize>> =
@@ -192,8 +191,7 @@ fn gate_g1_marginal_exactness() -> bool {
                             observed[i][t][tok] += 1;
                         }
                     }
-                }
-                None => {
+                } else {
                     let mut rng = Rng::new(5000 + batch as u64);
                     for obs_i in observed.iter_mut().take(K) {
                         for t in 0..T {
@@ -202,7 +200,6 @@ fn gate_g1_marginal_exactness() -> bool {
                         }
                     }
                 }
-            }
         }
 
         let mut min_p = f64::INFINITY;
@@ -373,9 +370,7 @@ fn gate_g2_sample_efficiency() -> bool {
         .collect();
     let k_iid = iid_pak
         .iter()
-        .find(|(_, p)| *p >= PASS_THRESHOLD)
-        .map(|(k, _)| *k)
-        .unwrap_or(K_MAX + 1);
+        .find(|(_, p)| *p >= PASS_THRESHOLD).map_or(K_MAX + 1, |(k, _)| *k);
 
     println!(
         "  pass@k (i.i.d.): K@>=0.5 = {}  (pass@k at K={:?})",
@@ -394,9 +389,7 @@ fn gate_g2_sample_efficiency() -> bool {
             .collect();
         let k_qmc = pak
             .iter()
-            .find(|(_, p)| *p >= PASS_THRESHOLD)
-            .map(|(k, _)| *k)
-            .unwrap_or(K_MAX + 1);
+            .find(|(_, p)| *p >= PASS_THRESHOLD).map_or(K_MAX + 1, |(k, _)| *k);
         let ratio = if k_iid > 0 {
             k_qmc as f64 / k_iid as f64
         } else {
@@ -626,8 +619,7 @@ fn gate_g5_sub_us_overhead() -> bool {
         let pass = per_rollout_ns < TARGET_NS;
         let verdict = if pass { "✅" } else { "❌" };
         println!(
-            "  K={:>3}  total={:>8.1} ns  per-rollout={:>7.2} ns  (target < {:.0} ns)  {}",
-            k, elapsed_ns, per_rollout_ns, TARGET_NS, verdict,
+            "  K={k:>3}  total={elapsed_ns:>8.1} ns  per-rollout={per_rollout_ns:>7.2} ns  (target < {TARGET_NS:.0} ns)  {verdict}",
         );
         all_pass &= pass;
     }
@@ -647,8 +639,7 @@ fn gate_g5_sub_us_overhead() -> bool {
         let elapsed_ns = start.elapsed().as_nanos() as f64 / ITERS as f64;
         let per_rollout_ns = elapsed_ns / k as f64;
         println!(
-            "  K={:>3}  total={:>8.1} ns  per-rollout={:>7.2} ns",
-            k, elapsed_ns, per_rollout_ns,
+            "  K={k:>3}  total={elapsed_ns:>8.1} ns  per-rollout={per_rollout_ns:>7.2} ns",
         );
     }
 

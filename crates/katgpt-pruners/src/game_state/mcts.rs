@@ -31,7 +31,9 @@ use crate::bandit::BanditStats;
 // `mcts_search` and `mcts_search_informed` are the public algorithm entry
 // points. Moved verbatim to katgpt-core; resolved through this shim so the
 // existing `crate::game_state::mcts::*` import paths keep working.
-pub use katgpt_core::mcts::{mcts_search, mcts_search_informed};
+pub use katgpt_core::mcts::{
+    MctsSearchBudget, mcts_search, mcts_search_informed, mcts_search_with,
+};
 
 // ── Bandit Rollout Policy (composition) ─────────────────────────────────
 
@@ -158,9 +160,10 @@ mod tests {
         type Action = bool;
 
         fn available_actions(&self, _player_id: u8) -> Vec<Self::Action> {
-            match self.acted {
-                true => vec![],
-                false => vec![false, true],
+            if self.acted {
+                vec![]
+            } else {
+                vec![false, true]
             }
         }
 

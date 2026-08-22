@@ -6,7 +6,9 @@
 //! See the module-level note in [`super`] for the rationale.
 //!
 //! // TODO: unify with peira's f64 path once a generic-over-`T: Float` Cholesky
-//! // is verified bit-identical to PEIRA's f64 specialisation (Plan 153 G4).
+//! // is verified bit-identical to PEIRA's f64 specialisation. (Plan 153 is
+//! // complete; this unification was NOT a Plan 153 task — it's standalone
+//! // future work. File a new plan before implementing.)
 //!
 //! # Numerical contract
 //!
@@ -80,9 +82,7 @@ pub fn cholesky_f64(l: &mut [f64], a: &[f64], k: usize) {
         if diag <= 0.0 {
             assert!(
                 diag > -tol,
-                "matrix not positive definite in cholesky_f64 (pivot {} < -{})",
-                diag,
-                tol
+                "matrix not positive definite in cholesky_f64 (pivot {diag} < -{tol})"
             );
             diag = floor;
         }
@@ -213,9 +213,7 @@ pub fn cholesky_f32(l: &mut [f32], a: &[f32], k: usize) {
         if diag <= 0.0 {
             assert!(
                 diag > -tol,
-                "matrix not positive definite in cholesky_f32 (pivot {} < -{})",
-                diag,
-                tol
+                "matrix not positive definite in cholesky_f32 (pivot {diag} < -{tol})"
             );
             diag = floor; // clamp near-singular pivot
         }

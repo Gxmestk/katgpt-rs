@@ -439,8 +439,8 @@ mod tests {
         ));
 
         // T11: MLWR discriminability
-        let mut winner_mlwr = Vec::new();
-        let mut loser_mlwr = Vec::new();
+        let mut winner_mlwr = Vec::with_capacity(results.len());
+        let mut loser_mlwr = Vec::with_capacity(results.len());
         for (replay, analytics) in &results {
             let Some(winner) = replay.winner else {
                 continue;

@@ -46,7 +46,7 @@ pub fn select_highest_attn_keys(
 ) -> KeySelection {
     assert_eq!(keys.len(), t_len * d);
     assert_eq!(queries.len(), n * d);
-    assert!(t <= t_len, "t ({}) must be ≤ T ({})", t, t_len);
+    assert!(t <= t_len, "t ({t}) must be ≤ T ({t_len})");
 
     // Compute score matrix S = Q K^T / √d into scratch.
     scratch_scores.clear();

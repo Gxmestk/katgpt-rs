@@ -56,8 +56,7 @@ fn g3_bit_identical_output_across_repeated_calls() {
 
         assert_eq!(
             r1, r2,
-            "G3 FAIL: n={}, d={}: rotation matrix differs between calls",
-            n, d
+            "G3 FAIL: n={n}, d={d}: rotation matrix differs between calls"
         );
         // Reports should also be bit-identical.
         assert_eq!(rep1.n, rep2.n);

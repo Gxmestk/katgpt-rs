@@ -51,6 +51,12 @@ mod maxsim;
 mod research;
 mod sparse;
 mod ternary;
+/// Group-scale ternary matvec kernels (`ternary_group_scale`, Issue 578).
+#[cfg(feature = "ternary_group_scale")]
+pub mod ternary_group;
+/// Trit-packed ternary matvec kernels (`ternary_trit_pack`, Issue 582).
+#[cfg(feature = "ternary_trit_pack")]
+pub mod ternary_trit;
 
 #[cfg(test)]
 mod tests;
@@ -93,8 +99,9 @@ pub use argmax::simd_argmax_f32;
 pub use dot::{
     simd_dot_f16_f16, simd_dot_f16_f32, simd_dot_f32, simd_fma_row, simd_matmul_f16_f16_rows,
     simd_matmul_f16_f16_rows_parallel, simd_matmul_f16_f32_rows, simd_matmul_f16_f32_rows_parallel,
-    simd_matmul_relu_rows, simd_matmul_rows, simd_matmul_rows_parallel, simd_matvec,
-    simd_outer_product_acc, simd_outer_product_acc_scaled,
+    simd_matmul_relu_rows, simd_matmul_rows, simd_matmul_rows_batched, simd_matmul_rows_parallel,
+    simd_matvec, simd_outer_product_acc, simd_outer_product_acc_scaled,
+    simd_transpose_matvec_acc, simd_transpose_matvec_into,
 };
 pub use elementwise::{
     simd_add_inplace, simd_add_into, simd_add_scalar_inplace, simd_fused_decay_write,
@@ -105,6 +112,16 @@ pub use elementwise::{
 // the underlying items so `cargo check --no-default-features` stays green.
 #[cfg(feature = "binary_plasma")]
 pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
+#[cfg(feature = "ternary_group_scale")]
+pub use ternary_group::{
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec,
+    simd_ternary_group_matvec_folded, simd_ternary_group_matvec_hoisted,
+    simd_ternary_group_matvec_parallel, ternary_group_matvec_scalar,
+};
+#[cfg(feature = "ternary_trit_pack")]
+pub use ternary_trit::{
+    simd_ternary_trit_matvec, simd_ternary_trit_matvec_parallel, ternary_trit_matvec_scalar,
+};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{
@@ -113,7 +130,11 @@ pub use research::{
     simd_sum_sq_quartic,
 };
 #[cfg(feature = "sigmoid_margin")]
-pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
+pub use research::{
+    ArgmaxAudit, argmaxable_witness, audit_argmaxable, compute_retrieval_margin,
+    dim_capacity_ceiling, dim_capacity_floor, dim_capacity_required, dim_sufficiency_bound,
+    ln_binomial, matrix_rank, sigmoid_margin_loss,
+};
 pub use sparse::{simd_sparse_dot_f32, simd_sparse_matmul_rows};
 pub use ternary::simd_ternary_dot_f32;
 #[cfg(feature = "plasma_path")]

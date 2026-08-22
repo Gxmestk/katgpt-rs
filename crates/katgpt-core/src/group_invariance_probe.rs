@@ -801,10 +801,7 @@ pub fn commutant_binary_association(associations: &[(usize, usize)], d: usize) -
     for &(a, b) in associations {
         debug_assert!(
             a < d && b < d,
-            "association ({}, {}) out of range for d={}",
-            a,
-            b,
-            d
+            "association ({a}, {b}) out of range for d={d}"
         );
         c[a][a] = 0.0; // clear diagonal
         c[b][b] = 0.0;
@@ -830,7 +827,7 @@ pub fn commutant_binary_association(associations: &[(usize, usize)], d: usize) -
 /// * `d` — ambient dimension.
 pub fn commutant_shift(k: usize, d: usize) -> Vec<Matrix> {
     debug_assert!(d > 0, "d must be > 0");
-    debug_assert!(k <= d, "k ({}) must be ≤ d ({})", k, d);
+    debug_assert!(k <= d, "k ({k}) must be ≤ d ({d})");
 
     let k = k.min(d);
     if k == 0 {
@@ -1272,9 +1269,7 @@ mod tests {
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
                     (cc[i][j] - expected).abs() < 1e-5,
-                    "C² should be identity at ({},{})",
-                    i,
-                    j
+                    "C² should be identity at ({i},{j})"
                 );
             }
         }
@@ -1314,9 +1309,7 @@ mod tests {
                 let expected = if i == j { 1.0 } else { 0.0 };
                 assert!(
                     (m_d[i][j] - expected).abs() < 1e-5,
-                    "M^d should be identity at ({},{})",
-                    i,
-                    j
+                    "M^d should be identity at ({i},{j})"
                 );
             }
         }

@@ -1,0 +1,143 @@
+---
+name: boundary-guard
+description: Audit + enforce game-stack boundary rules across the multi-repo workspace. Use when adding a System impl, game logic, vocabulary type, FFI surface, or view-layer code; when reviewing PRs touching game systems or view/FFI boundaries; when a violation is suspected; or quarterly as a boundary-hygiene gate. Reads each repo's BOUNDARY.md as the contract — owns, not-owns, dep allowlist, drift ledger — enforced via ci_boundary_contract.sh (workspace dep graph + contract honesty, all 15 repos) + ci_boundary_guard.sh (per-repo code logic) + grep checks. Sibling to feature-gate-audit + goat-audit + doc-sync.
+---
+
+# Boundary Guard
+
+Generic game logic → substrate (`riir-games`). View renders state, doesn't compute it. FFI moves raw bytes only.
+
+## Spec source — each repo's `BOUNDARY.md`
+
+Every repo ships a root [`BOUNDARY.md`](../../riir-ai/BOUNDARY.md) — the per-repo
+contract this skill audits against: **Owns** / **Does not own** / **May depend
+on** (crate-granular allowlist with Location) / **Inherited** (links) / **Drift
+ledger**. The 8-surface table below is the workspace *methodology*; the per-repo
+rules + exceptions come from that repo's BOUNDARY.md, not from this file's prose.
+Findings are therefore two classes: **code-vs-contract violations** and
+**contract rot** (drift row without an open issue, allowlist row without a gate,
+by-design row whose decision record is gone).
+
+**Two scripts, one job each** (added 2026-08-21, Issue 737 T-CI/T-GATE):
+
+| script | scope | question it answers |
+|---|---|---|
+| `riir-ai/scripts/ci_boundary_contract.sh` | workspace (all 15 repos) | Is the dep graph what the contracts say — and are the contracts still honest? Parses every `May depend on` table + drift ledger, checks the riir-ai CANONICAL matrix against the measured graph, pins the 4 split-prep invariants. `--list-deps` prints the measured edge set; `--repo X` narrows. |
+| `riir-mmorpg-examples/scripts/ci_boundary_guard.sh` | that repo's `src/` | Is the CODE in the right repo? Checks A–E: System impls with game logic, duplicated geometry, hardcoded behavior constants, generic logic in free functions, facade leaks. |
+
+The contract script replaces prose-only allowlists; it is the successor of
+Issue 724 Phase 2's "document the contract and review by hand". `EXEMPT_LEAKS`
+in the per-repo guard deliberately STAYS file-granular — the ledger is
+surface-granular, and collapsing the two would lose the file:line precision
+Check E needs.
+
+**Drift-ledger semantics** (scripts consume this): Disposition ∈ `fixable` |
+`owner-call` | `by-design`. `fixable`/`owner-call` rows REQUIRE an open issue;
+`by-design` rows cite a decision record instead. Issue closes → row removed in
+the same commit. Exit semantics: ledger unparseable → hard error; finding mapped
+to a row → exit 0 with a LOUD known-drift count; unmapped finding → exit 1;
+row-without-open-issue → exit 1 (rot). Never silently fail open or closed.
+
+## Eight surfaces
+
+| # | Surface | Rule | Grep check |
+|---|---------|------|------------|
+| 1 | Consumer `src/` (riir-mmorpg-examples, seal) | Thin glue only — no `impl System` with loops/math; no hardcoded constants; no duplicated helpers | `grep -rn 'fn distance_2d\|const.*FEAR' src/` |
+| 2 | SDK root crate (`riir-game-sdk/src/`) | Facade only — no engine/chain/db deps in the DEFAULT build. Sanctioned opt-in exceptions (Issue 053 Part 2 + `auth_impl`/`gm` pattern; all `optional = true`, heavy ones target-gated native): `auth_impl`/`identity_impl` (riir-auth, riir-chain/ssh_key), `gm` (katgpt-core, hoisted `InferenceBackend`), `static_data_impl`/`warm_tier_impl` (riir-neuron-db, neuron-db-sdk). Scan BOTH `[dependencies]` AND `[target.'cfg(...)'.dependencies]` — the Issue 053 deps live in the target-gated section | main + target sections, filter out `optional = true` lines |
+| 3 | SDK root vs workspace members | Root crate clean; members (`crates/riir-viz`, etc.) MAY depend on engine | `sed -n '/\[dependencies\]/,/^\[/p' riir-game-sdk/Cargo.toml \| grep katgpt` |
+| 4 | Leaf-clean vocabulary (`riir-games-shared`) | No engine deps unless feature-gated — **at the dep level too**: dep line `optional = true` AND its feature carries `dep:<name>`. Half-gated (module cfg-gated, dep non-optional) = violation — every no-features build pays the engine tree (Issue 682: katgpt-core non-optional pulled rustfft/postcard/half into a default-`[]` crate) | `grep -E 'katgpt-core\|riir-engine' riir-ai/crates/riir-games-shared/Cargo.toml \| grep -v 'optional = true'` |
+| 5 | View consumers (`riir-unity` C#, `riir-bevy`) | Rendering + input only — NO game logic (AI, combat, physics, sync). Documented deliberate debt in an OPEN issue + cross-language contract doc (the `WireProtocol.cs` precedent: riir-unity Issue 002 Phase A, contract at `.docs/03_game_client/wire_protocol.md`) = record as such, don't re-file | `grep -rn 'sigmoid\|dot_product\|class.*System' riir-unity/**/*.cs \| grep -v Showcase\|Benchmark\|Camera` |
+| 6 | FFI bridge (`riir-viewbridge`) | Raw physical only (`pos[3]`, `rot[4]`) — NO latent state crosses FFI | `grep -rn 'emotion\|fear\|mood\|curiosity' riir-viewbridge/crates/*/src/` |
+| 7 | Dev tools (`riir-clippy`) | Zero game-domain coupling in the DEFAULT build (only `katgpt-core`, the public primitives crate). Sanctioned opt-in arms where reimplementation would duplicate whole substrates: `ternary_inference` (riir-engine + riir-gpu), `latent_retrieval` (riir-rag) | `grep -E 'riir-games\|riir-chain' riir-clippy/Cargo.toml` (must be empty; engine/rag allowed only `optional = true` behind their features) |
+| 8 | dApp layer (`riir-dapps`) | One-way **game → dapps → chain** — never a game dep here (`scripts/direction_gate.sh`); a `Settlement` stays chain vocabulary (never quest/kill/recipe — gate check 3 of direction_gate.sh); anything a game wants on-chain passes the **three-test rule** (product / value / rate) on the **agreement axis** — the chain hosts what mutually distrusting parties must agree on; neuron-db hosts authenticated durability. A paid quest still needs NO chain program (neuron-db template + the one generic `MultiClaimEscrow`) | `grep -E 'riir-games\|riir-game-sdk\|riir-engine' riir-dapps/Cargo.toml` + game-vocab scan in `scripts/direction_gate.sh` |
+
+### The dApp three-test rule (surface 8 detail — riir-chain Issues 096/097 + riir-dapps Proposal 001)
+
+1. **Product** — would a commerce customer of this chain want it in their dependency? (An NFT is a token → yes. A quest/recipe/kill-credit predicate → no.)
+2. **Value** — BigInt fungible currency, a token, or an authority binding? Not FAME/XP/items/reputation/karma/quest progress.
+3. **Rate** — quorum-coordination ops are Glacial (≤0.1 Hz); settlement transactions are **capacity-share bound** (783 req/s measured floor) — different limits, both binding.
+
+The defining axis is **agreement** (Research 003 §"The Second Axis" "Must agree on" column) — value and rate are the disqualifying tests, not the definition. Full argument + failure-mode matrix: `riir-dapps/.proposals/001_agreement_boundary_and_tiered_durability.md`.
+
+All greps should return **empty** (clean), modulo the sanctioned opt-in exceptions noted per-surface.
+
+**Methodology lesson (2026-08-15 run):** exclusion filters can hide exactly what you're looking for — the "who enables feature X" grep returned zero because the forwarder lines contain `katgpt-core` and were killed by `grep -v katgpt-core`. Vocabulary-translation care applies to filters, not just search terms.
+
+## Failure pattern
+
+"Helper" in consumer → wrapped in `System impl` → grows loops + math → stuck in consumer. Same applies to C# view code reimplementing substrate logic.
+
+## Extraction checklist
+
+Before adding to consumer `src/` or view C#/Bevy:
+
+1. Is this generic game behavior? → substrate (`riir-games`)
+2. Does substrate already have it? → grep `riir-games/src/{swarm,motivation,combat}/`
+3. Can it be parameterized? → trait (`ThreatSource`) or config struct
+4. Is the consumer/view just data + wiring? → if loops/math/constants present, STOP
+
+If unsure → file an issue, don't add the code.
+
+## Filing violations
+
+1. `.issues/NNN_boundary_*.md` in the repo
+2. Reference which surface (1–7)
+3. Include file:line + grep output
+4. Propose extraction target (substrate module + trait)
+5. **Issue BEFORE fix** — every fixable finding gets its `.issues/NNN_boundary_*.md`
+   filed BEFORE any fix commit, even trivially-fixable ones. The fix commit
+   references the issue; closing the issue removes the drift row in the SAME
+   commit. Only the guard/script tooling itself may be fixed in-run — boundary
+   CODE never.
+
+## Move by script, never regenerate
+
+Any relocation of boundary content — extracting superseded sections from
+AGENTS.md into BOUNDARY.md, removing drift rows, linking READMEs, or any future
+crate/repo move — is done **by script** (`git mv` + anchored sed/python) with a
+before/after **grep-parity check** (every rule sentence present exactly once
+post-move). Re-typing or regenerating the content is forbidden. Grounding:
+the AGENTS.md section silently dropped by a concurrent session's stale-buffer
+commit (`88e5f98`), and the edit-fuzzy-match that ate a raw-string `#`
+terminator — both would have been caught by parity checks.
+
+## Running
+
+```bash
+# workspace contract (dep graph + contract honesty + split-prep gates)
+cd riir-ai && ./scripts/ci_boundary_contract.sh          # exit 0 = clean
+./scripts/ci_boundary_contract.sh --list-deps            # measured edge set
+./scripts/ci_boundary_contract.sh --repo riir-chain      # one repo
+
+# per-repo code logic (surface 1)
+cd riir-mmorpg-examples && ./scripts/ci_boundary_guard.sh # exit 0 = clean
+```
+
+Exit codes (contract script): 0 clean or all-findings-mapped (LOUD known-drift
+count), 1 unmapped finding or contract rot, **2 hard error** — a missing or
+unparseable contract never fails open. For other repos' code-logic checks,
+adapt the guard's SRC_DIR + patterns. Or as pre-commit: `exec ./scripts/ci_boundary_guard.sh`
+
+**Run boundary checks VIA this skill** — not as ad-hoc greps. The skill reads
+each repo's BOUNDARY.md as the contract, applies the methodology below, and
+records the run in the log. The T-CI/T-GATE wiring landed 2026-08-21, so the
+full via-skill run is now available (and the first one is logged below).
+
+## Run log
+
+| Date | Runner | Verdict |
+|---|---|---|
+| 2026-08-22 (routine check) | idle-queue routine check (riir-clippy skill item 6; grep-only + both scripts during the sibling riir-train 472 T6 auction-CDF measurement — no builds, the Plan 337 discipline) | **CONTRACT CLEAN (15 repos, 177 edges — up from 173 at the 2026-08-21 first full run); S1: 4 violations → Issue 081 filed (`8c30e93`), detection-only.** All 4 are E1/E2 facade leaks in `src/asset_vessel.rs` (`:89`/`:91` production `riir_neuron_db::load_vessel`/`decode_art_bundle`; `:132`/`:204` test-mod imports) — introduced `db20ebd` 2026-08-21 22:30 (Issue 735 T4/Plan 543), i.e. AFTER the 2026-08-21 routine run and under its contract-only check (Plan 543's "boundary-checked first" ran `ci_boundary_contract.sh`, which is dep-graph-level and stays clean — the dep is feature-gated; the code-logic guard never saw the landing). The asymmetry that makes it real: consumer `static_data`/`warm_tier` both forward through SDK impl gates while `asset_vessel` deps riir-neuron-db directly — the SDK `vessel_impl` carries `neuron_vessel`, not the `art_vessel` family. Fix route (Issue 061 precedent) recorded in 081. **RESOLVED same day** once the sibling RLVR run freed the box: SDK `art_vessel_impl` facade gate + `riir_game_sdk::art_vessel` module (riir-game-sdk `1a6fe62`) and the consumer swap to `asset_vessel = ["riir-game-sdk/art_vessel_impl"]` with all 4 import sites on the facade path (riir-mmorpg-examples `71d3c10`, Issue 081 removed per noise-reduction). The FACADE route was chosen over the `EXEMPT_LEAKS` sanction route precisely because of the static_data/warm_tier asymmetry above. Re-verified: guard exit 0, contract still 177 edges (a facade swap moves the edge consumer->SDK, it does not add one), the 5 boot tests byte-identical. Note `art_vessel_impl` is a SIBLING of `vessel_impl`, not a subset — one forwards `neuron_vessel`, the other `art_vessel`; a future guard finding on either vessel family should check WHICH family before assuming the existing gate covers it. **S2–S7 CLEAN on the delta** since 2026-08-21: S2/S3 SDK root — all heavy deps still `optional = true`, the new `spectral_hero_gate` (`7a25c11`, riir-ai 736 B2) is the sanctioned opt-in forward of `katgpt-core/spectral_pencil`; S4 no riir-games-shared dep changes; S5/S6 no unity/viewbridge changes; S7 no riir-clippy dep changes. Delta scanned: mmorpg `00fa172`+`b659389`+`00ab1be`, riir-ai `5aecd37bd` (riir-net manifest module — unconditional riir-net-internal, not a boundary surface), game-sdk `a491aae`/`7a25c11`. |
+| 2026-08-21 (routine check) | idle-queue routine check (riir-clippy skill item 6; grep-only S1 script during the sibling bonsai L4 RLVR training run — no builds, the Plan 337 discipline) | **CLEAN — exit 0, zero violations** on the tree that includes the sibling's in-flight tier-health WIP (uncommitted `src/tier_health.rs` + `Cargo.toml`/`Cargo.lock`/`src/lib.rs`/`sim_loop.rs` mods — the riir-dapps Issue 001 T4 producer). The new module (authority-side `TierHealthSnapshot` producer, gated `not(wasm32)` + `warm_tier`) introduces no facade leak, no game-logic drift, no geometry duplication; the `riir-mcp-client` reach is a dev-dep parity pin, not a production import, so Check E is correctly silent. Post-079 extraction tree (P0a–P8 landed) re-verified holding — the surface stays green since the 2026-08-19 Issue 075 fix. |
+| 2026-08-21 | **first full contract run** (Issue 737 T-RUN, via the new `ci_boundary_contract.sh`; closes the 724+737 pair) | **1 real code leak + 5 contract bugs — all fixed; gate now green (15 repos, 173 edges, 0 violations).** The code leak: riir-chain's ROOT `riir-wasm` dep had no `default-features = false` while riir-chaind's copy did — so riir-wasm's default (leap_strategy, skill_lifecycle) still activated riir-engine features for the whole chain graph (riir-chain `f19c6ee5`: engine features on the `chain_guard` path **1 → 0**, packages **106 → 104**; check + clippy clean at `chain_guard` and default). The contract bugs: (1) the hub CANONICAL matrix's `riir-neuron-db` row was measured **backwards** — the arrow is `riir-engine → riir-neuron-db` and neuron-db declares ZERO riir-ai deps; (2) three more matrix rows listed crates their repo does not use; (3) ~45 real cross-repo edges were missing from the per-repo allowlists (katgpt leaf crates, `neuron-db-sdk`, the sanctioned game→chain + game→dapps edges, viewbridge-node's adapter deps); (4) **four repos had no BOUNDARY.md at all** — `riir-auth` (3 live edges), `riir-armageddon` (2 live edges: `riir-games` + `katgpt-core`, entirely unaudited), `riir-burner`, `katgpt-web`: the workspace is **15** repos, not 11. Only `riir-auth` fell out of the first run, and by accident (it appeared as a dep OWNER in the edge dump); the other three needed check **C0**, which derives membership from OUTSIDE the set — C0a from the measured edges, C0b from the `riir-*`/`katgpt-*` naming convention (third-party clones under the same parent are excluded by it, and git worktrees are skipped by requiring `.git` to be a directory). **A set that enumerates its own members cannot notice a missing one** — the same failure shape as the inverted matrix row below; (5) split-prep invariant 2 ("never a games dep or default game feature") was FALSE as written — `riir-ffi/game_ai` is default-on by design — now split into 2a (games deps optional in chain-facing crates) + 2b (non-game consumers pass `default-features = false`), and 2b is what caught the leak. Methodology lesson: **a prose contract cannot catch an inverted measurement.** Every row that reads like a fact ("repo X may depend on Y") is a measurement with a direction, and the direction is exactly what prose review gets wrong. |
+| 2026-08-19 | idle-queue routine check (riir-clippy skill item 6; grep-only + S1 script during the sibling p335 LoRA measurement — no builds, the Plan 337 discipline) | **1 violation — S1 Check D1, NEW since 2026-08-17**: `src/remote_smoothing.rs` (guard cites fn `:218 path_at`; math sites `:237` inline `(dx*dx+dy*dy).sqrt()` + a hand-rolled `dist_sq` family at `:362/:366/:458/:527/:697` + `:404`) — landed `7ee3104` 2026-08-18 (Plan 025 remote movement smoothing). **Filed as mmorpg-examples Issue 075 (`4961be2`), detection-only** — scope nuance recorded there: the file is client-view interpolation/dead-reckoning over `[f32;2]` wire positions, so substrate-delegation vs guard-exemption is the owner's call (the `shared_world.rs` EXEMPT precedent). **S2–S7 all CLEAN** — S5 post-wire-deletion surface verified for the first time: user C# is now only OrbitBenchmark + SceneSetupMenu + TutorialInfo boilerplate; the 3 viewbridge adapter templates (`RiirGameNode`/`RiirViewBridge`/`TransformConsumer`) grep clean for game logic + AI verbs; S6 latent grep hits only the guard's own doc-comments, `TransformView` still raw-only (`pos[3]`+pad+`rot[4]`); S4 Issue 682 `optional = true` + `dep:` gating intact; S2/S3 SDK deps all optional or sanctioned (riir-games-shared + riir-net always-on facades). |
+| 2026-08-17 (evening, 2nd run) | idle-queue routine check (riir-clippy skill item 6; S1 script run in a clean temp worktree at origin/develop `222519c` — the main checkout holds sibling WIP) | **2 violations — both Check D1** in `src/issue068_measure.rs` (`radius_stats` :46-48 + probe `a_authority_spread` :134-136; guard cites the fn lines :35/:102): inline `(dx*dx+dy*dy).sqrt()` duplicating `MapPos3D::distance_2d_to` — Issue 068's diagnostic probes, landed after the earlier green run. **Filed as mmorpg-examples Issue 069 (`a48af77`), detection-only** per discipline: fix must be verified bit-identical against the recorded 068 probe numbers, and 068 is owner-decision-pending. Context finding recorded: the guard is still manual-only in this repo (no CI workflows) — wiring it in is a separate decision, not tasked.
+| 2026-08-17 (evening delta) | idle-queue (riir-clippy skill item 6; grep-only during the sibling bonsai GPU run — no builds) | **CLEAN, no findings.** Delta since `59e3113d9`: riir-clippy `7ec8f24` (T4.4 L4 e2e harness — grep-verified zero game/engine/chain refs, std + crate-local only), riir-ai Plan 529 Phases 4–7 + T5.8 (`riir-agents` — not a boundary surface; the only dep change is optional `arc-swap` from T2.7), riir-train 336/455/454 (not surfaces). S4 re-verified holding (Issue 682 `optional = true` + `dep:` gating intact in riir-games-shared). S7 re-verified (zero game deps in riir-clippy). S1/S2/S3/S5/S6 = M3-side surfaces (riir-mmorpg-examples / riir-game-sdk / riir-unity / riir-viewbridge not present on the 4090 box; last full run today green per the log above). |
+| 2026-08-17 (targeted delta check) | idle-queue (riir-clippy skill item 6; grep-only during the t42b measurement window — no builds) | **CLEAN, no findings.** Delta since the morning S1 runs: two cross-boundary landings checked. (1) **S7** riir-clippy `ab2d726` DaemonL4 client (the first real L4 transport, landed 09:12) — std-only verified (`std::io`/`std::process` + `crate::l4_fallback` only; zero riir-games/engine/sdk/chain/gpu refs) — the dev-tool no-game-coupling surface holds as L4 goes from deferred-seam to live-transport. (2) **S5** riir-unity OrbitBenchmark `3c759c4` (P8 measurement ring) — measurement-only C# (frame-time ring, percentiles, bridge-driven publish→consume→apply cycles), no game vocabulary, no engine recompute. riir-unity as a whole deferred to the ACTIVE sibling substrate-first audit (their Issue 003, wire-mirror drift pinning, is the live finding there — do not double-audit). |
+| 2026-08-17 (post-fix + sibling-WIP check) | idle-queue routine check (riir-clippy skill item 6; S1 script run, repo = riir-mmorpg-examples) | **GREEN — exit 0, zero violations** on the tree that includes ACTIVE Plan 022 sibling WIP (11 modified + 5 untracked). Confirms the Issue 061 fix run held (guard 2 → 0: pet_ai.rs substrate `position_toward` swap + shared_world.rs EXEMPT_LEAKS sanction) AND that the in-flight Plan 022 phases introduce no new facade leaks. No findings, no issues filed. |
+| 2026-08-17 (guard-semantics change) | Issue 061 task 4 (riir-clippy idle loop; Check D test-awareness) | **Detection-semantics fix, not a code fix** — `ci_boundary_guard.sh` Check D now skips `#[cfg(test)] mod X { ... }` blocks (mmorpg-examples `ca50093`): resolves the static_data.rs:1291 test-only FP (independent closest-AABB-point geometry — substrate-first exempts test code). Scope: inline mod form only (external `mod tests;` NOT tracked — production code after it stays scanned); `cfg(all(test, ...))` covered; Check D only (A-C + E unchanged, documented in E's comment). Validated: 9-fn fixture (prod fns before/after mods still scanned, both mod forms exempt, external no-over-skip) + full-src A/B — **221 test fns exempted, 0 production fns lost** (emitted-fn-set diff empty); pet_ai Check A + shared_world E2 verified still firing. Guard 3 → 2. **Future runs: the 221-fn reduction in Check D's scanned surface is by design — not silent violation decay.** |
+| 2026-08-17 (fix run) | Issue 061 task 1 (riir-clippy idle loop; post-fix re-run + enumeration correction) | **5 of 8 sites FIXED** — SDK `warm_tier_impl` now re-exports `karma_history` types (riir-game-sdk `94f3198`), consumer sites swapped (mmorpg-examples `70a5aac`); guard 8→3. **Enumeration correction:** the 2026-08-17 detection entry's "8 = 6 unique + dedup" was wrong — output truncation hid 2 sites: pet_ai.rs:237 (Check A — Phase G pet-alarm intercept hand-rolls `hero + (h−hero)/\|h−hero\|·R` beside a `follow_hero` substrate call; fix = substrate `position_toward` extension in riir-games::swarm::pet, tasked in Issue 061) + static_data.rs:1291 (Check D test-only FP — independent closest-AABB-point geometry, substrate-first exempts test code; fix = guard Check D mod-tests awareness, tasked). Remaining 3: those 2 + shared_world.rs:73 (sibling WIP, deferred to Plan 022 owner). Lesson: the guard's ~40-line-per-violation output truncates in `tail` views — capture the FULL violation list when filing. |
+| 2026-08-17 | idle-queue routine check (riir-clippy skill item 6; S1 script run, repo = riir-mmorpg-examples) | **1 actionable finding — S1 `ci_boundary_guard.sh` exit 1: 8 E1/E2 facade leaks, all new since the 2026-08-16 clean run, from Plan 022 phases F/H/K.** 5 sites landed (karma.rs:48/791 + warm_tier.rs:480/490/491 — `riir_neuron_db::karma_history` types reaching past the facade), 1 site in ACTIVE sibling WIP (shared_world.rs:73 `riir_simloop::SimLoop` — uncommitted). Detection-only per discipline: filed as riir-mmorpg-examples Issue 061 (commit `f3ac749`), fix route = SDK `karma_history` re-export (Issue 053 Part 2 precedent) + a `riir_simloop` facade-or-sanction decision; shared_world site deferred to the Plan 022 owner (do not touch sibling WIP). No fixes in the detection commit. |
+| 2026-08-15 | boundary-guard quarterly gate (agent session, katgpt-rs handoff) | 6/7 surfaces CLEAN; 1 actionable finding — Surface 4 half-gated dep: `katgpt-core` non-optional in riir-games-shared while its only consumers (`grudge_field`, `sleep_time_reload`) are cfg-gated (Issue 682). **Fixed same session** (commit `e982ef7d2`, riir-ai develop): dep optional + `dep:katgpt-core` in both features + implicit `katgpt-core/sleep_time_anticipation` need made explicit; no-features check 15.45s→5.76s, zero katgpt-core artifacts; all feature paths/forwarders/wasm32/reverse-deps/clippy/514 lib tests green; workspace Cargo.lock unchanged. Bonus pre-existing fix: stats doctest used the pre-move `riir_games::` path (commit `20abe832d` — no pinned suite runs `-p riir-games-shared --doc`, the "which gate runs this?" blind spot). Surfaces verified clean: 1 (`ci_boundary_guard.sh` exit 0), 2/3 (all heavy SDK deps optional + feature-gated + documented), 5 (WireProtocol.cs = documented open-issue debt, not re-filed), 6 (raw-physical only), 7 (opt-in arms documented, default = katgpt-core only). Skill checks refined this run: S2/S4/S7 grep notes now encode the sanctioned exceptions + the half-gated rule. |
+| 2026-08-15 (evening) | idle-queue routine check (riir-clippy skill item 6, Issue 019 T8; grep-only run during the Plan 337 32K measurement — no builds) | **7/7 surfaces CLEAN, zero violations, zero new issues.** Delta since the morning quarterly gate: only sibling WIP (riir-ai qv_lora/riir-gpu) + riir-clippy fix_verify WIP — none touch a boundary surface. S1 `ci_boundary_guard.sh` exit 0. S2/S3 SDK root: heavy deps all `optional = true` (comments-only grep hits). S4 Issue 682 fix holding (`dep:katgpt-core`/`dep:riir-engine` gating intact). S5 user C# zero sigmoid/dot_product/class-System hits (PackageCache hits excluded as toolchain, not user code; WireProtocol.cs remains documented open debt = riir-unity Issue 002 Phase A, user-gated). S6 viewbridge: only the guard's own doc-comments. S7 riir-clippy: no game deps; engine/gpu/rag `optional = true` behind features (sibling Cargo.toml WIP does not add coupling). First idle-queue invocation of the check — T8 closes on this run + the morning gate. |
+| 2026-08-16 | idle-queue routine check (riir-clippy skill item 6; grep-only + S1 script run) | **7/7 surfaces CLEAN, zero violations, zero new issues.** Delta since 2026-08-15 evening: Issue 599 derive fix (neuron-db-derive attr parser + mmorpg SpawnZoneRow attribute trim — no boundary surface), Issue 430 G2/G3 validation (riir-train bench example — not a surface), sibling riir-ai GPU WIP (705/706 — not surfaces). S1 `ci_boundary_guard.sh` exit 0. S2/S3 comments-only hits (all heavy deps optional). S4 gating intact. S5 zero user-C# hits. S6 clean. S7 clean. |

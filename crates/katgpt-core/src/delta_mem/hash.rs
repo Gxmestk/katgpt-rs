@@ -121,12 +121,26 @@ impl FeatureHasher {
     #[inline]
     fn project_into(&self, features: &[f32], out: &mut [f32]) {
         assert_eq!(out.len(), self.rank, "output dimension must match rank");
-        out.fill(0.0);
+        // Issue 669: a caller passing features.len() != feature_dim made
+        // simd_dot_f32 read past the features slice (silent UB in release,
+        // debug-precondition abort). The row length comes from the projection
+        // layout, so only this guard catches the mismatch.
+        assert_eq!(
+            features.len(),
+            self.feature_dim,
+            "features dimension must match feature_dim"
+        );
         let fd = self.feature_dim;
-        for (i, slot) in out.iter_mut().enumerate() {
-            let row_off = i * fd;
-            *slot =
-                crate::simd::simd_dot_f32(&self.projection[row_off..row_off + fd], features, fd);
+        if fd == 0 {
+            out.fill(0.0);
+            return;
+        }
+        // No `out.fill(0.0)` pre-pass: every slot is unconditionally overwritten
+        // below, so zeroing first was a dead store over the whole buffer.
+        // `chunks_exact` also drops the per-row `projection[off..off+fd]` bounds
+        // check. Bit-identical output.
+        for (slot, row) in out.iter_mut().zip(self.projection.chunks_exact(fd)) {
+            *slot = crate::simd::simd_dot_f32(row, features, fd);
         }
     }
 
@@ -522,11 +536,7 @@ mod tests {
                 let actual = hasher.projection[i * feature_dim + j];
                 assert!(
                     (expected - actual).abs() == 0.0,
-                    "projection[({}, {})] bit-drift: expected {} got {}",
-                    i,
-                    j,
-                    expected,
-                    actual
+                    "projection[({i}, {j})] bit-drift: expected {expected} got {actual}"
                 );
             }
         }

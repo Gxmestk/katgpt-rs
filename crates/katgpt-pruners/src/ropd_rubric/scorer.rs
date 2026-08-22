@@ -510,16 +510,8 @@ mod tests {
         // Criterion 1: max(0.4, 0.9) = 0.9, gap = 0.4
         assert_eq!(gaps.len(), 2);
         // Check that both gaps are present
-        let gap_0 = gaps
-            .iter()
-            .find(|(i, _)| *i == 0)
-            .map(|(_, g)| *g)
-            .unwrap_or(0.0);
-        let gap_1 = gaps
-            .iter()
-            .find(|(i, _)| *i == 1)
-            .map(|(_, g)| *g)
-            .unwrap_or(0.0);
+        let gap_0 = gaps.iter().find(|(i, _)| *i == 0).map_or(0.0, |(_, g)| *g);
+        let gap_1 = gaps.iter().find(|(i, _)| *i == 1).map_or(0.0, |(_, g)| *g);
         assert!((gap_0 - 0.5).abs() < 1e-6, "Expected 0.5, got {gap_0}");
         assert!((gap_1 - 0.4).abs() < 1e-6, "Expected 0.4, got {gap_1}");
     }

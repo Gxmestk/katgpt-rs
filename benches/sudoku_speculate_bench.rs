@@ -296,7 +296,7 @@ where
     F: Fn(&Sudoku9x9, usize) -> Vec<Vec<f32>>,
     P: Fn(Sudoku9x9) -> SudokuPruner,
 {
-    // Architectural ceiling: u128 parent_path packs 16-bit tokens → max 8.
+    // Architectural ceiling: TreePath holds one u32 slot per level → max 8.
     const MAX_LOOKAHEAD: usize = 8;
     let lookahead = lookahead_in.min(MAX_LOOKAHEAD);
 
@@ -472,7 +472,7 @@ fn main() {
     println!("  median time:     {}/solve", fmt_us(t_bt));
     let bt_us = t_bt.as_nanos() as f64 / 1000.0;
     let bt_per_step_us = bt_us / s_bt.steps.max(1) as f64;
-    println!("  per-step:        {:.2} µs", bt_per_step_us);
+    println!("  per-step:        {bt_per_step_us:.2} µs");
     println!();
 
     // ── Mode 4: solve_fast (MRV + constraint propagation) ──
@@ -490,7 +490,7 @@ fn main() {
     println!("  median time:     {}/solve", fmt_us(t_fast));
     let fast_us = t_fast.as_nanos() as f64 / 1000.0;
     let fast_per_step_us = fast_us / s_fast.steps.max(1) as f64;
-    println!("  per-step:        {:.2} µs", fast_per_step_us);
+    println!("  per-step:        {fast_per_step_us:.2} µs");
     let speedup = bt_us / fast_us.max(1e-9);
     let step_reduction = s_bt.steps as f64 / s_fast.steps.max(1) as f64;
     println!(
@@ -502,7 +502,7 @@ fn main() {
 
     // ── Mode 2: speculate_iterative ──
     println!("── Mode 2: speculate_iterative (DDTree + greedy commit + fallback) ──");
-    println!("  (lookahead capped at 8 — TreeNode.parent_path u128 / 16-bit ceiling)");
+    println!("  (lookahead capped at 8 — TreeNode.parent_path TreePath 8-slot ceiling)");
     println!(
         "{:<10} {:>10} {:>10} {:>12} {:>10} {:>12} {:>12} {:>10}",
         "lookahead",
@@ -676,8 +676,8 @@ fn main() {
         fmt_us(t_bt)
     );
     println!();
-    println!("  ARCHITECTURAL CEILING: TreeNode.parent_path is u128 packing");
-    println!("  16-bit tokens → max lookahead = 8 (128/16). The DDTree speculate");
+    println!("  ARCHITECTURAL CEILING: TreeNode.parent_path is a TreePath of");
+    println!("  8 u32 slots → max lookahead = 8. The DDTree speculate");
     println!("  primitive is a token-level speculative-decoding kernel, NOT a");
     println!("  full-puzzle search. A 60-empty Sudoku cannot be solved in one tree.");
     println!();

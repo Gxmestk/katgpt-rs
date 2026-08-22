@@ -669,72 +669,69 @@ impl RegimeClassifier {
         g: f32,
     ) -> Regime {
         let t = jacobian_trace(params);
-        match hopf_boundary(params) {
-            Some(_) => {
-                // Complex eigenvalues with positive real part — Hopf regime.
-                if t > self.hopf_margin {
-                    Regime::GlobalLimitCycle
-                } else if t > self.switching_margin && g > self.chaos_threshold {
-                    Regime::IrregularSwitching
-                } else if g > self.chaos_threshold {
-                    // Trace barely positive, low g — still switching per paper
-                    // Fig. 1 near-Hopf band.
-                    Regime::IrregularSwitching
-                } else {
-                    // Trace positive but g below chaos threshold — the bulk
-                    // cannot sustain switching; treat as noise-sustained (the
-                    // coherent mode is oscillatory but the bulk is quiescent).
-                    Regime::NoiseSustainedOscillation
-                }
+        if hopf_boundary(params).is_some() {
+            // Complex eigenvalues with positive real part — Hopf regime.
+            if t > self.hopf_margin {
+                Regime::GlobalLimitCycle
+            } else if t > self.switching_margin && g > self.chaos_threshold {
+                Regime::IrregularSwitching
+            } else if g > self.chaos_threshold {
+                // Trace barely positive, low g — still switching per paper
+                // Fig. 1 near-Hopf band.
+                Regime::IrregularSwitching
+            } else {
+                // Trace positive but g below chaos threshold — the bulk
+                // cannot sustain switching; treat as noise-sustained (the
+                // coherent mode is oscillatory but the bulk is quiescent).
+                Regime::NoiseSustainedOscillation
             }
-            None => {
-                // No Hopf (complex-eigenvalue) instability.
-                // Check for real-eigenvalue instability (saddle) — Issue 034 T1:
-                // at high β, the symmetric fixed point κ=0 can undergo a saddle
-                // bifurcation (real eigenvalue crossing zero). The saddle drives
-                // switching between ±κ basins. Without this check, the classifier
-                // misses saddle-mediated IrregularSwitching and incorrectly falls
-                // through to NoiseSustainedOscillation or Static.
-                //
-                // Weak-saddle gating (Issue 034 T1 follow-up): a saddle with
-                // tiny `λ₊` (e.g. ≈0.005 at g=1.0, β=1.4) grows too slowly to
-                // produce visible dynamics in finite simulation. Critically, the
-                // presence of a saddle signals high β (strong adaptation), which
-                // suppresses bulk-driven oscillations too — so weak-saddle points
-                // present as [`Regime::Static`] regardless of g. Only strong
-                // saddles (`λ₊ > saddle_margin`) drive IrregularSwitching.
-                //
-                // Spinodal-pole check (Issue 034 T1-followup-2): when a strong
-                // saddle coincides with spinodal proximity (`β·G_eff` large),
-                // the denominator `1−β·χ̄` is near zero and the linearized
-                // Jacobian eigenvalues are unreliable. Near the spinodal pole,
-                // tanh saturation bounds trajectories into a trapping region →
-                // a limit cycle (GLC) rather than switching (IS). The threshold
-                // `spinodal_margin = 9.0` corresponds to recovered denominator
-                // `1/(1+β·G_eff) < 0.10`, matching the `safe_g_eff` clamp at
-                // 0.1 — it flags points where G_eff was likely clamped.
-                let s = saddle_strength(params);
-                if s > self.saddle_margin {
-                    // Strong real-eigenvalue instability.
-                    if params.beta * params.g_eff > self.spinodal_margin {
-                        // Near spinodal pole → nonlinear trapping → limit cycle.
-                        Regime::GlobalLimitCycle
-                    } else if g > self.chaos_threshold {
-                        // Strong saddle, chaotic bulk → drives switching.
-                        Regime::IrregularSwitching
-                    } else {
-                        Regime::NoiseSustainedOscillation
-                    }
-                } else if s > 0.0 {
-                    // Weak saddle: instability too slow + strong adaptation
-                    // suppresses the chaotic bulk → Static (dissipation wins).
-                    Regime::Static
+        } else {
+            // No Hopf (complex-eigenvalue) instability.
+            // Check for real-eigenvalue instability (saddle) — Issue 034 T1:
+            // at high β, the symmetric fixed point κ=0 can undergo a saddle
+            // bifurcation (real eigenvalue crossing zero). The saddle drives
+            // switching between ±κ basins. Without this check, the classifier
+            // misses saddle-mediated IrregularSwitching and incorrectly falls
+            // through to NoiseSustainedOscillation or Static.
+            //
+            // Weak-saddle gating (Issue 034 T1 follow-up): a saddle with
+            // tiny `λ₊` (e.g. ≈0.005 at g=1.0, β=1.4) grows too slowly to
+            // produce visible dynamics in finite simulation. Critically, the
+            // presence of a saddle signals high β (strong adaptation), which
+            // suppresses bulk-driven oscillations too — so weak-saddle points
+            // present as [`Regime::Static`] regardless of g. Only strong
+            // saddles (`λ₊ > saddle_margin`) drive IrregularSwitching.
+            //
+            // Spinodal-pole check (Issue 034 T1-followup-2): when a strong
+            // saddle coincides with spinodal proximity (`β·G_eff` large),
+            // the denominator `1−β·χ̄` is near zero and the linearized
+            // Jacobian eigenvalues are unreliable. Near the spinodal pole,
+            // tanh saturation bounds trajectories into a trapping region →
+            // a limit cycle (GLC) rather than switching (IS). The threshold
+            // `spinodal_margin = 9.0` corresponds to recovered denominator
+            // `1/(1+β·G_eff) < 0.10`, matching the `safe_g_eff` clamp at
+            // 0.1 — it flags points where G_eff was likely clamped.
+            let s = saddle_strength(params);
+            if s > self.saddle_margin {
+                // Strong real-eigenvalue instability.
+                if params.beta * params.g_eff > self.spinodal_margin {
+                    // Near spinodal pole → nonlinear trapping → limit cycle.
+                    Regime::GlobalLimitCycle
                 } else if g > self.chaos_threshold {
-                    // Truly stable planar subsystem + chaotic bulk.
-                    Regime::NoiseSustainedOscillation
+                    // Strong saddle, chaotic bulk → drives switching.
+                    Regime::IrregularSwitching
                 } else {
-                    Regime::Static
+                    Regime::NoiseSustainedOscillation
                 }
+            } else if s > 0.0 {
+                // Weak saddle: instability too slow + strong adaptation
+                // suppresses the chaotic bulk → Static (dissipation wins).
+                Regime::Static
+            } else if g > self.chaos_threshold {
+                // Truly stable planar subsystem + chaotic bulk.
+                Regime::NoiseSustainedOscillation
+            } else {
+                Regime::Static
             }
         }
     }
@@ -887,7 +884,7 @@ mod tests {
         // Q = (1/4)·4·tanh(1.5)² = tanh(1.5)² ≈ 0.82.
         assert!(mfo.q() > 0.7 && mfo.q() < 0.95, "q {}", mfo.q());
         let g = mfo.estimate_chaos_intensity();
-        assert!(g > 1.5, "g {}", g);
+        assert!(g > 1.5, "g {g}");
     }
 
     #[test]
@@ -946,7 +943,7 @@ mod tests {
         let t = jacobian_trace(&p);
         let d = jacobian_determinant(&p);
         let delta = t * t - 4.0 * d;
-        assert!(delta < 0.0, "Δ should be negative for Hopf, got {}", delta);
+        assert!(delta < 0.0, "Δ should be negative for Hopf, got {delta}");
         let expected_omega = (0.0 - delta).sqrt() * 0.5;
         assert!((omega - expected_omega).abs() < 1e-6);
         // Paper Eq. A9 limit ω ≈ 1/sqrt(τ_a) ≈ 0.183 — but this requires the
@@ -966,7 +963,7 @@ mod tests {
             g_eff: 1.0,
         };
         let t = jacobian_trace(&p);
-        assert!(t < 0.0, "T should be negative, got {}", t);
+        assert!(t < 0.0, "T should be negative, got {t}");
         assert!(hopf_boundary(&p).is_none());
     }
 
@@ -1005,7 +1002,7 @@ mod tests {
             g_eff: 1.0,
         };
         let d = jacobian_determinant(&p);
-        assert!(d < 0.0, "D should be < 0 for saddle, got {}", d);
+        assert!(d < 0.0, "D should be < 0 for saddle, got {d}");
         assert!(static_boundary(&p));
     }
 
@@ -1023,11 +1020,10 @@ mod tests {
         let s = saddle_strength(&p);
         assert!(
             s > 0.0,
-            "saddle_strength should be positive for saddle, got {}",
-            s
+            "saddle_strength should be positive for saddle, got {s}"
         );
         // λ₊ = (T + √Δ)/2 = (0 + √(0+4))/2 = 1.
-        assert!((s - 1.0).abs() < 1e-6, "λ₊ should be 1.0, got {}", s);
+        assert!((s - 1.0).abs() < 1e-6, "λ₊ should be 1.0, got {s}");
     }
 
     #[test]
@@ -1116,7 +1112,7 @@ mod tests {
             g_eff: 1.0,
         };
         let t = jacobian_trace(&p);
-        assert!(t > 0.1, "T = {} should exceed hopf_margin", t);
+        assert!(t > 0.1, "T = {t} should exceed hopf_margin");
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&mfo, &p, 1.5);
         assert_eq!(r, Regime::GlobalLimitCycle);
@@ -1145,11 +1141,10 @@ mod tests {
         // Confirm this is actually Hopf (Δ < 0).
         // Δ = 0.07² − 4·D. D = 0.1033·(−1/30) − (−1)(5/30) = −0.00344 + 0.1667 = 0.163.
         // Δ = 0.0049 − 0.653 < 0. ✓
-        assert!(delta < 0.0, "Δ = {} should be < 0", delta);
+        assert!(delta < 0.0, "Δ = {delta} should be < 0");
         assert!(
             t > 0.05 && t <= 0.15,
-            "T = {} should be in (switching_margin, hopf_margin]",
-            t
+            "T = {t} should be in (switching_margin, hopf_margin]"
         );
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&MeanFieldOverlap::default(), &p, 1.5);
@@ -1191,7 +1186,7 @@ mod tests {
             g_eff: 1.0,
         };
         let s = saddle_strength(&p);
-        assert!(s > 0.0 && s < 0.005, "λ₊ = {} should be weak (< 0.005)", s);
+        assert!(s > 0.0 && s < 0.005, "λ₊ = {s} should be weak (< 0.005)");
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&MeanFieldOverlap::default(), &p, 1.5);
         assert_eq!(r, Regime::Static, "weak saddle should classify as Static");
@@ -1209,7 +1204,7 @@ mod tests {
             g_eff: 1.0,
         };
         let s = saddle_strength(&p);
-        assert!(s > 0.005, "λ₊ = {} should be strong (> 0.005)", s);
+        assert!(s > 0.005, "λ₊ = {s} should be strong (> 0.005)");
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&MeanFieldOverlap::default(), &p, 1.5);
         assert_eq!(r, Regime::IrregularSwitching);
@@ -1241,12 +1236,11 @@ mod tests {
         let bg = hopf_boundary(&p);
         assert!(bg.is_none(), "real eigenvalues → no Hopf");
         let s = saddle_strength(&p);
-        assert!(s > 0.005, "λ₊ = {} should be strong", s);
+        assert!(s > 0.005, "λ₊ = {s} should be strong");
         let bg_eff = p.beta * p.g_eff;
         assert!(
             bg_eff > 9.0,
-            "β·G_eff = {} should exceed spinodal_margin",
-            bg_eff
+            "β·G_eff = {bg_eff} should exceed spinodal_margin"
         );
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&MeanFieldOverlap::default(), &p, 1.4);
@@ -1276,11 +1270,10 @@ mod tests {
         let bg_eff = p.beta * p.g_eff;
         assert!(
             bg_eff < 9.0,
-            "β·G_eff = {} should be below spinodal_margin",
-            bg_eff
+            "β·G_eff = {bg_eff} should be below spinodal_margin"
         );
         let s = saddle_strength(&p);
-        assert!(s > 0.005, "λ₊ = {} should be strong", s);
+        assert!(s > 0.005, "λ₊ = {s} should be strong");
         let clf = RegimeClassifier::default();
         let r = clf.classify_with_g(&MeanFieldOverlap::default(), &p, 1.4);
         assert_eq!(

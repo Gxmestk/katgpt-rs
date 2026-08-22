@@ -117,10 +117,10 @@ Goal: prove the primitive is correct, fast enough for the per-tick hot path, doe
 
 This phase is intentionally deferred. Per the Gain-tier verdict (Research 461), the feature ships opt-in and stays opt-in until a downstream consumer proves a gain that warrants promotion. The trigger conditions for re-opening this phase:
 
-- [ ] **T3.1 (DEFERRED)** A per-NPC cognition runtime (riir-engine) adopts `EventLog::filter` for trajectory search AND benchmarks show it improves a measurable metric (e.g., CLR vote accuracy, KARC forecast skill, consolidation quality) over the no-query baseline. → opens a riir-ai plan for the latent-predicate bridge + consumer wiring.
-- [ ] **T3.2 (DEFERRED)** A consolidation pipeline (riir-neuron-db Raven/δ-Mem) adopts `query_window` for "find all events matching pattern P in the last N ticks" AND benchmarks show it improves consolidation quality or latency. → opens a riir-neuron-db plan.
-- [ ] **T3.3 (DEFERRED)** An MCTS planner (katgpt-pruners game_state) adopts `filter` for "find all evaluations matching pattern P" AND benchmarks show it improves search efficiency. → opens a katgpt-rs plan.
-- [ ] **T3.4 (DEFERRED)** If any of T3.1–T3.3 pass → promote `event_log_query` to default features in `katgpt-pruners/Cargo.toml` + root forwarder, update README Feature Showcase, update Research 461 with the promotion evidence.
+- [-] **T3.1 (DEFERRED)** A per-NPC cognition runtime (riir-engine) adopts `EventLog::filter` for trajectory search AND benchmarks show it improves a measurable metric (e.g., CLR vote accuracy, KARC forecast skill, consolidation quality) over the no-query baseline. → opens a riir-ai plan for the latent-predicate bridge + consumer wiring.
+- [-] **T3.2 (DEFERRED)** A consolidation pipeline (riir-neuron-db Raven/δ-Mem) adopts `query_window` for "find all events matching pattern P in the last N ticks" AND benchmarks show it improves consolidation quality or latency. → opens a riir-neuron-db plan.
+- [-] **T3.3 (DEFERRED)** An MCTS planner (katgpt-pruners game_state) adopts `filter` for "find all evaluations matching pattern P" AND benchmarks show it improves search efficiency. → opens a katgpt-rs plan.
+- [-] **T3.4 (DEFERRED)** If any of T3.1–T3.3 pass → promote `event_log_query` to default features in `katgpt-pruners/Cargo.toml` + root forwarder, update README Feature Showcase, update Research 461 with the promotion evidence.
 
 ---
 

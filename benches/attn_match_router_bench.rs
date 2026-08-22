@@ -57,8 +57,7 @@ fn main() {
     let ns_per_call = elapsed.as_nanos() as f64 / iters as f64;
 
     println!(
-        "pick_backend: {} calls in {:?} → {:.2} ns/call (last backend: {:?})",
-        iters, elapsed, ns_per_call, last
+        "pick_backend: {iters} calls in {elapsed:?} → {ns_per_call:.2} ns/call (last backend: {last:?})"
     );
     println!();
 
@@ -67,7 +66,7 @@ fn main() {
     let mut router = SolverRouter::new(cfg);
     let t0 = 512usize; // well within simd regime
     let b0 = router.pick_backend(t0, 8192, true);
-    println!("  t={:>4} → backend={:?}", t0, b0);
+    println!("  t={t0:>4} → backend={b0:?}");
     for &dt in &[1, 5, 10, 20, 50] {
         let t = t0 + dt;
         let b = router.pick_backend(t, 8192, true);

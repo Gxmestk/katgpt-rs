@@ -115,9 +115,10 @@ impl VortexFlow for BlockTopKRouter {
         }
 
         let hd = query.len();
-        let scale = match self.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         scratch.ensure_capacity(n_blocks);
@@ -131,18 +132,24 @@ impl VortexFlow for BlockTopKRouter {
             let mut dot1 = 0.0f32;
             let mut dot2 = 0.0f32;
             let mut dot3 = 0.0f32;
-            let chunks = hd / 4;
-            for c in 0..chunks {
-                let base = c * 4;
-                dot0 += query[base] * centroid[base];
-                dot1 += query[base + 1] * centroid[base + 1];
-                dot2 += query[base + 2] * centroid[base + 2];
-                dot3 += query[base + 3] * centroid[base + 3];
+            // `chunks_exact(4)` over pre-sliced rows: each yielded slice has a
+            // statically known length of 4, so the 8 per-iteration bounds
+            // checks collapse. The four lane accumulators receive their addends
+            // in exactly the same order as the index form and the tail covers
+            // the same `main..hd` range → bit-identical.
+            let main = (hd / 4) * 4;
+            for (q_c, c_c) in query[..main]
+                .chunks_exact(4)
+                .zip(centroid[..main].chunks_exact(4))
+            {
+                dot0 += q_c[0] * c_c[0];
+                dot1 += q_c[1] * c_c[1];
+                dot2 += q_c[2] * c_c[2];
+                dot3 += q_c[3] * c_c[3];
             }
             let mut dot = dot0 + dot1 + dot2 + dot3;
-            let rem = hd % 4;
-            for d in (hd - rem)..hd {
-                dot += query[d] * centroid[d];
+            for (&q_d, &c_d) in query[main..hd].iter().zip(centroid[main..hd].iter()) {
+                dot += q_d * c_d;
             }
             *score = dot * scale;
         }
@@ -441,7 +448,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
         let init = k.min(n);
         for i in 0..init {
-            heap_vals[i] = *scores.get_unchecked(i);
+            heap_vals[i] = *unsafe { scores.get_unchecked(i) };
             heap_idxs[i] = i;
         }
         // Sort initial k elements descending (insertion sort, k≤16)
@@ -464,7 +471,7 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
         let mut pos = init;
 
         for _ in 0..chunks8 {
-            let v = _mm256_loadu_ps(scores.as_ptr().add(pos));
+            let v = unsafe { _mm256_loadu_ps(scores.as_ptr().add(pos)) };
             let thresh = _mm256_set1_ps(heap_vals[k - 1]);
             // Compare: v > thresh (ordered, signaling)
             let cmp = _mm256_cmp_ps(v, thresh, _CMP_GT_OS);
@@ -472,16 +479,18 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
             if mask_bits != 0 {
                 // Extract qualifying lanes
-                let vals_arr: [f32; 8] = core::mem::transmute(v);
+                let vals_arr: [f32; 8] = unsafe { core::mem::transmute(v) };
                 for lane in 0..8 {
                     if mask_bits & (1 << lane) != 0 {
-                        insert_sorted_simd_avx2(
-                            &mut heap_vals,
-                            &mut heap_idxs,
-                            k,
-                            vals_arr[lane],
-                            pos + lane,
-                        );
+                        unsafe {
+                            insert_sorted_simd_avx2(
+                                &mut heap_vals,
+                                &mut heap_idxs,
+                                k,
+                                vals_arr[lane],
+                                pos + lane,
+                            );
+                        };
                     }
                 }
             }
@@ -492,22 +501,24 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
         let remaining4 = (n - pos) / 4;
         for _ in 0..remaining4 {
             // Process 4 at a time using SSE-like approach via AVX2
-            let v = _mm256_loadu_ps(scores.as_ptr().add(pos));
+            let v = unsafe { _mm256_loadu_ps(scores.as_ptr().add(pos)) };
             let thresh = _mm256_set1_ps(heap_vals[k - 1]);
             let cmp = _mm256_cmp_ps(v, thresh, _CMP_GT_OS);
             let mask_bits = (_mm256_movemask_ps(cmp) as u32) & 0x0F; // Only first 4 lanes
 
             if mask_bits != 0 {
-                let vals_arr: [f32; 8] = core::mem::transmute(v);
+                let vals_arr: [f32; 8] = unsafe { core::mem::transmute(v) };
                 for lane in 0..4 {
                     if mask_bits & (1 << lane) != 0 {
-                        insert_sorted_simd_avx2(
-                            &mut heap_vals,
-                            &mut heap_idxs,
-                            k,
-                            vals_arr[lane],
-                            pos + lane,
-                        );
+                        unsafe {
+                            insert_sorted_simd_avx2(
+                                &mut heap_vals,
+                                &mut heap_idxs,
+                                k,
+                                vals_arr[lane],
+                                pos + lane,
+                            );
+                        };
                     }
                 }
             }
@@ -516,9 +527,9 @@ fn argtopk_simd(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 
         // Scalar tail
         while pos < n {
-            let val = *scores.get_unchecked(pos);
+            let val = *unsafe { scores.get_unchecked(pos) };
             if val > heap_vals[k - 1] {
-                insert_sorted_simd_avx2(&mut heap_vals, &mut heap_idxs, k, val, pos);
+                unsafe { insert_sorted_simd_avx2(&mut heap_vals, &mut heap_idxs, k, val, pos) };
             }
             pos += 1;
         }
@@ -561,7 +572,7 @@ unsafe fn insert_sorted_simd_avx2(
     let chunks8 = k / 8;
     for c in 0..chunks8 {
         let base = c * 8;
-        let heap_chunk = _mm256_loadu_ps(heap_vals.as_ptr().add(base));
+        let heap_chunk = unsafe { _mm256_loadu_ps(heap_vals.as_ptr().add(base)) };
         let cmp = _mm256_cmp_ps(val_vec, heap_chunk, _CMP_GT_OS);
         let mask_bits = _mm256_movemask_ps(cmp) as u32;
 
@@ -707,9 +718,10 @@ impl VortexFlow for PerGroupTopKRouter {
         }
 
         let hd = query.len();
-        let scale = match self.inner.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.inner.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         // Budget: distribute top_k across groups, ensuring each gets at least 1
@@ -725,18 +737,24 @@ impl VortexFlow for PerGroupTopKRouter {
             let mut dot1 = 0.0f32;
             let mut dot2 = 0.0f32;
             let mut dot3 = 0.0f32;
-            let chunks = hd / 4;
-            for c in 0..chunks {
-                let base = c * 4;
-                dot0 += query[base] * centroid[base];
-                dot1 += query[base + 1] * centroid[base + 1];
-                dot2 += query[base + 2] * centroid[base + 2];
-                dot3 += query[base + 3] * centroid[base + 3];
+            // `chunks_exact(4)` over pre-sliced rows: each yielded slice has a
+            // statically known length of 4, so the 8 per-iteration bounds
+            // checks collapse. The four lane accumulators receive their addends
+            // in exactly the same order as the index form and the tail covers
+            // the same `main..hd` range → bit-identical.
+            let main = (hd / 4) * 4;
+            for (q_c, c_c) in query[..main]
+                .chunks_exact(4)
+                .zip(centroid[..main].chunks_exact(4))
+            {
+                dot0 += q_c[0] * c_c[0];
+                dot1 += q_c[1] * c_c[1];
+                dot2 += q_c[2] * c_c[2];
+                dot3 += q_c[3] * c_c[3];
             }
             let mut dot = dot0 + dot1 + dot2 + dot3;
-            let rem = hd % 4;
-            for d in (hd - rem)..hd {
-                dot += query[d] * centroid[d];
+            for (&q_d, &c_d) in query[main..hd].iter().zip(centroid[main..hd].iter()) {
+                dot += q_d * c_d;
             }
             *score = dot * scale;
         }

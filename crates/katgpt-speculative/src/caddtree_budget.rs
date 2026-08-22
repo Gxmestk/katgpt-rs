@@ -229,20 +229,17 @@ impl LatencyEstimator {
             return;
         };
 
-        match self.observations {
-            0 => {
+        if self.observations == 0 {
                 // First observation: use directly (no EMA blend).
                 self.draft_per_node = obs_draft_per_node;
                 self.verify_per_node = obs_verify_per_node;
                 self.verify_base = verify_time_us - obs_verify_per_node * (budget as f64 - 1.0);
-            }
-            _ => {
+            } else {
                 self.draft_per_node = self.draft_per_node * (1.0 - a) + obs_draft_per_node * a;
                 self.verify_base = self.verify_base * (1.0 - a) + verify_time_us * a;
                 self.verify_per_node =
                     self.verify_per_node * (1.0 - a) + obs_verify_per_node.max(0.0) * a;
             }
-        }
         self.observations += 1;
     }
 

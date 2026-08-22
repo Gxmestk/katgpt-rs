@@ -165,10 +165,7 @@ fn goat_3_gdn2_memory_less_than_flat_kv() {
         let gdn2_bytes = MultiLayerGdn2Cache::new(cfg).memory_bytes();
         let saved = (1.0 - gdn2_bytes as f64 / flat_bytes as f64) * 100.0;
 
-        println!(
-            "│ {:<12} {:>8} B {:>8} B {:>6.1}% │",
-            name, flat_bytes, gdn2_bytes, saved
-        );
+        println!("│ {name:<12} {flat_bytes:>8} B {gdn2_bytes:>8} B {saved:>6.1}% │");
 
         assert!(
             gdn2_bytes < flat_bytes,

@@ -176,8 +176,7 @@ impl<P: ScreeningPruner> WealthBanditPruner<P> {
                     .partial_cmp(&b.q_value)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     }
 
     /// Index of the arm with the highest wealth.
@@ -190,8 +189,7 @@ impl<P: ScreeningPruner> WealthBanditPruner<P> {
                     .partial_cmp(&b.wealth)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     }
 
     /// Total rebirth events since creation.

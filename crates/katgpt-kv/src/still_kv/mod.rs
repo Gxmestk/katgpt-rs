@@ -83,7 +83,7 @@ mod integration_tests {
         // Verify: at pos 0, rotation is identity, so f16 round-trip should be exact
         for i in 0..budget * head_dim {
             let original = f16::from_f32(original_f32[i]);
-            assert_eq!(re_rotated_f16[i], original, "Mismatch at index {}", i);
+            assert_eq!(re_rotated_f16[i], original, "Mismatch at index {i}");
         }
     }
 
@@ -114,9 +114,7 @@ mod integration_tests {
             let diff = (recovered_f16[i].to_f32() - original_f16[i].to_f32()).abs();
             assert!(
                 diff < 0.01,
-                "Round-trip error too large at index {}: {}",
-                i,
-                diff
+                "Round-trip error too large at index {i}: {diff}"
             );
         }
     }
@@ -232,8 +230,7 @@ mod integration_tests {
 
             assert_eq!(
                 compacted.len, budget,
-                "Strategy {:?} produced wrong budget",
-                strategy
+                "Strategy {strategy:?} produced wrong budget"
             );
             assert!(!compacted.keys.is_empty());
             assert!(!compacted.values.is_empty());
@@ -459,8 +456,7 @@ mod integration_tests {
         let ratios = [8usize, 16, 32];
 
         println!(
-            "\n=== T22: StillKV Compression Quality ({} tokens × {} heads × {} dim) ===",
-            seq_len, num_heads, head_dim
+            "\n=== T22: StillKV Compression Quality ({seq_len} tokens × {num_heads} heads × {head_dim} dim) ==="
         );
         println!(
             "{:>25} | {:>4}x | {:>10} | {:>10} | {:>10}",
@@ -568,8 +564,7 @@ mod integration_tests {
         let ratios = [8usize, 16, 32];
 
         println!(
-            "\n=== T23: Synthesis vs Selection ({} tokens × {} heads × {} dim) ===",
-            seq_len, num_heads, head_dim
+            "\n=== T23: Synthesis vs Selection ({seq_len} tokens × {num_heads} heads × {head_dim} dim) ==="
         );
         println!(
             "{:>10} | {:>12} | {:>10} | {:>10}",
@@ -665,8 +660,7 @@ mod integration_tests {
         let thresholds = [(8usize, 0.10f32), (16usize, 0.10f32), (32usize, 0.05f32)];
 
         println!(
-            "\n=== T24: GOAT Gate — Compact Cache Quality ({} tokens × {} heads × {} dim) ===",
-            seq_len, num_heads, head_dim
+            "\n=== T24: GOAT Gate — Compact Cache Quality ({seq_len} tokens × {num_heads} heads × {head_dim} dim) ==="
         );
         println!(
             "{:>4}x | {:>25} | {:>10} | {:>10} | {:>6}",
@@ -780,8 +774,7 @@ mod integration_tests {
         let ratios = [8usize, 16, 32];
 
         println!(
-            "\n=== T25: Beta Strategy Benchmark ({} tokens x {} heads x {} dim) ===",
-            seq_len, num_heads, head_dim
+            "\n=== T25: Beta Strategy Benchmark ({seq_len} tokens x {num_heads} heads x {head_dim} dim) ==="
         );
         println!(
             "{:>20} | {:>15} | {:>4}x | {:>10} | {:>8} | {:>8} | {:>8}",
@@ -1023,8 +1016,7 @@ mod integration_tests {
             dist_asym.is_not_collapsed()
         );
         println!(
-            "  beta-A all_same={}, beta-D all_same={}",
-            all_same_a, all_same
+            "  beta-A all_same={all_same_a}, beta-D all_same={all_same}"
         );
     }
 }

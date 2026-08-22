@@ -134,8 +134,7 @@ impl HeadBudgetSolver {
         assert!(n > 0);
         assert!(
             (0.0..=1.0).contains(&target_ratio),
-            "target_ratio must be in [0, 1], got {}",
-            target_ratio
+            "target_ratio must be in [0, 1], got {target_ratio}"
         );
 
         // Initialize uniform allocation. Each head starts at target_ratio.
@@ -314,7 +313,7 @@ mod tests {
         assert_eq!(shares.len(), 4);
         // Every head gets target_ratio exactly.
         for &s in &shares {
-            assert!((s - 0.5).abs() < 1e-6, "expected uniform 0.5, got {}", s);
+            assert!((s - 0.5).abs() < 1e-6, "expected uniform 0.5, got {s}");
         }
         let avg: f32 = shares.iter().sum::<f32>() / shares.len() as f32;
         assert!((avg - 0.5).abs() < 1e-6, "average must equal target_ratio");
@@ -335,8 +334,7 @@ mod tests {
         // The solution must be locally optimal: no improving single swap.
         assert!(
             solver.is_locally_optimal(&shares),
-            "solver did not converge to local optimum: shares={:?}",
-            shares
+            "solver did not converge to local optimum: shares={shares:?}"
         );
     }
 
@@ -354,38 +352,33 @@ mod tests {
         // The steep head should get more than the flat ones.
         assert!(
             shares[0] > shares[1],
-            "steep head should get more budget: shares={:?}",
-            shares
+            "steep head should get more budget: shares={shares:?}"
         );
         assert!(
             shares[0] > shares[2],
-            "steep head should get more budget: shares={:?}",
-            shares
+            "steep head should get more budget: shares={shares:?}"
         );
         assert!(
             shares[0] > shares[3],
-            "steep head should get more budget: shares={:?}",
-            shares
+            "steep head should get more budget: shares={shares:?}"
         );
         // Note: the greedy swap drains flat heads sequentially (lowest index
         // first when losses tie), so flat heads are NOT necessarily equal.
         // We only assert each flat head is below the steep head and above 0.
         for &s in &shares[1..] {
-            assert!(s >= 0.0, "flat head share {} should be non-negative", s);
+            assert!(s >= 0.0, "flat head share {s} should be non-negative");
             assert!(s < shares[0], "flat head should have less than steep head");
         }
         // Conservation: average must equal target.
         let avg: f32 = shares.iter().sum::<f32>() / shares.len() as f32;
         assert!(
             (avg - 0.5).abs() < 1e-3,
-            "average ratio {} should equal target 0.5",
-            avg
+            "average ratio {avg} should equal target 0.5"
         );
         // Solution must be locally optimal.
         assert!(
             solver.is_locally_optimal(&shares),
-            "solver should converge to local optimum: shares={:?}",
-            shares
+            "solver should converge to local optimum: shares={shares:?}"
         );
     }
 
@@ -402,9 +395,7 @@ mod tests {
             let avg: f32 = shares.iter().sum::<f32>() / shares.len() as f32;
             assert!(
                 (avg - target).abs() < 1e-2,
-                "target {}: avg ratio {} leaked budget",
-                target,
-                avg
+                "target {target}: avg ratio {avg} leaked budget"
             );
         }
     }
@@ -420,7 +411,7 @@ mod tests {
         assert_eq!(shares.len(), 6);
         // Identical curves → uniform.
         for &s in &shares {
-            assert!((s - 0.4).abs() < 1e-6, "uniform expected, got {}", s);
+            assert!((s - 0.4).abs() < 1e-6, "uniform expected, got {s}");
         }
     }
 

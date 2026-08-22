@@ -55,9 +55,18 @@ pub fn dilated_decode_step_into(
     // 2. Gather dilated KV references. Small alloc (n_dilated pointers) — for
     //    the hottest decode loops, callers should call bridge_attention_into
     //    directly with pre-built dilated slice references.
-    let indices = DilatedKvAccessor::dilated_indices(kv_cache_keys.len(), dilation);
-    let keys_dilated: Vec<&Vec<f32>> = indices.iter().map(|&i| &kv_cache_keys[i]).collect();
-    let vals_dilated: Vec<&Vec<f32>> = indices.iter().map(|&i| &kv_cache_vals[i]).collect();
+    //
+    //    The intermediate `dilated_indices()` `Vec<usize>` is gone: `step_by`
+    //    walks the exact same 0, stride, 2·stride… positions, so the gathered
+    //    order (and the `kv_cache_vals[i]` panic-on-short-vals behaviour) is
+    //    unchanged — one fewer heap allocation per decode step.
+    let n_dilated = DilatedKvAccessor::dilated_len(kv_cache_keys.len(), dilation);
+    let mut keys_dilated: Vec<&Vec<f32>> = Vec::with_capacity(n_dilated);
+    let mut vals_dilated: Vec<&Vec<f32>> = Vec::with_capacity(n_dilated);
+    for i in (0..kv_cache_keys.len()).step_by(dilation.stride()) {
+        keys_dilated.push(&kv_cache_keys[i]);
+        vals_dilated.push(&kv_cache_vals[i]);
+    }
 
     // 3. Fused attention + bridge + α-blend, written directly into `out`.
     super::fuse::bridge_attention_into(

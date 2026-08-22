@@ -178,12 +178,11 @@ impl FeedbackContextStats {
         let (n, q) = (self.visits[arm], self.q_values[arm]);
         // Use max(feedback_pulls, base_total) for the exploration bonus denominator
         let total = base_total.max(self.feedback_pulls).max(1);
-        match n {
-            0 => f32::MAX,
-            _ => {
-                let ln_total = (total as f32).ln();
-                q + (c * ln_total / n as f32).sqrt()
-            }
+        if n == 0 {
+            f32::MAX
+        } else {
+            let ln_total = (total as f32).ln();
+            q + (c * ln_total / n as f32).sqrt()
         }
     }
 

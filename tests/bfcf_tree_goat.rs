@@ -181,9 +181,7 @@ fn goat_preimage_improves_acceptance() {
     // Acceptance should improve
     assert!(
         after_rate >= before_rate,
-        "acceptance should not decrease: before={}, after={}",
-        before_rate,
-        after_rate,
+        "acceptance should not decrease: before={before_rate}, after={after_rate}",
     );
 
     // Verify ≥ 10% improvement (relative improvement)
@@ -225,7 +223,7 @@ fn goat_complexity_sigmoid_bounded() {
     let router = SigmoidPerceptRouter::default_router();
 
     // Stress test: very large partition
-    let mut regions = Vec::new();
+    let mut regions = Vec::with_capacity(1000);
     for i in 0..1000 {
         let label = match i % 3 {
             0 => RegionLabel::Accept,
@@ -239,8 +237,7 @@ fn goat_complexity_sigmoid_bounded() {
     let c = router.complexity(&large);
     assert!(
         (0.0..=1.0).contains(&c),
-        "complexity must be sigmoid-bounded [0, 1], got {}",
-        c
+        "complexity must be sigmoid-bounded [0, 1], got {c}"
     );
 
     // Verify the route is valid

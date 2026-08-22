@@ -94,35 +94,26 @@ fn main() {
     let start_class = quotient.class_of(StateId(0));
     let goal_class = quotient.class_of(StateId(5));
 
-    println!(
-        "── Plan: class({}) → class({}) ──────────────────────────────",
-        start_class, goal_class
-    );
-    match plan(&schema, &quotient, start_class, goal_class) {
-        Some(sequence) => {
-            println!("Found plan ({} steps):", sequence.len());
-            for (i, op) in sequence.iter().enumerate() {
-                println!("  step {}: {:?}", i, op);
-            }
+    println!("── Plan: class({start_class}) → class({goal_class}) ──────────────────────────────");
+    if let Some(sequence) = plan(&schema, &quotient, start_class, goal_class) {
+        println!("Found plan ({} steps):", sequence.len());
+        for (i, op) in sequence.iter().enumerate() {
+            println!("  step {i}: {op:?}");
+        }
 
-            // Replay to verify.
-            match schema.replay_plan(&quotient, start_class, &sequence, goal_class) {
-                Ok(final_class) => {
-                    println!();
-                    println!("✅ Replay succeeded — landed on class {}", final_class);
-                }
-                Err(step) => {
-                    println!();
-                    println!("❌ Replay failed at step {}", step);
-                }
+        // Replay to verify.
+        match schema.replay_plan(&quotient, start_class, &sequence, goal_class) {
+            Ok(final_class) => {
+                println!();
+                println!("✅ Replay succeeded — landed on class {final_class}");
+            }
+            Err(step) => {
+                println!();
+                println!("❌ Replay failed at step {step}");
             }
         }
-        None => {
-            println!(
-                "❌ No path exists from class {} to class {}",
-                start_class, goal_class
-            );
-        }
+    } else {
+        println!("❌ No path exists from class {start_class} to class {goal_class}");
     }
     println!();
 
@@ -148,5 +139,5 @@ fn main() {
 
 /// Format a byte slice as a lowercase hex string.
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

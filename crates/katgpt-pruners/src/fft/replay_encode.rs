@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(buf[7], 1); // alive
         // Tokens stay within state vocab range.
         for &v in &buf {
-            assert!(v < FFT_STATE_VOCAB as u8, "token {} out of range: {}", v, v);
+            assert!(v < FFT_STATE_VOCAB as u8, "token {v} out of range: {v}");
         }
     }
 

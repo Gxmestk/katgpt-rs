@@ -254,6 +254,16 @@ pub fn geometric_product_into(
         return;
     }
 
+    // Narrow every buffer to exactly `dim` once, outside the shift loop. All
+    // subsequent indexing is provably in range, so LLVM drops the per-element
+    // bounds checks and can actually auto-vectorize the 4-wide bodies below.
+    let u = &u[..dim];
+    let v = &v[..dim];
+    let dot_out = &mut dot_out[..dim];
+    let wedge_out = &mut wedge_out[..dim];
+    let scratch_u = &mut scratch_u[..dim];
+    let scratch_v = &mut scratch_v[..dim];
+
     // Hoist invariant chunk geometry out of the shift loop, mirroring the
     // 4-wide SIMD hint in dec::operators::exterior_derivative_into (T11).
     let chunks = dim / 4;
@@ -384,6 +394,14 @@ pub fn geometric_product_wedge_into(
     if dim == 0 || shifts.is_empty() {
         return;
     }
+
+    // Narrow to exactly `dim` once (see `geometric_product_into`) so the
+    // 4-wide inner bodies carry no bounds checks and auto-vectorize.
+    let u = &u[..dim];
+    let v = &v[..dim];
+    let wedge_out = &mut wedge_out[..dim];
+    let scratch_u = &mut scratch_u[..dim];
+    let scratch_v = &mut scratch_v[..dim];
 
     let chunks = dim / 4;
     let remainder = dim % 4;

@@ -153,8 +153,7 @@ mod tests {
             // both mints and retires would be two candidates).
             assert!(
                 !(mints && retires),
-                "kind {:?} cannot both mint and retire",
-                k
+                "kind {k:?} cannot both mint and retire"
             );
         }
         // Spot-check the specific classifications.

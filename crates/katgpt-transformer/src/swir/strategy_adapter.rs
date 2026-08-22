@@ -318,9 +318,7 @@ mod tests {
                 for (d, &v_d) in v.iter().enumerate() {
                     assert!(
                         (v_d - expected).abs() < 1e-5,
-                        "dim {d}: got {}, expected {}",
-                        v_d,
-                        expected
+                        "dim {d}: got {v_d}, expected {expected}"
                     );
                 }
             }

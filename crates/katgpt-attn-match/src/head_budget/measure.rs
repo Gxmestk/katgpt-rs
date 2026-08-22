@@ -129,8 +129,7 @@ mod tests {
             let delta = c.interpolate(1.0);
             assert!(
                 delta.abs() < 1e-6,
-                "delta at r=1.0 should be 0, got {}",
-                delta
+                "delta at r=1.0 should be 0, got {delta}"
             );
         }
     }

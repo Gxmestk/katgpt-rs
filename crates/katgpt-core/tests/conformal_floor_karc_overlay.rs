@@ -243,7 +243,7 @@ impl<const K: usize> KarcOverlayAdapter<K> {
             let mut ds = vec![0.0_f32; K * D];
             for t in (K - 1)..(warmup_corpus.len() - 1) {
                 for k in 0..K {
-                    ds[k * D..(k + 1) * D].copy_from_slice(&warmup_corpus[t - k..t - k + 1]);
+                    ds[k * D..(k + 1) * D].copy_from_slice(&warmup_corpus[t - k..=t - k]);
                 }
                 let target = [warmup_corpus[t + 1]];
                 karc.accumulate_pair(&ds, &target);
@@ -297,7 +297,7 @@ impl<const K: usize> KarcOverlayAdapter<K> {
     #[inline]
     fn build_delay_state(&mut self) {
         for k in 0..K {
-            self.delay_state[k * D..(k + 1) * D].copy_from_slice(&self.window[k..k + 1]);
+            self.delay_state[k * D..(k + 1) * D].copy_from_slice(&self.window[k..=k]);
         }
     }
 }
@@ -313,10 +313,7 @@ impl<const K: usize> UqPrimitiveUnderTest for KarcOverlayAdapter<K> {
         // can't `concat!` a const generic. `format!` + `Box::leak` is the
         // cleanest escape hatch for one-off cold-path formatting.)
         let s: String = format!(
-            "KARC+overlay (Chebyshev M={M}, K={K}, D={D}; pre-fitted on warmup)",
-            M = M,
-            K = K,
-            D = D
+            "KARC+overlay (Chebyshev M={M}, K={K}, D={D}; pre-fitted on warmup)"
         );
         Box::leak(s.into_boxed_str())
     }
@@ -464,7 +461,7 @@ fn floor_comparison_stationary_seasonal() {
     );
 
     println!("── KARC+overlay vs floor on {} ──", corpus.name);
-    println!("{:.?}", report);
+    println!("{report:.?}");
 
     // Sanity: at least 100 scored steps.
     assert!(report.n_scored > 100, "n_scored = {}", report.n_scored);
@@ -533,7 +530,7 @@ fn floor_comparison_lorenz_x() {
     );
 
     println!("── KARC+overlay vs floor on {} ──", corpus.name);
-    println!("{:.?}", report);
+    println!("{report:.?}");
 
     assert!(report.n_scored > 500, "n_scored = {}", report.n_scored);
 
@@ -624,7 +621,7 @@ fn floor_comparison_stationary_seasonal_k12() {
     );
 
     println!("── KARC+overlay (K=12) vs floor on {} ──", corpus.name);
-    println!("{:.?}", report);
+    println!("{report:.?}");
 
     // Sanity: at least 100 scored steps.
     assert!(report.n_scored > 100, "n_scored = {}", report.n_scored);
@@ -661,8 +658,7 @@ fn floor_comparison_stationary_seasonal_k12() {
         f32::NAN
     };
     println!(
-        "K=12 stationary_seasonal CRPS ratio (prim/floor): {:.4} (K=4 baseline was 5.74)",
-        crps_ratio
+        "K=12 stationary_seasonal CRPS ratio (prim/floor): {crps_ratio:.4} (K=4 baseline was 5.74)"
     );
 }
 
@@ -698,7 +694,7 @@ fn floor_comparison_lorenz_x_k12() {
     );
 
     println!("── KARC+overlay (K=12) vs floor on {} ──", corpus.name);
-    println!("{:.?}", report);
+    println!("{report:.?}");
 
     assert!(report.n_scored > 500, "n_scored = {}", report.n_scored);
 
@@ -731,7 +727,6 @@ fn floor_comparison_lorenz_x_k12() {
         f32::NAN
     };
     println!(
-        "K=12 Lorenz-x CRPS ratio (prim/floor): {:.4} (K=4 baseline was 0.0047)",
-        crps_ratio
+        "K=12 Lorenz-x CRPS ratio (prim/floor): {crps_ratio:.4} (K=4 baseline was 0.0047)"
     );
 }

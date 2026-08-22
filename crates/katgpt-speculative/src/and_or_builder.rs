@@ -220,18 +220,15 @@ impl<'a, P: ScreeningPruner> AndOrBuilder<'a, P> {
         let mut region_start: Option<usize> = None;
 
         for (i, &rel) in profile.iter().enumerate() {
-            match self.decompose_at(i, rel) {
-                true => {
-                    // Low relevance — extend or start region.
-                    if region_start.is_none() {
-                        region_start = Some(i);
-                    }
+            if self.decompose_at(i, rel) {
+                // Low relevance — extend or start region.
+                if region_start.is_none() {
+                    region_start = Some(i);
                 }
-                false => {
-                    // High relevance — close any open region.
-                    if let Some(start) = region_start.take() {
-                        regions.push((start, i));
-                    }
+            } else {
+                // High relevance — close any open region.
+                if let Some(start) = region_start.take() {
+                    regions.push((start, i));
                 }
             }
         }
@@ -363,16 +360,14 @@ impl<'a, P: ScreeningPruner> AndOrBuilder<'a, P> {
         let path = greedy_argmax_path(subgoal.depth_start, subgoal.depth_end, marginals);
 
         // Store result in cache.
-        let result = match path.is_empty() {
-            true => GoalResult::Unknown,
-            false => GoalResult::Proved,
+        let result = if path.is_empty() {
+            GoalResult::Unknown
+        } else {
+            GoalResult::Proved
         };
         self.cache.insert(&canonical, result);
 
-        match path.is_empty() {
-            true => None,
-            false => Some(path),
-        }
+        if path.is_empty() { None } else { Some(path) }
     }
 }
 
@@ -394,8 +389,7 @@ fn argmax_or_zero(marginals: &[&[f32]], d: usize) -> usize {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(idx, _)| idx)
-            .unwrap_or(0),
+            .map_or(0, |(idx, _)| idx),
         _ => 0,
     }
 }

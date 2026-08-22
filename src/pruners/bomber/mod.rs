@@ -389,7 +389,7 @@ pub struct ScoreBoard {
 impl ScoreBoard {
     pub fn add(&mut self, player: u8, points: i32) {
         if let 0..=3 = player {
-            self.scores[player as usize] += points
+            self.scores[player as usize] += points;
         }
     }
 }

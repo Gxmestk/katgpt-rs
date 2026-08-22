@@ -299,3 +299,81 @@ This requires the solution cache (Priority 2) and connects to the bandit (Plan 0
   journal = {arXiv preprint arXiv:2601.16175},
   year    = {2026}
 }
+```
+
+---
+
+## Addendum — 2026-08-16 re-verdict (post-self_evolve / post-GRPO-path)
+
+> Trigger: user re-surfaced the paper + repo (github.com/test-time-training/discover,
+> `pip install ttt-discover`, MIT). The original note above predates two consumers
+> that have since SHIPP, which flips two "not applicable" rows. Re-ran the
+> pre-flight (grep across all repos for training/model-based/self-adaptive code).
+
+### What changed since this note was written
+
+1. **riir-clippy `self_evolve` is now DEFAULT-ON** (Bench 023/024) — a live
+   test-time discovery loop: candidates = fixes, reward = verifier outcome,
+   buffer = `LatentFixMemory`, candidate selection = `SelectionMode::
+   {LinearBlend, BetaPosterior}` (Bench 028). Signal-diff vs the paper: both
+   shipped modes consume **history counts (S, F)**; the paper's entropic
+   objective consumes the **current batch reward distribution** (Boltzmann tilt
+> w_β(a) = e^{βR}/E[e^{βR}], β set by bisection so KL(q_β‖uniform) = ln 2).
+   Neither subsumes the other — complementary axes (the paper itself uses both:
+   PUCT buffer carries history, entropic objective carries within-batch).
+   Bench 028's own honest caveat (+2.9% crossover at 30 attempts — BetaPosterior
+> is wrong for large-sample/max-seeking regimes) is precisely the failure mode
+> the entropic objective mitigates. → **riir-clippy Issue 026** filed.
+
+2. **riir-train's GRPO path is real** — `degrpo` (Plan 242 / S2F collapse-aware
+   GRPO), `action_hoare`, G-Zero self-play DPO/GRPO (Plan 059), plus the
+   ReMax/RepPO lineage (Plans 304–306 — the same optimize-the-max family;
+   ReMax is an unbiased estimator FOR expected-max, the entropic J_β is a
+   smooth mean↔max interpolation with adaptive temperature). The entropic
+   advantage (replace group-mean/std normalization with w_β − 1) is a drop-in
+   for that path. → **riir-train Plan 341** filed (Path 0.5: applicable training
+   paper gets a plan with recipe + GPU-hours + GOAT gate).
+
+3. **PUCT already ships here** — `katgpt-moka-wasm/src/puct.rs` (AlphaZero-style,
+> Go). The paper's PUCT variants (Q = max child reward not mean, rank prior over
+> archive, lineage blocking) are deltas on shipped substrate, not a new
+> mechanism. Row "PUCT state reuse — not applicable" above is superseded:
+> the *runtime-for-inference* verdict stands, but for archive-reuse selection
+> loops (LatentFixMemory, ruliology) the max-Q + exploration-bonus variant is a
+> legitimate follow-up IF Issue 026's tilt wins first.
+
+### Prior art (novelty check, §4)
+
+The entropic/risk-seeking objective is **published prior art** — no novelty
+claim on the mechanism:
+
+- **RS-GRPO** — Jiang et al., "Risk-Sensitive RL for Alleviating Exploration
+  Dilemmas in Large Language Models", arXiv:2509.24261 (ICLR 2026) — the same
+  J_β objective for pass@k (the paper's own concurrent-work cite [29]).
+- **RSPO** — "Risk-Seeking Policy Optimization for Pass@k", arXiv:2508.01174.
+- Entropic risk measures in RL generally (Fei et al.; Lam et al. ICLR'23).
+
+TTT-Discover's deltas over those: the **adaptive β via KL budget** (per-state,
+> bisection on KL(q_β‖u) = γ), the **discovery framing** (one great solution, no
+> deployment), and the PUCT archive loop. Our stack's deltas over all of them:
+> applying it to **code-healing discovery** (clippy) and **game self-play**
+> (train) — domains none of the three cover.
+
+### Verdict (updated)
+
+**Gain** (was implicitly Pass-adjacent via "architecture pattern only"). The
+> mechanisms are prior art with shipped cousins (BetaPosterior, DeGRPO, ReMax
+> plans, moka PUCT) — not GOAT/Super-GOAT. Actionable because Bench 028's
+documented crossover is an unmitigated failure mode matching the paper's
+> objective, and the GRPO path is a live consumer. Outputs: this addendum +
+> riir-clippy `.issues/026_entropic_selection_mode.md` + riir-train
+> `.plans/341_entropic_grpo_discovery.md`.
+
+### Fusion idea (novelty TBD — no consumer today, not filed)
+
+Per-NPC "ambition" as the adaptive β: in the latent domain, β(s) is a
+> sigmoid-bounded risk-appetite scalar per NPC (KL budget = bounded deviation
+> from crowd prior). Max-seeking NPCs (one exceptional heist/craft) vs
+> mean-seeking NPCs (steady grinding) become one knob on the same tilt math —
+> a latent-space bridge of the paper's discovery objective. File only when a
+> game-design consumer asks for it.

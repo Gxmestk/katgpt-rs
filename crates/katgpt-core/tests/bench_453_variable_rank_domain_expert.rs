@@ -121,9 +121,7 @@ fn domain_gate(activity: &[f32; 3]) -> usize {
     activity
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).map_or(0, |(i, _)| i)
 }
 
 // ─── Baseline: uniform CommittedFieldBlend<3, 32> ───────────────────────────
@@ -164,9 +162,7 @@ impl Baseline {
         // Winning archetype = highest gate weight = highest pi (sigmoid monotonic)
         let winner = (0..3)
             .map(|k| (k, pi_override[k]))
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .map(|(k, _)| k)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).map_or(0, |(k, _)| k);
 
         (out, winner)
     }
@@ -211,9 +207,7 @@ impl MoveCluster {
 
         let winner = (0..12)
             .map(|k| (k, pi_override[k]))
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .map(|(k, _)| k)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).map_or(0, |(k, _)| k);
 
         (out, winner)
     }
@@ -241,9 +235,7 @@ impl CombatCluster {
 
         let winner = (0..6)
             .map(|k| (k, pi_override[k]))
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .map(|(k, _)| k)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).map_or(0, |(k, _)| k);
 
         (out, winner)
     }
@@ -272,9 +264,7 @@ impl QuestCluster {
 
         let winner = (0..3)
             .map(|k| (k, pi_override[k]))
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-            .map(|(k, _)| k)
-            .unwrap_or(0);
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).map_or(0, |(k, _)| k);
 
         (out, winner)
     }
@@ -380,28 +370,28 @@ fn poc_variable_rank_domain_expert() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║  Research 453 PoC: Variable-Rank Domain Expert Clusters     ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  N_NPCS = {}                                              ║", N_NPCS);
+    println!("║  N_NPCS = {N_NPCS}                                              ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  BASELINE: CommittedFieldBlend<3, 32> (uniform D=32)       ║");
-    println!("║    Archetype wins: {:?}", baseline_counts);
+    println!("║    Archetype wins: {baseline_counts:?}");
     println!("║    Entropy:        {:.4} bits (max=log₂(3)={:.4})", baseline_entropy, (3.0f32).log2());
-    println!("║    Latency:        {:.1} ns/NPC", baseline_latency_ns);
+    println!("║    Latency:        {baseline_latency_ns:.1} ns/NPC");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  VARIABLE-RANK: domain gate → project → per-domain blend    ║");
     println!("║    Domain split:  move={} combat={} quest={}",
         domain_counts[0], domain_counts[1], domain_counts[2]);
-    println!("║    Move wins:     {:?}", move_counts);
-    println!("║    Combat wins:   {:?}", combat_counts);
-    println!("║    Quest wins:    {:?}", quest_counts);
+    println!("║    Move wins:     {move_counts:?}");
+    println!("║    Combat wins:   {combat_counts:?}");
+    println!("║    Quest wins:    {quest_counts:?}");
     println!("║    Move entropy:  {:.4} bits (max=log₂(12)={:.4})", move_entropy, (12.0f32).log2());
     println!("║    Combat entropy:{:.4} bits (max=log₂(6)={:.4})", combat_entropy, (6.0f32).log2());
     println!("║    Quest entropy: {:.4} bits (max=log₂(3)={:.4})", quest_entropy, (3.0f32).log2());
-    println!("║    Weighted avg:  {:.4} bits", variable_entropy);
-    println!("║    Latency:       {:.1} ns/NPC", variable_latency_ns);
+    println!("║    Weighted avg:  {variable_entropy:.4} bits");
+    println!("║    Latency:       {variable_latency_ns:.1} ns/NPC");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  COMPARISON                                                 ║");
-    println!("║    Entropy ratio:  {:.2}× (variable / baseline)", entropy_ratio);
-    println!("║    Latency ratio:  {:.2}× (variable / baseline)", latency_ratio);
+    println!("║    Entropy ratio:  {entropy_ratio:.2}× (variable / baseline)");
+    println!("║    Latency ratio:  {latency_ratio:.2}× (variable / baseline)");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  GATES                                                      ║");
     println!("║    G1 correctness: {} (all {} NPCs processed)", if g1_pass { "✅ PASS" } else { "❌ FAIL" }, N_NPCS);
@@ -433,19 +423,19 @@ fn g1_correctness_no_nan_no_collapse() {
 
         // Baseline
         let (out, winner) = baseline.tick(&state, &pi3);
-        assert!(out.iter().all(|v| v.is_finite()), "baseline NaN at NPC {}", i);
+        assert!(out.iter().all(|v| v.is_finite()), "baseline NaN at NPC {i}");
         assert!(winner < 3, "baseline invalid winner");
 
         // Move cluster
         let pi12 = std::array::from_fn(|k| prng(seed + 100 + k as u64));
         let (out8, winner8) = move_cluster.tick(&state, &pi12);
-        assert!(out8.iter().all(|v| v.is_finite()), "move NaN at NPC {}", i);
+        assert!(out8.iter().all(|v| v.is_finite()), "move NaN at NPC {i}");
         assert!(winner8 < 12, "move invalid winner");
 
         // Combat cluster
         let pi6 = std::array::from_fn(|k| prng(seed + 200 + k as u64));
         let (out16, winner16) = combat_cluster.tick(&state, &pi6);
-        assert!(out16.iter().all(|v| v.is_finite()), "combat NaN at NPC {}", i);
+        assert!(out16.iter().all(|v| v.is_finite()), "combat NaN at NPC {i}");
         assert!(winner16 < 6, "combat invalid winner");
     }
 }

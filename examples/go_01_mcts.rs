@@ -35,7 +35,7 @@ fn mcts_select_move(state: &GoState, budget: usize, rng: &mut fastrand::Rng) -> 
 
     // If only pass available, just pass
     if actions.len() == 1 {
-        return actions[0].clone();
+        return actions[0];
     }
 
     // Filter out pass for MCTS — only search stone placements.

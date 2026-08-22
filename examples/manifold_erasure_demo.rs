@@ -50,9 +50,9 @@ fn main() {
     println!("║  MANCE Manifold-Aware Concept Erasure Demo (Plan 426)     ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    println!("Input: x = {:?}", x);
-    println!("Erasure direction: u = {:?}", u);
-    println!("Natural pool: {} points in {}-d space\n", n, d);
+    println!("Input: x = {x:?}");
+    println!("Erasure direction: u = {u:?}");
+    println!("Natural pool: {n} points in {d}-d space\n");
 
     // (a) Single MANCE step with default config.
     let config = ManceConfig {
@@ -82,8 +82,8 @@ fn main() {
         "── (a) Single MANCE step (ε={}, α={}) ──",
         config.epsilon, config.alpha
     );
-    println!("  Target alignment before: {:.6}", x_align);
-    println!("  Target alignment after:  {:.6}", out_align);
+    println!("  Target alignment before: {x_align:.6}");
+    println!("  Target alignment after:  {out_align:.6}");
     println!(
         "  Reduction:               {:.1}%",
         (1.0 - out_align / x_align) * 100.0
@@ -185,8 +185,8 @@ fn main() {
         .max(0.0)
         .sqrt();
 
-    println!("  MANCE orthogonal energy:        {:.6}", mance_orth);
-    println!("  Unconstrained orthogonal energy: {:.6}", uncon_orth);
+    println!("  MANCE orthogonal energy:        {mance_orth:.6}");
+    println!("  Unconstrained orthogonal energy: {uncon_orth:.6}");
     println!("  MANCE preserves more: {}", mance_orth >= uncon_orth);
 
     println!("\n╔════════════════════════════════════════════════════════════╗");

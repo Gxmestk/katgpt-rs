@@ -479,7 +479,7 @@ mod tests {
 
         // Accumulate gap beyond threshold
         let gap_needed = threshold + 1.0;
-        for _ in 0..(gap_needed as u32 + 1) {
+        for _ in 0..=gap_needed as u32 {
             state.update_phase_gap(1.0, 0.0);
         }
         assert!(
@@ -703,8 +703,7 @@ mod tests {
                 })
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
             assert!(best_arm < NUM_ARMS);
             // SafePhased selection (same UCB1 + mixture)
             let arm = state.select_with_safe_mixture(best_arm, &mut rng);

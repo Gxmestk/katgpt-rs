@@ -12,6 +12,16 @@
 mod context;
 mod contiguous;
 mod kv_cache;
+#[cfg(feature = "transformer_moe")]
+pub mod moe;
+// MoE analytic backward pass (Plan 318 Phase C C4). CPU reference for the
+// GPU backward. Gated behind `moe_backward` (implies `transformer_moe`).
+// katgpt-rs is modelless-by-mandate; this is the training-time reference
+// consumed by riir-train, never on the production inference path.
+#[cfg(feature = "moe_backward")]
+pub mod moe_backward;
+#[cfg(feature = "transformer_attn_res")]
+pub mod attn_res;
 mod mtp;
 mod weights;
 
@@ -50,6 +60,9 @@ pub use contiguous::load_ternary_bits;
 // Contiguous binary loader (Issue 145, gated `binary_plasma`).
 #[cfg(feature = "binary_plasma")]
 pub use contiguous::load_binary_bits;
+// Contiguous group-scale ternary loader — the Q2_0_g128 container (Issue 578).
+#[cfg(feature = "ternary_group_scale")]
+pub use contiguous::load_ternary_group_bits;
 
 // Decode stage for specialized forward paths (Plan 102: TileRT pipeline).
 /// Different stages have different optimization opportunities:

@@ -157,9 +157,10 @@ pub fn soft_gate_bias(utility: f32) -> f32 {
 /// bias = 0 if u ≥ τ (retain), -∞ if u < τ (prune).
 #[inline(always)]
 pub fn hard_gate_bias(utility: f32, threshold: f32) -> f32 {
-    match utility >= threshold {
-        true => 0.0,
-        false => f32::NEG_INFINITY,
+    if utility >= threshold {
+        0.0
+    } else {
+        f32::NEG_INFINITY
     }
 }
 
@@ -169,10 +170,7 @@ pub fn hard_gate_bias(utility: f32, threshold: f32) -> f32 {
 /// α ramps from 0→1 over annealing period.
 #[inline(always)]
 pub fn tahg_gate_bias(utility: f32, threshold: f32, alpha: f32) -> f32 {
-    let hard_indicator = match utility >= threshold {
-        true => 1.0f32,
-        false => 0.0f32,
-    };
+    let hard_indicator = if utility >= threshold { 1.0f32 } else { 0.0f32 };
     let blended = (1.0 - alpha) * utility + alpha * hard_indicator;
     (blended + 1e-8f32).ln()
 }

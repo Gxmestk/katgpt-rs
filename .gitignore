@@ -1,4 +1,8 @@
 /target
+
+# katgpt-moka-wasm build output (scripts/build-moka-wasm.sh)
+# The SIMD-enabled .wasm + JS glue lands here; rebuild with the script.
+/crates/katgpt-moka-wasm/target-wasm/
 .raw
 checkpoints/
 output/
@@ -22,3 +26,9 @@ __pycache__/
 
 # Local agent tool configuration (Claude Code, etc.)
 .claude/
+data/kimi-k3-0.40b/
+# Kimi-K3 layer-diff debug artifacts (regenerable via scripts/kimi_ref/run_reference.py + dump_layer*.py)
+scripts/kimi_ref/ref_output/
+
+# Symlink to AGENTS.md so Claude Code reads the same instructions as Zed's agent
+CLAUDE.md

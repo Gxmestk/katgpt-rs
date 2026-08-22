@@ -187,9 +187,7 @@ mod tests {
         // The worker saw its own ~4 KiB allocation (modulo Vec bookkeeping).
         assert!(
             worker_bytes >= WORKER_ALLOC_BYTES,
-            "worker thread should have seen its own {}-byte allocation, got {}",
-            WORKER_ALLOC_BYTES,
-            worker_bytes
+            "worker thread should have seen its own {WORKER_ALLOC_BYTES}-byte allocation, got {worker_bytes}"
         );
         // The main thread must NOT see the worker's allocation. Some runtime
         // bookkeeping from `recv`/`join` may allocate on this thread, but it

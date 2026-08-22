@@ -38,7 +38,7 @@
 #![allow(clippy::too_many_lines)]
 
 use katgpt_kv::cs_kv_probe::{
-    CsKvProbe, CsProbeConfig, DensityBudget, Episode, GatedKvSlice, KvGroupRanking, sample_masks,
+    sample_masks, CsKvProbe, CsProbeConfig, DensityBudget, Episode, GatedKvSlice, KvGroupRanking,
 };
 
 // ─── Allocation tracking (T3.5) ─────────────────────────────────────────
@@ -111,8 +111,8 @@ fn g1_cs_ranking_beats_random() {
     let overlap_frac = overlap as f32 / 3.0;
 
     println!("\n=== G1: CS ranking vs random ===");
-    println!("  signal_heads = {:?}", signal_heads);
-    println!("  CS top-3     = {:?}", cs_top3);
+    println!("  signal_heads = {signal_heads:?}");
+    println!("  CS top-3     = {cs_top3:?}");
     println!(
         "  overlap      = {overlap}/3 ({:.0}%)",
         overlap_frac * 100.0
@@ -130,7 +130,7 @@ fn g1_cs_ranking_beats_random() {
     let random_overlap = average_random_overlap(n_heads, 3, &signal_heads, 10_000, &mut rng);
     let margin_pp = (overlap_frac - random_overlap) * 100.0;
     println!("  random avg   = {:.0}%", random_overlap * 100.0);
-    println!("  margin       = +{:.1}pp (need ≥+15pp)", margin_pp);
+    println!("  margin       = +{margin_pp:.1}pp (need ≥+15pp)");
     assert!(
         margin_pp >= 15.0,
         "G1 FAIL: CS beats random by only {margin_pp:.1}pp, need ≥+15pp"

@@ -387,15 +387,14 @@ fn identify_inner(
         s.fix_set.clear();
         s.fix_set
             .extend(g.nodes.iter().copied().filter(|n| !c.contains(n)));
-        match try_fixseq_into(g, &s.fix_set, &mut s.fixseq_ws) {
-            Ok(()) => return Ok(AdmgSignature::from_nodes(d.iter().copied())),
-            Err(_) => {
-                return Err(IdentificationError::NotIdentifiable {
-                    cause: cause_head,
-                    effect: effect_head,
-                    hedge: first_two_nodes(c),
-                });
-            }
+        if let Ok(()) = try_fixseq_into(g, &s.fix_set, &mut s.fixseq_ws) {
+            return Ok(AdmgSignature::from_nodes(d.iter().copied()));
+        } else {
+            return Err(IdentificationError::NotIdentifiable {
+                cause: cause_head,
+                effect: effect_head,
+                hedge: first_two_nodes(c),
+            });
         }
     }
 

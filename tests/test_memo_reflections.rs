@@ -31,9 +31,10 @@ fn test_memo_reflections_goat_pair_count() {
                 })
                 .to_string(),
             ),
-            outcome_description: match i % 3 == 0 {
-                true => Some(format!("player_{id} eliminated at tick {i}", id = i % 4)),
-                false => None,
+            outcome_description: if i % 3 == 0 {
+                Some(format!("player_{id} eliminated at tick {i}", id = i % 4))
+            } else {
+                None
             },
             score: 1.0 / (1.0 + (i as f32 - 50.0).abs() / 50.0),
         })
@@ -59,8 +60,7 @@ fn test_memo_reflections_goat_pair_count() {
     let cross_count = result.step_counts[5]; // CrossGameSynthesis index
     assert!(
         cross_count >= 10,
-        "GOAT FAIL: Expected ≥10 cross-game pairs, got {}. G3 FAILED.",
-        cross_count
+        "GOAT FAIL: Expected ≥10 cross-game pairs, got {cross_count}. G3 FAILED."
     );
 
     println!("✅ MeMo Reflection QA GOAT PASSED");
@@ -110,9 +110,10 @@ fn test_memo_reflections_bandit_win_rate_improvement() {
                 })
                 .to_string(),
             ),
-            outcome_description: match i % 3 == 0 {
-                true => Some(format!("player_{id} eliminated at tick {i}", id = i % 4)),
-                false => None,
+            outcome_description: if i % 3 == 0 {
+                Some(format!("player_{id} eliminated at tick {i}", id = i % 4))
+            } else {
+                None
             },
             score: 1.0 / (1.0 + (i as f32 - 50.0).abs() / 50.0),
         })
@@ -190,10 +191,10 @@ fn test_memo_reflections_bandit_win_rate_improvement() {
     );
 
     println!("✅ MeMo Reflection QA Bandit GOAT PASSED");
-    println!("   Raw density:            {:.3}", raw_density);
-    println!("   Reflection density:     {:.3}", reflection_density);
-    println!("   Raw avg reward:         {:.3}", raw_avg_reward);
-    println!("   Reflection avg reward:  {:.3}", reflection_avg_reward);
+    println!("   Raw density:            {raw_density:.3}");
+    println!("   Reflection density:     {reflection_density:.3}");
+    println!("   Raw avg reward:         {raw_avg_reward:.3}");
+    println!("   Reflection avg reward:  {reflection_avg_reward:.3}");
     println!(
         "   Control bandit:  avg_reward={:.3}, found_optimal={}",
         result_control.avg_reward(),

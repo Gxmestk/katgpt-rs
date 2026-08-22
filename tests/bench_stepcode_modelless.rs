@@ -315,8 +315,7 @@ fn select_thompson_arm(stats: &BanditStats, num_arms: usize, rng: &mut Rng) -> u
     (0..num_arms)
         .map(|i| (i, stats.thompson_sample(i, rng)))
         .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .map_or(0, |(i, _)| i)
 }
 
 // ── Bench 3: Path Consistency Computation ───────────────────────

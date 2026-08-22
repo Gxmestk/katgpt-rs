@@ -162,14 +162,14 @@ mod tests {
     fn test_adaptive_budget_clamped_lower() {
         // Even with r=0.01, budget shouldn't go below base/2
         let budget = adaptive_tree_budget(100, 0.01, BudgetAdaptation::Compression);
-        assert!(budget >= 50, "budget {} < base/2 = 50", budget);
+        assert!(budget >= 50, "budget {budget} < base/2 = 50");
     }
 
     #[test]
     fn test_adaptive_budget_clamped_upper() {
         // Even with r=1.0, budget shouldn't exceed base*2
         let budget = adaptive_tree_budget(100, 1.0, BudgetAdaptation::Compression);
-        assert!(budget <= 200, "budget {} > base*2 = 200", budget);
+        assert!(budget <= 200, "budget {budget} > base*2 = 200");
     }
 
     // ── Entropy mode tests (Plan 175 Fusion 2: RangeBudget) ────────
@@ -201,8 +201,7 @@ mod tests {
         let budget = adaptive_tree_budget(100, 10.0, BudgetAdaptation::Entropy);
         assert!(
             budget <= 200,
-            "H>threshold should clamp at base*2, got {}",
-            budget
+            "H>threshold should clamp at base*2, got {budget}"
         );
     }
 
@@ -233,8 +232,7 @@ mod tests {
         let h = shannon_entropy(&probs);
         assert!(
             h < 0.01,
-            "deterministic distribution should have ~0 entropy, got {}",
-            h
+            "deterministic distribution should have ~0 entropy, got {h}"
         );
     }
 
@@ -245,8 +243,7 @@ mod tests {
         let h = shannon_entropy(&probs);
         assert!(
             (h - 4.0f32.ln()).abs() < 0.01,
-            "uniform(4) should have H=ln(4)≈1.386, got {}",
-            h
+            "uniform(4) should have H=ln(4)≈1.386, got {h}"
         );
     }
 
@@ -257,8 +254,7 @@ mod tests {
         let h = shannon_entropy(&probs);
         assert!(
             (h - 27.0f32.ln()).abs() < 0.01,
-            "uniform(27) should have H=ln(27)≈3.296, got {}",
-            h
+            "uniform(27) should have H=ln(27)≈3.296, got {h}"
         );
     }
 
@@ -276,8 +272,7 @@ mod tests {
         let h = entropy_signal(&probs);
         assert!(
             h < 1.0,
-            "peaked distribution should have low entropy, got {}",
-            h
+            "peaked distribution should have low entropy, got {h}"
         );
     }
 

@@ -21,10 +21,13 @@
 //! # G5 (Super-GOAT confirmation)
 //!
 //! G5 is the quality-axis gate (paper's 0.999 edit score at d=128, F=2048 — does
-//! the construction hold at our d=64 shard scale?). G5 is BLOCKED on the PoC at
-//! `riir-neuron-db/.issues/027` — a three-competitor race
-//! (Hebbian-data-dependent vs GD-trained vs frozen-baseline) at d=64, F=128.
-//! Until G5 lands, the primitive stays opt-in.
+//! the construction hold at our d=64 shard scale?). G5 was resolved 2026-07-25
+//! (riir-neuron-db Bench 462, the three-competitor race
+//! (Hebbian-data-dependent vs GD-trained vs frozen-baseline) at d=64, F=128):
+//! Constructed=GD edit_score 1.000 at 2/5/10% edits vs Frozen 0.000 efficacy —
+//! G5 PASS. The primitive was promoted DEFAULT-ON the same day (Phase 24,
+//! Plan 559 Phase 3); the IP-bearing `hebbian_fact_store` bridge in
+//! riir-neuron-db stays opt-in (Defense-3 layer split).
 //!
 //! # Run
 //!
@@ -362,9 +365,10 @@ fn main() {
         }
     }
 
-    println!("\n=== G5 (Super-GOAT quality-axis gate) — PENDING PoC ===");
-    println!("    PoC: riir-neuron-db/.issues/027 (three-competitor race at d=64, F=128).");
-    println!("    Until G5 lands, the primitive stays opt-in (per Plan 559 Phase 3).");
+    println!("\n=== G5 (Super-GOAT quality-axis gate) — RESOLVED 2026-07-25 (Bench 462, riir-neuron-db) ===");
+    println!("    Three-competitor race at d=64, F=128: Constructed=GD edit_score 1.000");
+    println!("    at 2/5/10% edits vs Frozen 0.000 efficacy — G5 PASS.");
+    println!("    Primitive promoted DEFAULT-ON 2026-07-25 (Phase 24, Plan 559 Phase 3).");
 
     if all_pass {
         println!("\n✅ ALL G1–G4 GATES PASS — Plan 559 Phase 1 GOAT gate green.");

@@ -969,6 +969,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-regex"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e24cb5a94bcae1e5408b0effca5cd7172ea3c5755049c5f3af4cd283a165298"
+dependencies = [
+ "bit-set",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1794,7 +1805,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "ahash",
  "arrayvec",
@@ -1827,7 +1838,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-dec"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "katgpt-deprecated"
@@ -1857,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-hla"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "katgpt-types",
  "serde",
@@ -1880,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-micro-belief"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "blake3",
  "fastrand",
@@ -1893,11 +1904,19 @@ dependencies = [
 name = "katgpt-moka-wasm"
 version = "0.1.0"
 dependencies = [
+ "katgpt-nn",
  "katgpt-types",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasmi",
+]
+
+[[package]]
+name = "katgpt-nn"
+version = "0.1.0"
+dependencies = [
+ "katgpt-types",
 ]
 
 [[package]]
@@ -1911,7 +1930,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-personality"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "blake3",
  "katgpt-types",
@@ -1968,10 +1987,12 @@ dependencies = [
 name = "katgpt-rs"
 version = "0.2.1"
 dependencies = [
+ "base64",
  "bevy_ecs",
  "blake3",
  "bytemuck",
  "crossterm",
+ "fancy-regex",
  "fastrand",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
@@ -1997,6 +2018,7 @@ dependencies = [
  "katgpt-transformer",
  "katgpt-validator",
  "log",
+ "memmap2",
  "papaya",
  "plotters",
  "postcard",
@@ -2004,11 +2026,11 @@ dependencies = [
  "rayon",
  "reqwest",
  "rustfft",
+ "safetensors",
  "serde",
  "serde_json",
  "tempfile",
  "toml",
- "uuid",
  "wasmi",
 ]
 
@@ -2024,7 +2046,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-sense"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "blake3",
  "fastrand",
@@ -2034,7 +2056,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-sleep"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "blake3",
  "katgpt-types",
@@ -2112,7 +2134,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "blake3",
  "fastrand",
@@ -2249,6 +2271,15 @@ name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
+
+[[package]]
+name = "memmap2"
+version = "0.9.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "metal"

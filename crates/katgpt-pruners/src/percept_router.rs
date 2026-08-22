@@ -199,15 +199,14 @@ mod tests {
         // Single region → entropy = 0 → sigmoid(1 * 0) = sigmoid(0) = 0.5
         assert!(
             (c - 0.5).abs() < 0.01,
-            "single-region complexity should be ~0.5 (sigmoid(0)), got {}",
-            c
+            "single-region complexity should be ~0.5 (sigmoid(0)), got {c}"
         );
     }
 
     #[test]
     fn test_complexity_high_for_complex_partition() {
         // Many mixed regions → high entropy → high complexity
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(30);
         for i in 0..30 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -223,8 +222,7 @@ mod tests {
         // 30 regions * ln(3) ≈ 30 * 1.099 ≈ 33 → sigmoid(33) ≈ 1.0
         assert!(
             c > 0.99,
-            "complex partition should have high complexity, got {}",
-            c
+            "complex partition should have high complexity, got {c}"
         );
     }
 
@@ -240,7 +238,7 @@ mod tests {
     #[test]
     fn test_route_deep_for_complex() {
         // Many mixed regions
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(30);
         for i in 0..30 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -283,7 +281,7 @@ mod tests {
         );
 
         // Complex partition
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(50);
         for i in 0..50 {
             let label = match i % 3 {
                 0 => RegionLabel::Accept,
@@ -302,7 +300,7 @@ mod tests {
     #[test]
     fn test_entropy_of_uniform_labels() {
         // Equal distribution: 10 accept, 10 reject, 10 maybe
-        let mut regions = Vec::new();
+        let mut regions = Vec::with_capacity(10);
         for _ in 0..10 {
             regions.push(BorelRegion::new(RegionLabel::Accept, vec![], 5));
         }
@@ -318,8 +316,7 @@ mod tests {
         let expected = (3.0f32).ln(); // ln(3) ≈ 1.099
         assert!(
             (entropy - expected).abs() < 0.01,
-            "uniform distribution entropy should be ln(3) ≈ 1.099, got {}",
-            entropy
+            "uniform distribution entropy should be ln(3) ≈ 1.099, got {entropy}"
         );
     }
 }

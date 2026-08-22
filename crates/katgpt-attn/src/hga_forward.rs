@@ -111,27 +111,27 @@ pub fn forward_hga(
     // Entmax-1.5 over chunk scores for sparse selection.
     let (chunk_probs, _tau) = entmax_1p5(&chunk_scores);
 
-    // Select top-k_c chunks by entmax probability (or all if budget allows).
-    let mut chunk_indices_scored: Vec<(usize, f32)> = chunk_probs
-        .iter()
-        .enumerate()
-        .filter(|(_, p)| **p > 0.0)
-        .map(|(i, p)| (i, *p))
-        .collect();
-    chunk_indices_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
-
-    let max_chunks = budget.k_c.min(n_chunks);
-    let selected_chunks: Vec<usize> = chunk_indices_scored
-        .iter()
-        .take(max_chunks)
-        .map(|(i, _)| *i)
-        .collect();
-
-    // If budget is FULL, select all chunks.
-    let selected_chunks = if budget.k_c == usize::MAX {
+    // Select top-k_c chunks by entmax probability (or all if budget is FULL).
+    //
+    // The FULL branch is tested first: previously the probability-ranked
+    // `chunk_indices_scored` Vec was always built, sorted (O(n log n)) and
+    // collected into a `selected_chunks` Vec that the FULL override then threw
+    // away. Hoisting the check skips two allocations plus the sort on that path,
+    // and drops the always-discarded intermediate collect on the budgeted path.
+    // The budgeted path's filter → sort → take sequence is unchanged.
+    let selected_chunks: Vec<usize> = if budget.k_c == usize::MAX {
         (0..n_chunks).collect()
     } else {
-        selected_chunks
+        let mut chunk_indices_scored: Vec<(usize, f32)> = chunk_probs
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| **p > 0.0)
+            .map(|(i, p)| (i, *p))
+            .collect();
+        chunk_indices_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let max_chunks = budget.k_c.min(n_chunks);
+        chunk_indices_scored.truncate(max_chunks);
+        chunk_indices_scored.into_iter().map(|(i, _)| i).collect()
     };
 
     // ── Stage 2: group-level scoring + top-k_g ───────────────────────────────

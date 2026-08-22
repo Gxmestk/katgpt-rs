@@ -54,15 +54,13 @@ mod tests {
                 degree: 1,
                 root_discriminant: 1.0,
             };
-            let delta = arm.compute_delta().map(|d| d.delta).unwrap_or(0.0);
-            println!("  Q(i) t={}: δ={:.8}", n, delta);
+            let delta = arm.compute_delta().map_or(0.0, |d| d.delta);
+            println!("  Q(i) t={n}: δ={delta:.8}");
 
             if prev_delta > 0.0 {
                 assert!(
                     delta >= prev_delta - 1e-10,
-                    "δ should be non-decreasing with more primes: {} < {}",
-                    delta,
-                    prev_delta
+                    "δ should be non-decreasing with more primes: {delta} < {prev_delta}"
                 );
             }
             prev_delta = delta;
@@ -104,12 +102,10 @@ mod tests {
         let worst_pulls = bandit.stats().iter().map(|(_, _, p)| *p).min().unwrap_or(0);
         let best_pulls = top3[0].2;
 
-        println!("  Best arm pulls: {} vs worst: {}", best_pulls, worst_pulls);
+        println!("  Best arm pulls: {best_pulls} vs worst: {worst_pulls}");
         assert!(
             best_pulls > worst_pulls,
-            "Best arm should have more pulls than worst: {} vs {}",
-            best_pulls,
-            worst_pulls
+            "Best arm should have more pulls than worst: {best_pulls} vs {worst_pulls}"
         );
 
         println!("✅ GOAT Proof T5-G3 passed. Bandit concentrates on best arms.");
@@ -322,8 +318,8 @@ mod tests {
         assert!(verification.delta_positive, "δ must be positive");
 
         // Verify δ from the field matches the search result
-        let field_delta = field.delta().map(|d| d.delta).unwrap_or(0.0);
-        println!("  Field δ:          {:.8}", field_delta);
+        let field_delta = field.delta().map_or(0.0, |d| d.delta);
+        println!("  Field δ:          {field_delta:.8}");
         println!("  Search δ:         {:.8}", result.best_delta);
         assert!(
             (field_delta - result.best_delta).abs() < 1e-6,
@@ -362,8 +358,7 @@ mod tests {
         for (id, _, pulls) in &stats {
             assert!(
                 *pulls > 0,
-                "Arm {} should be pulled at least once (warm-up)",
-                id
+                "Arm {id} should be pulled at least once (warm-up)"
             );
         }
 

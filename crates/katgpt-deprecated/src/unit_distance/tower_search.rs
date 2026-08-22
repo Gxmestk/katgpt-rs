@@ -111,7 +111,7 @@ impl std::fmt::Display for TowerFamily {
             Self::Qi => write!(f, "Q(i)"),
             Self::QSqrt5I => write!(f, "Q(√5,i)"),
             Self::Pro2Tower => write!(f, "Pro-2"),
-            Self::Cyclotomic { degree } => write!(f, "Cyc({})", degree),
+            Self::Cyclotomic { degree } => write!(f, "Cyc({degree})"),
         }
     }
 }
@@ -166,7 +166,7 @@ impl TowerArm {
                     denominator: self.denominator,
                 };
                 let exponents = vec![1; params.split_primes.len()];
-                CmField::from_params(&format!("Cyc({})", degree), params, exponents)
+                CmField::from_params(&format!("Cyc({degree})"), params, exponents)
             }
         }
     }
@@ -434,7 +434,7 @@ impl TowerSearch {
 
     /// Evaluate a single arm — compute its δ.
     pub fn evaluate_arm(arm: &TowerArm) -> f64 {
-        arm.compute_delta().map(|d| d.delta).unwrap_or(0.0)
+        arm.compute_delta().map_or(0.0, |d| d.delta)
     }
 
     /// Run the full search.
@@ -550,9 +550,7 @@ mod tests {
         let d8 = arm8.compute_delta().unwrap().delta;
         assert!(
             d8 > d3,
-            "More split primes should give larger δ: {} vs {}",
-            d8,
-            d3
+            "More split primes should give larger δ: {d8} vs {d3}"
         );
     }
 

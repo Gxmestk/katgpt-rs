@@ -106,8 +106,13 @@ pub fn forward_training_free_loop<'a>(
         ctx.x[..n].copy_from_slice(&ctx.tf_x_pre_window[..n]);
     }
 
-    // Temp buffer for window output (pre-allocated on ForwardContext)
-    ctx.tf_y_buf[..n].fill(0.0);
+    // Temp buffer for window output (pre-allocated on ForwardContext).
+    // No pre-zero needed: `tf_y_buf` is the only user of this buffer in the whole
+    // crate (grep: written at 2 sites, read at 2 sites), and every read is
+    // immediately preceded by a full-width
+    // `tf_y_buf[..n].copy_from_slice(&ctx.x[..n])` in the same loop iteration —
+    // in both `IterationMode` arms. Nothing after the loop reads it, so when
+    // `k == 0` the buffer is never observed at all.
 
     // 4. Loop K times over the window with sub-stepping
     match tf_config.iteration_mode {

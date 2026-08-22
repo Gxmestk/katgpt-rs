@@ -109,19 +109,18 @@ pub struct StructuralDiffSynthesizer;
 impl ConstraintSynthesizer for StructuralDiffSynthesizer {
     fn synthesize(&self, candidate: &[usize], reference: &[usize]) -> Vec<SynthesizedConstraint> {
         let min_len = candidate.len().min(reference.len());
-        let mut constraints = Vec::new();
+        let mut constraints = Vec::with_capacity(min_len);
 
         for pos in 0..min_len {
-            match candidate[pos] == reference[pos] {
-                true => continue, // agree — no constraint
-                false => {
-                    // disagree — constrain to reference's token
-                    constraints.push(SynthesizedConstraint {
-                        position_range: (pos, pos + 1),
-                        allowed_tokens: vec![reference[pos]],
-                        disallowed_tokens: vec![candidate[pos]],
-                    });
-                }
+            if candidate[pos] == reference[pos] {
+                continue;
+            } else {
+                // disagree — constrain to reference's token
+                constraints.push(SynthesizedConstraint {
+                    position_range: (pos, pos + 1),
+                    allowed_tokens: vec![reference[pos]],
+                    disallowed_tokens: vec![candidate[pos]],
+                });
             }
         }
 
@@ -223,18 +222,17 @@ impl<P: ConstraintPruner, L: EpisodeLookup, S: ConstraintSynthesizer> EpisodePru
         token_idx: usize,
     ) -> bool {
         for c in constraints {
-            match depth >= c.position_range.0 && depth < c.position_range.1 {
-                false => continue,
-                true => {
-                    // If allowed_tokens is non-empty, token must be in it
-                    if !c.allowed_tokens.is_empty() && !c.allowed_tokens.contains(&token_idx) {
-                        return true;
-                    }
-                    // If token is explicitly disallowed, reject
-                    if c.disallowed_tokens.contains(&token_idx) {
-                        return true;
-                    }
+            if depth >= c.position_range.0 && depth < c.position_range.1 {
+                // If allowed_tokens is non-empty, token must be in it
+                if !c.allowed_tokens.is_empty() && !c.allowed_tokens.contains(&token_idx) {
+                    return true;
                 }
+                // If token is explicitly disallowed, reject
+                if c.disallowed_tokens.contains(&token_idx) {
+                    return true;
+                }
+            } else {
+                continue;
             }
         }
         false
@@ -276,13 +274,12 @@ impl<P: ConstraintPruner, L: EpisodeLookup, S: ConstraintSynthesizer> Constraint
         let len = candidates.len().min(results.len());
         for (_, constraints) in &self.constraint_cache {
             for i in 0..len {
-                match results[i] {
-                    false => continue, // already rejected by inner
-                    true => {
-                        if Self::is_disallowed_by_synthesis(constraints, depth, candidates[i]) {
-                            results[i] = false;
-                        }
+                if results[i] {
+                    if Self::is_disallowed_by_synthesis(constraints, depth, candidates[i]) {
+                        results[i] = false;
                     }
+                } else {
+                    continue;
                 }
             }
         }
@@ -336,9 +333,10 @@ impl Default for MemoryEpisodeLookup {
 impl EpisodeLookup for MemoryEpisodeLookup {
     fn lookup(&self, prompt_hash: u64) -> Option<Episode> {
         for ep in &self.episodes {
-            match ep.prompt_hash == prompt_hash {
-                true => return Some(ep.clone()),
-                false => continue,
+            if ep.prompt_hash == prompt_hash {
+                return Some(ep.clone());
+            } else {
+                continue;
             }
         }
         None

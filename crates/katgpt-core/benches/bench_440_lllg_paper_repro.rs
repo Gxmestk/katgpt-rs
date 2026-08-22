@@ -333,8 +333,7 @@ fn ensure_connected(map: &mut GridMap) {
             .iter()
             .enumerate()
             .max_by_key(|(_, s)| *s)
-            .map(|(i, _)| i as i32)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i as i32);
 
         // Scan wall cells for one adjacent to BOTH main and a small component.
         'outer: for wy in 0..h {
@@ -455,9 +454,8 @@ fn run_simulation(map: &GridMap, n_agents: usize, steps: usize, seed: u64) -> Si
     // When set, uses EscalationBudget::multistep_default() (stuck-agent
     // targeting + depth-8 + larger node/time budget) for maze-class maps.
     // Default: not set → Plan 453 one-step behavior (paper-faithful).
-    let multistep = std::env::var("LLLG_MULTISTEP")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
+    let multistep =
+        std::env::var("LLLG_MULTISTEP").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
     #[cfg(feature = "lacam_escalation")]
     let mut lacam = if multistep {
         lacam.with_escalation_budget(EscalationBudget::multistep_default())
@@ -733,7 +731,7 @@ fn main() {
     let n_agents_g1 = 800;
     let steps_g1 = 300;
 
-    let mut g1_details = Vec::new();
+    let mut g1_details = Vec::with_capacity(maps.len());
 
     for (map_name, map) in &maps {
         // Scale agent count down if the map is too small.

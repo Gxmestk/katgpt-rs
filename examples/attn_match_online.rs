@@ -58,14 +58,13 @@ fn main() {
     let total_generate: usize = 4096;
 
     println!(
-        "\nConfig: phys_budget = {}, recent_window = {}, compact_size = {}",
-        phys_budget, recent_window, compact_size
+        "\nConfig: phys_budget = {phys_budget}, recent_window = {recent_window}, compact_size = {compact_size}"
     );
     println!(
         "Trigger threshold: pos >= {} (phys_budget + recent_window)",
         phys_budget + recent_window
     );
-    println!("Will generate {} tokens total.", total_generate);
+    println!("Will generate {total_generate} tokens total.");
 
     let cfg = AmConfig::highest_attn(compact_size);
     let compactor = OnlineCompactor::new(phys_budget, recent_window);
@@ -145,7 +144,7 @@ fn main() {
         "  Tokens generated (post initial): {}",
         total_generate - (phys_budget + recent_window)
     );
-    println!("  Compactions triggered: {}", compaction_count);
+    println!("  Compactions triggered: {compaction_count}");
     println!();
 
     if !compaction_log.is_empty() {
@@ -181,14 +180,14 @@ fn main() {
             max_logical,
             phys_budget + recent_window
         );
-        println!("  Max physical position observed: {}", max_phys);
+        println!("  Max physical position observed: {max_phys}");
         println!(
             "  Logical stays bounded at ~phys_budget + recent_window = {} while physical grows.",
             phys_budget + recent_window
         );
 
-        let bytes_first = compaction_log.first().map(|(_, _, pb, _)| *pb).unwrap_or(0);
-        let bytes_last = compaction_log.last().map(|(_, _, _, cb)| *cb).unwrap_or(0);
+        let bytes_first = compaction_log.first().map_or(0, |(_, _, pb, _)| *pb);
+        let bytes_last = compaction_log.last().map_or(0, |(_, _, _, cb)| *cb);
         println!(
             "\n  Memory: peak physical = {} bytes, post-compaction = {} bytes ({:.1}% reduction)",
             bytes_first,

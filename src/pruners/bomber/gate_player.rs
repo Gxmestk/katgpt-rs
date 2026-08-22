@@ -150,8 +150,6 @@ impl BomberPlayer for GatePlayer {
         update_powerups(&mut self.known_powerups, events);
 
         let in_danger = in_blast_zone(pos, grid, &self.known_bombs);
-        let bomb_positions: std::collections::HashSet<(i32, i32)> =
-            self.known_bombs.iter().map(|(p, _, _)| *p).collect();
 
         let vocab_size = self.config.vocab_size;
 
@@ -166,8 +164,13 @@ impl BomberPlayer for GatePlayer {
             // Wall collision filter
             if is_move {
                 let target = move_target(action, pos);
+                // Linear scan over `known_bombs` (typically < 8) instead of a
+                // per-tick `HashSet` allocation whose only use was this lookup.
                 if !grid.is_walkable(target.x, target.y)
-                    || bomb_positions.contains(&(target.x, target.y))
+                    || self
+                        .known_bombs
+                        .iter()
+                        .any(|(p, _, _)| *p == (target.x, target.y))
                 {
                     routed_scores[i] = f32::NEG_INFINITY;
                     continue;

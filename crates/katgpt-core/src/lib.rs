@@ -35,6 +35,50 @@ pub fn sigmoid(x: f32) -> f32 {
     simd::fast_sigmoid(x)
 }
 
+/// Noisy-OR span aggregation `1 − Π(1−kᵢ)`, direct product form.
+///
+/// Generalized from the riir-games-civ salience gate's literal
+/// `1 − (1−c)(1−boost)` (Research 491 distilled item 5 / Issue 672 T4 — the
+/// civ site delegates here). Inputs are clamped to `[0, 1]` (each k is a
+/// probability-style weight). Boundary identities: all k = 0 ⇒ exactly 0;
+/// any k = 1 ⇒ exactly 1; monotone non-decreasing in every k.
+///
+/// **Bit-compatibility note:** for the two-term case the accumulation is
+/// exactly `(1.0−k₀)·(1.0−k₁)` in source order — bit-identical to the civ
+/// inline formula it replaces (pinned by the sterling module's test).
+///
+/// Always available — no feature gate — same rationale as [`sigmoid`]: a
+/// pure math utility consumed across domains, with a DEFAULT-ON consumer
+/// (civ salience gate) that must not gain a feature dependency for a
+/// behavior-preserving refactor.
+#[inline]
+pub fn noisy_or(ks: &[f32]) -> f32 {
+    let mut acc = 1.0f32;
+    for &k in ks {
+        let one_minus = 1.0 - k.clamp(0.0, 1.0);
+        acc *= one_minus;
+    }
+    1.0 - acc
+}
+
+/// Log1p-stable noisy-OR for spans of MANY small weights:
+/// `1 − exp(Σ ln(1−kᵢ)) = −expm1(Σ log1p(−kᵢ))`.
+///
+/// The direct product form underflows to `1 − 0 = 1` prematurely when
+/// enough small factors accumulate (catastrophic for long spans of tiny
+/// probabilities); the log1p/expm1 form keeps resolution. Inputs clamped
+/// to `[0, 1]`: k = 1 yields `log1p(−1) = −∞` ⇒ the stable form returns
+/// exactly 1.0 — the correct saturated limit.
+#[inline]
+pub fn noisy_or_stable(ks: &[f32]) -> f32 {
+    let mut sum = 0.0f32;
+    for &k in ks {
+        let kc = k.clamp(0.0, 1.0);
+        sum += (-kc).ln_1p(); // ln(1 − k), stable for small k
+    }
+    -sum.exp_m1()
+}
+
 #[cfg(feature = "tiled_attention")]
 pub mod attention;
 
@@ -68,6 +112,47 @@ pub mod linking_fold;
 pub mod best_belief;
 #[cfg(feature = "best_belief")]
 pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief};
+// entropic_tilt — KL-budgeted max-seeking advantage tilt (TTT-Discover
+// arXiv:2601.16175; prior art RS-GRPO / RSPO). The max-seeking counterpart to
+// `best_belief` above: that scores a candidate from its OWN history counts,
+// this scores it from the SHAPE of the current group. Shared math with exactly
+// two consumers — riir-clippy `selection_entropic` (Issue 026, ranking) and
+// riir-train `loss_grpo` (Plan 341, gradient scaling) — hoisted here rather
+// than forked. Opt-in pending the Plan 341 Phase 2/3 GOAT.
+#[cfg(feature = "entropic_tilt")]
+pub mod entropic_tilt;
+#[cfg(feature = "entropic_tilt")]
+pub use entropic_tilt::{
+    KL_BUDGET_LN2, solve_beta, tilt_advantages_into, tilt_advantages_loo_into, tilted_weights,
+};
+// tether — closed-form outcome-fit estimator blend (Issue 675, Research 426
+// via arXiv:2608.16739 "Le Critique" TETHER baseline): ρ* per window by OLS
+// against realized outcomes with the exact in-sample never-worse guarantee,
+// the lag law encoded as API shape (same-window application unrepresentable),
+// EMA smoothing, an explained-variance accumulator + control-variate gate,
+// and the horizon-decay LUT λ = c^(1/L). Two documented hazards in-source:
+// Report-the-Floor (blending does not discharge the promotion gate) and
+// prediction-vs-ranking (measured NEGATIVE on a ranking consumer, Bench 042
+// — fit ρ against the consumer's own metric). Consumers: riir-train
+// loss_grpo TETHER baseline (Plan 345). Opt-in; G1–G4 PASS (Bench 670).
+#[cfg(feature = "tether")]
+pub mod tether;
+#[cfg(feature = "tether")]
+pub use tether::{
+    control_variate_improves, fit_rho, horizon_decay, sse, EvAccumulator, TetherBlend, TetherStats,
+    DEFAULT_EMA_DECAY, DEFAULT_RHO, DEFAULT_WINDOW, DEGENERATE_EPS,
+};
+// ignition — closed-form logistic ignition (Issue 459 T5, Research 422 §3.5
+// via arXiv:2608.13335): z(t) = K·σ(ζt − ln((K−z₀)/z₀)) per singular mode,
+// the patience law t* = ln(1/ε)/ζ, and a ζ-descending ordering helper
+// (modes ignite in ζ order). Sigmoid-in-time is the adoption shape GD itself
+// produces — the second grounding for sigmoid-not-softmax (after R315).
+// Opt-in; GOAT G1–G4 PASS (Bench 666). Promotion needs the consumer pilot
+// win (selection patience ∝ 1/ζ vs fixed patience).
+#[cfg(feature = "ignition_schedule")]
+pub mod ignition;
+#[cfg(feature = "ignition_schedule")]
+pub use ignition::{IgnitionSchedule, ignition_time, order_by_ignition_into};
 // Conformal Predictive Intervals — modelless UQ overlay (Plan 340, Research
 // 322, arXiv:2605.03789 CSP + arXiv:2606.09473 "Report the Floor"). Wraps any
 // PointForecaster with a per-channel × per-horizon-bucket exp-recency-
@@ -84,6 +169,10 @@ pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief}
 // STAY opt-in — this promotion removes the katgpt-core re-forward friction
 // only; consumers still choose.
 #[cfg(feature = "conformal_predictive_intervals")]
+// Issue 580: the LIMIT adversarial retrieval fixture (arXiv:2508.21038 §5.2).
+// Opt-in — a cold-path eval fixture, never linked into production builds.
+#[cfg(feature = "limit_fixture")]
+pub mod limit_fixture;
 pub mod conformal;
 #[cfg(feature = "conformal_predictive_intervals")]
 pub use conformal::metrics::{
@@ -243,6 +332,57 @@ pub use set_diffusion_schedule::{
     PositionOffsetSchedule, ar_order, block_causal_gen_steps, mdlm_gen_steps, order_to_gen_steps,
     uniform_order, uniform_order_with,
 };
+// UGC — Unmasking Growth Complexity certified schedules for masked diffusion
+// (arXiv:2608.13520, Research 485 / Issue 664). Always-on: pure math + a
+// denoiser trait, zero deps beyond crate::types::Rng — the same no-gate
+// rationale as set_diffusion_schedule. Feature-flag plan (`ugc_schedule`)
+// opens ONLY if the Issue 664 G1b promotion gate passes.
+pub mod ugc_schedule;
+pub use ugc_schedule::{
+    UgcBlockPlan, UgcDenoiser, UgcIntervalEstimate, UgcProfile, UgcScratch, UGC_MASK,
+    bernoulli_unmask_with_grid, certified_block_plan, certified_iteration_count,
+    dp_partition, equal_sqrt_mass_grid, estimate_interval, estimate_profile,
+    inv_log_reveal_odds, log_reveal_odds, reveal_grid_from_plan, reveal_odds,
+};
+// SwitchCostTable — directed pairwise switch-difficulty table (skill-entropy
+// distillation, Research 484 / arXiv:2608.05139, Issue 663). Opt-in per the
+// issue's GOAT-gate discipline: promotion to default requires a riir-ai
+// consumer A/B (F1: SkE-gated preemptive re-estimation vs the coherence-only
+// arm on the Issue-054 stuck-rate scenario).
+#[cfg(feature = "switch_cost")]
+pub mod switch_cost;
+#[cfg(feature = "switch_cost")]
+pub use switch_cost::{
+    FactorizedSwitchCost, SwitchCostSnapshot, SwitchCostTable, DEFAULT_ALPHA, NEUTRAL_ACC,
+    cdf_rank,
+};
+// Extension-count (freedom-of-function) selection criterion — closed-form
+// near-best selection over a declared finite output partition (Research 486,
+// arXiv:2608.05423, Issue 665). Opt-in PoC-gated: promotion to default
+// requires the Issue 665 PoC gate (freedom-guided near-best beats min-loss
+// AND random-near-best under a declared distribution shift) plus a
+// production consumer.
+#[cfg(feature = "freedom_selection")]
+pub mod extension_count;
+#[cfg(feature = "freedom_selection")]
+pub use extension_count::{
+    ExtensionOccupancy, LossGate, FIRST_ACTIVATION_GAIN, freedom_gain, log_freedom,
+};
+// Effective Degree — function-space simplicity via polynomial representations
+// along data-anchored interpolation paths (Research 488 / arXiv:2605.29823,
+// Issue 668). Modelless measurement only; the paper's differentiable
+// regularizer is training-side (riir-train). Reuses `karc::ChebyshevBasis` +
+// `linalg`'s damped Cholesky, so the feature implies `karc_forecaster`.
+// Opt-in: promotion to default is blocked on a consumer verdict
+// (riir-neuron-db Issue 602 freeze-gate PoC — does ED beat `output_flatness`?).
+#[cfg(feature = "effective_degree")]
+pub mod effective_degree;
+#[cfg(feature = "effective_degree")]
+pub use effective_degree::{
+    EdConfig, EdError, EdResult, EdScratch, MAX_ED_DEGREE, MAX_ED_TERMS, ed_from_coeff_norms,
+    ed_over_pairs, effective_degree_along_path, effective_degree_along_path_multi,
+    randomized_cosine_nodes,
+};
 // SIMD-accelerated linear algebra kernels (NEON / AVX2 / WASM-SIMD128 /
 // scalar fallback). Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::simd` for backwards
@@ -250,6 +390,13 @@ pub use set_diffusion_schedule::{
 pub use katgpt_types::simd;
 pub mod speculative;
 pub mod traits;
+
+// Prompt-backend trait — generic prompt→string inference contract (Issue 580).
+// Hoisted from riir-game-sdk::gm::prompt so multiple consumers (riir-agents
+// Phase 2, the SDK's gm::prompt module, future callers) share one trait.
+// Always-on: pure trait + zero-dep mock, no feature gate needed.
+pub mod prompt_backend;
+pub use prompt_backend::InferenceBackend;
 // Shared configuration, RNG, math utilities, LoRA, domain embeddings, and
 // inference types. Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::types` for backwards
@@ -449,6 +596,11 @@ pub use renoise_ce::{
     Proposer, RenoiseCeConfig, RenoiseCeProbe, RenoiseCeScore, best_of_n_stability,
     renoise_ce_score, verify_and_restart,
 };
+// Freedom-guided sibling of best_of_n_stability (Issue 665 / Research 486):
+// near-best drift gate + Δ-log-extension-count selection over a caller-owned
+// occupancy table. Gated on freedom_selection (implies renoise_ce).
+#[cfg(feature = "freedom_selection")]
+pub use renoise_ce::best_of_n_freedom;
 
 #[cfg(feature = "dual_leo")]
 pub use traits::{
@@ -545,6 +697,30 @@ pub use simd::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matve
 #[cfg(feature = "binary_plasma")]
 pub use types::{BinaryWeights, GROUP_SIZE as BINARY_GROUP_SIZE};
 
+// Issue 578: the Q2_0_g128 container — ternary {-1,0,+1} bit-planes with the
+// per-128 f16 group scale. Neither shipped tier could hold it (plasma_path has
+// the zero state but per-row scale; binary_plasma has the group scale but no
+// zero state).
+#[cfg(feature = "ternary_group_scale")]
+pub use simd::{
+    simd_ternary_group_matmul_batch, simd_ternary_group_matvec, simd_ternary_group_matvec_parallel,
+    ternary_group_matvec_scalar,
+};
+#[cfg(feature = "ternary_group_scale")]
+pub use types::{
+    TernaryFfnHook, TernaryGroupWeights, TernaryInputProjHook, TernaryMatvecHook,
+};
+
+// Issue 582: the base-3 footprint tier — same alphabet and group scale as the
+// Q2_0_g128 container, 5 trits per byte instead of two bit-planes (1.75 vs
+// 2.125 bits/weight, -17.6%).
+#[cfg(feature = "ternary_trit_pack")]
+pub use simd::{
+    simd_ternary_trit_matvec, simd_ternary_trit_matvec_parallel, ternary_trit_matvec_scalar,
+};
+#[cfg(feature = "ternary_trit_pack")]
+pub use types::{TRITS_PER_BYTE, TernaryTritWeights};
+
 #[cfg(feature = "peira_distill")]
 pub mod peira;
 #[cfg(feature = "peira_distill")]
@@ -563,7 +739,11 @@ pub mod spectral_hierarchy;
 pub use spectral_hierarchy::{cauchy_interlacing_check, eigenspace_alignment, haar_wavelet_basis};
 
 #[cfg(feature = "sigmoid_margin")]
-pub use simd::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
+pub use simd::{
+    ArgmaxAudit, argmaxable_witness, audit_argmaxable, compute_retrieval_margin,
+    dim_capacity_ceiling, dim_capacity_floor, dim_capacity_required, dim_sufficiency_bound,
+    ln_binomial, matrix_rank, sigmoid_margin_loss,
+};
 
 #[cfg(feature = "dual_gram_pca")]
 pub use simd::simd_gram_f32;
@@ -662,6 +842,16 @@ pub mod group_invariance_probe;
 // misses) passes; promotion to a routing role is a separate follow-up plan.
 #[cfg(feature = "latent_trajectory_geometry")]
 pub mod latent_trajectory_geometry;
+
+// SWE Trajectory Freezer — modelless committed freeze of an inference
+// attempt's trajectory geometry (Proposal 011 Phase 5, Task T5.5). Composes
+// latent_trajectory_geometry + committed_field_blend + a local BLAKE3
+// envelope. Opt-in — research-validation primitive; promotion requires the
+// T5.6 G5 gate (cross-snapshot discrimination) to pass on real-model
+// trajectories (currently PARTIAL — T5.4 G3 FAIL at 29% on Kimi-K3 depth
+// trajectories; see .benchmarks/012_kimi_k3_trajectory_geometry.md).
+#[cfg(feature = "swe_trajectory_freeze")]
+pub mod swe_trajectory_freeze;
 
 // Latent Confounder Audit — three modelless forward-pass diagnostics
 // (R₀ zero-transition response + R_shift shift-invariance response + L
@@ -838,6 +1028,14 @@ pub use cross_stage_relocation::{
 #[cfg(feature = "latent_trajectory_geometry")]
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
+    from_states_into,
+};
+
+#[cfg(feature = "swe_trajectory_freeze")]
+pub use swe_trajectory_freeze::{
+    FrozenAttempt, FrozenValueAttempt, GeometrySummaryEncoder, StateMagnitudeEncoder,
+    SweTrajectoryFreezer, SWTF_MAGIC, SWTF_VERSION, TrajectoryFreezeEnvelope, derive_directions,
+    derive_directions_and_centroid,
 };
 
 #[cfg(feature = "latent_confounder_audit")]
@@ -1412,6 +1610,17 @@ pub use bisimulation::{
     StateClassId, StateId, Transition, TransitionGraph, TransitionGraphBuilder, partition_refine,
     plan as bisimulation_plan,
 };
+// Issue 586 — rule-application consistency metric (BDH-CQ §6.4 analog):
+// 3-bin strict/partial/none task histogram + sigmoid-guarded gap +
+// structure-preservation breakdown + complexity-cluster regime detection.
+// Gates `infer_operators` output via `promotion_verdict`; the
+// ComplexityClustered regime is the exemplar-seeking trigger consumed by
+// riir-ai Issue 672.
+#[cfg(feature = "operator_consistency")]
+pub use bisimulation::consistency::{
+    ApplicationOutcome, ConsistencyGateConfig, ConsistencyRegime, ConsistencyReport,
+    PromotionVerdict, promotion_verdict, rule_consistency,
+};
 
 // ── FORE — Fitted Occupancy-Ratio Estimator (Plan 438, Research 423, arxiv 2607.05375) ─
 //
@@ -1523,6 +1732,18 @@ pub use engram::{
     sigmoid_fuse_multi_branch_into, try_compress_token,
 };
 
+// Issue 656 — counterfactual privilege gating for engram fusion (modelless δ
+// from LOPD, riir-train Research 419 §5.2). Adds the missing *utility* axis to
+// the similarity-only gate: `out = (base_gate · σ((Δ_slot − m)/s)) · v`, where
+// Δ is an outcome-weighted EMA of the counterfactual advantage
+// `score(state + fuse) − score(state)`. Modelless — two evaluations and a
+// comparison, no gradients. Opt-in.
+#[cfg(feature = "engram_privilege")]
+pub use engram::{
+    CreditAssignment, PrivilegeConfig, PrivilegeLedger, PrivilegeTrace,
+    fuse_into_hidden_state_privileged, sigmoid_fuse_scaled_into,
+};
+
 // ── Product Key Memory — O(√N) Factored Retrieval (Plan 408, Research 387) ─
 //
 // Open MIT-licensed primitive: the fourth complexity class in the retrieval
@@ -1550,6 +1771,16 @@ pub use product_key_memory::{
     D_K_FLOOR, PkEntry, PkQuery, PkmScratch, ProductKeyMemory, SQRT_N_FLOOR, ScoreFn, score_dot,
     score_idw,
 };
+
+// MOP — Maximum Occupancy Principle value-iteration primitive (Plan 573 /
+// Research 478, arXiv:2205.10316). The paper's Eq. 7 fixed-point map in
+// log-space LSE form over a frozen tabular kernel — reward-free optimal
+// policy with emergent survival (absorbing states V=0 bit-exact) and a β
+// risk knob. Opt-in `mop_path_entropy`. Consumers: riir-ai Plan 538.
+#[cfg(feature = "mop_path_entropy")]
+pub mod mop;
+#[cfg(feature = "mop_path_entropy")]
+pub use mop::{MopConfig, MopConfigError, MopScratch, MopSolver, MopSolution};
 // Phase 4 (F4 fusion) — freeze/thaw wrapper around ProductKeyMemory. Gated
 // separately so the leaf-clean retrieval primitive (above) stays usable
 // without the Arc<RwLock<Arc<...>>> + BLAKE3 commitment machinery. See
@@ -1622,6 +1853,8 @@ pub use set_attention::{
     SetAttentionConfig, SetAttentionError, identity, identity_into, identity_projection,
     identity_projection_into, set_sigmoid_attention_into,
 };
+#[cfg(feature = "clr_weighted_set_attention")]
+pub use set_attention::{clr_reliability_scores, clr_weighted_set_attention_into};
 
 // Depth-Invariance Diagnostic + Magnitude-Regularized Residual — the
 // root-cause counterpart to four symptom-only detectors (BeliefRankPruner,
@@ -1735,6 +1968,38 @@ pub mod hope;
 #[cfg(feature = "hebbian_kernel_memory")]
 pub mod hebbian_kernel_memory;
 
+// spectral_pencil — the affine matrix pencil scalar gate f(x) =
+// λk(A₀ + Σ xᵢAᵢ) (Issue 676, Research 495, arXiv:2608.08003 "The
+// Spectral Neuron"). Shape-by-construction + coefficient transparency
+// + seeded γk ≥ ½ init. Opt-in; see the module doc for the determinism
+// policy (pinned Jacobi/Sturm/QR — no library eigensolver on committed
+// paths).
+#[cfg(feature = "spectral_pencil")]
+pub mod spectral_pencil;
+
+// CP^(d-1) Symmetric-Space Hopfield — Top-Eigenvector Recall (Plan 567,
+// Research 466, Galitski "High-Capacity Generalized Hopfield Networks",
+// alphaXiv 2607.hopfield-networks, JQI/UMD 2026-07-31).
+//
+// Associative-memory recall on the symmetric space CP^(d-1) = SU(d)/U(d-1)
+// instead of the sphere. The memory kernel K_i = Σ_μ O_μ^(i) |ξ_i^μ⟩⟨ξ_i^μ| is a
+// d×d Hermitian SPIKED random matrix and recall aligns the neuron with its TOP
+// EIGENVECTOR, which is BBP-protected against GUE crosstalk. That gap is why
+// CP^(d-1) capacity grows with d (α_c ≈ 0.62 at d=3, 2.41 at d=4) where gapless
+// vector alignment on S^(n-1) decays as 4/(27n) — and it is the mechanism the
+// Plan 276 AttractorKernel lacked when it failed G2.1 at random init.
+//
+// Pure modelless: closed-form SU(d) basis construction + Hebbian outer-product
+// kernel + Rayleigh-quotient ascent. No gradient descent, so memories load from a
+// frozen snapshot (freeze/thaw Path 1) rather than being trained.
+//
+// OPT-IN pending the Plan 567 GOAT gate. Load-bearing gates are G5 (the Plan 276
+// modelless unblock) and G7 (whether the BBP gap survives at N=8/N=64 rather than
+// only asymptotically in N). Zero runtime cost unless a caller constructs a
+// CpHopfieldRecaller.
+#[cfg(feature = "cp_hopfield")]
+pub mod cp_hopfield;
+
 // Transformer Inversion — SipIt open primitive (Plan 561, Research 232
 // Gain-Redirects, arXiv:2510.15511 Nikolaou et al. ICLR 2026). Modelless,
 // O(T·|V|) exact prompt recovery from a layer-ℓ hidden state matrix via
@@ -1772,6 +2037,32 @@ pub use inversion::{
     AcceptanceRegion, InversionConfig, InversionError, InversionForward, InversionPolicy,
     InversionResult, ObservedStates, RandomPolicy, accept_observation, accept_observation_into,
     invert_sequence, invert_sequence_into,
+};
+
+// Similarity Inference — endogenous correlation device for embedded equilibrium
+// (Plan 526, Research 471, arXiv:2608.03958 Meulemans et al. *Paradigms of
+// Intelligence* Aug 2026). Per-focal `SimilarityPosterior ω ∈ (0,1)` updated
+// incrementally from joint-action history via the paper's §H.2 closed form
+// `ω_T = α/(α+(1−α)·|A|^(−T))`; `embedded_best_response` switches from
+// competitive-best-response (Nash) to cooperative-best-response (CCE) when ω
+// crosses a payoff-derived threshold (exactly 0.5 for canonical PD). Pure
+// modelless closed-form math; O(1) observe, O(A²) best-response, zero allocs
+// after construction. The mechanism is genuinely novel per R471 §3.5: the
+// shipped `CceLp<N,A>` (Plan 295, DEFAULT-ON) uses an *exogenous*
+// designer-set correlation device ζ; this primitive *infers* an *endogenous*
+// correlation device ω from interaction history. NOT a sync-boundary primitive
+// (ω is latent per-focal; only the final cooperate/defect u8 action crosses).
+// Sigmoid, not softmax (ω is a posterior probability, not a categorical).
+// DEFAULT-ON (2026-08-11) — Plan 526 Phase 1-5 GOAT G1–G8 ALL PASS (Bench 579:
+// G1 closed-form reproduction, G2 emergent cooperation, G5 indirect inference,
+// G7 UQ floor, G8 PD threshold); see the Cargo.toml feature-def comment for the
+// full gate record.
+#[cfg(feature = "similarity_inference")]
+pub mod similarity_inference;
+#[cfg(feature = "similarity_inference")]
+pub use similarity_inference::{
+    JointActionHistory, PayoffMatrix, SimilarityError, SimilarityPosterior, canonical_pd,
+    embedded_best_response, embedded_best_response_into,
 };
 
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
@@ -2108,6 +2399,14 @@ pub use tilr::discover_invariant_subspace;
 // local tangent SVD (Plan 301 thin_svd_into).
 #[cfg(all(feature = "manifold_erasure", feature = "subspace_phase_gate"))]
 pub mod manifold_erasure;
+
+// Issue 565 / Research 463: Quantization-Error Compensating Reader-LoRA —
+// deterministically-constructed low-rank (weight-space SVD, output-space
+// data-aware SVD) or sparse (top-K COO bypass) correction for quantized
+// weight matrices. Pure modelless (closed-form SVD / partial-sort). Gated on
+// subspace_phase_gate for the thin SVD machinery (Plan 301).
+#[cfg(all(feature = "quant_error_lora", feature = "subspace_phase_gate"))]
+pub mod quant_error_lora;
 #[cfg(all(feature = "manifold_erasure", feature = "subspace_phase_gate"))]
 pub use manifold_erasure::{
     ManceConfig, ManceError, ManceScratch, ManceStepInfo, ManceTangentCache,
@@ -2144,6 +2443,114 @@ pub use poincare::{
     PoincareFitError, RIDGE_ALPHA_DEFAULT, TARGET_DIM_MAX, accumulate_pinv_into, eval_phi_into,
     fit_poincare_adapter, poincare_multi_step_into, poincare_navigate_into,
 };
+
+// Plan 571: Phase Separation Probe — per-entity minimum circular distance on
+// a phase circle, distilled from the Lonely Runner Conjecture (Barajas & Serra
+// 2007, arXiv:0710.4495; proven for N≤7, conjectured beyond). The LRC
+// guarantees every entity cycles through phase_separation ≥ 1/N — a coverage
+// guarantee no existing primitive provides. Three modelless paths (O(N),
+// O(N²), O(N log N)) + two bridge helpers (raw time-phase, latent projection).
+// Pure modelless (closed-form modular arithmetic + sigmoid + dot-product).
+// DEFAULT-ON (2026-08-07, Plan 571) — G1–G4 GOAT gate ALL PASS
+// (bench_571_phase_separation_goat).
+#[cfg(feature = "phase_separation")]
+pub mod phase_separation;
+#[cfg(feature = "phase_separation")]
+pub use phase_separation::{
+    circular_distance, from_latent_projection, from_speeds_and_tick, phase_separation,
+    phase_separation_all, phase_separation_sorted,
+};
+
+// Issue 680: Signed-Coupling Opinion Dynamics — Glauber (heat-bath) update on
+// a SIGNED social graph plus the three crowd order parameters, distilled from
+// "Physics of Agents" (El et al., arXiv:2608.16578; Research 497). The kernel
+// is CLR set attention's sibling — the same σ(gated weighted sum) shape, but
+// with signed, tie-typed couplings on a stance instead of unsigned relevance
+// weights: h_i = β⁺Σ J⁺s + β⁻Σ J⁻s + β₀Σ|J|s + g_i, collapsed to one
+// branch-free O(edges) pass over a CSR row. Ships the three reducers nothing
+// else in the stack had: net_opinion (mean), crowd_conviction (mean of
+// squares — genuinely new), and the χ = N·Var_t(|n|) susceptibility
+// accumulator whose peak over a temperature sweep locates the critical social
+// temperature. Pure modelless (the paper's only gradient descent fits ~19
+// scalars to real LLM transitions; a game crowd AUTHORS its couplings, so the
+// paper's fitted ranges become designer-facing defaults). OPT-IN — promotion
+// waits on a production consumer, the CLR precedent.
+#[cfg(feature = "signed_coupling_dynamics")]
+pub mod signed_coupling;
+#[cfg(feature = "signed_coupling_dynamics")]
+pub use signed_coupling::{
+    Couplings, InformedCouplings, PAPER_BETA_MINUS_RANGE, PAPER_BETA_PLUS_RANGE,
+    PAPER_BETA_ZERO_RANGE, PAPER_TRUTH_GAP_RANGE, SignedGraph, SignedGraphError,
+    SusceptibilityAccumulator, crowd_conviction, net_opinion, sample_states_into,
+    signed_coupling_update_informed_into, signed_coupling_update_into,
+};
+
+// Plan 568: Recurrent Residual Quantization (RRQ) — single-checkpoint
+// multi-precision weight representation via iterated 2-bit RTN residual
+// corrections (Luo et al. Intel, arXiv:2608.04048 Aug 2026; Research 467).
+// W̃(t) = Ŵ0 + Σ residuals — base + N stages, each 2-bit RTN with per-group
+// f16 scale + zero-point. Default 1+3 → 2/4/6/8-bit prefixes. Pure modelless
+// PTQ (no Hessian, no calibration). prefix_dot_into exploits matmul linearity.
+// Verdict: Gain (not Super-GOAT — no concrete consumer today). Opt-in until a
+// multi-precision LLM / per-NPC expert base / incremental-upgrade consumer lands.
+#[cfg(feature = "rrq_quant")]
+pub mod rrq_quant;
+#[cfg(feature = "rrq_quant")]
+pub use rrq_quant::{
+    peak_to_mean_ratio, select_quant_strategy, BITS_PER_STAGE, CODES_PER_BYTE,
+    DEFAULT_DIRECT_RTN_BITS, DEFAULT_GROUP_SIZE, DEFAULT_N_STAGES, KS_FLAG_THRESHOLD,
+    LEVELS_PER_STAGE, PMR_THRESHOLD_2_2, QuantStrategy, RrqStage, RrqWeights,
+};
+
+// Selection-Set Fixpoint Propagation — KEEP M3 in house operator vocabulary
+// (Issue 655 / Research 483, KEEP arXiv:2602.23592; HippoRAG PPR class). The
+// one genuinely-unshipped composition from the Research 483 audit: a
+// query-seeded importance propagation iterated until the top-r selected set
+// stabilizes (membership fixpoint). Sigmoid-gated membership, CLR-reliability
+// edge weighting, zero-alloc caller scratch, deterministic CSR order.
+// Opt-in — promotion depends on the Issue 655 G1 head-to-head vs the shipped
+// BFS-decay traversal (riir-rag fuse_graph_candidates) + downstream consumers.
+#[cfg(feature = "selection_propagation")]
+pub mod selection_propagation;
+#[cfg(feature = "selection_propagation")]
+pub use selection_propagation::{
+    PropagationBlend, PropagationConfig, PropagationOutcome, SelectionPropagationScratch,
+    propagate_selection_to_fixpoint_into,
+};
+
+// Sterling-derived modelless primitives (Issue 672 / Research 491,
+// arXiv:2608.07594 Steerling-8B): ReLU-gated logit suppression (the naive
+// subtraction promotes anti-aligned tokens), exact-decomposition readout
+// (Σ parts + residual == fused, bit-identical by fixed summation order),
+// lift-set steering targets (two-pass corpus statistic), γ=τ/peak logit-space
+// calibration, + the HSIC-style cross-covariance gauge (measure-only). The
+// noisy-OR rider lives UNGATED at the crate root (`noisy_or` / `noisy_or_stable`)
+// because the riir-games-civ salience gate delegates to it under the DEFAULT
+// feature set. Opt-in — promotion requires a consumer GOAT (riir-ai Issue 732,
+// the exact-emotion-ledger NPC decision surface, is the first candidate).
+#[cfg(feature = "sterling_primitives")]
+pub mod sterling;
+
+// Recirculation — cross-step residual mixture operator (Issue 673 Phase 1 /
+// Research 492, arXiv:2608.17981 Mozer et al. DeepMind): leaks a convex,
+// norm-matched mixture of the previous step's deep-layer state into a
+// shallow destination layer at the NEXT input step. Sibling of RelocateOp
+// (R417/Plan 431 — whose defend-wrong PoC refuted the overwrite semantics
+// this mixture answers). Opt-in — promotion requires the Phase 2 defend-wrong
+// PoC on gemma-2-2b (ppl reduction > 0 on ≥2 datasets AND strictly safer than
+// the overwrite at equal layer pairs); default stays OFF until then.
+#[cfg(feature = "recirculation")]
+pub mod recirculation;
+
+// Contrastive scope gate (Issue 674 / Research 493, arXiv:2608.13545
+// LittleLearner): two-corpus log-odds table + Naive-Bayes log-LLR document
+// scope score D(x) + epistemic haircut ĉ = c·sigmoid(−κ·D) + decline wiring
+// + the paired OOS probe battery (Report-the-Floor extension). "A relevance
+// check is not a scope check." Opt-in POC — per the issue's own T5 rule,
+// promotion requires a consumer adoption (riir-clippy L4 2D gate / riir-ai
+// engram gates); otherwise record negative and close.
+#[cfg(feature = "contrastive_scope")]
+pub mod contrastive_scope;
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,

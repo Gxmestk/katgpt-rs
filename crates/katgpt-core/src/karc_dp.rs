@@ -156,8 +156,7 @@ impl DpRng {
     fn from_system_time() -> Self {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0xDEAD_BEEF_CAFE_F00D);
+            .map_or(0xDEAD_BEEF_CAFE_F00D, |d| d.as_nanos() as u64);
         Self::new(nanos)
     }
 
@@ -246,16 +245,12 @@ mod tests {
         let expected: f32 = 0.1 * (2.0f32 * (1.25f32 / 1e-5f32).ln()).sqrt();
         assert!(
             (sigma - expected).abs() < 1e-4,
-            "sigma_dp {:.6} != expected {:.6}",
-            sigma,
-            expected
+            "sigma_dp {sigma:.6} != expected {expected:.6}"
         );
         // Spot-check against the hand-computed value.
         assert!(
             (sigma - 0.4845).abs() < 1e-2,
-            "sigma_dp {} should be ~0.4845, got {}",
-            sigma,
-            sigma
+            "sigma_dp {sigma} should be ~0.4845, got {sigma}"
         );
     }
 
@@ -277,9 +272,7 @@ mod tests {
             };
             assert!(
                 cfg.sigma_dp().is_infinite(),
-                "epsilon={}, delta={} should give infinite sigma",
-                eps,
-                delta
+                "epsilon={eps}, delta={delta} should give infinite sigma"
             );
         }
     }
@@ -300,8 +293,7 @@ mod tests {
         let ratio = double.sigma_dp() / base.sigma_dp();
         assert!(
             (ratio - 2.0).abs() < 1e-4,
-            "doubling sensitivity should double sigma_dp, got ratio {}",
-            ratio
+            "doubling sensitivity should double sigma_dp, got ratio {ratio}"
         );
     }
 
@@ -321,8 +313,7 @@ mod tests {
         let ratio = half_eps.sigma_dp() / base.sigma_dp();
         assert!(
             (ratio - 2.0).abs() < 1e-4,
-            "halving epsilon should double sigma_dp, got ratio {}",
-            ratio
+            "halving epsilon should double sigma_dp, got ratio {ratio}"
         );
     }
 
@@ -360,8 +351,7 @@ mod tests {
         let diffs = a.iter().zip(b.iter()).filter(|(x, y)| x != y).count();
         assert!(
             diffs > 90,
-            "different seeds should produce mostly-different noise ({} of 100 differ)",
-            diffs
+            "different seeds should produce mostly-different noise ({diffs} of 100 differ)"
         );
     }
 
@@ -394,9 +384,7 @@ mod tests {
         );
         assert!(
             (stddev - sigma as f64).abs() / (sigma as f64) < 0.10,
-            "noise stddev {} should be near sigma_dp {} (10% tol)",
-            stddev,
-            sigma
+            "noise stddev {stddev} should be near sigma_dp {sigma} (10% tol)"
         );
     }
 
@@ -421,8 +409,7 @@ mod tests {
         // for floating-point coincidence.
         assert!(
             unchanged < 2,
-            "{} of 50 entries unchanged after DP noise — noise not applied to all",
-            unchanged
+            "{unchanged} of 50 entries unchanged after DP noise — noise not applied to all"
         );
     }
 

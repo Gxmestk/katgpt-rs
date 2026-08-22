@@ -138,14 +138,32 @@ impl CcePrimalDual {
 
         // Compute gradient: grad[m] = gamma0_coeff(m) + λ · linear_derivative(m).
         // Reuse the hoisted gradient scratch — zero alloc after the first step.
+        //
+        // `linear_derivative(rho, m, d, p)` is
+        // `reward_follow(s, a) − reward_deviate(s, κ*(ρ))` where `κ*(ρ) =
+        // best_deviation(ρ)` depends ONLY on `ρ`, not on `m`. Calling it per
+        // index re-ran the O(|D|·N·A) `best_deviation` scan N·A times, making
+        // `step` O((N·A)²·|D|). Hoisting κ* above the loop (exactly what the
+        // sibling `step_heterogeneous` already does, and what
+        // `linear_derivative_heterogeneous`'s doc warns about) brings it back to
+        // O(N·A·|D| + N·A). `reward_deviate(s, κ*)` additionally depends only on
+        // `s`, so it is hoisted out of the inner `a` loop.
+        //
+        // Bit-identical: the same κ* is selected on every iteration (its scan
+        // reads only `rho_view`, which is not mutated in this loop), and each
+        // `grad[m]` is formed from the same three values in the same order.
+        let kappa_star = er_eval
+            .best_deviation(&rho_view, d, p)
+            .expect("primal-dual step: deviation class must be non-empty");
         let grad = &mut self.grad_scratch;
         debug_assert_eq!(grad.len(), na);
         for s in 0..N {
-            for a in 0..A {
-                let m = s * A + a;
+            let deviate_s = p.reward_deviate(s, kappa_star);
+            let row = &mut grad[s * A..(s + 1) * A];
+            for (a, grad_m) in row.iter_mut().enumerate() {
                 let g0 = p.gamma0_coeff(s, a);
-                let er_deriv = er_eval.linear_derivative(&rho_view, m, d, p);
-                grad[m] = g0 + self.lambda * er_deriv;
+                let er_deriv = p.reward_follow(s, a) - deviate_s;
+                *grad_m = g0 + self.lambda * er_deriv;
             }
         }
 

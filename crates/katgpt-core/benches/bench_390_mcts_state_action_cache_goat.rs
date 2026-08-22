@@ -242,10 +242,7 @@ fn main() {
     };
 
     println!("=== Plan 390 Phase 3: State-Action Cache GOAT Gate (Issue 044 re-gate) ===\n");
-    println!(
-        "Domain: {}-token sequence, {} depth levels, 5 actions",
-        SEQ_LEN, N_DEPTH
-    );
+    println!("Domain: {SEQ_LEN}-token sequence, {N_DEPTH} depth levels, 5 actions");
     println!("Optimal: interleave actions 0 (early) → 4 (late)\n");
 
     // ── G1: Cache hit rate vs NFE ──

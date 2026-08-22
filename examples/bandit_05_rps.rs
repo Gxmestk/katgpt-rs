@@ -73,8 +73,7 @@ fn select_arm(stats: &BanditStats, strategy: &BanditStrategy, rng: &mut Rng) -> 
         BanditStrategy::ThompsonSampling => (0..NUM_ARMS)
             .map(|i| (i, stats.thompson_sample(i, rng)))
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0),
+            .map_or(0, |(i, _)| i),
         BanditStrategy::VarianceEpsilon { epsilon, .. } => {
             let mean_var = stats.mean_reward_variance();
             let adapted_eps = (epsilon * (1.0 + 0.1 * mean_var.sqrt())).clamp(0.01, 1.0);
@@ -246,9 +245,10 @@ fn section_exploitation() {
 
     let total: u32 = stats.visits().iter().sum();
     let paper_pct = stats.visits()[1] as f32 / total as f32 * 100.0;
-    let exploit = match paper_pct > 50.0 {
-        true => "✅ Learned to exploit Rock bias",
-        false => "⚠️ Not yet exploiting",
+    let exploit = if paper_pct > 50.0 {
+        "✅ Learned to exploit Rock bias"
+    } else {
+        "⚠️ Not yet exploiting"
     };
     println!("  Exploitation: {exploit} (Paper={paper_pct:.1}%)");
     println!("  → Adaptive agent discovers Paper counters Rock-heavy opponent");

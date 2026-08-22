@@ -163,8 +163,8 @@ impl ResidualRingBuffer {
     /// Flat index for `(channel, bucket)`.
     #[inline]
     fn flat(&self, channel: usize, bucket: usize) -> usize {
-        debug_assert!(channel < self.n_channels, "channel {} oob", channel);
-        debug_assert!(bucket < self.n_buckets, "bucket {} oob", bucket);
+        debug_assert!(channel < self.n_channels, "channel {channel} oob");
+        debug_assert!(bucket < self.n_buckets, "bucket {bucket} oob");
         channel * self.n_buckets + bucket
     }
 

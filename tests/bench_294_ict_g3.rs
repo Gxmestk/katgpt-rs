@@ -231,14 +231,13 @@ fn ascii_scatter(xs: &[f32], ys: &[f32]) {
     }
     println!("      H_1 (x) →");
     println!(
-        "      {:.3}                                                            {:.3}",
-        xmin, xmax
+        "      {xmin:.3}                                                            {xmax:.3}"
     );
     for row in 0..h {
         let label = if row == 0 {
-            format!("{:.3}", ymax)
+            format!("{ymax:.3}")
         } else if row == h - 1 {
-            format!("{:.3}", ymin)
+            format!("{ymin:.3}")
         } else {
             String::new()
         };
@@ -246,7 +245,7 @@ fn ascii_scatter(xs: &[f32], ys: &[f32]) {
             .iter()
             .map(|&c| c as char)
             .collect();
-        println!("{:>6} |{}", label, line);
+        println!("{label:>6} |{line}");
     }
     println!("       +-----------------------------------------------------------");
     println!("         u_max (y) ↑");
@@ -300,11 +299,8 @@ fn g3_orthogonality_to_h1_make_or_break() {
 
     println!("\n=== G3 — Orthogonality to H_1 (MAKE-OR-BREAK) ===");
     println!("Samples: {N_DECISION_POINTS} decision points × (H_1(P̄), max_k u_k)");
-    println!("\nSpearman ρ(H_1, u_max) = {:.4}", rho);
-    println!(
-        "Bootstrap 95% CI       = [{:.4}, {:.4}]  (n_boot = {N_BOOTSTRAP})",
-        ci_lo, ci_hi
-    );
+    println!("\nSpearman ρ(H_1, u_max) = {rho:.4}");
+    println!("Bootstrap 95% CI       = [{ci_lo:.4}, {ci_hi:.4}]  (n_boot = {N_BOOTSTRAP})");
     println!("\nScatter (H_1 on x, u_max on y):");
     ascii_scatter(&h1_samples, &umax_samples);
 

@@ -346,8 +346,7 @@ mod goat_structural_proof {
         let elapsed = start.elapsed();
         assert!(
             elapsed.as_millis() < 10,
-            "10K observes should be < 10ms, took {:?}",
-            elapsed
+            "10K observes should be < 10ms, took {elapsed:?}"
         );
 
         // RV should be well-defined
@@ -363,8 +362,7 @@ mod goat_structural_proof {
         let elapsed = start.elapsed();
         assert!(
             elapsed.as_millis() < 10,
-            "10K resets should be < 10ms, took {:?}",
-            elapsed
+            "10K resets should be < 10ms, took {elapsed:?}"
         );
     }
 

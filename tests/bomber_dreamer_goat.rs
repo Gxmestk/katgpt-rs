@@ -75,11 +75,10 @@ fn proof_1_end_to_end_bomber_integration() {
 
         // Map game result to reward for each action arm
         // Use a simplified reward: average score across players
-        let avg_score = match result.scores.is_empty() {
-            true => 0.0,
-            false => {
-                result.scores.iter().map(|&s| s as f32).sum::<f32>() / result.scores.len() as f32
-            }
+        let avg_score = if result.scores.is_empty() {
+            0.0
+        } else {
+            result.scores.iter().map(|&s| s as f32).sum::<f32>() / result.scores.len() as f32
         };
 
         // Normalize reward to [0, 1] range (scores range roughly -5 to +8)

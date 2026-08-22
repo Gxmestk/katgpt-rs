@@ -100,6 +100,51 @@ pub enum ModelArchitecture {
     /// Plan 182: Luce Megakernel Distill — DeltaNet GPU Inference.
     #[cfg(feature = "deltanet_inference")]
     QwenDeltaNet,
+    /// Gemma 4 unified text model (Issue 577 — baseline loader for Plan 318).
+    /// Alternating sliding-window attention (5 layers, window=1024) +
+    /// full attention (1 layer) repeating; per-layer head_dim and KV-head
+    /// count vary. Native 256K context. GGUF-loaded; opt-in `gemma4_inference`.
+    #[cfg(feature = "gemma4_inference")]
+    Gemma4,
+    /// Ternary-weight transformer (Plan 333 Phase 2).
+    /// Ternary {-1,0,+1} weights with per-128 f16 group scale (Q2_0_g128).
+    /// The weight substrate ships behind `ternary_group_scale` (Issue 578:
+    /// `TernaryGroupWeights` + `simd_ternary_group_matvec`); this variant
+    /// gates only the forward dispatch in riir-engine. GGUF-loaded via the
+    /// `Q2_0` tensor type (Plan 333 T2.1).
+    ///
+    /// **Not named `BitNet`** (renamed 2026-08-10): the format is `Q2_0_g128`,
+    /// not BitNet's `i2_s`, and Ternary-Bonsai-27B is `general.architecture =
+    /// qwen35`, not the BitNet b1.58 family. Every piece of the substrate is
+    /// named `ternary`; this variant now matches.
+    ///
+    /// **Known modelling tension** (riir-ai Issue 594): "ternary" is a *weight
+    /// container*, not an architecture, so it is orthogonal to the other
+    /// variants rather than parallel to them. It earns a variant here only
+    /// because this repo's dispatch pattern is one variant per weights struct.
+    /// Running a ternary qwen35 hybrid will need a container-vs-architecture
+    /// split, not a second variant.
+    #[cfg(feature = "ternary_inference")]
+    Ternary,
+}
+
+/// Per-layer attention type for Gemma 4 (Issue 577).
+///
+/// Gemma 4 alternates between sliding-window attention layers (5 of every 6)
+/// and full-attention layers (1 of every 6, at index `% 6 == 5`). The two layer
+/// kinds differ in head_dim, n_kv_head, RoPE base, and whether sliding-window
+/// masking applies — see `Config::gemma4_12b` for the concrete shape.
+#[cfg(feature = "gemma4_inference")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Gemma4LayerType {
+    /// Sliding-window attention: head_dim=256, n_kv_head=8 (GQA 2:1),
+    /// rope_theta=10000, sliding_window=1024, full RoPE rotation.
+    #[default]
+    Sliding,
+    /// Full attention: head_dim=512, n_kv_head=1 (MQA),
+    /// rope_theta=1_000_000, partial_rotary_factor=0.25, no sliding window.
+    Full,
 }
 
 /// Attention projection configuration.

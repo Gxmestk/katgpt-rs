@@ -94,9 +94,7 @@ fn argmax_index(logits: &[f32]) -> usize {
     logits
         .iter()
         .enumerate()
-        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)).map_or(0, |(i, _)| i)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -113,7 +111,7 @@ fn section_1_dilution_problem() {
     println!("│ Section 1: The dilution problem (gold mass collapses as N grows)  │");
     println!("└─────────────────────────────────────────────────────────────────────┘");
     println!();
-    println!("  Gold-distractor pre-softmax gap Δ = {}", DELTA);
+    println!("  Gold-distractor pre-softmax gap Δ = {DELTA}");
     println!("  Without SSMax (s = 1): α_gold ≈ 1 / (1 + (N−1) · N^(−Δ))");
     println!();
 
@@ -178,8 +176,7 @@ fn section_2_fixed_mode() {
             f32::INFINITY
         };
         println!(
-            "  {:>10}  {:>10.3}  {:>14.6}  {:>14.6}  {:>9.1}×",
-            n, log_n, base_mass, ssmax_mass, ratio
+            "  {n:>10}  {log_n:>10.3}  {base_mass:>14.6}  {ssmax_mass:>14.6}  {ratio:>9.1}×"
         );
     }
     println!();
@@ -317,8 +314,7 @@ fn section_4_api_surface() {
     let s_l = 1.0_f32;
     let n_identity = (1.0 / s_l).exp();
     println!(
-        "  Identity point (multiplier = 1): s_L={}, N = e^(1/s_L) = {:.2}",
-        s_l, n_identity
+        "  Identity point (multiplier = 1): s_L={s_l}, N = e^(1/s_L) = {n_identity:.2}"
     );
     println!("  At this N, SSMax is a no-op (multiplies by 1.0). Below this N,");
     println!("  SSMax is milder than base (multiplier < 1); above, sharper.");

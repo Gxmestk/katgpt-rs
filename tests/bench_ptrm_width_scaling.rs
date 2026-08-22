@@ -38,8 +38,7 @@ fn greedy_path(marginals: &[Vec<f32>]) -> Vec<usize> {
             m.iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i)
-                .unwrap_or(0)
+                .map_or(0, |(i, _)| i)
         })
         .collect()
 }
@@ -389,8 +388,7 @@ fn bench_ptrm_selection_modes() {
             };
 
             println!(
-                "{:>6} {:>12} {:>10.6} {:>10.4} {:>12.1}",
-                k, mode_str, avg_quality, avg_agreement, latency_us
+                "{k:>6} {mode_str:>12} {avg_quality:>10.6} {avg_agreement:>10.4} {latency_us:>12.1}"
             );
         }
         println!();
@@ -476,8 +474,7 @@ fn bench_ptrm_early_stop_gate() {
             let reduction = (1.0 - avg_tree / baseline_tree) * 100.0;
 
             println!(
-                "{:>6} {:>12.1} {:>10.1} {:>10.6} {:>10.1}",
-                k, threshold, avg_tree, avg_quality, reduction
+                "{k:>6} {threshold:>12.1} {avg_tree:>10.1} {avg_quality:>10.6} {reduction:>10.1}"
             );
         }
         println!();
@@ -635,8 +632,8 @@ fn bench_ptrm_goat_proof_width_vs_depth() {
     }
 
     // ── GOAT Verdict ─────────────────────────────────────────────
-    let max_width_gain = width_gains.last().map(|(_, g)| *g).unwrap_or(0.0);
-    let max_depth_gain = depth_gains.last().map(|(_, g)| *g).unwrap_or(0.0);
+    let max_width_gain = width_gains.last().map_or(0.0, |(_, g)| *g);
+    let max_depth_gain = depth_gains.last().map_or(0.0, |(_, g)| *g);
     let ratio = if max_depth_gain.abs() > 0.01 {
         max_width_gain / max_depth_gain
     } else {

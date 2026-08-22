@@ -25,6 +25,12 @@ pub mod gpu_backend {
 #[cfg(feature = "adaptive_cot_compaction")]
 pub mod attn_match_adaptive_cot;
 
+// ── Kimi-K3 native support (Proposal 032) ──────────────────────────────────
+// Decoder layer composition + (optional) safetensors loader + tiktoken tokenizer.
+// Gated by `kimi_k3` (composition) / `kimi_k3_loader` (loader + tokenizer).
+#[cfg(feature = "kimi_k3")]
+pub mod kimi_k3;
+
 // ── Benchmark harness ──────────────────────────────────────────────────────
 pub mod benchmark;
 

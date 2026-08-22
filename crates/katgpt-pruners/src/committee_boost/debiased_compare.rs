@@ -126,7 +126,7 @@ where
     /// Vector of `BtComparison` results (winner/loser pairs).
     /// Ties are excluded from the output since they carry no ranking information.
     pub fn tournament(&self, n_candidates: usize) -> Vec<BtComparison> {
-        let mut comparisons = Vec::new();
+        let mut comparisons = Vec::with_capacity(n_candidates);
 
         for i in 0..n_candidates {
             for j in (i + 1)..n_candidates {

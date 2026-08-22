@@ -295,15 +295,11 @@ mod tests {
         // X > Z > Y (strict).
         assert!(
             s_confirmed > s_mixed,
-            "G5 mixed violated: confirmed {} must beat mixed {}",
-            s_confirmed,
-            s_mixed
+            "G5 mixed violated: confirmed {s_confirmed} must beat mixed {s_mixed}"
         );
         assert!(
             s_mixed > s_lowconf,
-            "G5 mixed violated: mixed {} must beat lowconf {}",
-            s_mixed,
-            s_lowconf
+            "G5 mixed violated: mixed {s_mixed} must beat lowconf {s_lowconf}"
         );
     }
 
@@ -342,10 +338,7 @@ mod tests {
             let s_lowconf = scorer.score(&unscored_edge(), &lowconf).score;
             assert!(
                 s_confirmed > s_lowconf,
-                "lambda={}: confirmed {} must beat lowconf {}",
-                lambda,
-                s_confirmed,
-                s_lowconf
+                "lambda={lambda}: confirmed {s_confirmed} must beat lowconf {s_lowconf}"
             );
         }
     }

@@ -253,7 +253,7 @@ Operating on each Super-GOAT factory module:
 
 (e) **NeuronShard / freeze envelope** (`riir-neuron-db/src/`): `CharsAnchorShard` subtype. Layout: `[zone_hash(32) | src_centroids(K·D·4) | tgt_centroids(K·D·4) | ot_plan(K·K·4) | sigma2(4) | blake3(32) | merkle_root(32)]`. For K=8, D=8 → 32 + 8·8·4·2 + 8·8·4 + 4 + 32 + 32 = 836 bytes, padded to ~1 KB. `MerkleFrozenEnvelope` wraps it.
 
-(f) **DEC Stokes-calculus** (`katgpt-core/src/dec/`): the OT plan `P⋆` is a transport cochain; applying it to the source-cochain (`a_i`'s) yields the target-cochain (`b_j`'s) under the discrete OT operator. The CHaRS barycentric map is a rank-1 cochain interpolation weighted by the RBF kernel. **Curse-of-dimensionality caveat (R296):** OT-plan computation is `O(K³ log K)` — small for K=8–15, intractable for high-D shards. CHaRS operates on small-K anchor banks (D=8 HLA), well within tractable range.
+(f) **DEC Stokes-calculus** (`katgpt-dec/src/`): the OT plan `P⋆` is a transport cochain; applying it to the source-cochain (`a_i`'s) yields the target-cochain (`b_j`'s) under the discrete OT operator. The CHaRS barycentric map is a rank-1 cochain interpolation weighted by the RBF kernel. **Curse-of-dimensionality caveat (R296):** OT-plan computation is `O(K³ log K)` — small for K=8–15, intractable for high-D shards. CHaRS operates on small-K anchor banks (D=8 HLA), well within tractable range.
 
 ---
 

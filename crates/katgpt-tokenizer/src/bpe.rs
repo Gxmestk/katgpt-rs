@@ -202,6 +202,14 @@ pub struct FastBpeEncoder<'tok> {
     /// (< 0.1% of natural-language pretokens), so the SipHash overhead is
     /// immaterial here. The fast path is [`Self::short_cache`].
     long_pretokens: HashMap<Vec<u8>, Box<[u32]>>,
+    /// Reused across [`Self::encode_into_pretok`] calls — accumulates the bytes
+    /// of the current non-whitespace run. v1 allocated a fresh `Vec` per call
+    /// and regrew it from zero on every call.
+    pretoken_bytes: Vec<u8>,
+    /// Reused across [`Self::encode_pretoken_tokens`] calls — the merged token
+    /// IDs for the current pretoken. v1 returned a freshly allocated
+    /// `Vec<u32>` on every short-cache miss.
+    pretok_tokens: Vec<u32>,
 }
 
 #[cfg(feature = "fast_bpe")]
@@ -238,6 +246,8 @@ impl<'tok> FastBpeEncoder<'tok> {
             short_cache: crate::fast_bpe::ShortPretokenCache::with_pow2_capacity(256),
             long_values: Vec::new(),
             long_pretokens: HashMap::new(),
+            pretoken_bytes: Vec::new(),
+            pretok_tokens: Vec::new(),
         }
     }
 
@@ -287,18 +297,15 @@ impl<'tok> FastBpeEncoder<'tok> {
             return;
         }
 
-        match &self.pair_ranks {
-            Some(table) => {
+        if let Some(table) = &self.pair_ranks {
                 crate::fast_bpe::bpe_merge_symbols_by_rank(table, &mut self.symbols, &mut self.scratch);
-            }
-            None => {
+            } else {
                 crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
                     &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
                     &mut self.symbols,
                     &mut self.scratch,
                 );
             }
-        }
 
         out.extend(self.symbols.iter().map(|t| t.0 as usize));
     }
@@ -376,7 +383,13 @@ impl<'tok> FastBpeEncoder<'tok> {
         // — same predicate Rust's `str::split_whitespace` uses, so the
         // pretoken boundaries here exactly match the trainer's word
         // boundaries. That's what makes the result bit-identical.
-        let mut pretoken_bytes: Vec<u8> = Vec::new();
+        //
+        // The buffer lives on `self` and is reused across calls; `take` moves
+        // it out for the duration so `flush_pretoken(&mut self, ..)` can borrow
+        // `self` mutably, and it is put back before returning (all early
+        // returns happen above this point).
+        let mut pretoken_bytes: Vec<u8> = std::mem::take(&mut self.pretoken_bytes);
+        pretoken_bytes.clear();
 
         // Helper: flush the current non-ws run through the cache + merge
         // loop, appending to `out`. Inlined by hand because the borrow
@@ -407,6 +420,8 @@ impl<'tok> FastBpeEncoder<'tok> {
         }
         // Flush any trailing non-ws run.
         flush_run!();
+        // Hand the (now grown) scratch buffer back for the next call.
+        self.pretoken_bytes = pretoken_bytes;
     }
 
     /// Encode one non-whitespace pretoken through the two-tier cache.
@@ -447,11 +462,14 @@ impl<'tok> FastBpeEncoder<'tok> {
                     return;
                 }
                 Err(slot) => {
-                    // Miss. Encode the pretoken via the merge loop.
-                    let tokens = self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
-                    // Emit first (borrow tokens), then store.
-                    out.extend(tokens.iter().map(|&t| t as usize));
-                    let (val, ext) = Self::pack_value(&tokens, &mut self.long_values);
+                    // Miss. Encode the pretoken via the merge loop into the
+                    // reusable `pretok_tokens` scratch (no per-miss alloc).
+                    self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
+                    // Emit first (borrow the scratch), then store.
+                    out.extend(self.pretok_tokens.iter().map(|&t| t as usize));
+                    // `pretok_tokens` and `long_values` are disjoint fields, so
+                    // the shared + unique borrows coexist.
+                    let (val, ext) = Self::pack_value(&self.pretok_tokens, &mut self.long_values);
                     self.short_cache.insert_at(slot, key, h, val, ext);
                     return;
                 }
@@ -462,18 +480,19 @@ impl<'tok> FastBpeEncoder<'tok> {
             out.extend(cached.iter().map(|&t| t as usize));
             return;
         }
-        let tokens = self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
-        out.extend(tokens.iter().map(|&t| t as usize));
+        self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
+        out.extend(self.pretok_tokens.iter().map(|&t| t as usize));
         // Store in the long-pretoken map. Clone the key (pretoken_bytes is
         // borrowed from the caller's reuse buffer).
         let key_owned = pretoken_bytes.to_vec();
-        let val_owned: Box<[u32]> = tokens.into_boxed_slice();
+        let val_owned: Box<[u32]> = self.pretok_tokens.as_slice().into();
         self.long_pretokens.insert(key_owned, val_owned);
     }
 
-    /// Encode a single pretoken's bytes through the merge loop, returning
-    /// the merged token IDs. Reuses [`Self::symbols`] + [`Self::scratch`]
-    /// (no per-call allocation after warmup).
+    /// Encode a single pretoken's bytes through the merge loop, leaving the
+    /// merged token IDs in [`Self::pretok_tokens`]. Reuses [`Self::symbols`] +
+    /// [`Self::scratch`] + [`Self::pretok_tokens`] (no per-call allocation
+    /// after warmup — v1 returned a freshly allocated `Vec<u32>`).
     ///
     /// # Panics
     ///
@@ -486,7 +505,7 @@ impl<'tok> FastBpeEncoder<'tok> {
         pretoken_bytes: &[u8],
         buf: &mut [u8; 4],
         unk: usize,
-    ) -> Vec<u32> {
+    ) {
         // SAFETY: `pretoken_bytes` is built from `char`s' UTF-8 encodings
         // in the caller's accumulation loop; qed.
         let s = std::str::from_utf8(pretoken_bytes)
@@ -497,23 +516,23 @@ impl<'tok> FastBpeEncoder<'tok> {
             let id = self.tokenizer.vocab_to_id.get(cs).copied().unwrap_or(unk);
             self.symbols.push(crate::fast_bpe::TokenId(id as u32));
         }
-        match &self.pair_ranks {
-            Some(table) => {
+        if let Some(table) = &self.pair_ranks {
                 crate::fast_bpe::bpe_merge_symbols_by_rank(
                     table,
                     &mut self.symbols,
                     &mut self.scratch,
                 );
-            }
-            None => {
+            } else {
                 crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
                     &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
                     &mut self.symbols,
                     &mut self.scratch,
                 );
             }
-        }
-        self.symbols.iter().map(|t| t.0).collect()
+        // Same element order as the previous `.collect()`; writes into the
+        // reused scratch instead of a fresh allocation.
+        self.pretok_tokens.clear();
+        self.pretok_tokens.extend(self.symbols.iter().map(|t| t.0));
     }
 
     /// Pack merged tokens into the (val, ext) inline encoding, spilling to

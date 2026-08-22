@@ -167,33 +167,29 @@ fn main() {
 
     let sigmoid_companions = katgpt_core::personality_composition::sigmoid(w[2] / config.tau);
     println!(
-        "  sigmoid(w_COMPANIONS/tau) = {:.4}  (the COMPANIONS layer gate value)",
-        sigmoid_companions
+        "  sigmoid(w_COMPANIONS/tau) = {sigmoid_companions:.4}  (the COMPANIONS layer gate value)"
     );
 
-    match tame_tick {
-        Some(t) => {
-            println!("\n✓ TAMED at tick {t}: w_COMPANIONS(player) crossed tau_tame = {TAU_TAME}");
-            println!("  The host (riir-ai Plan 327) would now trigger the species-swap:");
-            println!("    wildlife → pet (game-specific logic, not in this open primitive).");
+    if let Some(t) = tame_tick {
+        println!("\n✓ TAMED at tick {t}: w_COMPANIONS(player) crossed tau_tame = {TAU_TAME}");
+        println!("  The host (riir-ai Plan 327) would now trigger the species-swap:");
+        println!("    wildlife → pet (game-specific logic, not in this open primitive).");
 
-            // Snapshot the tamed personality.
-            let snap = katgpt_core::personality_composition::PersonalitySnapshot::from_composition(
-                &kernel,
-                ArchetypeLabel::from_str("wildlife_tamed"),
-                1,
-            );
-            assert!(snap.verify_blake3(), "tamed snapshot must verify");
-            println!("\n  Tamed-personality blake3: {}", hex_short(&snap.blake3));
-        }
-        None => {
-            println!("\n✗ Not tamed after {tick} ticks — try increasing alpha or feeding longer.");
-        }
+        // Snapshot the tamed personality.
+        let snap = katgpt_core::personality_composition::PersonalitySnapshot::from_composition(
+            &kernel,
+            ArchetypeLabel::from_str("wildlife_tamed"),
+            1,
+        );
+        assert!(snap.verify_blake3(), "tamed snapshot must verify");
+        println!("\n  Tamed-personality blake3: {}", hex_short(&snap.blake3));
+    } else {
+        println!("\n✗ Not tamed after {tick} ticks — try increasing alpha or feeding longer.");
     }
 
     println!("\n=== Demo complete ===");
 }
 
 fn hex_short(bytes: &[u8; 32]) -> String {
-    bytes[..8].iter().map(|b| format!("{:02x}", b)).collect()
+    bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
 }

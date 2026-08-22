@@ -4,6 +4,7 @@
 **Status:** Research — Novelty Assessment & Literature Review
 **For:** Plan 213 (BFCF Tree) Extension — Post-GOAT Optimization
 **Relates:** Plan 189 (FreqBandit), Plan 109 (ShardDrop), Plan 043 (TurboQuant), Plan 070 (SP-KV)
+**PASS-Redirects (synthesis):** Li, Yang, Chen, Xu, Li, Su [arXiv:2605.22566 "GraphFlow: A Graph-Based Workflow Management for Efficient LLM-Agent Serving"] (ICML 2026) — PASS. GraphFlow's topology-aware KV management = BFCF's LFU eviction × sharding (this note) + DominoCorrector P197's prefix-hash → residual correction. GraphFlow's `KV(P,v) = KV_base(v) + ΔKV(P,v)` (sparse prefix-induced residual + path pruning of low-frequency transitions) is the dual of BFCF's LFU eviction: GraphFlow *materializes* high-freq residuals and falls back to on-the-fly compute for rare paths; BFCF *evicts* low-freq entries. Both bound memory by the effective working set. The paper's 4× memory reduction + 4.95pp accuracy gain validates the BFCF + DominoCorrector composition at agent-serving scale; no new primitive for our stack.
 
 ---
 

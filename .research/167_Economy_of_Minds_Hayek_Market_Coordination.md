@@ -4,6 +4,7 @@
 > **Code:** `.raw/EoM/` (HayekMAS Python reference)
 > **Date:** 2026-06-05
 > **Verdict: HIGH VALUE — Decentralized market-based agent coordination distills into modelless Rust via our existing BanditPruner + AbsorbCompress + DDTree stack. The key insight is NOT the LLM multi-agent system (that's orchestration, stays in Python). The key insight is the AUCTION → PAYMENT → REWARD → BANKRUPTCY → BIRTH cycle as a modelless credit assignment mechanism for our HL (Heuristic Learning) arms.**
+> **PASS-Redirects (synthesis):** Tomašev, Franklin, Leibo, Jacobs, Cunningham, Gabriel & Osindero [arXiv:2509.10147 "Virtual Agent Economies"] — the DeepMind sandbox-economy framework paper (ancestor of arXiv:2602.11865) wraps this note's auction/payment/credit-assignment cycle in the sociological framing (permeability as design variable, mission economies, VC trust triangles); its Dworkin equal-endowment envy-test auction is a fairness bar we don't ship but have no consumer for, and its karma-economy citation (Elokda et al. 2024 — spendable allocation currency, future-aware concession) is the academic ancestor of riir-neuron-db's `KarmaRing` (signal-diff: ours is a behavioral reputation score with read-time decay, not a spendable currency) — validation of the market-coordination direction, no new primitive.
 
 ---
 

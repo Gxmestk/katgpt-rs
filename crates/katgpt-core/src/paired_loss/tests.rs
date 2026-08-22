@@ -108,7 +108,7 @@ fn mean_gap_for_class_content() {
     let (gap, classes) = g1_fixture();
     // Content at positions 0, 2, 5: (1+2+3)/3 = 2.0
     let m = gap.mean_gap_for_class(&classes, TokenClass::Content);
-    assert!(approx(m, 2.0), "Content mean = {}, want 2.0", m);
+    assert!(approx(m, 2.0), "Content mean = {m}, want 2.0");
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn mean_gap_for_class_function() {
     let (gap, classes) = g1_fixture();
     // Function at position 1: 0/1 = 0.0
     let m = gap.mean_gap_for_class(&classes, TokenClass::Function);
-    assert!(approx(m, 0.0), "Function mean = {}, want 0.0", m);
+    assert!(approx(m, 0.0), "Function mean = {m}, want 0.0");
 }
 
 #[test]
@@ -124,7 +124,7 @@ fn mean_gap_for_class_copy_n_exact_match() {
     let (gap, classes) = g1_fixture();
     // CopyN(2) at position 3: 1/1 = 1.0
     let m = gap.mean_gap_for_class(&classes, TokenClass::CopyN(2));
-    assert!(approx(m, 1.0), "CopyN(2) mean = {}, want 1.0", m);
+    assert!(approx(m, 1.0), "CopyN(2) mean = {m}, want 1.0");
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn mean_gap_for_class_copy_n_wrong_n_is_empty() {
     let (gap, classes) = g1_fixture();
     // CopyN(5) matches no positions → 0.0
     let m = gap.mean_gap_for_class(&classes, TokenClass::CopyN(5));
-    assert!(approx(m, 0.0), "CopyN(5) mean = {}, want 0.0 (empty)", m);
+    assert!(approx(m, 0.0), "CopyN(5) mean = {m}, want 0.0 (empty)");
 }
 
 #[test]
@@ -140,10 +140,10 @@ fn mean_gap_for_class_brackets() {
     let (gap, classes) = g1_fixture();
     // BracketOpen at position 6: 2/1 = 2.0
     let m_open = gap.mean_gap_for_class(&classes, TokenClass::BracketOpen);
-    assert!(approx(m_open, 2.0), "BracketOpen mean = {}", m_open);
+    assert!(approx(m_open, 2.0), "BracketOpen mean = {m_open}");
     // BracketClose at position 7: 1/1 = 1.0
     let m_close = gap.mean_gap_for_class(&classes, TokenClass::BracketClose);
-    assert!(approx(m_close, 1.0), "BracketClose mean = {}", m_close);
+    assert!(approx(m_close, 1.0), "BracketClose mean = {m_close}");
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn mean_gap_for_class_other() {
     let (gap, classes) = g1_fixture();
     // Other at position 4: 0/1 = 0.0
     let m = gap.mean_gap_for_class(&classes, TokenClass::Other);
-    assert!(approx(m, 0.0), "Other mean = {}", m);
+    assert!(approx(m, 0.0), "Other mean = {m}");
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn mean_gap_for_class_empty_returns_zero() {
         TokenClass::BracketClose,
     ];
     let m = gap.mean_gap_for_class(&classes_no_fn, TokenClass::Function);
-    assert!(approx(m, 0.0), "empty bucket → 0.0, got {}", m);
+    assert!(approx(m, 0.0), "empty bucket → 0.0, got {m}");
 }
 
 // ── T1.6 filtered_mean: ALL / TOP-K∩NO-COPY / COPY-N-ONLY ─────────────────
@@ -188,7 +188,7 @@ fn filtered_mean_copy_n_only() {
     let (gap, classes) = g1_fixture();
     // CopyN(2) at position 3: 1.0
     let m = gap.filtered_mean(&classes, FilterKind::CopyNOnly { n: 2 });
-    assert!(approx(m, 1.0), "CopyNOnly(2) = {}, want 1.0", m);
+    assert!(approx(m, 1.0), "CopyNOnly(2) = {m}, want 1.0");
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn filtered_mean_copy_n_only_no_match() {
     let (gap, classes) = g1_fixture();
     // CopyN(5) matches nothing → 0.0
     let m = gap.filtered_mean(&classes, FilterKind::CopyNOnly { n: 5 });
-    assert!(approx(m, 0.0), "CopyNOnly(5) = {}, want 0.0 (empty)", m);
+    assert!(approx(m, 0.0), "CopyNOnly(5) = {m}, want 0.0 (empty)");
 }
 
 #[test]
@@ -208,7 +208,7 @@ fn filtered_mean_topk_nocopy_k2() {
     // CopyN(2) at pos 3 already excluded (not Content/Function).
     // Mean over {1.0, 0.0, 2.0, 3.0} = 6.0/4 = 1.5
     let m = gap.filtered_mean(&classes, FilterKind::TopKNoCopy { k: 2, max_ngram: 4 });
-    assert!(approx(m, 1.5), "TopKNoCopy(k=2) = {}, want 1.5", m);
+    assert!(approx(m, 1.5), "TopKNoCopy(k=2) = {m}, want 1.5");
 }
 
 #[test]
@@ -218,7 +218,7 @@ fn filtered_mean_topk_nocopy_k1_picks_higher_mean_class() {
     // Mask = positions 0, 2, 5 (Content only).
     // Mean over {1.0, 2.0, 3.0} = 6.0/3 = 2.0
     let m = gap.filtered_mean(&classes, FilterKind::TopKNoCopy { k: 1, max_ngram: 4 });
-    assert!(approx(m, 2.0), "TopKNoCopy(k=1) = {}, want 2.0", m);
+    assert!(approx(m, 2.0), "TopKNoCopy(k=1) = {m}, want 2.0");
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn filtered_mean_topk_nocopy_k0_is_empty() {
     let (gap, classes) = g1_fixture();
     // k=0: select nothing → empty mask → 0.0
     let m = gap.filtered_mean(&classes, FilterKind::TopKNoCopy { k: 0, max_ngram: 4 });
-    assert!(approx(m, 0.0), "TopKNoCopy(k=0) = {}, want 0.0 (empty)", m);
+    assert!(approx(m, 0.0), "TopKNoCopy(k=0) = {m}, want 0.0 (empty)");
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn filtered_mean_topk_nocopy_excludes_copy_brackets_other() {
     // Function has no positions). The CopyN(2) position with Δ=9.0 is
     // excluded. Mean over {0.0} = 0.0.
     let m = gap.filtered_mean(&classes, FilterKind::TopKNoCopy { k: 2, max_ngram: 4 });
-    assert!(approx(m, 0.0), "CopyN excluded: got {}, want 0.0", m);
+    assert!(approx(m, 0.0), "CopyN excluded: got {m}, want 0.0");
 }
 
 #[test]
@@ -259,9 +259,7 @@ fn filtered_mean_amplifies_gap_vs_aggregate() {
         .abs();
     assert!(
         m_topk >= m_all,
-        "filter should amplify (or match): topk={} < all={}",
-        m_topk,
-        m_all
+        "filter should amplify (or match): topk={m_topk} < all={m_all}"
     );
 }
 
@@ -350,8 +348,7 @@ fn copy_ngram_tagger_no_repeats() {
         assert_eq!(
             tagger.classify(prefix[i], i, &prefix),
             TokenClass::Other,
-            "position {} should be Other (no repeats)",
-            i
+            "position {i} should be Other (no repeats)"
         );
     }
 }
@@ -366,8 +363,7 @@ fn copy_ngram_tagger_n3() {
         assert_eq!(
             tagger.classify(prefix[i], i, &prefix),
             TokenClass::Other,
-            "position {} should be Other",
-            i
+            "position {i} should be Other"
         );
     }
     // position 3: n-gram [2,3,4], no earlier → Other
@@ -401,8 +397,7 @@ fn copy_ngram_tagger_short_prefix() {
         assert_eq!(
             tagger.classify(prefix[i], i, &prefix),
             TokenClass::Other,
-            "position {}: prefix too short for n=3",
-            i
+            "position {i}: prefix too short for n=3"
         );
     }
 }
@@ -431,8 +426,7 @@ fn copy_ngram_tagger_does_not_self_match() {
         assert_eq!(
             tagger.classify(prefix[i], i, &prefix),
             TokenClass::Other,
-            "no self-match at position {}",
-            i
+            "no self-match at position {i}"
         );
     }
 }
@@ -520,12 +514,7 @@ fn annotate_rows_sorted_by_ratio_descending_nan_last() {
     let mut last = f32::INFINITY;
     for &r in &ratios {
         if !r.is_nan() {
-            assert!(
-                r <= last + 1e-6,
-                "ratios not descending: {} after {}",
-                r,
-                last
-            );
+            assert!(r <= last + 1e-6, "ratios not descending: {r} after {last}");
             last = r;
         }
     }
@@ -535,9 +524,7 @@ fn annotate_rows_sorted_by_ratio_descending_nan_last() {
     if let (Some(fn_idx), Some(ln_idx)) = (first_nan, last_non_nan) {
         assert!(
             ln_idx < fn_idx,
-            "NaN rows must sort last: last_non_nan={} first_nan={}",
-            ln_idx,
-            fn_idx
+            "NaN rows must sort last: last_non_nan={ln_idx} first_nan={fn_idx}"
         );
     }
     // First row should be CopyN(2) (highest ratio ≈ 1.44).

@@ -85,21 +85,20 @@ impl RegimeCollapseClassifier {
     /// Compute the standard deviation of failure depths using Welford's one-pass algorithm.
     /// Returns 0.0 for empty or single-element sets.
     fn failure_depth_std(&self, stats: &DDTreeStats) -> f64 {
-        match stats.failure_depths.len() {
-            0 | 1 => 0.0,
-            _ => {
-                let mut mean = 0.0f64;
-                let mut m2 = 0.0f64;
-                for (i, &d) in stats.failure_depths.iter().enumerate() {
-                    let x = d as f64;
-                    let delta = x - mean;
-                    mean += delta / (i as f64 + 1.0);
-                    let delta2 = x - mean;
-                    m2 += delta * delta2;
-                }
-                let n = stats.failure_depths.len() as f64;
-                (m2 / n).sqrt()
+        if let 0 | 1 = stats.failure_depths.len() {
+            0.0
+        } else {
+            let mut mean = 0.0f64;
+            let mut m2 = 0.0f64;
+            for (i, &d) in stats.failure_depths.iter().enumerate() {
+                let x = d as f64;
+                let delta = x - mean;
+                mean += delta / (i as f64 + 1.0);
+                let delta2 = x - mean;
+                m2 += delta * delta2;
             }
+            let n = stats.failure_depths.len() as f64;
+            (m2 / n).sqrt()
         }
     }
 }
@@ -851,8 +850,7 @@ mod tests {
         assert_eq!(
             dl,
             3.0 * 16.0 + 2.0 * 8.0,
-            "DL should be 3*16 + 2*8 = 64.0, got {}",
-            dl
+            "DL should be 3*16 + 2*8 = 64.0, got {dl}"
         );
     }
 
@@ -938,12 +936,7 @@ mod tests {
     fn sigmoid_bounded() {
         for x in [-100.0, -10.0, -1.0, 0.0, 1.0, 10.0, 100.0] {
             let s = sigmoid(x);
-            assert!(
-                (0.0..=1.0).contains(&s),
-                "sigmoid({}) = {} not in [0,1]",
-                x,
-                s
-            );
+            assert!((0.0..=1.0).contains(&s), "sigmoid({x}) = {s} not in [0,1]");
         }
     }
 
@@ -1439,8 +1432,7 @@ mod tests {
         let confirms = ab.verify_synthetic_failure(pattern);
         assert!(
             confirms > 0,
-            "Synthetic confirms must be > 0 for genuine weakness, got {}",
-            confirms
+            "Synthetic confirms must be > 0 for genuine weakness, got {confirms}"
         );
 
         // Extract failure rule
@@ -1482,8 +1474,7 @@ mod tests {
                 // Call is_valid with parent = prefix, token = 3
                 assert!(
                     !ab.is_valid(depth, 3, prefix),
-                    "token 3 must be rejected with prefix {:?}",
-                    prefix
+                    "token 3 must be rejected with prefix {prefix:?}"
                 );
             }
         }
@@ -1509,8 +1500,7 @@ mod tests {
                 .expect("trigger_prefix should be non-empty");
             assert_eq!(
                 *last, 3,
-                "All rules should point to token 3 as the systematic weakness, got {}",
-                last
+                "All rules should point to token 3 as the systematic weakness, got {last}"
             );
             assert!(
                 rule.synthetic_confirms > 0,

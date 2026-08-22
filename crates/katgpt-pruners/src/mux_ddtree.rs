@@ -39,7 +39,7 @@ impl MuxNode {
     /// The span is assumed to be sorted by descending weight.
     /// The dominant token is the first entry's token ID.
     pub fn new(span: Vec<(usize, f32)>) -> Self {
-        let dominant = span.first().map(|&(idx, _)| idx).unwrap_or(0);
+        let dominant = span.first().map_or(0, |&(idx, _)| idx);
         Self { span, dominant }
     }
 
@@ -95,7 +95,7 @@ impl MuxDdTree {
 
     /// Total number of leaf nodes (at maximum depth).
     pub fn leaf_count(&self) -> usize {
-        self.nodes.last().map(|level| level.len()).unwrap_or(0)
+        self.nodes.last().map_or(0, |level| level.len())
     }
 
     /// Total hypothesis coverage across all leaves.

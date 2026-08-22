@@ -221,19 +221,38 @@ pub unsafe fn attention_head_core<B: BiasProvider>(
         sum += exp_val;
     }
 
-    // Pass 3: normalize + weighted value accumulation
+    // Pass 3: normalize + weighted value accumulation.
+    //
+    // Loop order flipped from d-outer/t-inner to t-outer/d-inner. Two wins:
+    //  1. `scores_buf[t] * inv_sum` was recomputed once per (d, t) — i.e. hd×t_n
+    //     multiplies for a value that only depends on `t`. It is now hoisted to
+    //     `t_n` multiplies (loop-invariant w.r.t. the `d` loop).
+    //  2. `value_cache` is now walked contiguously along `d` (one row per `t`)
+    //     instead of striding by `kv_dim` per `t` for every `d`, which touched a
+    //     fresh cache line on every single access.
+    //
+    // BIT-IDENTICAL: for each fixed `d`, the additions still happen in ascending
+    // `t` order, so each output element sees the exact same sequence of partial
+    // sums as the old register accumulator (`val` also started at 0.0f32, so the
+    // leading `0.0 + x` is unchanged). The per-term product is still
+    // `(scores_buf[t] * inv_sum) * value` with the same left-to-right grouping —
+    // no FMA contraction is introduced (deliberately NOT using
+    // `simd_fused_scale_acc`, which single-rounds via `mul_add` and would change
+    // the result).
     let inv_sum = 1.0 / sum;
     for d in 0..hd {
-        let mut val = 0.0f32;
-        for t in 0..t_n {
-            unsafe {
-                val += *scores_buf.get_unchecked(t)
-                    * inv_sum
-                    * *value_cache.get_unchecked(t * kv_dim + kv_group_offset + d);
-            }
-        }
         unsafe {
-            *attn_out.get_unchecked_mut(q_head_offset + d) = val;
+            *attn_out.get_unchecked_mut(q_head_offset + d) = 0.0f32;
+        }
+    }
+    for t in 0..t_n {
+        let s = unsafe { *scores_buf.get_unchecked(t) } * inv_sum;
+        let v_base = t * kv_dim + kv_group_offset;
+        for d in 0..hd {
+            unsafe {
+                *attn_out.get_unchecked_mut(q_head_offset + d) +=
+                    s * *value_cache.get_unchecked(v_base + d);
+            }
         }
     }
 }

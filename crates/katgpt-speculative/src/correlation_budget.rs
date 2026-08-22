@@ -63,9 +63,10 @@ impl CorrelationBudgetAllocator {
 
     /// Get the current EMA alpha (warmup-aware).
     fn current_alpha(&self) -> f32 {
-        match self.update_count < self.warmup_steps {
-            true => self.ema_alpha_warmup,
-            false => self.ema_alpha,
+        if self.update_count < self.warmup_steps {
+            self.ema_alpha_warmup
+        } else {
+            self.ema_alpha
         }
     }
 
@@ -88,10 +89,7 @@ impl CorrelationBudgetAllocator {
 
         let alpha = self.current_alpha();
         let old = self.depth_agreement_rate[depth];
-        let new_val = match accepted {
-            true => 1.0_f32,
-            false => 0.0_f32,
-        };
+        let new_val = if accepted { 1.0_f32 } else { 0.0_f32 };
         self.depth_agreement_rate[depth] = old * (1.0 - alpha) + new_val * alpha;
         self.update_count += 1;
     }
@@ -229,9 +227,7 @@ mod tests {
         assert_eq!(allocation.len(), 2);
         assert!(
             total <= budget + 2,
-            "total {} should be close to budget {}",
-            total,
-            budget
+            "total {total} should be close to budget {budget}"
         );
         // Depth 0 should get MORE budget than depth 1
         assert!(
@@ -260,8 +256,7 @@ mod tests {
         for &a in &allocation {
             assert!(
                 a >= 1,
-                "each depth should get at least min_budget_per_depth, got {}",
-                a
+                "each depth should get at least min_budget_per_depth, got {a}"
             );
         }
     }
@@ -275,8 +270,7 @@ mod tests {
         let rate_after_1 = alloc.agreement_rate(0);
         assert!(
             (rate_after_1 - 0.65).abs() < 0.01,
-            "warmup rate should be 0.65, got {}",
-            rate_after_1
+            "warmup rate should be 0.65, got {rate_after_1}"
         );
     }
 

@@ -1,7 +1,7 @@
 # Plan 300: Subjective-CCE Heterogeneous-Payoff Wrapper Primitive
 
 **Date:** 2026-06-21
-**Research:** Forked from [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/62_bayes_cce_regret_sketch.md) §2 (subjective-CCE framing, bound transfers at math level).
+**Research:** Forked from [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/06_self_learn_npcs/cwm_runtime.md) §2 (subjective-CCE framing, bound transfers at math level).
 **Source paper:** [arxiv 2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzoumas — Optimal CCEs in MFGs via LP + No-Regret Learning.
 **Parent issue:** Issue 327 (riir-ai, closed + removed) — closed 2026-06-21 (split decision, Branch 4: subjective-CCE demoted to wiring).
 **Target:** `katgpt-rs/src/cce/` (extend existing module from Plan 295) + extend `cce_moderator` feature.
@@ -312,7 +312,7 @@ katgpt-rs/src/cce/
 
 - **Plan 295 (homogeneous CceLp primitive):** [`katgpt-rs/.plans/295_lp_cce_moderator_primitive.md`](295_lp_cce_moderator_primitive.md)
 - **Source paper:** [Campi, Cannerozzi, Tzoumas — arxiv 2606.20062](https://arxiv.org/pdf/2606.20062)
-- **P0.5 regret sketch (subjective-CCE §2):** [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/62_bayes_cce_regret_sketch.md)
+- **P0.5 regret sketch (subjective-CCE §2):** [`riir-ai/.docs/62_bayes_cce_regret_sketch.md`](../../riir-ai/.docs/06_self_learn_npcs/cwm_runtime.md)
 - **Parent issue (closed):** Issue 327 (riir-ai, closed + removed)
 - **Sibling issue (deferred):** Issue 328 (riir-ai, closed + removed)
 - **Public CCE research note:** [`katgpt-rs/.research/274_Optimal_CCE_Moderator_LP_No_Regret.md`](../.research/274_Optimal_CCE_Moderator_LP_No_Regret.md)

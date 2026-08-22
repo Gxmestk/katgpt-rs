@@ -56,6 +56,8 @@ plasma_path = []
 # Binary plasma loader (Issue 145, Bonsai 27B). Gates: load_binary_bits in contiguous.rs.
 # Forwards to katgpt-core so BinaryWeights resolves.
 binary_plasma = ["katgpt-core/binary_plasma"]
+# Issue 578: the Q2_0_g128 container (ternary bit-planes + per-128 f16 scale).
+ternary_group_scale = ["katgpt-core/ternary_group_scale", "binary_plasma"]
 
 # ── Phase 9 absorptions (Proposal 003) — modules moved from katgpt-rs root ──
 
@@ -110,3 +112,24 @@ breakeven_routing = []
 # because the standard ReLU MLP is the production path; gated MLP is a
 # training-target architecture for aHLA MLP LoRA (Plan 066 Experiment E).
 gated_mlp = []
+
+# Transformer-level FFN MoE (DeepSeek-V3 fine-grained MoE + noaux_tc).
+# Proposal 032 Phase 3, Research 328. Implements the auxiliary-loss-free
+# load balancing from DeepSeek-V3 §3.3 (per-expert bias participates in
+# top-K selection only; raw sigmoid scores drive renormalization).
+# Opt-in — promotion requires Phase 6 real-model GOAT; MoE FFN is a model
+# architecture choice, not a modelless gain over existing substrate.
+transformer_moe = []
+
+# MoE analytic backward pass (Plan 318 Phase C C4). The CPU reference for
+# the GPU backward. Implies `transformer_moe`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+moe_backward = ["transformer_moe"]
+
+# Attention Residual Block — Kimi-K3 block-residual softmax mixing.
+# Proposal 032 Phase 5 prerequisite, Research 330 §5. Implements the
+# `_apply_attn_res` mechanism that wraps around BOTH attention and MLP in
+# every decoder layer when `attn_res_block_size` is set. Opt-in —
+# promotion requires Phase 6 real-model GOAT.
+transformer_attn_res = []

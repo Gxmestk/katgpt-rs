@@ -3,16 +3,14 @@
 //! All systems operate on `&mut World` for tick-based game loop control.
 //! Called in deterministic order by [`run_tick`]; no ECS schedule is used.
 
-use std::collections::{HashMap, HashSet};
-
 use bevy_ecs::prelude::*;
 
 use super::arena::ArenaGrid;
 use super::{
-    Alive, BOMB_FUSE_TICKS, Blast, Bomb, BombCount, BombFuse, BombRange, BombType, BomberAction,
-    Cell, DEFAULT_BLAST_RANGE, DEFAULT_MAX_BOMBS, DEFAULT_SPEED, GameEvent, GameRng, GridPos,
-    Player, PlayerEntities, PowerUp, PowerUpKind, SPAWN_POSITIONS, ScoreBoard, Speed, TICK_LIMIT,
-    TickCounter,
+    ARENA_H, ARENA_W, Alive, BOMB_FUSE_TICKS, Blast, Bomb, BombCount, BombFuse, BombRange, BombType,
+    BomberAction, Cell, DEFAULT_BLAST_RANGE, DEFAULT_MAX_BOMBS, DEFAULT_SPEED, GameEvent, GameRng,
+    GridPos, Player, PlayerEntities, PowerUp, PowerUpKind, SPAWN_POSITIONS, ScoreBoard, Speed,
+    TICK_LIMIT, TickCounter,
 };
 
 // ---------------------------------------------------------------------------
@@ -31,6 +29,60 @@ pub struct PendingExplosion {
 
 /// Four cardinal directions used for blast propagation.
 const DIRECTIONS: [(i32, i32); 4] = [(0, -1), (0, 1), (-1, 0), (1, 0)];
+
+/// Number of `u64` words needed to cover every arena cell.
+const CELLSET_WORDS: usize = (ARENA_W * ARENA_H).div_ceil(64);
+
+/// Stack-resident occupancy set over the bounded 13×13 arena.
+///
+/// Replaces the per-tick `HashSet<(i32, i32)>` allocations in the tick systems:
+/// membership becomes a shift + mask instead of a SipHash probe, and the whole
+/// set lives in three `u64`s with no heap traffic.
+///
+/// Coordinates outside the arena spill into `oob`, which stays empty (and hence
+/// unallocated) for every reachable game state — bombs and players are always
+/// in bounds, and `ArenaGrid::get` reports out-of-bounds cells as `FixedWall`
+/// so blast propagation never leaves the grid. The fallback exists purely so
+/// behaviour is identical to the old `HashSet` for hand-built worlds.
+#[derive(Default)]
+struct CellSet {
+    bits: [u64; CELLSET_WORDS],
+    oob: Vec<(i32, i32)>,
+}
+
+impl CellSet {
+    #[inline]
+    fn index(x: i32, y: i32) -> Option<usize> {
+        if x >= 0 && y >= 0 && (x as usize) < ARENA_W && (y as usize) < ARENA_H { Some(y as usize * ARENA_W + x as usize) } else { None }
+    }
+
+    /// Insert `(x, y)`; returns `true` if it was not already present
+    /// (same contract as `HashSet::insert`).
+    #[inline]
+    fn insert(&mut self, x: i32, y: i32) -> bool {
+        match Self::index(x, y) {
+            Some(i) => {
+                let mask = 1u64 << (i % 64);
+                let word = &mut self.bits[i / 64];
+                let fresh = *word & mask == 0;
+                *word |= mask;
+                fresh
+            }
+            None => if self.oob.contains(&(x, y)) { false } else {
+                    self.oob.push((x, y));
+                    true
+                },
+        }
+    }
+
+    #[inline]
+    fn contains(&self, x: i32, y: i32) -> bool {
+        match Self::index(x, y) {
+            Some(i) => self.bits[i / 64] & (1u64 << (i % 64)) != 0,
+            None => self.oob.contains(&(x, y)),
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // World initialisation
@@ -239,105 +291,126 @@ fn process_explosions(world: &mut World, queue: Vec<PendingExplosion>) -> Vec<(i
     }
 
     // ── Snapshot current state (immutable reads) ────────────────────
-    let bomb_map: HashMap<(i32, i32), (Entity, u32, Entity, BombType)> = {
+    // Both snapshots are tiny (a handful of bombs, ≤4 alive players), so flat
+    // `Vec`s with linear scans replace the old `HashMap`s: no hashing per blast
+    // cell, and no per-occupied-cell `Vec` allocation for the player buckets.
+    #[allow(clippy::type_complexity)]
+    let bombs: Vec<((i32, i32), Entity, u32, Entity, BombType)> = {
         let mut q =
             world.query_filtered::<(Entity, &GridPos, &BombRange, &BombFuse, &Bomb), With<Bomb>>();
         q.iter(world)
-            .map(|(e, p, r, f, b)| ((p.x, p.y), (e, r.cells, f.owner, b.bomb_type)))
+            .map(|(e, p, r, f, b)| ((p.x, p.y), e, r.cells, f.owner, b.bomb_type))
             .collect()
     };
 
-    // Vec to handle multiple players at the same position
-    let player_map: HashMap<(i32, i32), Vec<(u8, Entity)>> = {
+    // (id, entity, pos) per alive player, in query order — the same order the
+    // old `HashMap<pos, Vec<_>>` buckets were pushed in, so the `players_killed`
+    // ordering (and therefore the `PlayerKilled` event order) is unchanged.
+    let alive_players: Vec<(u8, Entity, (i32, i32))> = {
         let mut q = world.query_filtered::<(Entity, &Player, &GridPos), With<Alive>>();
-        let mut map: HashMap<(i32, i32), Vec<(u8, Entity)>> = HashMap::new();
-        for (e, p, pos) in q.iter(world) {
-            map.entry((pos.x, pos.y)).or_default().push((p.id, e));
-        }
-        map
+        q.iter(world)
+            .map(|(e, p, pos)| (p.id, e, (pos.x, pos.y)))
+            .collect()
     };
-
-    // Map player entity → player id (for killer tracking)
-    let player_id_map: HashMap<Entity, u8> = player_map
-        .values()
-        .flat_map(|v| v.iter())
-        .copied()
-        .map(|(id, e)| (e, id))
-        .collect();
 
     // ── Compute blast propagation (no world mutation) ───────────────
     let mut blast_cells: Vec<(i32, i32)> = Vec::new();
-    let mut walls_destroyed: HashSet<(i32, i32)> = HashSet::new();
+    // Bitset dedup + insertion-ordered `Vec`, replacing a `HashSet`.
+    let mut walls_seen = CellSet::default();
+    let mut walls_destroyed: Vec<(i32, i32)> = Vec::new();
     let mut powerups_revealed: Vec<(PowerUpKind, (i32, i32))> = Vec::new();
     let mut players_killed: Vec<(u8, Entity, Option<u8>)> = Vec::new();
     let mut bombs_to_despawn: Vec<Entity> = Vec::new();
-    let mut owners_to_decrement: HashSet<Entity> = HashSet::new();
-    let mut processed: HashSet<(i32, i32)> = HashSet::new();
+    // Distinct-owner sets; each owner is decremented exactly once regardless of
+    // order, so a linear-scan `Vec` is equivalent to the old `HashSet`.
+    let mut owners_to_decrement: Vec<Entity> = Vec::new();
+    let mut processed = CellSet::default();
 
     let mut explosion_queue: Vec<PendingExplosion> = queue;
 
-    while let Some(exp) = explosion_queue.pop() {
-        let killer_id = player_id_map.get(&exp.owner).copied();
-        processed.insert(exp.pos);
-        blast_cells.push(exp.pos);
-        owners_to_decrement.insert(exp.owner);
+    {
+        // Hoisted out of the propagation loop: `World::resource` costs a
+        // `TypeId` → `ComponentId` lookup plus a sparse-set probe, and it was
+        // being paid once per blast cell. Nothing in the loop mutates `world`.
+        let grid = world.resource::<ArenaGrid>();
 
-        if let Some(players) = player_map.get(&exp.pos) {
-            for &(pid, pe) in players {
-                players_killed.push((pid, pe, killer_id));
+        while let Some(exp) = explosion_queue.pop() {
+            let killer_id = alive_players
+                .iter()
+                .find(|&&(_, e, _)| e == exp.owner)
+                .map(|&(id, _, _)| id);
+            processed.insert(exp.pos.0, exp.pos.1);
+            blast_cells.push(exp.pos);
+            if !owners_to_decrement.contains(&exp.owner) {
+                owners_to_decrement.push(exp.owner);
             }
-        }
 
-        for (dx, dy) in DIRECTIONS {
-            for dist in 1..=exp.range as i32 {
-                let cx = exp.pos.0 + dx * dist;
-                let cy = exp.pos.1 + dy * dist;
-                let cell = world.resource::<ArenaGrid>().get(cx, cy);
+            for &(pid, pe, ppos) in &alive_players {
+                if ppos == exp.pos {
+                    players_killed.push((pid, pe, killer_id));
+                }
+            }
 
-                match cell {
-                    Cell::FixedWall => break,
-                    Cell::DestructibleWall => {
-                        blast_cells.push((cx, cy));
-                        walls_destroyed.insert((cx, cy));
-                        if let Some(players) = player_map.get(&(cx, cy)) {
-                            for &(pid, pe) in players {
-                                players_killed.push((pid, pe, killer_id));
+            for (dx, dy) in DIRECTIONS {
+                for dist in 1..=exp.range as i32 {
+                    let cx = exp.pos.0 + dx * dist;
+                    let cy = exp.pos.1 + dy * dist;
+                    let cell = grid.get(cx, cy);
+
+                    match cell {
+                        Cell::FixedWall => break,
+                        Cell::DestructibleWall => {
+                            blast_cells.push((cx, cy));
+                            if walls_seen.insert(cx, cy) {
+                                walls_destroyed.push((cx, cy));
+                            }
+                            for &(pid, pe, ppos) in &alive_players {
+                                if ppos == (cx, cy) {
+                                    players_killed.push((pid, pe, killer_id));
+                                }
+                            }
+                            match exp.bomb_type {
+                                BombType::Piercing => {} // continue through wall
+                                _ => break,
                             }
                         }
-                        match exp.bomb_type {
-                            BombType::Piercing => {} // continue through wall
-                            _ => break,
-                        }
-                    }
-                    Cell::PowerUpHidden(kind) => {
-                        blast_cells.push((cx, cy));
-                        walls_destroyed.insert((cx, cy));
-                        powerups_revealed.push((kind, (cx, cy)));
-                        if let Some(players) = player_map.get(&(cx, cy)) {
-                            for &(pid, pe) in players {
-                                players_killed.push((pid, pe, killer_id));
+                        Cell::PowerUpHidden(kind) => {
+                            blast_cells.push((cx, cy));
+                            if walls_seen.insert(cx, cy) {
+                                walls_destroyed.push((cx, cy));
                             }
-                        }
-                        break;
-                    }
-                    Cell::Floor => {
-                        blast_cells.push((cx, cy));
-                        if let Some(players) = player_map.get(&(cx, cy)) {
-                            for &(pid, pe) in players {
-                                players_killed.push((pid, pe, killer_id));
+                            powerups_revealed.push((kind, (cx, cy)));
+                            for &(pid, pe, ppos) in &alive_players {
+                                if ppos == (cx, cy) {
+                                    players_killed.push((pid, pe, killer_id));
+                                }
                             }
+                            break;
                         }
-                        if processed.insert((cx, cy))
-                            && let Some(&(be, br, bo, bt)) = bomb_map.get(&(cx, cy))
-                        {
-                            bombs_to_despawn.push(be);
-                            owners_to_decrement.insert(bo);
-                            explosion_queue.push(PendingExplosion {
-                                pos: (cx, cy),
-                                range: br,
-                                owner: bo,
-                                bomb_type: bt,
-                            });
+                        Cell::Floor => {
+                            blast_cells.push((cx, cy));
+                            for &(pid, pe, ppos) in &alive_players {
+                                if ppos == (cx, cy) {
+                                    players_killed.push((pid, pe, killer_id));
+                                }
+                            }
+                            // `.rev()` mirrors `HashMap::collect`'s last-wins
+                            // behaviour if two bombs ever share a cell.
+                            if processed.insert(cx, cy)
+                                && let Some(&(_, be, br, bo, bt)) =
+                                    bombs.iter().rev().find(|b| b.0 == (cx, cy))
+                            {
+                                bombs_to_despawn.push(be);
+                                if !owners_to_decrement.contains(&bo) {
+                                    owners_to_decrement.push(bo);
+                                }
+                                explosion_queue.push(PendingExplosion {
+                                    pos: (cx, cy),
+                                    range: br,
+                                    owner: bo,
+                                    bomb_type: bt,
+                                });
+                            }
                         }
                     }
                 }
@@ -365,9 +438,14 @@ fn process_explosions(world: &mut World, queue: Vec<PendingExplosion>) -> Vec<(i
         world.entity_mut(be).despawn();
     }
 
-    let mut killed_entities: HashSet<Entity> = HashSet::new();
+    // ≤4 players — linear scan beats hashing and never allocates a table.
+    let mut killed_entities: Vec<Entity> = Vec::new();
     for (pid, pe, killer) in players_killed {
-        if killed_entities.insert(pe) && world.get::<Alive>(pe).is_some() {
+        let fresh = !killed_entities.contains(&pe);
+        if fresh {
+            killed_entities.push(pe);
+        }
+        if fresh && world.get::<Alive>(pe).is_some() {
             world.entity_mut(pe).remove::<Alive>();
             world.send_event(GameEvent::PlayerKilled {
                 victim: pid,
@@ -398,20 +476,25 @@ fn process_explosions(world: &mut World, queue: Vec<PendingExplosion>) -> Vec<(i
 // ---------------------------------------------------------------------------
 
 fn apply_movement(world: &mut World, actions: [Option<BomberAction>; 4]) {
-    // Landmines do NOT block movement — players can walk onto them
-    let bomb_pos: HashSet<(i32, i32)> = {
+    // Landmines do NOT block movement — players can walk onto them.
+    // Bitset instead of a per-tick `HashSet` allocation.
+    let mut bomb_pos = CellSet::default();
+    {
         let mut q = world.query_filtered::<(&GridPos, &Bomb), ()>();
-        q.iter(world)
-            .filter(|(_, bomb)| bomb.bomb_type != BombType::Landmine)
-            .map(|(p, _)| (p.x, p.y))
-            .collect()
-    };
+        for (p, bomb) in q.iter(world) {
+            if bomb.bomb_type != BombType::Landmine {
+                bomb_pos.insert(p.x, p.y);
+            }
+        }
+    }
 
     // Collect phase — immutable query
     #[allow(clippy::type_complexity)]
     let mut moves: Vec<(u8, Entity, (i32, i32), (i32, i32))> = Vec::new();
     {
         let mut q = world.query_filtered::<(Entity, &Player, &GridPos), With<Alive>>();
+        // Resource lookup hoisted out of the per-player loop.
+        let grid = world.resource::<ArenaGrid>();
         for (entity, player, pos) in q.iter(world) {
             let action = match actions.get(player.id as usize).copied().flatten() {
                 Some(a) => a,
@@ -427,10 +510,10 @@ fn apply_movement(world: &mut World, actions: [Option<BomberAction>; 4]) {
             let tx = pos.x + dx;
             let ty = pos.y + dy;
 
-            if !world.resource::<ArenaGrid>().is_walkable(tx, ty) {
+            if !grid.is_walkable(tx, ty) {
                 continue;
             }
-            if bomb_pos.contains(&(tx, ty)) {
+            if bomb_pos.contains(tx, ty) {
                 continue;
             }
             moves.push((player.id, entity, (pos.x, pos.y), (tx, ty)));
@@ -514,10 +597,14 @@ fn trigger_landmines(world: &mut World) -> Vec<PendingExplosion> {
 // ---------------------------------------------------------------------------
 
 fn place_bombs(world: &mut World, actions: [Option<BomberAction>; 4]) {
-    let bomb_pos: HashSet<(i32, i32)> = {
+    // Bitset instead of a per-tick `HashSet` allocation.
+    let mut bomb_pos = CellSet::default();
+    {
         let mut q = world.query_filtered::<&GridPos, With<Bomb>>();
-        q.iter(world).map(|p| (p.x, p.y)).collect()
-    };
+        for p in q.iter(world) {
+            bomb_pos.insert(p.x, p.y);
+        }
+    }
 
     let mut to_place: Vec<(Entity, (i32, i32), u32)> = Vec::new();
     {
@@ -531,7 +618,7 @@ fn place_bombs(world: &mut World, actions: [Option<BomberAction>; 4]) {
             if count.active >= count.max {
                 continue;
             }
-            if bomb_pos.contains(&(pos.x, pos.y)) {
+            if bomb_pos.contains(pos.x, pos.y) {
                 continue;
             }
             to_place.push((entity, (pos.x, pos.y), range.cells));
@@ -551,7 +638,7 @@ fn place_bombs(world: &mut World, actions: [Option<BomberAction>; 4]) {
         if let Some(mut c) = world.get_mut::<BombCount>(owner) {
             c.active += 1;
         }
-        let pid = world.get::<Player>(owner).map(|p| p.id).unwrap_or(0);
+        let pid = world.get::<Player>(owner).map_or(0, |p| p.id);
         world.send_event(GameEvent::BombPlaced {
             player: pid,
             pos: (x, y),
@@ -564,14 +651,19 @@ fn place_bombs(world: &mut World, actions: [Option<BomberAction>; 4]) {
 // ---------------------------------------------------------------------------
 
 fn collect_powerups(world: &mut World) {
-    let pu_map: HashMap<(i32, i32), (Entity, PowerUpKind)> = {
+    // Flat `Vec` instead of a per-tick `HashMap`: at most 4 players probe it, so
+    // a linear scan is cheaper than building and hashing a table, and an empty
+    // board allocates nothing at all.
+    let powerups: Vec<((i32, i32), Entity, PowerUpKind)> = {
         let mut q = world.query_filtered::<(Entity, &PowerUp, &GridPos), ()>();
-        q.iter(world)
-            .map(|(e, pu, pos)| ((pos.x, pos.y), (e, pu.kind)))
-            .collect()
+        let mut v = Vec::new();
+        for (e, pu, pos) in q.iter(world) {
+            v.push(((pos.x, pos.y), e, pu.kind));
+        }
+        v
     };
 
-    if pu_map.is_empty() {
+    if powerups.is_empty() {
         return;
     }
 
@@ -579,7 +671,9 @@ fn collect_powerups(world: &mut World) {
     {
         let mut pq = world.query_filtered::<(Entity, &Player, &GridPos), With<Alive>>();
         for (pe, _player, pos) in pq.iter(world) {
-            if let Some(&(pue, kind)) = pu_map.get(&(pos.x, pos.y)) {
+            // `.rev()` mirrors `HashMap::collect`'s last-wins behaviour if two
+            // power-up entities ever share a cell.
+            if let Some(&(_, pue, kind)) = powerups.iter().rev().find(|p| p.0 == (pos.x, pos.y)) {
                 to_collect.push((pe, pue, kind));
             }
         }
@@ -587,7 +681,7 @@ fn collect_powerups(world: &mut World) {
 
     // Track already-despawned entities to prevent double-despawn when
     // two players land on the same power-up cell in the same tick.
-    let mut collected_entities: HashSet<bevy_ecs::entity::Entity> = HashSet::new();
+    let mut collected_entities: Vec<bevy_ecs::entity::Entity> = Vec::new();
 
     for (player_entity, pu_entity, kind) in to_collect {
         // Apply power-up effect to player
@@ -609,16 +703,13 @@ fn collect_powerups(world: &mut World) {
             }
         }
         let pid = world
-            .get::<Player>(player_entity)
-            .map(|p| p.id)
-            .unwrap_or(0);
+            .get::<Player>(player_entity).map_or(0, |p| p.id);
 
         // Only first player to reach this entity emits event and despawns
-        if collected_entities.insert(pu_entity) {
+        if !collected_entities.contains(&pu_entity) {
+            collected_entities.push(pu_entity);
             let pu_pos = world
-                .get::<GridPos>(pu_entity)
-                .map(|g| (g.x, g.y))
-                .unwrap_or((0, 0));
+                .get::<GridPos>(pu_entity).map_or((0, 0), |g| (g.x, g.y));
             world.send_event(GameEvent::PowerUpCollected {
                 player: pid,
                 kind,
@@ -657,16 +748,21 @@ fn cleanup_and_check(world: &mut World, blast_cells: Vec<(i32, i32)>) -> bool {
     // Advance tick counter
     world.resource_mut::<TickCounter>().tick += 1;
 
-    // Count survivors
-    let alive: Vec<u8> = {
+    // Count survivors. Only the round-ending tick needs the actual id list, so
+    // the common path counts without allocating a `Vec`.
+    let alive_count = {
         let mut q = world.query_filtered::<(Entity, &Player), With<Alive>>();
-        q.iter(world).map(|(_, p)| p.id).collect()
+        q.iter(world).count()
     };
 
     let tick = world.resource::<TickCounter>().tick;
-    let round_over = alive.len() <= 1 || tick >= TICK_LIMIT;
+    let round_over = alive_count <= 1 || tick >= TICK_LIMIT;
 
     if round_over {
+        let alive: Vec<u8> = {
+            let mut q = world.query_filtered::<(Entity, &Player), With<Alive>>();
+            q.iter(world).map(|(_, p)| p.id).collect()
+        };
         world.send_event(GameEvent::RoundEnd { survivors: alive });
         return false;
     }

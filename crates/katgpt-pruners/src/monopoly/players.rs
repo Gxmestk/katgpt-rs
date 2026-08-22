@@ -77,7 +77,7 @@ impl DecisionContext {
 
     /// Squares in a given color group that this player owns.
     pub fn owned_in_group(&self, group: PropertyGroup) -> Vec<u8> {
-        let mut result = Vec::new();
+        let mut result = Vec::with_capacity(BOARD_SIZE as usize);
         for sq in 0..BOARD_SIZE {
             if matches!(square_kind(sq), SquareKind::Property(g) if g == group)
                 && self.square_owners[sq as usize] == Some(self.player_id)
@@ -1043,7 +1043,7 @@ impl HLPlayer {
     pub fn compress_cycle(&mut self) -> Vec<usize> {
         let min_visits = 20u32;
         let threshold = 0.1f32;
-        let mut newly_compressed = Vec::new();
+        let mut newly_compressed = Vec::with_capacity(Strategy::COUNT);
 
         for i in 0..Strategy::COUNT {
             if self.compressed[i] {

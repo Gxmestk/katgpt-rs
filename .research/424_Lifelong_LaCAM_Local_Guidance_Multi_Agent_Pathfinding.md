@@ -247,7 +247,7 @@ deterministic replay and anti-cheat). The reframing is:
 > how many sibling flows pass through the same (cell, time). High `χ` =
 > positive divergence = "agents are converging here, avoid".
 
-This connects to the existing DEC substrate (`katgpt-core/src/dec/`):
+This connects to the existing DEC substrate (`katgpt-dec/src/`):
 
 - The joint configuration `Q_t = (p_1, ..., p_n)` is a **0-cochain** over
   the spatial complex at time `t`.

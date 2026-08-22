@@ -550,10 +550,7 @@ mod tests {
             let norm_out_sq: f32 = out.iter().map(|v| v * v).sum();
             assert!(
                 norm_out_sq <= bound + 1e-4,
-                "α={}: ‖out‖² = {} exceeds bound ‖a‖²+‖b‖² = {}",
-                alpha,
-                norm_out_sq,
-                bound
+                "α={alpha}: ‖out‖² = {norm_out_sq} exceeds bound ‖a‖²+‖b‖² = {bound}"
             );
         }
     }
@@ -570,8 +567,7 @@ mod tests {
         let norm_out_sq: f32 = out.iter().map(|v| v * v).sum();
         assert!(
             (norm_out_sq - 1.0).abs() < 1e-5,
-            "α=π/4, a⊥b, ‖a‖=‖b‖=1: ‖out‖² = {} should be 1.0",
-            norm_out_sq
+            "α=π/4, a⊥b, ‖a‖=‖b‖=1: ‖out‖² = {norm_out_sq} should be 1.0"
         );
     }
 
@@ -644,26 +640,17 @@ mod tests {
                 compute_phase_from_projection(state, dirn, 4.0, &mut cos_a, &mut sin_a).unwrap();
                 assert!(
                     cos_a >= -1e-6,
-                    "cos α = {} < 0 for state={:?} dirn={:?}",
-                    cos_a,
-                    state,
-                    dirn
+                    "cos α = {cos_a} < 0 for state={state:?} dirn={dirn:?}"
                 );
                 assert!(
                     sin_a >= -1e-6,
-                    "sin α = {} < 0 for state={:?} dirn={:?}",
-                    sin_a,
-                    state,
-                    dirn
+                    "sin α = {sin_a} < 0 for state={state:?} dirn={dirn:?}"
                 );
                 // Pythagorean identity holds (within f32 drift).
                 let sum_sq = cos_a * cos_a + sin_a * sin_a;
                 assert!(
                     (sum_sq - 1.0).abs() < 1e-5,
-                    "cos²+sin² = {} != 1 for state={:?} dirn={:?}",
-                    sum_sq,
-                    state,
-                    dirn
+                    "cos²+sin² = {sum_sq} != 1 for state={state:?} dirn={dirn:?}"
                 );
             }
         }
@@ -790,21 +777,18 @@ mod tests {
         // sqrt-recovery construction this is essentially f32 rounding noise.
         assert!(
             max_pythagorean_drift < 1e-4,
-            "phase_safe cos²+sin² drift = {} exceeds G1 1e-4 budget",
-            max_pythagorean_drift
+            "phase_safe cos²+sin² drift = {max_pythagorean_drift} exceeds G1 1e-4 budget"
         );
         // Per-element accuracy: sin is from libm (~1 ULP), cos is sqrt(1-sin²)
         // (~2 ULP, sin error amplified by the sqrt derivative). Both well
         // within 5e-3.
         assert!(
             max_cos_err < 5e-3,
-            "phase_safe cos max abs err = {} exceeds 5e-3 budget",
-            max_cos_err
+            "phase_safe cos max abs err = {max_cos_err} exceeds 5e-3 budget"
         );
         assert!(
             max_sin_err < 5e-3,
-            "phase_safe sin max abs err = {} exceeds 5e-3 budget",
-            max_sin_err
+            "phase_safe sin max abs err = {max_sin_err} exceeds 5e-3 budget"
         );
     }
 
@@ -854,13 +838,11 @@ mod tests {
         }
         assert!(
             max_cos_diff < 5e-3,
-            "per-channel phase_safe vs libm cos diff = {} exceeds budget",
-            max_cos_diff
+            "per-channel phase_safe vs libm cos diff = {max_cos_diff} exceeds budget"
         );
         assert!(
             max_sin_diff < 5e-3,
-            "per-channel phase_safe vs libm sin diff = {} exceeds budget",
-            max_sin_diff
+            "per-channel phase_safe vs libm sin diff = {max_sin_diff} exceeds budget"
         );
     }
 
@@ -979,18 +961,12 @@ mod tests {
             // sim_a must be non-increasing.
             assert!(
                 sim_a <= prev_sim_a + 1e-5,
-                "α={}: sim_a = {} increased from {} (should be monotone decreasing)",
-                alpha,
-                sim_a,
-                prev_sim_a
+                "α={alpha}: sim_a = {sim_a} increased from {prev_sim_a} (should be monotone decreasing)"
             );
             // sim_b must be non-decreasing.
             assert!(
                 sim_b >= prev_sim_b - 1e-5,
-                "α={}: sim_b = {} decreased from {} (should be monotone increasing)",
-                alpha,
-                sim_b,
-                prev_sim_b
+                "α={alpha}: sim_b = {sim_b} decreased from {prev_sim_b} (should be monotone increasing)"
             );
             prev_sim_a = sim_a;
             prev_sim_b = sim_b;

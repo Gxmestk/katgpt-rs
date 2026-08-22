@@ -1045,9 +1045,8 @@ mod tests {
             AneFamily::A16,
             AneFamily::A17,
         ] {
-            let peaks = AnePeaks::for_family(f).unwrap_or_else(|| {
-                panic!("for_family({:?}) returned None for a post-A12 family", f)
-            });
+            let peaks = AnePeaks::for_family(f)
+                .unwrap_or_else(|| panic!("for_family({f:?}) returned None for a post-A12 family"));
             assert_eq!(peaks.family, f);
         }
     }

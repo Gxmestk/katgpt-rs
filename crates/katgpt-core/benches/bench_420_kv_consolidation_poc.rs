@@ -382,11 +382,7 @@ fn consolidate(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        let max_mass = indices
-            .first()
-            .map(|&i| attn_mass[i])
-            .unwrap_or(1.0)
-            .max(1e-10);
+        let max_mass = indices.first().map_or(1.0, |&i| attn_mass[i]).max(1e-10);
 
         for &j in indices.iter().take(k_eff) {
             let alpha = (attn_mass[j] / max_mass) as f32;
@@ -831,15 +827,12 @@ fn run_sweep(model: &MicroGpt, problems: &[Problem]) {
             );
             if agg.token_accuracy > best_ta {
                 best_ta = agg.token_accuracy;
-                best_config = format!("g_max={}, k={}", g_max, k);
+                best_config = format!("g_max={g_max}, k={k}");
             }
         }
     }
     println!();
-    println!(
-        "  Best config (by token accuracy): {} → ta={:.4}",
-        best_config, best_ta
-    );
+    println!("  Best config (by token accuracy): {best_config} → ta={best_ta:.4}");
     println!();
 }
 
@@ -949,10 +942,7 @@ fn main() {
         ta_gain,
         ta_gain * 100.0
     );
-    println!(
-        "    NLL change:        {:+.4} (negative = better)",
-        nll_gain
-    );
+    println!("    NLL change:        {nll_gain:+.4} (negative = better)");
     println!();
     println!("  Consolidation vs Random-rewrite:");
     println!(
@@ -965,10 +955,7 @@ fn main() {
         ta_vs_random,
         ta_vs_random * 100.0
     );
-    println!(
-        "    NLL difference:    {:+.4} (negative = consolidation better)",
-        nll_vs_random
-    );
+    println!("    NLL difference:    {nll_vs_random:+.4} (negative = consolidation better)");
     println!();
 
     // Verdict (≥2pp EM gain AND beats random-rewrite → GOAT confirmed)
@@ -1002,8 +989,7 @@ fn main() {
         println!("    Any gain is from noise injection, not IB-consistent consolidation.");
     } else if direction_matters {
         println!(
-            "    ℹ️ Mean-shift direction matters (Δtoken_acc vs random = {:+.4}).",
-            ta_vs_random
+            "    ℹ️ Mean-shift direction matters (Δtoken_acc vs random = {ta_vs_random:+.4})."
         );
     }
     println!();

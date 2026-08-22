@@ -5,7 +5,7 @@
 > **Depends:** Plan 030 (Multi-Armed Bandit ✅), Plan 049 (G-Zero ✅)
 > **Feature Gate:** `safe_bandit = ["bandit"]` (opt-in, NOT default-on)
 > **Status:** ✅ COMPLETE (T1-T18 done, GOAT 5/5)
-> **GOAT Pillar:** ❌ Not a pillar — secondary bet, enhances all 4 pillars via safer bandit exploration. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md).
+> **GOAT Pillar:** ❌ Not a pillar — secondary bet, enhances all 4 pillars via safer bandit exploration. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md).
 > **Domain:** `katgpt-rs` — generic safe-phased bandit strategy. Game-specific delay configs and per-game ξ tuning stay in `riir-ai`.
 
 ---
@@ -203,4 +203,4 @@ examples/
 - Hu, Cai, Vlatakis-Gkaragkounis (2026). "Prudent-Banker: No Extra Fees for Baseline Safety in Adversarial Bandits With and Without Delays." arXiv:2605.23351.
 - Müller et al. (2025). "Best of both worlds: Regret minimization versus minimax play." arXiv:2502.11673.
 - Huang, Dai, Huang (2023). "Banker Online Mirror Descent: A Universal Approach for Delayed Online Bandit Learning." ICML 2023.
-- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md)
+- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md)

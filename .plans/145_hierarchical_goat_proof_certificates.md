@@ -4,7 +4,7 @@
 > **Paper:** [arXiv:2503.13877](https://arxiv.org/abs/2503.13877) — Formal Proofs of Correctness for Hyperbolic PDE Solvers (Gorard & Hakim, 2025)
 > **Feature Gate:** `proof_cert` (opt-in, NOT default-on)
 > **Status:** ✅ COMPLETE
-> **GOAT Pillar:** ❌ Not a pillar — proof methodology enhancement. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md).
+> **GOAT Pillar:** ❌ Not a pillar — proof methodology enhancement. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md).
 > **Domain:** `katgpt-rs` — generic proof certificate infrastructure. No game-specific code.
 > **Blocks:** None. Enhances existing GOAT proof methodology.
 > **Cross-ref:** Plan 128 (proof sketch evolution), Plan 143 (Nexus Elo Plackett-Luce P-UCB)
@@ -417,7 +417,7 @@ proof_cert = ["serde", "serde_json", "chrono"]  # Phases 1-3
 ## What This Is NOT
 
 - ❌ Not a new game feature
-- ❌ Not a GOAT pillar (per [decision matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md))
+- ❌ Not a GOAT pillar (per [decision matrix](../../riir-ai/.docs/03_pillars/README.md))
 - ❌ Not model-based — entirely modelless proof methodology
 - ❌ Not a symbolic algebra system — we use concrete benchmark data, not symbolic proofs
 - ❌ Not a replacement for existing GOAT proofs — a structured enhancement
@@ -478,4 +478,4 @@ katgpt-rs/src/
 
 - Research: [106 — Shock with Confidence](../.research/106_Shock_Confidence_Formal_PDE_Verification.md)
 - Cross-ref: Research 088/104 (AlphaProof Nexus), Plan 143 (Nexus Elo Plackett-Luce P-UCB)
-- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md)
+- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md)

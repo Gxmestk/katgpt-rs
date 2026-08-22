@@ -92,15 +92,8 @@ impl ZonePoset {
 
         // Add explicit order pairs
         for (a, b) in &order_pairs {
-            match (index.get(a), index.get(b)) {
-                (Some(&ia), Some(&ib)) => {
-                    leq_matrix[ia][ib] = true;
-                }
-                _ => {
-                    // Order pair references unknown zone — skip silently.
-                    // In debug builds this might indicate a data error, but we
-                    // don't panic in production.
-                }
+            if let (Some(&ia), Some(&ib)) = (index.get(a), index.get(b)) {
+                leq_matrix[ia][ib] = true;
             }
         }
 

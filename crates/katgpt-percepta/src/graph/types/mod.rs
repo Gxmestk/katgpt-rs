@@ -849,9 +849,7 @@ impl GraphBuilder {
         let b_expr = b.into_expr(self.one);
         let key = (a_expr.expr_key(), b_expr.expr_key());
 
-        match self.reglu_cache.get(&key).copied() {
-            Some(dim_id) => Expression::from_dim(dim_id),
-            None => {
+        if let Some(dim_id) = self.reglu_cache.get(&key).copied() { Expression::from_dim(dim_id) } else {
                 let id = self.next_dim_id;
                 let name = format!("reglu_{id}");
                 let dim_id = self.alloc_dim(
@@ -864,7 +862,6 @@ impl GraphBuilder {
                 self.reglu_cache.insert(key, dim_id);
                 Expression::from_dim(dim_id)
             }
-        }
     }
 
     /// `a * step(b >= 0)` — conditional gate via two ReGLU dims + persist.
@@ -878,9 +875,7 @@ impl GraphBuilder {
         let b_expr = b.into_expr(self.one);
         let key = (a_expr.expr_key(), b_expr.expr_key());
 
-        match self.stepglu_cache.get(&key).copied() {
-            Some(dim_id) => Expression::from_dim(dim_id),
-            None => {
+        if let Some(dim_id) = self.stepglu_cache.get(&key).copied() { Expression::from_dim(dim_id) } else {
                 // stepglu(a, b) = reglu(a, b+1) - reglu(a, b)
                 let one_expr = Expression::from_dim(self.one);
                 let b_plus_1 = b_expr.clone() + one_expr;
@@ -918,7 +913,6 @@ impl GraphBuilder {
                 self.stepglu_cache.insert(key, id_persist);
                 Expression::from_dim(id_persist)
             }
-        }
     }
 
     /// Materialize a linear expression into a dedicated residual slot.
@@ -941,9 +935,7 @@ impl GraphBuilder {
     fn multiply(&mut self, a: &Expression, b: &Expression) -> Expression {
         let key = (a.expr_key(), b.expr_key());
 
-        match self.multiply_cache.get(&key).copied() {
-            Some(dim_id) => Expression::from_dim(dim_id),
-            None => {
+        if let Some(dim_id) = self.multiply_cache.get(&key).copied() { Expression::from_dim(dim_id) } else {
                 let neg_b = -b.clone();
 
                 let id_r1 = {
@@ -981,7 +973,6 @@ impl GraphBuilder {
 
                 Expression::from_dim(id_persist)
             }
-        }
     }
 
     /// Create a generic (named intermediate) dimension.
@@ -1035,21 +1026,15 @@ impl GraphBuilder {
 
         // Apply clear_key (effectively zeros out attention to non-matching keys)
         if let Some(ck) = clear_key_expr {
-            let clear = match ck.len() {
-                1 => ck.clone(),
-                _ => {
+            let clear = if ck.len() == 1 { ck.clone() } else {
                     let ck_key = ck.expr_key();
-                    match self.clear_key_cache.get(&ck_key).copied() {
-                        Some(dim_id) => Expression::from_dim(dim_id),
-                        None => {
+                    if let Some(dim_id) = self.clear_key_cache.get(&ck_key).copied() { Expression::from_dim(dim_id) } else {
                             let persist_expr = self.persist(ck.clone());
                             let dim_id = persist_expr.terms.keys().next().copied().unwrap_or(0);
                             self.clear_key_cache.insert(ck_key, dim_id);
                             persist_expr
                         }
-                    }
-                }
-            };
+                };
             ky = ky - clear * BIG;
         }
 
@@ -1184,9 +1169,7 @@ impl GraphBuilder {
     pub fn name_dim(&mut self, dim_id: DimId, name: &str) {
         let is_input = self
             .all_dims
-            .get(&dim_id)
-            .map(|d| matches!(d.kind, DimensionKind::Input))
-            .unwrap_or(true);
+            .get(&dim_id).is_none_or(|d| matches!(d.kind, DimensionKind::Input));
 
         if is_input {
             return;

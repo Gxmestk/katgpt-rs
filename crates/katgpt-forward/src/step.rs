@@ -153,7 +153,7 @@ pub fn speculative_step_rollback(
 
     if paths.is_empty() {
         let fallback = sample_from_distribution(
-            marginals.first().map(|m| m.as_slice()).unwrap_or(&[1.0]),
+            marginals.first().map_or(&[1.0], |m| m.as_slice()),
             rng,
         );
         #[cfg(feature = "stability_metrics")]
@@ -800,15 +800,17 @@ pub fn extract_ddtree_paths(tree: &[katgpt_core::speculative::types::TreeNode]) 
     // Single pass: find roots, compute max depth, and build parent-path → node index
     // for O(1) child lookups instead of O(N) linear scans per depth.
     //
-    // For each node at depth > 0, index by (parent_path >> 16) so we can
-    // look up children by the parent's parent_path value.
+    // For each node at depth > 0, index by its ancestor path (own token
+    // dropped) so we can look up children by the parent's parent_path value.
     let mut max_depth: usize = 0;
     let mut roots: Vec<&katgpt_core::speculative::types::TreeNode> =
         Vec::with_capacity(tree.len().min(16));
-    // Index: (depth, parent_path >> 16) → best node (highest score).
+    // Index: (depth, ancestor path) → best node (highest score).
     // Pre-sized to tree.len() — every non-root node inserts exactly once.
-    let mut child_index: HashMap<(usize, u128), &katgpt_core::speculative::types::TreeNode> =
-        HashMap::with_capacity(tree.len());
+    let mut child_index: HashMap<
+        (usize, katgpt_core::speculative::types::TreePath),
+        &katgpt_core::speculative::types::TreeNode,
+    > = HashMap::with_capacity(tree.len());
 
     for node in tree.iter() {
         if node.depth > max_depth {
@@ -817,7 +819,7 @@ pub fn extract_ddtree_paths(tree: &[katgpt_core::speculative::types::TreeNode]) 
         if node.depth == 0 {
             roots.push(node);
         } else {
-            let key = (node.depth, node.parent_path >> 16);
+            let key = (node.depth, node.parent_path.parent(node.depth));
             child_index
                 .entry(key)
                 .and_modify(|existing| {
@@ -934,116 +936,52 @@ pub fn speculative_step_with_configurator(
     let ctx = ConfiguratorContext::new(context.domain, entropy_bin);
     let decision = configurator.select(ctx);
 
-    match decision {
-        PlanningDecision::PlanSkip => {
-            // Bypass tree, sample directly from first marginal
-            let sample =
+    if let PlanningDecision::PlanSkip = decision {
+        // Bypass tree, sample directly from first marginal
+        let sample = sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
+        configurator.update(ctx, decision, 0.0);
+        (vec![sample], 1, decision)
+    } else {
+        // PlanNew or PlanExtend → build tree with possible lookahead adjustment.
+        // Clone deferred to PlanExtend arm only — PlanNew borrows draft_config as-is
+        // (common case, avoids Config clone per step).
+        let extended_config: Option<Config> = if matches!(decision, PlanningDecision::PlanExtend) {
+            let mut c = draft_config.clone();
+            c.draft_lookahead = c.draft_lookahead.saturating_add(1).min(c.block_size);
+            Some(c)
+        } else {
+            None
+        };
+        let effective_config: &Config = extended_config.as_ref().unwrap_or(draft_config);
+
+        // Build DDTree (reuses pre-allocated heap/tree buffers)
+        let tree = tree_builder.build(marginals, effective_config, &NoPruner, false);
+        let paths = extract_ddtree_paths(tree);
+
+        if paths.is_empty() {
+            let fallback =
                 sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
-            configurator.update(ctx, decision, 0.0);
-            (vec![sample], 1, decision)
+            let reward = if draft_config.tree_budget > 0 {
+                1.0 / draft_config.tree_budget as f32
+            } else {
+                0.0
+            };
+            configurator.update(ctx, decision, reward);
+            return (vec![fallback], 1, decision);
         }
-        _ => {
-            // PlanNew or PlanExtend → build tree with possible lookahead adjustment.
-            // Clone deferred to PlanExtend arm only — PlanNew borrows draft_config as-is
-            // (common case, avoids Config clone per step).
-            let extended_config: Option<Config> =
-                if matches!(decision, PlanningDecision::PlanExtend) {
-                    let mut c = draft_config.clone();
-                    c.draft_lookahead = c.draft_lookahead.saturating_add(1).min(c.block_size);
-                    Some(c)
-                } else {
-                    None
-                };
-            let effective_config: &Config = extended_config.as_ref().unwrap_or(draft_config);
 
-            // Build DDTree (reuses pre-allocated heap/tree buffers)
-            let tree = tree_builder.build(marginals, effective_config, &NoPruner, false);
-            let paths = extract_ddtree_paths(tree);
+        // Snapshot target KV cache at current position (zero-alloc: reuse
+        // hoisted scratch from SpeculativeContext).
+        target_cache.snapshot_into(pos, target_config, &mut draft_sctx.target_snap);
 
-            if paths.is_empty() {
-                let fallback =
-                    sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
-                let reward = if draft_config.tree_budget > 0 {
-                    1.0 / draft_config.tree_budget as f32
-                } else {
-                    0.0
-                };
-                configurator.update(ctx, decision, reward);
-                return (vec![fallback], 1, decision);
-            }
-
-            // Snapshot target KV cache at current position (zero-alloc: reuse
-            // hoisted scratch from SpeculativeContext).
-            target_cache.snapshot_into(pos, target_config, &mut draft_sctx.target_snap);
-
-            // Try each candidate path with rollback on rejection
-            for path in &paths {
-                target_cache.restore(&draft_sctx.target_snap, target_config);
-
-                let mut accepted = Vec::with_capacity(path.len());
-                let mut all_accepted = true;
-
-                // Score initial token with target (zero-alloc: reuse probs_buf)
-                let logits = forward(
-                    target_ctx,
-                    target_weights,
-                    target_cache,
-                    token,
-                    pos,
-                    target_config,
-                );
-                probs_buf.copy_from_slice(logits);
-                softmax_scaled(probs_buf, 1.0 / target_config.temperature);
-
-                for (i, &draft_tok) in path.iter().enumerate() {
-                    let q_dist = marginals.get(i).copied().unwrap_or(&[]);
-                    let q_i = q_dist.get(draft_tok).copied().unwrap_or(0.0);
-                    let p_i = probs_buf.get(draft_tok).copied().unwrap_or(0.0);
-
-                    let acceptance_prob = if q_i > 0.0 { (p_i / q_i).min(1.0) } else { 1.0 };
-
-                    if rng.uniform() <= acceptance_prob {
-                        accepted.push(draft_tok);
-                        if i + 1 < path.len() {
-                            let logits = forward(
-                                target_ctx,
-                                target_weights,
-                                target_cache,
-                                draft_tok,
-                                pos + 1 + i,
-                                target_config,
-                            );
-                            probs_buf.copy_from_slice(logits);
-                            softmax_scaled(probs_buf, 1.0 / target_config.temperature);
-                        }
-                    } else {
-                        let replacement =
-                            sample_residual_distribution_into(probs_buf, q_dist, residual_buf, rng);
-                        accepted.push(replacement);
-                        all_accepted = false;
-                        break;
-                    }
-                }
-
-                if all_accepted && !probs_buf.is_empty() {
-                    let bonus = sample_from_distribution(probs_buf, rng);
-                    accepted.push(bonus);
-                }
-
-                if !accepted.is_empty() {
-                    let len = accepted.len();
-                    let reward = if draft_config.tree_budget > 0 {
-                        len as f32 / draft_config.tree_budget as f32
-                    } else {
-                        0.0
-                    };
-                    configurator.update(ctx, decision, reward);
-                    return (accepted, len, decision);
-                }
-            }
-
-            // All paths exhausted: restore and sample from target
+        // Try each candidate path with rollback on rejection
+        for path in &paths {
             target_cache.restore(&draft_sctx.target_snap, target_config);
+
+            let mut accepted = Vec::with_capacity(path.len());
+            let mut all_accepted = true;
+
+            // Score initial token with target (zero-alloc: reuse probs_buf)
             let logits = forward(
                 target_ctx,
                 target_weights,
@@ -1054,10 +992,69 @@ pub fn speculative_step_with_configurator(
             );
             probs_buf.copy_from_slice(logits);
             softmax_scaled(probs_buf, 1.0 / target_config.temperature);
-            let fallback = sample_from_distribution(probs_buf, rng);
-            configurator.update(ctx, decision, 0.0);
-            (vec![fallback], 1, decision)
+
+            for (i, &draft_tok) in path.iter().enumerate() {
+                let q_dist = marginals.get(i).copied().unwrap_or(&[]);
+                let q_i = q_dist.get(draft_tok).copied().unwrap_or(0.0);
+                let p_i = probs_buf.get(draft_tok).copied().unwrap_or(0.0);
+
+                let acceptance_prob = if q_i > 0.0 { (p_i / q_i).min(1.0) } else { 1.0 };
+
+                if rng.uniform() <= acceptance_prob {
+                    accepted.push(draft_tok);
+                    if i + 1 < path.len() {
+                        let logits = forward(
+                            target_ctx,
+                            target_weights,
+                            target_cache,
+                            draft_tok,
+                            pos + 1 + i,
+                            target_config,
+                        );
+                        probs_buf.copy_from_slice(logits);
+                        softmax_scaled(probs_buf, 1.0 / target_config.temperature);
+                    }
+                } else {
+                    let replacement =
+                        sample_residual_distribution_into(probs_buf, q_dist, residual_buf, rng);
+                    accepted.push(replacement);
+                    all_accepted = false;
+                    break;
+                }
+            }
+
+            if all_accepted && !probs_buf.is_empty() {
+                let bonus = sample_from_distribution(probs_buf, rng);
+                accepted.push(bonus);
+            }
+
+            if !accepted.is_empty() {
+                let len = accepted.len();
+                let reward = if draft_config.tree_budget > 0 {
+                    len as f32 / draft_config.tree_budget as f32
+                } else {
+                    0.0
+                };
+                configurator.update(ctx, decision, reward);
+                return (accepted, len, decision);
+            }
         }
+
+        // All paths exhausted: restore and sample from target
+        target_cache.restore(&draft_sctx.target_snap, target_config);
+        let logits = forward(
+            target_ctx,
+            target_weights,
+            target_cache,
+            token,
+            pos,
+            target_config,
+        );
+        probs_buf.copy_from_slice(logits);
+        softmax_scaled(probs_buf, 1.0 / target_config.temperature);
+        let fallback = sample_from_distribution(probs_buf, rng);
+        configurator.update(ctx, decision, 0.0);
+        (vec![fallback], 1, decision)
     }
 }
 
@@ -1397,7 +1394,8 @@ mod tests {
 
     // TODO: Implement embedding-conditioned speculative step functions, then uncomment these tests.
     // Requires: speculative_step_embedding_conditioned() and speculative_step_embedding_conditioned_with()
-    // See: Plan 024 (embedding_router)
+    // No plan exists for this yet — the prior reference to "Plan 024 (embedding_router)"
+    // was bogus (no Plan 024 file exists in .plans/). File a plan before implementing.
     //
     // #[cfg(feature = "embedding_router")]
     // #[test]

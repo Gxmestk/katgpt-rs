@@ -82,8 +82,7 @@ mod tests {
         let result = kernel_score(&q, &c, KernelKind::Gaussian { sigma: 1.0 });
         assert!(
             result < 0.01,
-            "distant vectors should have low similarity, got {}",
-            result
+            "distant vectors should have low similarity, got {result}"
         );
     }
 
@@ -110,9 +109,7 @@ mod tests {
         let simd = kernel_score_simd_gaussian(&q, &c, 1.0);
         assert!(
             (scalar - simd).abs() < 1e-5,
-            "scalar {} != simd {}",
-            scalar,
-            simd
+            "scalar {scalar} != simd {simd}"
         );
     }
 }

@@ -299,8 +299,7 @@ fn matches_reference_sigmoid() {
     let err = frobenius(&out, &ref_out) / frobenius(&ref_out, &vec![0.0; ref_out.len()]).max(1e-30);
     assert!(
         err < 1e-3,
-        "sigmoid forward disagrees with reference: relative error = {}",
-        err
+        "sigmoid forward disagrees with reference: relative error = {err}"
     );
 }
 
@@ -310,8 +309,7 @@ fn matches_reference_softmax() {
     let err = frobenius(&out, &ref_out) / frobenius(&ref_out, &vec![0.0; ref_out.len()]).max(1e-30);
     assert!(
         err < 1e-3,
-        "softmax forward disagrees with reference: relative error = {}",
-        err
+        "softmax forward disagrees with reference: relative error = {err}"
     );
 }
 
@@ -332,9 +330,7 @@ fn matches_reference_extreme_alpha() {
             frobenius(&out, &ref_out) / frobenius(&ref_out, &vec![0.0; ref_out.len()]).max(1e-30);
         assert!(
             err < 1e-3,
-            "α={}: forward disagrees with reference: relative error = {}",
-            alpha,
-            err
+            "α={alpha}: forward disagrees with reference: relative error = {err}"
         );
     }
 }
@@ -355,9 +351,7 @@ fn matches_reference_temperature_sweep() {
             frobenius(&out, &ref_out) / frobenius(&ref_out, &vec![0.0; ref_out.len()]).max(1e-30);
         assert!(
             err < 1e-3,
-            "τ={}: forward disagrees with reference: relative error = {}",
-            temp,
-            err
+            "τ={temp}: forward disagrees with reference: relative error = {err}"
         );
     }
 }
@@ -462,12 +456,7 @@ fn g1_sweep_input_norm_and_alpha() {
             )
             .expect("convex combo should be PD for any α ∈ (0, 1)");
             for x in &out {
-                assert!(
-                    x.is_finite(),
-                    "non-finite output at B={}, α={}",
-                    b_scale,
-                    alpha
-                );
+                assert!(x.is_finite(), "non-finite output at B={b_scale}, α={alpha}");
             }
         }
     }
@@ -545,7 +534,7 @@ fn g1_lipschitz_bounded() {
     let lip = frobenius(&out, &out_pert);
     assert!(lip.is_finite(), "Lipschitz ratio not finite");
     // Empirically this is ~1-50 for random normalized inputs at α=0.5.
-    assert!(lip < 1.0e6, "empirical Lipschitz too large: {}", lip);
+    assert!(lip < 1.0e6, "empirical Lipschitz too large: {lip}");
 }
 
 // ── Partition-of-unity check ──────────────────────────────────
@@ -569,14 +558,10 @@ fn basis_rows_partition_of_unity() {
                 let sum: f32 = row.iter().sum();
                 assert!(
                     (sum - 1.0).abs() < 1e-5,
-                    "row {} doesn't sum to 1 for {:?} τ={}: sum = {}",
-                    i,
-                    kind,
-                    temp,
-                    sum
+                    "row {i} doesn't sum to 1 for {kind:?} τ={temp}: sum = {sum}"
                 );
                 for &v in row {
-                    assert!(v >= 0.0, "negative basis entry for {:?} τ={}", kind, temp);
+                    assert!(v >= 0.0, "negative basis entry for {kind:?} τ={temp}");
                 }
             }
         }
@@ -762,8 +747,7 @@ fn pre_rotate_identity_eigenvectors_is_noop() {
     let diff = frobenius(&w_basis, &original);
     assert!(
         diff < 1e-5,
-        "identity rotation should be no-op: diff = {}",
-        diff
+        "identity rotation should be no-op: diff = {diff}"
     );
 }
 
@@ -819,11 +803,7 @@ fn pre_rotate_preserves_orthogonality_of_w_basis() {
             let expected = if a == b { 1.0 } else { 0.0 };
             assert!(
                 (dot - expected).abs() < 1e-3,
-                "Gram[{},{}] = {} (want {})",
-                a,
-                b,
-                dot,
-                expected
+                "Gram[{a},{b}] = {dot} (want {expected})"
             );
         }
     }
@@ -866,9 +846,7 @@ fn pre_rotate_forward_output_still_finite_and_partition_of_unity() {
         let row_sum: f32 = phi[i * k..(i + 1) * k].iter().sum();
         assert!(
             (row_sum - 1.0).abs() < 1e-4,
-            "row {} sum = {} (want 1.0)",
-            i,
-            row_sum
+            "row {i} sum = {row_sum} (want 1.0)"
         );
     }
 

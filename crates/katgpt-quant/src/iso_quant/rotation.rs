@@ -90,60 +90,57 @@ pub fn apply_rotation(
     let _n_groups = q_left.len();
     let n_full_groups = dim / 4;
 
-    match q_right {
-        Some(qr) => {
-            // Main loop: no bounds checks for full groups
-            for g in 0..n_full_groups {
-                let base = g * 4;
-                let v = [
-                    input[base],
-                    input[base + 1],
-                    input[base + 2],
-                    input[base + 3],
-                ];
-                let r = quat_sandwich_forward(&q_left[g], &v, &qr[g]);
-                output[base] = r[0];
-                output[base + 1] = r[1];
-                output[base + 2] = r[2];
-                output[base + 3] = r[3];
-            }
-            // Tail: partial last group (zero-padded)
-            if !dim.is_multiple_of(4) {
-                let g = n_full_groups;
-                let base = g * 4;
-                let n = dim - base;
-                let mut v = [0.0f32; 4];
-                v[..n].copy_from_slice(&input[base..base + n]);
-                let r = quat_sandwich_forward(&q_left[g], &v, &qr[g]);
-                output[base..base + n].copy_from_slice(&r[..n]);
-            }
+    if let Some(qr) = q_right {
+        // Main loop: no bounds checks for full groups
+        for g in 0..n_full_groups {
+            let base = g * 4;
+            let v = [
+                input[base],
+                input[base + 1],
+                input[base + 2],
+                input[base + 3],
+            ];
+            let r = quat_sandwich_forward(&q_left[g], &v, &qr[g]);
+            output[base] = r[0];
+            output[base + 1] = r[1];
+            output[base + 2] = r[2];
+            output[base + 3] = r[3];
         }
-        None => {
-            // stride math: `g` indexes both q_left[g] and base = g*4 into input/output
-            #[allow(clippy::needless_range_loop)]
-            for g in 0..n_full_groups {
-                let base = g * 4;
-                let v = [
-                    input[base],
-                    input[base + 1],
-                    input[base + 2],
-                    input[base + 3],
-                ];
-                let r = quat_left_forward(&q_left[g], &v);
-                output[base] = r[0];
-                output[base + 1] = r[1];
-                output[base + 2] = r[2];
-                output[base + 3] = r[3];
-            }
-            if !dim.is_multiple_of(4) {
-                let g = n_full_groups;
-                let base = g * 4;
-                let n = dim - base;
-                let mut v = [0.0f32; 4];
-                v[..n].copy_from_slice(&input[base..base + n]);
-                let r = quat_left_forward(&q_left[g], &v);
-                output[base..base + n].copy_from_slice(&r[..n]);
-            }
+        // Tail: partial last group (zero-padded)
+        if !dim.is_multiple_of(4) {
+            let g = n_full_groups;
+            let base = g * 4;
+            let n = dim - base;
+            let mut v = [0.0f32; 4];
+            v[..n].copy_from_slice(&input[base..base + n]);
+            let r = quat_sandwich_forward(&q_left[g], &v, &qr[g]);
+            output[base..base + n].copy_from_slice(&r[..n]);
+        }
+    } else {
+        // stride math: `g` indexes both q_left[g] and base = g*4 into input/output
+        #[allow(clippy::needless_range_loop)]
+        for g in 0..n_full_groups {
+            let base = g * 4;
+            let v = [
+                input[base],
+                input[base + 1],
+                input[base + 2],
+                input[base + 3],
+            ];
+            let r = quat_left_forward(&q_left[g], &v);
+            output[base] = r[0];
+            output[base + 1] = r[1];
+            output[base + 2] = r[2];
+            output[base + 3] = r[3];
+        }
+        if !dim.is_multiple_of(4) {
+            let g = n_full_groups;
+            let base = g * 4;
+            let n = dim - base;
+            let mut v = [0.0f32; 4];
+            v[..n].copy_from_slice(&input[base..base + n]);
+            let r = quat_left_forward(&q_left[g], &v);
+            output[base..base + n].copy_from_slice(&r[..n]);
         }
     }
 }
@@ -161,58 +158,55 @@ pub fn apply_inverse_rotation(
     let _n_groups = q_left.len();
     let n_full_groups = dim / 4;
 
-    match q_right {
-        Some(qr) => {
-            for g in 0..n_full_groups {
-                let base = g * 4;
-                let v = [
-                    input[base],
-                    input[base + 1],
-                    input[base + 2],
-                    input[base + 3],
-                ];
-                let r = quat_sandwich_inverse(&q_left[g], &v, &qr[g]);
-                output[base] = r[0];
-                output[base + 1] = r[1];
-                output[base + 2] = r[2];
-                output[base + 3] = r[3];
-            }
-            if !dim.is_multiple_of(4) {
-                let g = n_full_groups;
-                let base = g * 4;
-                let n = dim - base;
-                let mut v = [0.0f32; 4];
-                v[..n].copy_from_slice(&input[base..base + n]);
-                let r = quat_sandwich_inverse(&q_left[g], &v, &qr[g]);
-                output[base..base + n].copy_from_slice(&r[..n]);
-            }
+    if let Some(qr) = q_right {
+        for g in 0..n_full_groups {
+            let base = g * 4;
+            let v = [
+                input[base],
+                input[base + 1],
+                input[base + 2],
+                input[base + 3],
+            ];
+            let r = quat_sandwich_inverse(&q_left[g], &v, &qr[g]);
+            output[base] = r[0];
+            output[base + 1] = r[1];
+            output[base + 2] = r[2];
+            output[base + 3] = r[3];
         }
-        None => {
-            // stride math: `g` indexes both q_left[g] and base = g*4 into input/output
-            #[allow(clippy::needless_range_loop)]
-            for g in 0..n_full_groups {
-                let base = g * 4;
-                let v = [
-                    input[base],
-                    input[base + 1],
-                    input[base + 2],
-                    input[base + 3],
-                ];
-                let r = quat_left_inverse(&q_left[g], &v);
-                output[base] = r[0];
-                output[base + 1] = r[1];
-                output[base + 2] = r[2];
-                output[base + 3] = r[3];
-            }
-            if !dim.is_multiple_of(4) {
-                let g = n_full_groups;
-                let base = g * 4;
-                let n = dim - base;
-                let mut v = [0.0f32; 4];
-                v[..n].copy_from_slice(&input[base..base + n]);
-                let r = quat_left_inverse(&q_left[g], &v);
-                output[base..base + n].copy_from_slice(&r[..n]);
-            }
+        if !dim.is_multiple_of(4) {
+            let g = n_full_groups;
+            let base = g * 4;
+            let n = dim - base;
+            let mut v = [0.0f32; 4];
+            v[..n].copy_from_slice(&input[base..base + n]);
+            let r = quat_sandwich_inverse(&q_left[g], &v, &qr[g]);
+            output[base..base + n].copy_from_slice(&r[..n]);
+        }
+    } else {
+        // stride math: `g` indexes both q_left[g] and base = g*4 into input/output
+        #[allow(clippy::needless_range_loop)]
+        for g in 0..n_full_groups {
+            let base = g * 4;
+            let v = [
+                input[base],
+                input[base + 1],
+                input[base + 2],
+                input[base + 3],
+            ];
+            let r = quat_left_inverse(&q_left[g], &v);
+            output[base] = r[0];
+            output[base + 1] = r[1];
+            output[base + 2] = r[2];
+            output[base + 3] = r[3];
+        }
+        if !dim.is_multiple_of(4) {
+            let g = n_full_groups;
+            let base = g * 4;
+            let n = dim - base;
+            let mut v = [0.0f32; 4];
+            v[..n].copy_from_slice(&input[base..base + n]);
+            let r = quat_left_inverse(&q_left[g], &v);
+            output[base..base + n].copy_from_slice(&r[..n]);
         }
     }
 }
@@ -412,7 +406,7 @@ mod tests {
         // zero after the roundtrip — this is what makes the padded-buffer
         // convention invertible.
         for &v in &recovered[dim..padded] {
-            assert!(v.abs() < 1e-4, "padded tail not preserved: {}", v);
+            assert!(v.abs() < 1e-4, "padded tail not preserved: {v}");
         }
     }
 }

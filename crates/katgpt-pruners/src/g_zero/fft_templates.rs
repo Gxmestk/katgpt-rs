@@ -146,10 +146,7 @@ impl FFTTemplateProposer {
 
     /// Mean δ for a specific template.
     pub fn mean_delta(&self, template_id: usize) -> f32 {
-        self.stats
-            .get(template_id)
-            .map(|s| s.mean_delta())
-            .unwrap_or(0.0)
+        self.stats.get(template_id).map_or(0.0, |s| s.mean_delta())
     }
 
     /// Template with highest mean δ.
@@ -167,8 +164,7 @@ impl FFTTemplateProposer {
                     .partial_cmp(&self.stats[*b].mean_delta())
                     .unwrap_or(Ordering::Equal)
             })
-            .map(|i| FFTTemplate::all()[i])
-            .unwrap_or(FFTTemplate::HealFirst)
+            .map_or(FFTTemplate::HealFirst, |i| FFTTemplate::all()[i])
     }
 
     /// Total number of template selections.

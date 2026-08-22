@@ -307,7 +307,7 @@ fn bench_end_to_end() {
     match overhead_pct {
         p if p <= 10.0 => println!("  ✅ Overhead ≤ 10% — BB filter is lightweight"),
         p if p <= 30.0 => {
-            println!("  ⚠️  Overhead 10-30% — acceptable if acceptance rate improves")
+            println!("  ⚠️  Overhead 10-30% — acceptable if acceptance rate improves");
         }
         _ => println!("  ❌ Overhead > 30% — investigate Pearson optimization"),
     }

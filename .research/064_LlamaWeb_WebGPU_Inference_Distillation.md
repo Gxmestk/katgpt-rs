@@ -270,3 +270,5 @@ gpu_autotune = []       # Priority 4: Auto-tuned tile sizes
 - Our Plan 102: Batched prefill kernels (partial)
 - Research 29: rust-gpu feasibility (WGSL migration)
 - Research 63: OCTOPUS KV cache compression (complementary)
+
+> **PASS-Redirects (synthesis):** VectorWare [https://www.vectorware.com/blog/simd-on-gpu/ "Rust SIMD on the GPU"] (2026-08-10) — an alternative route to GPU lane-level parallelism: compile Rust `core::simd` directly onto warp lanes via a typed shuffle/ballot/scan IR, instead of adopting wgpu subgroup matrices (Priority 1 here). PASS: NVIDIA-only, nightly, unreleased compiler fork, no published timings — but the typed warp-lane IR design (barrier scope + shuffle control as compile errors, strip mining typed on lane capacity) is worth borrowing if/when `gpu_subgroup` lands in riir-gpu.

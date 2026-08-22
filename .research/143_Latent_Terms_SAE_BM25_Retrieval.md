@@ -4,6 +4,8 @@
 **Date:** 2026-05-31
 **Verdict:** ❌ NO GAIN — Validates existing architecture, no actionable distillation
 
+> **PASS-Redirects (synthesis):** Qdrant Team [https://qdrant.tech/blog/qdrant-1.19.x/ "Qdrant 1.19 - TurboQuant Datatype & Memory Tiers"] (2026-08-05) — vector-DB release. Per-Tenant IDF Statistics, Prefix Matching on keyword fields, and Slice Filter are **lexical-DB optimizations** that sit on the BM25-fallback side of our latent-first retrieval substrate (`riir-rag` + `riir-neuron-db::Bm25Index`). Our primary retrieval path is 8-D vector KNN (Clifford-wedge on `hla_moments`) + KG triples (k-hop BFS); BM25 is the explicit fallback for exact symbol matching, never the primary path. Per-zone vocabulary rarity (the game-context analog of per-tenant IDF) is modeled as a **latent** signal (zone embedding dot-product → NPC zone-attention), not a lexical IDF segmentation. Prefix matching is the lexical concern our CodeTokenizer + post-C13 AST chunker is planned to handle on the code-RAG path. Slice filter (deterministic disjoint subsets) maps to our `zone_hash`-keyed partitioning — zones ARE the disjoint subsets. §1.55.2 reverse-grep found ZERO documented gaps in `Bm25Index`/`riir-rag` mapping to any of these features. PASS: latent-first architecture handles the same problems via different primitives, no actionable gap.
+
 ---
 
 ## Paper Summary

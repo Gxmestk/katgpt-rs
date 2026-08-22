@@ -119,15 +119,16 @@ impl EvictionReport {
 
 impl fmt::Display for EvictionReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.did_evict() {
-            true => write!(
+        if self.did_evict() {
+            write!(
                 f,
                 "EvictionReport(evicted={}, {}→{})",
                 self.count(),
                 self.population_before,
                 self.population_after
-            ),
-            false => write!(f, "EvictionReport(none)"),
+            )
+        } else {
+            write!(f, "EvictionReport(none)")
         }
     }
 }
@@ -201,13 +202,14 @@ impl SketchPopulation {
         let population_before = self.sketches.len();
         self.sketches.insert(entry.id, entry);
 
-        match self.needs_eviction() {
-            true => self.evict_to_capacity(),
-            false => EvictionReport {
+        if self.needs_eviction() {
+            self.evict_to_capacity()
+        } else {
+            EvictionReport {
                 evicted_ids: Vec::new(),
                 population_before,
                 population_after: self.sketches.len(),
-            },
+            }
         }
     }
 
@@ -222,9 +224,10 @@ impl SketchPopulation {
     ///
     /// Call this after a batch of `insert_no_evict` calls.
     pub fn finalize_batch(&mut self) -> EvictionReport {
-        match self.needs_eviction() {
-            true => self.evict_to_capacity(),
-            false => EvictionReport::default(),
+        if self.needs_eviction() {
+            self.evict_to_capacity()
+        } else {
+            EvictionReport::default()
         }
     }
 
@@ -342,12 +345,11 @@ impl SketchPopulation {
     ///
     /// Returns `DEFAULT_ELO` if population is empty.
     pub fn avg_elo(&self) -> f64 {
-        match self.sketches.is_empty() {
-            true => DEFAULT_ELO,
-            false => {
-                let total: f64 = self.sketches.values().map(|e| e.elo_rating).sum();
-                total / self.sketches.len() as f64
-            }
+        if self.sketches.is_empty() {
+            DEFAULT_ELO
+        } else {
+            let total: f64 = self.sketches.values().map(|e| e.elo_rating).sum();
+            total / self.sketches.len() as f64
         }
     }
 

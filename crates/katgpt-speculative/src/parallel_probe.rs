@@ -211,10 +211,7 @@ impl<A: Clone> ProbingMatrix<A> {
 
     /// Get all answers for a specific branch across all probe steps.
     pub fn row(&self, branch_idx: usize) -> &[Option<A>] {
-        self.answers
-            .get(branch_idx)
-            .map(|r| r.as_slice())
-            .unwrap_or(&[])
+        self.answers.get(branch_idx).map_or(&[], |r| r.as_slice())
     }
 
     /// Get answers for all branches at a specific probe step.
@@ -406,8 +403,7 @@ impl<A: Clone + Eq + Hash> ParallelProbeController<A> {
     ///
     /// Returns `Some(consensus_answer)` if we should stop, `None` otherwise.
     fn should_stop(&mut self, majority: &Option<A>) -> Option<A> {
-        match majority {
-            Some(consensus) => {
+        if let Some(consensus) = majority {
                 // Check if consensus matches previous (or is first).
                 let is_same = self
                     .last_consensus
@@ -426,14 +422,12 @@ impl<A: Clone + Eq + Hash> ParallelProbeController<A> {
                 } else {
                     None
                 }
-            }
-            None => {
+            } else {
                 // No consensus — reset streak.
                 self.consensus_streak = 0;
                 self.last_consensus = None;
                 None
             }
-        }
     }
 
     /// Determine which branches to prune based on deviation from majority.

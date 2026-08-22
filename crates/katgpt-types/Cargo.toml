@@ -1,6 +1,6 @@
 [package]
 name = "katgpt-types"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "MIT"
 description = "Shared configuration, RNG, math utilities, LoRA, domain embeddings, and inference types for katgpt-rs / riir-engine. Pure substrate leaf — no katgpt-* deps."
@@ -47,6 +47,20 @@ hydra_budget = []
 # DeltaNet layer type enum (Plan 182).
 deltanet_inference = []
 
+# Gemma 4 unified text model: ModelArchitecture::Gemma4 variant +
+# Gemma4LayerType enum + Config::gemma4_12b() preset (Issue 577).
+# Opt-in — gates the loader + forward pass in riir-engine.
+gemma4_inference = []
+
+# Ternary-weight inference: ModelArchitecture::Ternary variant.
+# Gates the forward dispatch arm in riir-engine. The weight substrate
+# (TernaryGroupWeights + simd_ternary_group_matvec) ships behind
+# `ternary_group_scale` (Issue 578); this feature gates only the
+# architecture enum + the riir-engine forward path. Plan 333 Phase 2.
+# Renamed from `bitnet_inference` 2026-08-10 — the format is Q2_0_g128,
+# not BitNet i2_s, and the whole substrate is named `ternary`.
+ternary_inference = []
+
 # Collapse-aware ThinkingBudget enum (Plan 212).
 collapse_aware_thinking = []
 
@@ -67,6 +81,21 @@ plasma_path = []
 # + 1.82× storage (PASSES). Conjunction fails → binary remains opt-in for
 # memory-constrained edge deployments.
 binary_plasma = []
+# Issue 578: ternary {-1,0,+1} bit-planes with per-128 f16 group scale — the
+# Q2_0_g128 container (Ternary-Bonsai-27B). Implies binary_plasma for the shared
+# GROUP_SIZE convention (single source of truth for the 128-weight group).
+# G1-G4 GOAT gate ALL PASS (2026-08-12; Issue 578 closed and removed, content in
+# .docs/08_performance/ternary_group_q2_0_tier.md). STAYS OPT-IN BY POLICY:
+# promotion would transitively promote binary_plasma (opt-in by deliberate
+# decision above), and the tier is a model-specific container 1.3x slower than
+# the row-scale kernel — its win is memory traffic on Q2_0_g128 weights only.
+ternary_group_scale = ["binary_plasma"]
+
+# Issue 582: base-3 trit packing — 5 trits/byte + per-128 f16 scale = 1.75
+# bits/weight vs the bit-plane tier's 2.125 (-17.6%, Bonsai-27B 7.17 -> 5.90 GB).
+# Same alphabet, same group granularity; only the storage differs. Implies
+# ternary_group_scale for GROUP_SIZE + the `from_group`/`to_group` repack.
+ternary_trit_pack = ["ternary_group_scale"]
 
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []
@@ -97,3 +126,21 @@ gpart_pruning = []
 # Depth-Invariance Diagnostic + MagnitudeRegularizedResidual (Plan 306).
 # Gates the depth_invariance module. Pure math (simd-only deps).
 depth_invariance = []
+
+# Issue 578 GOAT gates G2 (perf) + G4 (alloc-free) for the Q2_0_g128 tier.
+# Needs plasma_path too: G2 compares against the row-scale ternary kernel.
+[[test]]
+name = "bench_578_ternary_group_goat"
+required-features = ["ternary_group_scale", "plasma_path"]
+
+# Issue 582 GOAT gates: G2 footprint (deterministic), G2b latency
+# (informational, 2x reject bound), G1 cross-tier, G4 alloc-free.
+[[test]]
+name = "bench_582_trit_pack_goat"
+required-features = ["ternary_trit_pack"]
+
+# Issue 583 A/B: group scale hoisted vs folded in the bit-plane NEON kernel.
+# Needs plasma_path only because the harness shares bench_578's feature shape.
+[[test]]
+name = "bench_583_scale_hoist_goat"
+required-features = ["ternary_group_scale", "plasma_path"]

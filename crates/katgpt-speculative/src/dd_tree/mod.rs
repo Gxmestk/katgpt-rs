@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // it doesn't read as unused when all those features are off.
 #[cfg(feature = "and_or_dtree")]
 use katgpt_core::AndOrNode;
-use katgpt_core::speculative::types::{SdeConfig, TreeNode};
+use katgpt_core::speculative::types::{SdeConfig, TreeNode, TreePath};
 #[cfg(feature = "domino_correction")]
 use katgpt_core::traits::DominoPruner;
 #[cfg(any(
@@ -38,23 +38,16 @@ pub use tree_builder::TreeBuilder;
 /// Below this, serial iteration is faster (~5μs rayon overhead vs ~0.1μs per element).
 const RAYON_CANDIDATE_THRESHOLD: usize = 512;
 
-/// Extract tokens from `parent_path` bitfield for path-aware pruning.
+/// Extract tokens from a [`TreePath`] for path-aware pruning.
 ///
-/// `parent_path` uses 5 bits per depth, packed LSB-first:
-/// - Depth 0 token: bits 0–4
-/// - Depth 1 token: bits 5–9
-/// - ...
-/// - Depth k token: bits (k*5) to (k*5+4)
+/// `parent_path` holds one `u32` token per level, root at slot 0 (Issue 670
+/// widened this from the `u128` 16-bit-per-level packing, which corrupted
+/// paths at vocab > 65,536).
 ///
 /// Returns `Vec<usize>` where `result[k]` = token at depth `k`.
-/// Max depths: 64/5 = 12 (sufficient for lookahead of 5–8).
-pub fn extract_parent_tokens(parent_path: u128, num_tokens: usize) -> Vec<usize> {
-    // parent_path packs tokens with most-recent in lowest bits:
-    //   depth 0 token → bits (num_tokens-1)*16 .. (num_tokens-1)*16+15
-    //   depth k token → bits (num_tokens-1-k)*16 .. (num_tokens-1-k)*16+15
-    (0..num_tokens)
-        .map(|k| ((parent_path >> ((num_tokens - 1 - k) * 16)) & 0xFFFF) as usize)
-        .collect()
+/// Max depth: [`TreePath::MAX_TOKENS`] = 8 (sufficient for lookahead of 5–8).
+pub fn extract_parent_tokens(parent_path: TreePath, num_tokens: usize) -> Vec<usize> {
+    (0..num_tokens).map(|k| parent_path.token_at(k) as usize).collect()
 }
 
 /// Zero-alloc variant of [`extract_parent_tokens`].
@@ -62,12 +55,12 @@ pub fn extract_parent_tokens(parent_path: u128, num_tokens: usize) -> Vec<usize>
 /// Returns the slice `&buf[..num_tokens]`.
 #[inline]
 pub fn extract_parent_tokens_into(
-    parent_path: u128,
+    parent_path: TreePath,
     num_tokens: usize,
     buf: &mut [usize],
 ) -> &[usize] {
     for (k, slot) in buf.iter_mut().enumerate().take(num_tokens) {
-        *slot = ((parent_path >> ((num_tokens - 1 - k) * 16)) & 0xFFFF) as usize;
+        *slot = parent_path.token_at(k) as usize;
     }
     &buf[..num_tokens]
 }
@@ -336,9 +329,9 @@ pub fn merge_retrieved_branches(
 
         let sim_ln = similarity.ln();
 
-        // Incrementally reconstruct parent_path: shift 16 bits + token per depth.
+        // Incrementally reconstruct parent_path: one u32 slot per depth.
         // Avoids per-depth O(depth) fold over seq[..=depth] (was O(D²) per sequence).
-        let mut parent_path: u128 = 0;
+        let mut parent_path = TreePath::default();
         for (depth, &token_idx) in seq.iter().enumerate() {
             if depth >= marginals.len() {
                 break;
@@ -351,21 +344,13 @@ pub fn merge_retrieved_branches(
             if base_prob <= 0.0 {
                 // Still advance parent_path so deeper tokens reconstruct the
                 // same path the original fold would have produced.
-                parent_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                parent_path = parent_path.push(token_idx as u32, depth);
                 continue;
             }
 
             let blended = (base_prob.ln() * inv_weight) + (sim_ln * rest_weight);
 
-            parent_path = if depth == 0 {
-                token_idx as u128
-            } else {
-                (parent_path << 16) | (token_idx as u128)
-            };
+            parent_path = parent_path.push(token_idx as u32, depth);
 
             tree.push(TreeNode {
                 score: blended,
@@ -1009,8 +994,7 @@ pub fn best_of_k_rollouts(
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
             paths.into_iter().nth(best_idx).unwrap_or_default()
         }
         WidthSelectionMode::MostFrequent => {
@@ -1035,15 +1019,13 @@ pub fn best_of_k_rollouts(
                         .iter()
                         .enumerate()
                         .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                        .map(|(i, _)| i)
-                        .unwrap_or(0)
+                        .map_or(0, |(i, _)| i)
                 } else {
                     final_residuals
                         .iter()
                         .enumerate()
                         .min_by(|(_, a), (_, b)| a.total_cmp(b))
-                        .map(|(i, _)| i)
-                        .unwrap_or(0)
+                        .map_or(0, |(i, _)| i)
                 };
             paths.into_iter().nth(best_idx).unwrap_or_default()
         }
@@ -1084,9 +1066,10 @@ fn cumulative_relevance(path: &[usize], screener: &dyn ScreeningPruner) -> f32 {
 pub fn entropy_truncate_horizon(entropy: f32, max_horizon: usize) -> usize {
     const ENTROPY_THRESHOLD: f32 = 2.5;
     const TRUNCATED_HORIZON: usize = 2;
-    match entropy > ENTROPY_THRESHOLD {
-        true => TRUNCATED_HORIZON.min(max_horizon),
-        false => max_horizon,
+    if entropy > ENTROPY_THRESHOLD {
+        TRUNCATED_HORIZON.min(max_horizon)
+    } else {
+        max_horizon
     }
 }
 
@@ -1138,9 +1121,20 @@ pub fn build_dd_tree_dendritic(
     let base_budget = config.tree_budget;
     let mut parent_buf: Vec<usize> = vec![0usize; seq_len];
 
+    // Per-depth cache for the two gate inputs that depend ONLY on
+    // `marginals[next_depth]` and never on the popped node: the entropy (an
+    // O(vocab) scan with one `exp()` per element) and the top-K index list (an
+    // O(vocab·K) scan that also allocated a fresh `Vec` per call). The
+    // best-first loop pops many nodes at the same depth, so both were being
+    // recomputed identically on every pop. Both are pure functions of their
+    // arguments, so caching per depth yields bit-identical values while
+    // collapsing O(nodes·vocab) exp() calls into O(depths·vocab), and removes
+    // the per-pop `Vec` allocation.
+    let mut depth_gate_cache: Vec<Option<(f32, Vec<usize>)>> = vec![None; seq_len];
+
     // Optional: seed greedy chain backbone first
     if chain_seed {
-        let mut chain_path = 0u128;
+        let mut chain_path = TreePath::default();
         let mut chain_score = 0.0f32;
         for depth in 0..seq_len {
             let parent_tokens = extract_parent_tokens_into(chain_path, depth, &mut parent_buf);
@@ -1154,7 +1148,7 @@ pub fn build_dd_tree_dendritic(
             }
             if best_prob > 0.0 {
                 chain_score += best_prob.ln();
-                chain_path = (chain_path << 16) | (best_idx as u128);
+                chain_path = chain_path.push(best_idx as u32, depth);
                 tree.push(TreeNode {
                     score: chain_score,
                     depth,
@@ -1175,7 +1169,7 @@ pub fn build_dd_tree_dendritic(
                     score: prob.ln(),
                     depth: 0,
                     token_idx: i,
-                    parent_path: i as u128,
+                    parent_path: TreePath::root(i as u32),
                 });
             }
         }
@@ -1195,14 +1189,17 @@ pub fn build_dd_tree_dendritic(
             let parent_tokens =
                 extract_parent_tokens_into(best.parent_path, best.depth + 1, &mut parent_buf);
 
-            // Compute gate signal from entropy + coincidence at this depth
-            let entropy = entropy_f32(marginals[next_depth]);
-            let coinc = coincidence_score(
-                &top_k_indices(marginals[next_depth], gate.coincidence_window),
-                parent_tokens,
-                gate.coincidence_window,
-            );
-            let nmda_gate = gate.compute_gate(entropy, coinc);
+            // Compute gate signal from entropy + coincidence at this depth.
+            // `entropy` / `top_k` are depth-invariant (see `depth_gate_cache`);
+            // only `coincidence_score` depends on this node's `parent_tokens`.
+            let cached = depth_gate_cache[next_depth].get_or_insert_with(|| {
+                (
+                    entropy_f32(marginals[next_depth]),
+                    top_k_indices(marginals[next_depth], gate.coincidence_window),
+                )
+            });
+            let coinc = coincidence_score(&cached.1, parent_tokens, gate.coincidence_window);
+            let nmda_gate = gate.compute_gate(cached.0, coinc);
 
             // Early exit: proximal dendrite sufficient
             if nmda_gate < 0.1 {
@@ -1221,7 +1218,7 @@ pub fn build_dd_tree_dendritic(
                         score,
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: (best.parent_path << 16) | (i as u128),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }
@@ -1390,14 +1387,11 @@ where
             marginals: marginal.to_vec(),
         };
 
-        let candidates = match generator.generate(&condition, rng) {
-            Ok(c) => c,
-            Err(_) => {
+        let candidates = if let Ok(c) = generator.generate(&condition, rng) { c } else {
                 // Generator failed — use original marginals as fallback
                 filtered_marginals.push(marginal.to_vec());
                 continue;
-            }
-        };
+            };
 
         // Keep marginals only for valid candidates
         let mut filtered = vec![0.0f32; marginal.len()];
@@ -1564,13 +1558,10 @@ where
             marginals: marginal.to_vec(),
         };
 
-        let candidates = match generator.generate(&condition, rng) {
-            Ok(c) => c,
-            Err(_) => {
+        let candidates = if let Ok(c) = generator.generate(&condition, rng) { c } else {
                 filtered_marginals.push(marginal.to_vec());
                 continue;
-            }
-        };
+            };
 
         // Keep marginals only for valid candidates
         let mut filtered = vec![0.0f32; marginal.len()];
@@ -1767,27 +1758,24 @@ pub fn build_dd_tree_and_or<P: ScreeningPruner>(
     let and_or_tree = builder.build(marginals);
 
     // Step 2: Check if decomposition happened.
-    match &and_or_tree {
-        AndOrNode::Leaf { .. } => {
-            // No decomposition needed — use standard screened build.
-            build_dd_tree_screened(marginals, config, pruner, chain_seed)
+    if let AndOrNode::Leaf { .. } = &and_or_tree {
+        // No decomposition needed — use standard screened build.
+        build_dd_tree_screened(marginals, config, pruner, chain_seed)
+    } else {
+        // Decomposition happened — extract best path from AND-OR tree.
+        let _blueprint = BlueprintPass::generate(marginals);
+        let _reviewer = DecompositionReviewer::new(0.3);
+
+        // Collect all solved leaf solutions into a combined path.
+        let combined_path = collect_solved_path(&and_or_tree);
+
+        // If we got a complete solution from cache, convert to TreeNode directly.
+        if !combined_path.is_empty() {
+            return path_to_tree_nodes(&combined_path);
         }
-        _ => {
-            // Decomposition happened — extract best path from AND-OR tree.
-            let _blueprint = BlueprintPass::generate(marginals);
-            let _reviewer = DecompositionReviewer::new(0.3);
 
-            // Collect all solved leaf solutions into a combined path.
-            let combined_path = collect_solved_path(&and_or_tree);
-
-            // If we got a complete solution from cache, convert to TreeNode directly.
-            if !combined_path.is_empty() {
-                return path_to_tree_nodes(&combined_path);
-            }
-
-            // Partial solution — fall back to screened DDTree.
-            build_dd_tree_screened(marginals, config, pruner, chain_seed)
-        }
+        // Partial solution — fall back to screened DDTree.
+        build_dd_tree_screened(marginals, config, pruner, chain_seed)
     }
 }
 
@@ -1798,15 +1786,13 @@ where
     S: Clone,
 {
     match node {
-        AndOrNode::Or { children, best, .. } => match best {
-            Some(idx) => children
+        AndOrNode::Or { children, best, .. } => if let Some(idx) = best { children
                 .get(*idx)
                 .and_then(|c| {
                     let path = collect_solved_path(c);
                     if path.is_empty() { None } else { Some(path) }
                 })
-                .unwrap_or_default(),
-            None => {
+                .unwrap_or_default() } else {
                 for child in children {
                     let path = collect_solved_path(child);
                     if !path.is_empty() {
@@ -1814,8 +1800,7 @@ where
                     }
                 }
                 Vec::new()
-            }
-        },
+            },
         AndOrNode::And {
             children,
             solved_count,
@@ -1851,11 +1836,11 @@ fn path_to_tree_nodes(path: &[Vec<usize>]) -> Vec<TreeNode> {
     }
 
     let mut nodes = Vec::with_capacity(flat.len());
-    let mut parent_path: u128 = 0;
+    let mut parent_path = TreePath::default();
 
     for (depth, &token_idx) in flat.iter().enumerate() {
-        // Pack token into parent_path (16 bits per token, LSB-first).
-        parent_path |= (token_idx as u128) << (depth * 16);
+        // One u32 slot per level (Issue 670 widened from 16-bit packing).
+        parent_path = parent_path.push(token_idx as u32, depth);
 
         nodes.push(TreeNode {
             parent_path,

@@ -38,8 +38,11 @@ pub struct PhraseBoostPruner<P: ScreeningPruner> {
     inner: P,
     /// Context trie holding all phrase sequences.
     trie: PhraseTrie,
-    /// Raw boost score before normalization.
-    boost_score: f32,
+    /// `boost_score / (1.0 + boost_score)`, precomputed in [`Self::new`] from
+    /// the raw boost score. The raw value is immutable after construction, so
+    /// the divide (≈13-cycle latency) would otherwise be re-done on every
+    /// `relevance()` call.
+    normalized_boost: f32,
     /// Per-path active trie states. Keyed by hash of the parent token sequence.
     /// Lock-free via papaya — avoids RwLock contention on every relevance() call.
     active_states: papaya::HashMap<u128, Vec<usize>>,
@@ -55,7 +58,7 @@ impl<P: ScreeningPruner> PhraseBoostPruner<P> {
         Self {
             inner,
             trie,
-            boost_score,
+            normalized_boost: boost_score / (1.0 + boost_score),
             active_states: papaya::HashMap::new(),
         }
     }
@@ -74,8 +77,9 @@ impl<P: ScreeningPruner> PhraseBoostPruner<P> {
     ///
     /// Maps any positive `boost_score` to [0, 1), ensuring the result stays bounded.
     /// Example: boost_score = 5.0 → normalized = 5/6 ≈ 0.833.
+    #[inline]
     pub fn normalized_boost(&self) -> f32 {
-        self.boost_score / (1.0 + self.boost_score)
+        self.normalized_boost
     }
 
     /// Compute a fast hash of the parent token sequence for state tracking.
@@ -111,10 +115,13 @@ impl<P: ScreeningPruner> PhraseBoostPruner<P> {
         for &tok in parent_tokens {
             active = self.trie.advance(&active, tok);
         }
+        // Test BEFORE inserting so `active` can be moved into the map instead of
+        // cloned — saves one heap alloc + memcpy per cache miss.
+        let boosted = self.trie.is_token_boosted(&active, token_idx);
         // Insert (another thread may have raced — their entry wins, which is fine
         // since the computation is deterministic).
-        let _ = map.insert(key, active.clone());
-        self.trie.is_token_boosted(&active, token_idx)
+        let _ = map.insert(key, active);
+        boosted
     }
 }
 

@@ -326,7 +326,7 @@ fn train_variant(
         &mut scratch,
         &mut out,
     );
-    eprintln!("[{}] init mse = {:.6}", label, last_mse);
+    eprintln!("[{label}] init mse = {last_mse:.6}");
 
     for step in 0..STEPS {
         last_mse = fd_sgd_step(
@@ -374,8 +374,7 @@ fn g6_eigenbasis_aligned_beats_vanilla_on_anisotropic() {
 
     eprintln!("\n=== G6: FUNCATTN T5.1 eigenbasis composition gate ===");
     eprintln!(
-        "model: n={}, d={}, k={}, steps={} (FD-SGD, LR={}, FD_EPS={}, τ={})",
-        N, D, K, STEPS, LR, FD_EPS, TEMPERATURE
+        "model: n={N}, d={D}, k={K}, steps={STEPS} (FD-SGD, LR={LR}, FD_EPS={FD_EPS}, τ={TEMPERATURE})"
     );
     eprintln!(
         "calibration: n_samples={}, d_eff={:.2}, top_eig={:.4}, bot_eig={:.4}, spectral_gap={:?}",
@@ -424,9 +423,9 @@ fn g6_eigenbasis_aligned_beats_vanilla_on_anisotropic() {
     // ── G6 verdict ───────────────────────────────────────────────────────
     let ratio = aligned_mse / vanilla_mse.max(1e-20);
     eprintln!("\n=== G6 verdict ===");
-    eprintln!("  vanilla FUNCATTN    mse = {:.6}", vanilla_mse);
-    eprintln!("  eigen-aligned       mse = {:.6}", aligned_mse);
-    eprintln!("  aligned / vanilla ratio = {:.4}", ratio);
+    eprintln!("  vanilla FUNCATTN    mse = {vanilla_mse:.6}");
+    eprintln!("  eigen-aligned       mse = {aligned_mse:.6}");
+    eprintln!("  aligned / vanilla ratio = {ratio:.4}");
     eprintln!("  gate: ratio ≤ 0.90 (PASS, ≥10% improvement)");
     eprintln!("        ratio ≤ 1.10 (TIE, no clear benefit — keep helper opt-in)");
     eprintln!("        ratio > 1.10 (FAIL, alignment hurts — escalate issue)");
@@ -440,21 +439,14 @@ fn g6_eigenbasis_aligned_beats_vanilla_on_anisotropic() {
     let y_mean: f32 = y.iter().sum::<f32>() / y.len() as f32;
     let trivial_mse: f32 =
         y.iter().map(|&v| (v - y_mean) * (v - y_mean)).sum::<f32>() / y.len() as f32;
-    eprintln!(
-        "  trivial-predictor mse = {:.6} (variance of y)",
-        trivial_mse
-    );
+    eprintln!("  trivial-predictor mse = {trivial_mse:.6} (variance of y)");
     assert!(
         vanilla_mse.is_finite() && vanilla_mse < trivial_mse,
-        "vanilla FUNCATTN did not learn: mse={} vs trivial={}",
-        vanilla_mse,
-        trivial_mse
+        "vanilla FUNCATTN did not learn: mse={vanilla_mse} vs trivial={trivial_mse}"
     );
     assert!(
         aligned_mse.is_finite() && aligned_mse < trivial_mse,
-        "eigen-aligned FUNCATTN did not learn: mse={} vs trivial={}",
-        aligned_mse,
-        trivial_mse
+        "eigen-aligned FUNCATTN did not learn: mse={aligned_mse} vs trivial={trivial_mse}"
     );
 
     // Determinism check: re-running the rotation on the same weights must
@@ -470,13 +462,9 @@ fn g6_eigenbasis_aligned_beats_vanilla_on_anisotropic() {
             .fold(0.0f32, f32::max);
         assert!(
             max_diff < 1e-6,
-            "rotation not deterministic: max_diff = {}",
-            max_diff
+            "rotation not deterministic: max_diff = {max_diff}"
         );
-        eprintln!(
-            "  determinism: rotation reproducible (max_diff = {:.2e})",
-            max_diff
-        );
+        eprintln!("  determinism: rotation reproducible (max_diff = {max_diff:.2e})");
     }
 
     if ratio <= 0.90 {

@@ -182,6 +182,202 @@ pub fn dim_sufficiency_bound(k: usize, n: usize) -> usize {
     bound.ceil() as usize
 }
 
+// ── Worst-case retrieval capacity (Research 472, arXiv:2508.21038) ──
+//
+// Theorem 1 (Weller, Boratko, Naim & Lee, ICLR 2026): if EVERY top-k subset of
+// n documents is realizable by some unit query with score-gap margin 2γ, then
+//
+//     C(n, k) ≤ (1 + 1/γ)^d        hence        d ≥ ln C(n, k) / ln(1 + 1/γ)
+//
+// This is the NEGATIVE, worst-case counterpart to `dim_sufficiency_bound`:
+//
+// | fn                       | paper       | direction | conditioned on          |
+// |--------------------------|-------------|-----------|-------------------------|
+// | `dim_sufficiency_bound`  | 2605.23556  | positive  | k-sparse queries        |
+// | `dim_capacity_required`  | 2508.21038  | negative  | ALL C(n,k) subsets      |
+//
+// They answer different questions and will disagree; that is expected, not a
+// bug. `dim_sufficiency_bound` says "this d suffices for the margin you want on
+// k-sparse queries". `dim_capacity_required` says "below this d there PROVABLY
+// EXIST relevance structures no single-vector index can represent, at any model
+// size or training budget". Neither subsumes the other.
+//
+// These are provisioning/diagnostic helpers, NOT hot-path functions:
+// `dim_capacity_ceiling` runs a ~64-step binary search, each step costing k
+// `ln` calls. Call at index construction or in a debug assertion, never per
+// query.
+
+/// Corpus size below which a `d`-dimensional single-vector index is safe for
+/// **every** `k` simultaneously — the worst-case-over-`k` floor.
+///
+/// Because [`dim_capacity_ceiling`] is U-shaped in `k`, its minimum is the only
+/// `k`-free statement you can make about a dimension. That minimum sits near
+/// `k ≈ n/2`, where `C(n, n/2) ≈ 2ⁿ`, so Theorem 1 collapses to
+///
+/// ```text
+///     n · ln 2 ≤ d · ln(1 + 1/γ)        ⇒        n ≤ d · log₂(1 + 1/γ)
+/// ```
+///
+/// At γ = 0.1 that is `≈ 3.46·d` — a strikingly small linear function of the
+/// embedding dimension. Reference values (exact minimum in parentheses):
+/// d=8 → 27 (30), d=16 → 55 (58), d=32 → 110 (114), d=64 → 221 (225),
+/// d=128 → 442 (447), d=768 → 2656 (2662).
+///
+/// This closed form is a **lower** estimate of the true minimum: dropping
+/// Stirling's `√(πn/2)` factor costs a few documents. Use it as a quick
+/// provisioning reference; use [`dim_capacity_ceiling`] with the `k` you
+/// actually retrieve when you need the exact answer for a guard.
+///
+/// Returns `usize::MAX` when no bound applies (`γ ≤ 0`).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_floor(d: usize, gamma: f64) -> usize {
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return usize::MAX;
+    };
+    // n ≤ d · ln(1 + 1/γ) / ln 2
+    ((d as f64) * per_dim / core::f64::consts::LN_2) as usize
+}
+
+/// Natural log of the binomial coefficient `C(n, k)`, as `Σ_{i=1..k} ln((n−k+i)/i)`.
+///
+/// Computing `C(n, k)` directly overflows almost immediately (`C(46, 2)` fits in
+/// a `u64`, `C(1000, 10)` does not), so the capacity bounds work in log space
+/// throughout. `k` terms, no gamma function, no allocation.
+///
+/// Returns `0.0` for `k == 0` (`C(n, 0) = 1`) and `f64::INFINITY` for `k > n`
+/// (no such subset exists).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+#[inline]
+pub fn ln_binomial(n: usize, k: usize) -> f64 {
+    if k == 0 {
+        return 0.0;
+    }
+    if k > n {
+        return f64::INFINITY;
+    }
+    // n ≥ k, so `base` cannot underflow; `base + i ≤ n` cannot overflow.
+    let base = n - k;
+    let mut acc = 0.0f64;
+    for i in 1..=k {
+        acc += (((base + i) as f64) / (i as f64)).ln();
+    }
+    acc
+}
+
+/// Capacity in nats contributed per embedding dimension: `ln(1 + 1/γ)`.
+///
+/// `None` means "no bound applies" — as `γ → 0⁺` the margin requirement
+/// vanishes and any corpus size is representable.
+///
+/// γ is clamped to the paper's feasible range: for unit vectors the score gap
+/// `2γ ≤ 2`, so `γ ≤ 1`. Non-finite γ falls through to the conservative `γ = 1`
+/// clamp (both comparisons are false for `NaN`).
+///
+/// γ is `f64` deliberately, not `f32`. Boundary cases are razor-thin: at
+/// `d = 8, k = 2, γ = 0.1` the ceiling n = 20,706 clears the cap by only
+/// `7.5e-8` nats, while representing `0.1` in `f32` perturbs the cap by
+/// `1.1e-7` — enough to flip the answer to 20,705. This is a provisioning
+/// helper, so accuracy beats the (nonexistent) benefit of a narrower float.
+#[cfg(feature = "sigmoid_margin")]
+#[inline]
+fn capacity_nats_per_dim(gamma: f64) -> Option<f64> {
+    if gamma <= 0.0 {
+        return None;
+    }
+    let g = if gamma <= 1.0 { gamma } else { 1.0 };
+    Some((1.0 + 1.0 / g).ln())
+}
+
+/// Minimum embedding dimension for which every top-`k` subset of `n` documents
+/// is realizable at margin γ (Theorem 1, forward direction).
+///
+/// Reproduces the paper's Table 1 exactly at γ = 0.1 — e.g. `n = 10_000` gives
+/// 8 (k=2), 33 (k=10), 233 (k=100), 1354 (k=1000).
+///
+/// Returns `0` when `k == 0` or `k >= n`: at most one subset exists, so no
+/// separation is required (the paper's "trivial" table entries).
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_required(n: usize, k: usize, gamma: f64) -> usize {
+    if k == 0 || k >= n {
+        return 0;
+    }
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return 0;
+    };
+    (ln_binomial(n, k) / per_dim).ceil() as usize
+}
+
+/// Largest corpus size `n` whose every top-`k` subset a `d`-dimensional
+/// single-vector index can realize at margin γ (Theorem 1, inverted).
+///
+/// Beyond the returned `n`, there provably exist relevance structures that no
+/// `d`-dimensional single-vector cosine/dot ranking can produce as a top-`k`
+/// result — regardless of model size, training data, or loss. Note the paper
+/// cannot say a priori *which* structures fail, so exceeding this ceiling is a
+/// loss of worst-case headroom, not a guarantee of observed failure: a benign,
+/// low-rank realized relevance matrix stays perfectly servable.
+///
+/// **Decreasing in `k` throughout the practical regime `k ≪ n`** — at `d = 8`,
+/// γ = 0.1: 20,706 (k=2), 269 (k=4), 122 (k=5), 44 (k=8), 35 (k=10), 30 (k=16).
+/// Raising `k` to widen coverage *shrinks* the ceiling, because more subsets
+/// must be representable. **Coverage cannot be bought with a larger `k`;** the
+/// escape is structural (graph/lexical expansion, multi-vector late
+/// interaction) or dimensional.
+///
+/// The curve is U-shaped, not monotone: past the minimum it rises again
+/// (d=8, γ=0.1: 31 at k=20, 40 at k=32, 47 at k=40) because `C(n,k) = C(n,n−k)`
+/// makes near-complete subsets easy once `k` approaches `n` — "retrieve almost
+/// everything" needs little separating power. That branch is degenerate for
+/// retrieval and should not be read as extra headroom. The **global minimum
+/// over all `k`** is the honest worst case for a given `d` (30 documents at
+/// d=8, γ=0.1, attained at k=16).
+///
+/// Returns `usize::MAX` when no bound applies (`k == 0`, or `γ ≤ 0`), and `k`
+/// when `d == 0` (only the single subset `C(k,k) = 1` is representable).
+///
+/// Not a hot-path function — see the module note above.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Research 472
+#[cfg(feature = "sigmoid_margin")]
+pub fn dim_capacity_ceiling(d: usize, k: usize, gamma: f64) -> usize {
+    if k == 0 {
+        return usize::MAX;
+    }
+    let Some(per_dim) = capacity_nats_per_dim(gamma) else {
+        return usize::MAX;
+    };
+    let cap = (d as f64) * per_dim;
+
+    // `n = k` is always feasible (`ln C(k,k) = 0 ≤ cap`), so `lo` is a valid
+    // answer from the start and the search never returns something too small.
+    if ln_binomial(usize::MAX, k) <= cap {
+        return usize::MAX;
+    }
+    let mut lo = k;
+    let mut hi = usize::MAX - 1;
+    while lo < hi {
+        // Overflow-safe midpoint, biased up so `lo` converges to the last
+        // feasible n rather than stalling.
+        let mid = lo + (hi - lo).div_ceil(2);
+        if ln_binomial(mid, k) <= cap {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    lo
+}
+
 // ── SIMD Sum of Squares (Issue 075) ──────────────────────────
 
 /// SIMD-accelerated sum of squares: `Σ x[i]²`.
@@ -1149,12 +1345,12 @@ pub fn simd_fused_sub_acc(dst: &mut [f32], a: &[f32], b: &[f32], len: usize) {
         if is_avx2_fma_available() {
             unsafe { avx2_fused_sub_acc(dst, a, b, len) }
         } else {
-            scalar_fused_sub_acc(dst, a, b, len)
+            scalar_fused_sub_acc(dst, a, b, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_sub_acc(dst, a, b, len)
+        scalar_fused_sub_acc(dst, a, b, len);
     }
 }
 
@@ -1234,12 +1430,12 @@ pub fn simd_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: usize
         if is_avx2_fma_available() {
             unsafe { avx2_fused_scale_acc(dst, src, scale, len) }
         } else {
-            scalar_fused_scale_acc(dst, src, scale, len)
+            scalar_fused_scale_acc(dst, src, scale, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_scale_acc(dst, src, scale, len)
+        scalar_fused_scale_acc(dst, src, scale, len);
     }
 }
 
@@ -1333,12 +1529,12 @@ pub fn simd_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f
         if is_avx2_fma_available() {
             unsafe { avx2_fused_scale_acc_f16(dst, src_f16, scale, len) }
         } else {
-            scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+            scalar_fused_scale_acc_f16(dst, src_f16, scale, len);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+        scalar_fused_scale_acc_f16(dst, src_f16, scale, len);
     }
 }
 
@@ -1573,4 +1769,210 @@ pub fn coincidence_score(top_k: &[usize], parent_path: &[usize], window: usize) 
     }
 
     agreement as f32 / effective_window
+}
+
+// ── Sigmoid argmaxability (Issue 581, Grivas/Vergari/Lopez AAAI 2024) ──
+//
+// A low-rank sigmoid output layer cannot produce every label combination. For
+// `W ∈ R^{L×d}` and independent per-label sigmoid gates, label combination
+// `y ∈ {0,1}^L` is *argmaxable* (achievable for some input) iff the strict
+// linear system
+//
+//     diag(2y − 1) · W · x > 0
+//
+// has a solution. Grivas et al. (arXiv:2310.10443) show that when `L` exceeds
+// the rank of `W`, exponentially many combinations are **unargmaxable** — no
+// input produces them, at any weight values. Their fix is a DFT output layer.
+//
+// Two-tier decision procedure, both constructive:
+//
+// 1. **rank(W) == L ⇒ every combination is argmaxable.** `W` then has a right
+//    inverse, so `W x = 2y − 1` is solvable exactly and the system holds with
+//    margin 1. This is a proof, not a heuristic, and it is the common case
+//    whenever `d ≥ L` with non-degenerate directions.
+// 2. Otherwise, per-combination search: the rows of `A = diag(s)W` admit an
+//    `x` with `Ax > 0` iff they all lie in one open halfspace. A perceptron
+//    finds such an `x` whenever one exists; failing to find one within the
+//    iteration budget is reported as *unresolved*, never as proof of
+//    impossibility.
+//
+// Relevance here: the affect bridge projects a flattened HLA onto 5–6 emotion
+// directions (valence / arousal / desperation / calm / fear [+ anger]) and gates
+// each with a sigmoid — a textbook low-rank sigmoid multi-label layer whose
+// outputs cross the sync boundary.
+
+/// Rank of a row-major `rows × cols` matrix via Gaussian elimination with
+/// partial pivoting. `tol` is the absolute pivot threshold below which a column
+/// is treated as dependent.
+///
+/// Allocation: one scratch copy of the matrix. Diagnostic use only.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn matrix_rank(m: &[f32], rows: usize, cols: usize, tol: f32) -> usize {
+    debug_assert_eq!(m.len(), rows * cols, "matrix_rank: shape mismatch");
+    let mut a: Vec<f32> = m.to_vec();
+    let mut rank = 0usize;
+    let mut row = 0usize;
+    for col in 0..cols {
+        if row >= rows {
+            break;
+        }
+        // Partial pivot: largest |value| in this column at or below `row`.
+        let mut piv = row;
+        let mut best = a[row * cols + col].abs();
+        for r in (row + 1)..rows {
+            let v = a[r * cols + col].abs();
+            if v > best {
+                best = v;
+                piv = r;
+            }
+        }
+        if best <= tol {
+            continue;
+        }
+        if piv != row {
+            for c in 0..cols {
+                a.swap(row * cols + c, piv * cols + c);
+            }
+        }
+        let inv = 1.0 / a[row * cols + col];
+        for r in (row + 1)..rows {
+            let f = a[r * cols + col] * inv;
+            if f == 0.0 {
+                continue;
+            }
+            for c in col..cols {
+                a[r * cols + c] -= f * a[row * cols + c];
+            }
+        }
+        rank += 1;
+        row += 1;
+    }
+    rank
+}
+
+/// Search for an input realizing the sign pattern `signs` through the low-rank
+/// sigmoid layer `w` (row-major `l × d`).
+///
+/// `signs[i]` must be `+1` (label on) or `-1` (label off). Returns a witness `x`
+/// if one is found, else `None` — which means *not found within the budget*, not
+/// *proved impossible*.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn argmaxable_witness(
+    w: &[f32],
+    l: usize,
+    d: usize,
+    signs: &[i8],
+    max_iters: usize,
+) -> Option<Vec<f32>> {
+    debug_assert_eq!(w.len(), l * d);
+    debug_assert_eq!(signs.len(), l);
+    // Rows of A = diag(signs) * W.
+    let a: Vec<f32> = (0..l)
+        .flat_map(|i| {
+            let s = signs[i] as f32;
+            (0..d).map(move |j| s * w[i * d + j])
+        })
+        .collect();
+    // Perceptron: start at the sum of rows (a good guess when feasible), then
+    // repair the most-violated constraint each step.
+    let mut x = vec![0.0f32; d];
+    for i in 0..l {
+        for j in 0..d {
+            x[j] += a[i * d + j];
+        }
+    }
+    for _ in 0..max_iters {
+        let mut worst = (usize::MAX, f32::INFINITY);
+        for i in 0..l {
+            let s: f32 = (0..d).map(|j| a[i * d + j] * x[j]).sum();
+            if s < worst.1 {
+                worst = (i, s);
+            }
+        }
+        if worst.1 > 0.0 {
+            return Some(x);
+        }
+        // Add the violated row; normalize to keep magnitudes bounded.
+        for j in 0..d {
+            x[j] += a[worst.0 * d + j];
+        }
+        let norm: f32 = x.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if norm > 1e-12 {
+            for v in x.iter_mut() {
+                *v /= norm;
+            }
+        }
+    }
+    None
+}
+
+/// Result of an exhaustive argmaxability audit over all `2^L` label combinations.
+#[cfg(feature = "sigmoid_margin")]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ArgmaxAudit {
+    /// Rank of the output matrix.
+    pub rank: usize,
+    /// Number of labels `L`.
+    pub labels: usize,
+    /// `2^L`.
+    pub total: usize,
+    /// Combinations with a constructed witness.
+    pub achievable: usize,
+    /// Combinations where no witness was found within the budget. **Suspected**
+    /// unargmaxable — not proven, since the search is incomplete.
+    pub unresolved: usize,
+    /// `true` when `rank == labels`, which *proves* every combination is
+    /// argmaxable (the matrix has a right inverse). No search needed.
+    pub full_rank_proof: bool,
+}
+
+/// Exhaustively audit a low-rank sigmoid output layer for unargmaxable label
+/// combinations. `w` is row-major `l × d`; `l` must be ≤ 24 to keep `2^L`
+/// tractable.
+///
+/// When `rank(w) == l` the audit short-circuits with a proof that all
+/// combinations are achievable (see the module note). Otherwise every one of the
+/// `2^l` sign patterns gets a perceptron search.
+///
+/// # Feature flag
+/// `sigmoid_margin` — Issue 581
+#[cfg(feature = "sigmoid_margin")]
+pub fn audit_argmaxable(w: &[f32], l: usize, d: usize) -> ArgmaxAudit {
+    assert!(l <= 24, "audit_argmaxable: 2^{l} combinations is not tractable");
+    let rank = matrix_rank(w, l, d, 1e-6);
+    let total = 1usize << l;
+    if rank == l {
+        return ArgmaxAudit {
+            rank,
+            labels: l,
+            total,
+            achievable: total,
+            unresolved: 0,
+            full_rank_proof: true,
+        };
+    }
+    let mut achievable = 0usize;
+    let mut signs = vec![1i8; l];
+    for mask in 0..total {
+        for (i, s) in signs.iter_mut().enumerate() {
+            *s = if mask & (1 << i) != 0 { 1 } else { -1 };
+        }
+        if argmaxable_witness(w, l, d, &signs, 256).is_some() {
+            achievable += 1;
+        }
+    }
+    ArgmaxAudit {
+        rank,
+        labels: l,
+        total,
+        achievable,
+        unresolved: total - achievable,
+        full_rank_proof: false,
+    }
 }

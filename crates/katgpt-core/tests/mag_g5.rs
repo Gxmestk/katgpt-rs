@@ -116,17 +116,15 @@ fn g5_zero_alloc_hot_path() {
     let dealloc_delta = dealloc_after - dealloc_before;
 
     println!("G5 zero-alloc hot path (1000 iterations):");
-    println!("  allocs:   {} (target 0)", alloc_delta);
-    println!("  deallocs: {} (target 0)", dealloc_delta);
+    println!("  allocs:   {alloc_delta} (target 0)");
+    println!("  deallocs: {dealloc_delta} (target 0)");
 
     assert_eq!(
         alloc_delta, 0,
-        "G5 FAIL: hot path allocated {} times in 1000 iterations",
-        alloc_delta
+        "G5 FAIL: hot path allocated {alloc_delta} times in 1000 iterations"
     );
     assert_eq!(
         dealloc_delta, 0,
-        "G5 FAIL: hot path deallocated {} times in 1000 iterations",
-        dealloc_delta
+        "G5 FAIL: hot path deallocated {dealloc_delta} times in 1000 iterations"
     );
 }

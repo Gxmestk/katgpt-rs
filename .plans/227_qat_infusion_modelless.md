@@ -1,7 +1,7 @@
 # Plan 227: QAT Infusion — Modelless Inference-Time Quantization Awareness
 
 **Date:** 2026-06-08
-**Status:** ✅ MOSTLY COMPLETE — 5/6 phases DEFAULT-ON (SCT, TPB, Modality, PASD, Async Q/DQ all GOAT-proved + promoted in katgpt root default); Phase 5 Channel SIMD BLOCKED pending release benchmark (1.02× debug only).
+**Status:** ✅ COMPLETE — **all 6 phases DEFAULT-ON** (SCT, TPB, Modality, PASD, Channel SIMD, Async Q/DQ all GOAT-proved + promoted in katgpt root default). Phase 5 Channel SIMD promoted 2026-08-11 per [Bench 580](../.benchmarks/580_channel_simd_align_release_goat.md) — release-mode G5 gate PASS at 84.9% / 86.7% throughput improvement (debug-mode 1.02× was uninitialized-SIMD noise).
 **Research:** `.research/202_QAT_Infusion_Inference_Time_Quantization_Awareness.md`
 **Feature Flags:** `static_cal_tables`, `targeted_precision`, `modality_pruned_load`, `precision_aware_draft`, `channel_simd_align`, `async_qdq_overlap`
 **GOAT Policy:** All opt-in until benchmarked, then default-ON if gain + no perf hurt
@@ -119,7 +119,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 | TPB (Targeted Precision) | 2-5% perplexity at same cache | Sensitivity analysis accuracy | ✅ **GOAT proved 21.3% ppl → default-ON** |
 | Modality Pruning | 20-40% for simple queries | Query classification accuracy | ✅ **GOAT proved 97.6% latency → default-ON** |
 | PASD (Draft Awareness) | 5-10% acceptance rate | Boundary computation overhead | ✅ **GOAT proved 12.5% acceptance, 0.12% overhead → default-ON** |
-| Channel SIMD | 5-10% SIMD throughput | Alignment overhead for small matrices | ⚠️ **GOAT 1.02x debug — BLOCKED pending release benchmark** |
+| Channel SIMD | 5-10% SIMD throughput | Alignment overhead for small matrices | ✅ **GOAT 84.9% release (Plan 227 Phase 5, 2026-08-11) → DEFAULT-ON** — debug 1.02× was SIMD-uninitialized noise; release auto-vectorization confirms 6.64×–7.90× ratio. See [Bench 580](../.benchmarks/580_channel_simd_align_release_goat.md). |
 | Async Q/DQ | 15-25% GPU throughput | GPU-only, needs `inference_router` | ✅ **GOAT proved 37.5% → default-ON** |
 
 ---

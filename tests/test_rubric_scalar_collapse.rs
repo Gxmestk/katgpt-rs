@@ -98,8 +98,8 @@ fn test_quadratic_reward_differentiates_same_weighted_score() {
     let gaps_c = student_c.gap_criteria(&reference);
 
     println!("\n📊 Step 3: Per-criterion gaps differ");
-    println!("  A gaps: {:?}", gaps_a);
-    println!("  C gaps: {:?}", gaps_c);
+    println!("  A gaps: {gaps_a:?}");
+    println!("  C gaps: {gaps_c:?}");
     assert_ne!(gaps_a, gaps_c, "Gap profiles must differ");
 
     // ── Step 4: Prove A has HIGHER quadratic reward (concentrated gaps) ──

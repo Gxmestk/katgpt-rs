@@ -183,15 +183,13 @@ fn g1_pri_latency_reported_against_100us_target() {
     // regressions (e.g. O(N²) blowup) without papering over the real gap.
     assert!(
         elapsed_us < 50_000,
-        "G1 CATASTROPHIC REGRESSION: PRI took {}µs (> 50ms — something is wrong)",
-        elapsed_us,
+        "G1 CATASTROPHIC REGRESSION: PRI took {elapsed_us}µs (> 50ms — something is wrong)",
     );
     if elapsed_us < 100 {
         println!("✅ G1 PASSED: PRI < 100µs canonical target");
     } else {
         println!(
-            "⚠️  G1 PARTIAL: PRI {}µs exceeds 100µs canonical target — feature stays opt-in (see benchmark doc)",
-            elapsed_us,
+            "⚠️  G1 PARTIAL: PRI {elapsed_us}µs exceeds 100µs canonical target — feature stays opt-in (see benchmark doc)",
         );
     }
 }
@@ -231,10 +229,7 @@ fn g2_motif_mining_overhead_under_5pct_of_admission() {
     // admission path". We measure both and compare.
     let ratio = mine_elapsed.as_nanos() as f64 / admit_elapsed.as_nanos().max(1) as f64;
 
-    println!(
-        "G2: mine_batch {:?}, admit {:?}, ratio = {:.3}",
-        mine_elapsed, admit_elapsed, ratio,
-    );
+    println!("G2: mine_batch {mine_elapsed:?}, admit {admit_elapsed:?}, ratio = {ratio:.3}",);
 
     // NOTE: ratio is reported, not strictly asserted, because absolute timings
     // depend on CPU. The canonical number lives in the benchmark file.
@@ -288,26 +283,19 @@ fn g3_tar_synthetic_proxy_monotone_with_overlap() {
     let tar_same = compute_tar_score(&baseline, &perturbed_same);
     let tar_none = compute_tar_score(&baseline, &perturbed_none);
 
-    println!(
-        "G3 (synthetic proxy): TaR(same)={:.4}, TaR(none)={:.4}",
-        tar_same, tar_none,
-    );
+    println!("G3 (synthetic proxy): TaR(same)={tar_same:.4}, TaR(none)={tar_none:.4}",);
 
     assert!(
         tar_same > 0.95,
-        "G3 FAIL: TaR for identical motif multisets = {:.4} (expected ~1.0)",
-        tar_same,
+        "G3 FAIL: TaR for identical motif multisets = {tar_same:.4} (expected ~1.0)",
     );
     assert!(
         tar_none <= 0.10,
-        "G3 FAIL: TaR for disjoint motif multisets = {:.4} (expected ~0.0)",
-        tar_none,
+        "G3 FAIL: TaR for disjoint motif multisets = {tar_none:.4} (expected ~0.0)",
     );
     assert!(
         tar_same > tar_none,
-        "G3 FAIL: TaR(same) = {:.4} not > TaR(none) = {:.4} (proxy is non-monotone)",
-        tar_same,
-        tar_none,
+        "G3 FAIL: TaR(same) = {tar_same:.4} not > TaR(none) = {tar_none:.4} (proxy is non-monotone)",
     );
     println!("✅ G3 PASSED (synthetic proxy): TaR monotone with motif overlap");
     println!("   TODO: upgrade to real AnchorProfile correlation in Phase 4 wire-up");
@@ -344,8 +332,7 @@ fn g4_snapshot_10k_traces_reported_against_1mb_target() {
     // node to ~3 bytes (1B None tag + 1B prim varint + 1B tick varint).
     assert!(
         size_mb < 1.0,
-        "G4 FAIL: 10K-trace snapshot = {:.3} MB (>= 1MB canonical target)",
-        size_mb,
+        "G4 FAIL: 10K-trace snapshot = {size_mb:.3} MB (>= 1MB canonical target)",
     );
     println!("✅ G4 PASSED: 10K-trace snapshot < 1 MB canonical target");
 
@@ -376,14 +363,12 @@ fn g4_snapshot_upper_bound_all_committed() {
     let bytes = postcard::to_allocvec(&corpus).expect("postcard serialize 10K traces");
     let size_mb = bytes.len() as f64 / (1024.0 * 1024.0);
     println!(
-        "G4 upper bound: 10K-trace snapshot (all Some) = {:.3} MB — informational, NOT asserted",
-        size_mb
+        "G4 upper bound: 10K-trace snapshot (all Some) = {size_mb:.3} MB — informational, NOT asserted"
     );
     // Guard against accidental bloat beyond the pre-fix baseline (~1.77MB).
     assert!(
         size_mb < 2.5,
-        "G4 upper bound regressed past pre-fix baseline: {:.3} MB",
-        size_mb,
+        "G4 upper bound regressed past pre-fix baseline: {size_mb:.3} MB",
     );
 }
 
@@ -478,7 +463,7 @@ fn motif_admission_recognises_high_pri_motif() {
             );
         }
         GateResult::Rejected { reason } => {
-            panic!("high-PRI motif was rejected: {:?}", reason);
+            panic!("high-PRI motif was rejected: {reason:?}");
         }
     }
 }

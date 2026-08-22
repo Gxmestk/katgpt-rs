@@ -987,8 +987,8 @@ mod tests {
         let e1 = mat[3];
         let mut eigs = [e0, e1];
         eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        assert!((eigs[0] - 1.0).abs() < 1e-5, "eigs = {:?}", eigs);
-        assert!((eigs[1] - 3.0).abs() < 1e-5, "eigs = {:?}", eigs);
+        assert!((eigs[0] - 1.0).abs() < 1e-5, "eigs = {eigs:?}");
+        assert!((eigs[1] - 3.0).abs() < 1e-5, "eigs = {eigs:?}");
     }
 
     #[test]
@@ -1001,14 +1001,12 @@ mod tests {
         eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
         assert!(
             (eigs[0] - (2.0 - std::f32::consts::SQRT_2)).abs() < 1e-4,
-            "eigs = {:?}",
-            eigs
+            "eigs = {eigs:?}"
         );
-        assert!((eigs[1] - 2.0).abs() < 1e-4, "eigs = {:?}", eigs);
+        assert!((eigs[1] - 2.0).abs() < 1e-4, "eigs = {eigs:?}");
         assert!(
             (eigs[2] - (2.0 + std::f32::consts::SQRT_2)).abs() < 1e-4,
-            "eigs = {:?}",
-            eigs
+            "eigs = {eigs:?}"
         );
     }
 

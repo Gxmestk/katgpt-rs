@@ -375,7 +375,7 @@ mod tests {
         let direction = [1.0, 0.0];
         let params = FunctorEdgeParams::new([0u8; 32], 0, 8.0, 0.6);
         let gate = functor_edge_gate(&state, &params, &direction, 2);
-        assert!((gate - 0.5).abs() < 1e-6, "gate = {}", gate);
+        assert!((gate - 0.5).abs() < 1e-6, "gate = {gate}");
     }
 
     #[test]

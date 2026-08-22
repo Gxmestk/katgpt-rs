@@ -297,9 +297,7 @@ mod tests {
         // Total accept ≥ 10 + some from maybe → improvement ≥ 10%
         assert!(
             after_rate >= before_rate,
-            "acceptance should not decrease: before={}, after={}",
-            before_rate,
-            after_rate,
+            "acceptance should not decrease: before={before_rate}, after={after_rate}",
         );
 
         // Verify ≥10% improvement (relative to initial maybe rate)

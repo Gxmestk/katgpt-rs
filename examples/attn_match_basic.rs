@@ -70,14 +70,14 @@ fn run_compaction(
     let result = compact(keys, values, queries, t_len, d, n, &cfg).expect("compact failed");
     let elapsed = start.elapsed();
 
-    println!("\n{}: selector = {:?}", label, selector);
+    println!("\n{label}: selector = {selector:?}");
     println!(
         "  Original T = {}, compact t = {}, compression = {:.1}×",
         t_len,
         result.compact_len,
         result.compression_ratio()
     );
-    println!("  Wall-clock: {:?}", elapsed);
+    println!("  Wall-clock: {elapsed:?}");
 
     let report = result.report.as_ref().expect("report should be present");
     println!(
@@ -126,10 +126,7 @@ fn main() {
     let n: usize = 128;
     let t: usize = 64; // 8× compression
 
-    println!(
-        "\nSynthetic config: T = {} tokens, d = {} head_dim, n = {} reference queries",
-        t_len, d, n
-    );
+    println!("\nSynthetic config: T = {t_len} tokens, d = {d} head_dim, n = {n} reference queries");
     println!(
         "Target compaction: t = {} tokens ({:.1}× compression)",
         t,

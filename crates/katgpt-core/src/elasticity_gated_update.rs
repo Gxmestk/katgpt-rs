@@ -325,7 +325,7 @@ pub fn elasticity_gated_update_into(
 
     out.fill(0.0);
     for (i, neighbor) in neighbor_states.iter().enumerate() {
-        debug_assert_eq!(neighbor.len(), dim, "neighbor {} has wrong dimension", i);
+        debug_assert_eq!(neighbor.len(), dim, "neighbor {i} has wrong dimension");
         let scale = weights[i] * scale_factor;
 
         let mut lane = 0;
@@ -667,8 +667,7 @@ mod tests {
 
         assert!(
             out.iter().all(|&x| x == 0.0),
-            "zero error should produce zero delta, got {:?}",
-            out
+            "zero error should produce zero delta, got {out:?}"
         );
     }
 
@@ -689,8 +688,7 @@ mod tests {
 
         assert!(
             out.iter().all(|&x| x == 0.0),
-            "near-zero error should produce zero delta, got {:?}",
-            out
+            "near-zero error should produce zero delta, got {out:?}"
         );
     }
 
@@ -714,8 +712,7 @@ mod tests {
 
         assert!(
             out.iter().all(|&x| x == 0.0),
-            "zero-weight guard should produce zero delta, got {:?}",
-            out
+            "zero-weight guard should produce zero delta, got {out:?}"
         );
     }
 
@@ -735,8 +732,7 @@ mod tests {
 
         assert!(
             out.iter().all(|&x| x == 0.0),
-            "empty neighbors should produce zero delta, got {:?}",
-            out
+            "empty neighbors should produce zero delta, got {out:?}"
         );
     }
 
@@ -885,8 +881,7 @@ mod tests {
         let error = compute_error(&state, &target, 10.0);
         assert!(
             (error - 0.5).abs() < 1e-6,
-            "error should be 0.5, got {}",
-            error
+            "error should be 0.5, got {error}"
         );
     }
 
@@ -896,8 +891,7 @@ mod tests {
         let error = compute_error(&state, &state, 1.0);
         assert!(
             error < ZERO_ERROR_THRESHOLD,
-            "error should be ~0, got {}",
-            error
+            "error should be ~0, got {error}"
         );
     }
 
@@ -907,25 +901,21 @@ mod tests {
     fn effective_k_equal_weights() {
         let weights = [0.5f32, 0.5, 0.5, 0.5, 0.5];
         let ek = effective_neighborhood_size(&weights);
-        assert!((ek - 5.0).abs() < 1e-5, "equal weights → ek=5, got {}", ek);
+        assert!((ek - 5.0).abs() < 1e-5, "equal weights → ek=5, got {ek}");
     }
 
     #[test]
     fn effective_k_dominant_weight() {
         let weights = [1.0f32, 1e-6, 1e-6];
         let ek = effective_neighborhood_size(&weights);
-        assert!(
-            (ek - 1.0).abs() < 0.01,
-            "dominant weight → ek≈1, got {}",
-            ek
-        );
+        assert!((ek - 1.0).abs() < 0.01, "dominant weight → ek≈1, got {ek}");
     }
 
     #[test]
     fn effective_k_all_zero() {
         let weights = [0.0f32, 0.0, 0.0];
         let ek = effective_neighborhood_size(&weights);
-        assert_eq!(ek, 0.0, "all-zero weights → ek=0, got {}", ek);
+        assert_eq!(ek, 0.0, "all-zero weights → ek=0, got {ek}");
     }
 
     // ── neighborhood_weight unit tests ───────────────────────────────────
@@ -940,11 +930,7 @@ mod tests {
     fn neighborhood_weight_zero_distance() {
         // d=0 → weight = exp(0) = 1.0 (the winner itself)
         let w = neighborhood_weight(0.0, 0.5, 1.0);
-        assert!(
-            (w - 1.0).abs() < 1e-6,
-            "zero distance → weight=1, got {}",
-            w
-        );
+        assert!((w - 1.0).abs() < 1e-6, "zero distance → weight=1, got {w}");
     }
 
     #[test]
@@ -955,9 +941,7 @@ mod tests {
         let w2 = neighborhood_weight(0.5, error, eta);
         assert!(
             w1 > w2,
-            "closer neighbor should have higher weight: {} vs {}",
-            w1,
-            w2
+            "closer neighbor should have higher weight: {w1} vs {w2}"
         );
     }
 
@@ -969,9 +953,7 @@ mod tests {
         let w_large = neighborhood_weight(d, 0.5, eta);
         assert!(
             w_large > w_small,
-            "larger error → wider neighborhood (higher weight): {} vs {}",
-            w_large,
-            w_small
+            "larger error → wider neighborhood (higher weight): {w_large} vs {w_small}"
         );
     }
 

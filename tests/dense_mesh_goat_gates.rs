@@ -403,9 +403,8 @@ fn run_gate4_at_scale(config: &Config, config_name: &str, assert_beats_sequentia
         );
     } else {
         println!(
-            "    → Path A+B slower than sequential {:.0}× — rayon spawn overhead \
-                 (~5us/task) dominates this forward scale.",
-            expected_sequential_ratio
+            "    → Path A+B slower than sequential {expected_sequential_ratio:.0}× — rayon spawn overhead \
+                 (~5us/task) dominates this forward scale."
         );
     }
 
@@ -623,9 +622,9 @@ fn test_dense_mesh_gate2_composition_differs_from_single_lora() {
     println!(
         "├─────────────────────────────────────────┼────────────────────────────────────────┤"
     );
-    println!("│ L2 norm (chain output)          │ {:>38.4} │", l2_chain);
-    println!("│ L2 norm (diamond output)        │ {:>38.4} │", l2_diamond);
-    println!("│ L2 distance (chain vs diamond)  │ {:>38.4} │", l2_diff);
+    println!("│ L2 norm (chain output)          │ {l2_chain:>38.4} │");
+    println!("│ L2 norm (diamond output)        │ {l2_diamond:>38.4} │");
+    println!("│ L2 distance (chain vs diamond)  │ {l2_diff:>38.4} │");
     println!(
         "│ relative distance (diff/chain)  │ {:>38.4} │",
         l2_diff / l2_chain.max(1e-9)
@@ -643,8 +642,7 @@ fn test_dense_mesh_gate2_composition_differs_from_single_lora() {
     );
     let rel = l2_diff / l2_chain.max(1e-9);
     println!(
-        "Gate 2 (composition): relative L2 distance = {:.4} (must be > 0 for composition) — ✅ PASS",
-        rel
+        "Gate 2 (composition): relative L2 distance = {rel:.4} (must be > 0 for composition) — ✅ PASS"
     );
     println!("  Note: ≥ 3 pp win rate on real arena requires riir-ai R122 trained edges.");
     println!("        This test proves the composition MECHANISM; the win-rate GAIN is");
@@ -720,8 +718,5 @@ fn test_dense_mesh_gate5_bandit_convergence() {
         chosen, 1,
         "Gate 5: bandit should converge to the high-reward arm"
     );
-    println!(
-        "Gate 5 (bandit convergence): chose arm {} after 500 pulls — ✅ PASS",
-        chosen
-    );
+    println!("Gate 5 (bandit convergence): chose arm {chosen} after 500 pulls — ✅ PASS");
 }

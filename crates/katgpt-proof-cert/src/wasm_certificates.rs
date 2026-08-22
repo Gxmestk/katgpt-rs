@@ -29,10 +29,8 @@ pub fn generate_wasm_validator_certificates(
             },
         );
         cert.implies = vec!["P2.3".into()];
-        cert.explanation = format!(
-            "{} critical mismatches in {} A/B comparisons",
-            mismatches, n_comparisons
-        );
+        cert.explanation =
+            format!("{mismatches} critical mismatches in {n_comparisons} A/B comparisons");
         certs.push(cert);
     }
 
@@ -57,10 +55,8 @@ pub fn generate_wasm_validator_certificates(
             },
         );
         cert.implies = vec!["P2.3".into()];
-        cert.explanation = format!(
-            "Latency {:.2}µs/call < target {}µs/call",
-            latency_us, target_latency_us
-        );
+        cert.explanation =
+            format!("Latency {latency_us:.2}µs/call < target {target_latency_us}µs/call");
         certs.push(cert);
     }
 
@@ -103,10 +99,8 @@ pub fn generate_wasm_validator_certificates(
                 delta: lora_wasm_delta as f64,
             },
         );
-        cert.explanation = format!(
-            "LoRA+WASM beats LoRA alone by +{} win rate points",
-            lora_wasm_delta
-        );
+        cert.explanation =
+            format!("LoRA+WASM beats LoRA alone by +{lora_wasm_delta} win rate points");
         certs.push(cert);
     }
 

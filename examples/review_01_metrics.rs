@@ -213,8 +213,7 @@ fn print_q_values(name: &str, result: &katgpt_rs::pruners::BanditResult, true_pr
         let bar_len = (*q * 20.0) as usize;
         let bar: String = "█".repeat(bar_len);
         println!(
-            "    arm {}: Q={:.3} (true={:.1}, err={:.3}) visits={:4} {bar}",
-            arm, q, true_p, err, visits
+            "    arm {arm}: Q={q:.3} (true={true_p:.1}, err={err:.3}) visits={visits:4} {bar}"
         );
     }
     println!();

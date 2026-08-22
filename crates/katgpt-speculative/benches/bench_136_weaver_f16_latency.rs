@@ -205,20 +205,16 @@ fn main() {
         cfg.max_depth + 1,
         cfg.k_candidates
     );
-    println!("Iterations: {}", N);
+    println!("Iterations: {N}");
     println!();
 
     if speedup >= 1.5 {
-        println!("✅ G2 PASS: f16 is {:.2}× faster (≥1.5× target)", speedup);
+        println!("✅ G2 PASS: f16 is {speedup:.2}× faster (≥1.5× target)");
     } else if speedup >= 1.2 {
-        println!(
-            "⚠️  G2 MARGINAL: f16 is {:.2}× faster (≥1.2× but <1.5× target)",
-            speedup
-        );
+        println!("⚠️  G2 MARGINAL: f16 is {speedup:.2}× faster (≥1.2× but <1.5× target)");
     } else {
         println!(
-            "❌ G2 FAIL: f16 is {:.2}× faster (<1.2× — f16 conversion overhead exceeds bandwidth savings)",
-            speedup
+            "❌ G2 FAIL: f16 is {speedup:.2}× faster (<1.2× — f16 conversion overhead exceeds bandwidth savings)"
         );
     }
 
@@ -228,5 +224,5 @@ fn main() {
         WeaverCorrectorF16::from_f32(&WeaverCorrector::from_weights(weights_f32.clone()));
     let conv_ms = conv_start.elapsed().as_secs_f64() * 1000.0;
     println!();
-    println!("f32→f16 conversion (one-time load cost): {:.1} ms", conv_ms);
+    println!("f32→f16 conversion (one-time load cost): {conv_ms:.1} ms");
 }

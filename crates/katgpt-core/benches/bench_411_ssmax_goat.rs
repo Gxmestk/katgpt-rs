@@ -135,7 +135,7 @@ fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
 fn main() {
     println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 411 Phase 4 — SSMax GOAT gate (G1, G3, G4, G5)");
-    println!("  Δ (gold-distractor pre-softmax gap) = {}", DELTA);
+    println!("  Δ (gold-distractor pre-softmax gap) = {DELTA}");
     println!("══════════════════════════════════════════════════════════════════\n");
 
     let ns: &[usize] = &[64, 1_000, 10_000, 100_000];
@@ -217,8 +217,7 @@ fn main() {
 
     let g5_pass = base_argmax == ssmax_argmax && base_argmax == gold_index;
     println!(
-        "  N={}: base_argmax={}, ssmax_argmax={}, gold_index={}",
-        n_small, base_argmax, ssmax_argmax, gold_index
+        "  N={n_small}: base_argmax={base_argmax}, ssmax_argmax={ssmax_argmax}, gold_index={gold_index}"
     );
     println!(
         "  G5 verdict: {}",
@@ -333,12 +332,10 @@ fn main() {
     let per_call_ns = elapsed.as_nanos() as f64 / iters as f64;
 
     println!(
-        "  apply_ssmax_inplace @ n_kv={}: {:.1} ns/call ({} iterations)",
-        n_kv, per_call_ns, iters
+        "  apply_ssmax_inplace @ n_kv={n_kv}: {per_call_ns:.1} ns/call ({iters} iterations)"
     );
     println!(
-        "  Budget: ≤ 1% of attention forward time. A typical forward at n_kv=1024 is ~100µs-1ms; SSMax overhead of ~{:.0}ns is <0.1% — well under budget.",
-        per_call_ns
+        "  Budget: ≤ 1% of attention forward time. A typical forward at n_kv=1024 is ~100µs-1ms; SSMax overhead of ~{per_call_ns:.0}ns is <0.1% — well under budget."
     );
     let g3_pass = per_call_ns < 1000.0; // generous: 1µs budget
     println!(
@@ -365,7 +362,7 @@ fn main() {
     let after = ALLOC_COUNT.load(std::sync::atomic::Ordering::Relaxed);
     let alloc_delta = after - before;
 
-    println!("  apply_ssmax_inplace: {} allocs / 1000 calls", alloc_delta);
+    println!("  apply_ssmax_inplace: {alloc_delta} allocs / 1000 calls");
     let g4_pass = alloc_delta == 0;
     println!(
         "  G4 verdict: {}",

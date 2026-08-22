@@ -472,12 +472,10 @@ fn run_g2(dim: usize, shifts: &[usize], label: &str) -> f32 {
     );
     println!("  G2 [{label}, D={dim}]:");
     println!(
-        "    Pearson(wedge_score, sin θ):  {:+.4}   (target ≥ 0.90)",
-        r
+        "    Pearson(wedge_score, sin θ):  {r:+.4}   (target ≥ 0.90)"
     );
     println!(
-        "    Pearson(wedge_score, cos θ):  {:+.4}   (sanity: should be ≈ 0 — wedge is the sin component)",
-        r_dot
+        "    Pearson(wedge_score, cos θ):  {r_dot:+.4}   (sanity: should be ≈ 0 — wedge is the sin component)"
     );
     r
 }
@@ -501,8 +499,7 @@ fn run_g3_alloc(dim: usize, shifts: &[usize], label: &str) -> usize {
         }
     });
     println!(
-        "  G3-alloc [{label}, D={dim}]: {} allocs / 1000 calls (target: 0)",
-        allocs
+        "  G3-alloc [{label}, D={dim}]: {allocs} allocs / 1000 calls (target: 0)"
     );
     allocs
 }
@@ -635,8 +632,7 @@ fn run_g4_silu_accuracy(dim: usize, shifts: &[usize], label: &str) {
     }
     let mean_err = sum_err / (n * dim * shifts.len()) as f32;
     println!(
-        "  G4-silu-acc [{label}, D={dim}]: max |Δ| = {:.3e}, mean |Δ| = {:.3e} vs libm SiLU",
-        max_err, mean_err
+        "  G4-silu-acc [{label}, D={dim}]: max |Δ| = {max_err:.3e}, mean |Δ| = {mean_err:.3e} vs libm SiLU"
     );
 }
 
@@ -713,7 +709,7 @@ fn main() {
     let allocs_d64 = run_g3_alloc(64, shifts_d64, "shard");
     println!();
     let g3_pass = allocs_d8 == 0 && allocs_d64 == 0;
-    println!("  G3-alloc pass: {}", g3_pass);
+    println!("  G3-alloc pass: {g3_pass}");
     println!();
 
     // ── G4: performance ──
@@ -752,12 +748,10 @@ fn main() {
         if g4_wedge_pass { "PASS" } else { "FAIL" },
     );
     println!(
-        "    D=8  full: {:.1} ns (<150), wedge: {:.1} ns (<80)",
-        ns_d8, ns_d8_wedge
+        "    D=8  full: {ns_d8:.1} ns (<150), wedge: {ns_d8_wedge:.1} ns (<80)"
     );
     println!(
-        "    D=64 full: {:.1} ns (<600), wedge: {:.1} ns (<250)",
-        ns_d64, ns_d64_wedge
+        "    D=64 full: {ns_d64:.1} ns (<600), wedge: {ns_d64_wedge:.1} ns (<250)"
     );
     if g1_pass && g2_pass && g3_pass && g4_abs_pass {
         println!("  → FULL GOAT PASS. PROMOTE geometric_product to default (Plan 319 Phase 3).");
@@ -775,8 +769,7 @@ fn main() {
             acc_ab_d64 * 100.0
         );
         println!(
-            "    AND G2 rotational recovery r={:.3}/{:.3} PASS.",
-            r_d8, r_d64
+            "    AND G2 rotational recovery r={r_d8:.3}/{r_d64:.3} PASS."
         );
         println!("    AND G4 absolute latency PASS (polynomial SiLU perf unblock). ");
         println!("  → FULL GOAT on non-redundancy criterion + perf unblock.");
@@ -785,8 +778,7 @@ fn main() {
     } else if g1_nonredundant && g2_pass && g3_pass {
         println!("  → G1 non-redundancy + G2 + G3 all PASS, but G4 absolute latency FAILS:");
         println!(
-            "    D=8 {:.1}ns (target<150), D=64 {:.1}ns (target<600).",
-            ns_d8, ns_d64
+            "    D=8 {ns_d8:.1}ns (target<150), D=64 {ns_d64:.1}ns (target<600)."
         );
         println!("  → Quality GOAT holds. Keep opt-in pending further perf work.");
     } else if g1_pass {

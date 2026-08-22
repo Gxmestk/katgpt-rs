@@ -202,12 +202,10 @@ impl<'a> StrategicPruner<'a> {
         let all_t = (1 << self.pruner.map.treasures.len()) - 1;
 
         if state.collected_treasures != all_t {
-            match target {
-                MultiFloorTarget::Goal => {}
-                _ => {
-                    let (f, r, c) = self.pruner.map.goal;
-                    blocked.entry(f).or_default().insert((r, c));
-                }
+            if let MultiFloorTarget::Goal = target {
+            } else {
+                let (f, r, c) = self.pruner.map.goal;
+                blocked.entry(f).or_default().insert((r, c));
             }
         }
         if state.inventory == 0 {

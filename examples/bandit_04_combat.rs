@@ -344,8 +344,7 @@ fn select_arm(
         BanditStrategy::ThompsonSampling => (0..combat_arms)
             .map(|i| (i, stats.thompson_sample(i, rng)))
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0),
+            .map_or(0, |(i, _)| i),
         BanditStrategy::VarianceEpsilon { epsilon: eps, .. } => {
             if rng.uniform() < *eps {
                 (rng.uniform() * combat_arms as f32) as usize % combat_arms
@@ -442,8 +441,7 @@ impl CombatTracker {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         MonsterAction::from_usize(best)
     }
 }
@@ -655,7 +653,7 @@ fn section2() {
     let checkpoints = COMBATS_STRATEGY_TEST / 50;
     for row in (0..=10).rev() {
         let threshold = row as f32 / 10.0;
-        print!("  {:3.1} ┤", threshold);
+        print!("  {threshold:3.1} ┤");
         for cp in 0..checkpoints {
             let mut best_char = ' ';
             for (si, (_, curve)) in all_curves.iter().enumerate() {
@@ -715,7 +713,7 @@ fn section3(all_stats: &[(PlayerType, BanditStats)]) {
         print!("  {:>12} │", action.label());
         for (_pt, stats) in all_stats {
             let q = stats.q_value(arm);
-            print!(" {:>10.3}", q);
+            print!(" {q:>10.3}");
         }
         // Show which player type this action is best against
         let best_vs: Vec<&str> = all_stats

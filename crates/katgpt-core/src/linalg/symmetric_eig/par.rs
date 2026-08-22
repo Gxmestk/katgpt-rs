@@ -66,8 +66,10 @@ pub fn symmetric_eig_par(
         .par_chunks_mut(n)
         .enumerate()
         .for_each(|(i, row)| {
-            for (j, slot) in row.iter_mut().enumerate().take(n) {
-                *slot = if i == j { 1.0 } else { 0.0 };
+            // memset the row + one diagonal store, instead of n branchy writes.
+            row.fill(0.0);
+            if i < row.len() {
+                row[i] = 1.0;
             }
         });
 
@@ -349,9 +351,12 @@ fn tqli_implicit_shift_par(
             if !rot_buf.is_empty() {
                 z.par_chunks_mut(n).for_each(|row| {
                     for &(c_r, s_r, i_r) in &rot_buf {
+                        // Load row[i_r] once (the original read it twice) —
+                        // identical arithmetic, one fewer bounds-checked load.
+                        let z_i = row[i_r];
                         let f_local = row[i_r + 1];
-                        row[i_r + 1] = s_r * row[i_r] + c_r * f_local;
-                        row[i_r] = c_r * row[i_r] - s_r * f_local;
+                        row[i_r + 1] = s_r * z_i + c_r * f_local;
+                        row[i_r] = c_r * z_i - s_r * f_local;
                     }
                 });
             }

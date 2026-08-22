@@ -125,8 +125,7 @@ fn greedy_path(marginals: &[Vec<f32>]) -> Vec<usize> {
             m.iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i)
-                .unwrap_or(0)
+                .map_or(0, |(i, _)| i)
         })
         .collect()
 }
@@ -336,8 +335,8 @@ fn bench_gram_width_sweep() {
     );
 
     // Summary: quality gain K=1 → K=20
-    let q_k1 = results.first().map(|r| r.avg_quality).unwrap_or(0.0);
-    let q_k20 = results.last().map(|r| r.avg_quality).unwrap_or(0.0);
+    let q_k1 = results.first().map_or(0.0, |r| r.avg_quality);
+    let q_k20 = results.last().map_or(0.0, |r| r.avg_quality);
     let gain_pct = if q_k1.abs() > 1e-9 {
         (q_k20 - q_k1) / q_k1 * 100.0
     } else {
@@ -365,8 +364,8 @@ fn bench_gram_depth_sweep() {
     );
 
     // Summary: quality gain T=1 → T=16
-    let q_t1 = results.first().map(|r| r.avg_quality).unwrap_or(0.0);
-    let q_t16 = results.last().map(|r| r.avg_quality).unwrap_or(0.0);
+    let q_t1 = results.first().map_or(0.0, |r| r.avg_quality);
+    let q_t16 = results.last().map_or(0.0, |r| r.avg_quality);
     let gain_pct = if q_t1.abs() > 1e-9 {
         (q_t16 - q_t1) / q_t1 * 100.0
     } else {
@@ -461,8 +460,8 @@ fn bench_gram_goat_verdict() {
     let depth_results = run_depth_sweep(&config, &marginals, FIXED_WIDTH, DEPTH_VALUES, N_TRIALS);
 
     // Compute quality deltas
-    let q_k1 = width_results.first().map(|r| r.avg_quality).unwrap_or(0.0);
-    let q_k20 = width_results.last().map(|r| r.avg_quality).unwrap_or(0.0);
+    let q_k1 = width_results.first().map_or(0.0, |r| r.avg_quality);
+    let q_k20 = width_results.last().map_or(0.0, |r| r.avg_quality);
     let width_gain_pct = if q_k1.abs() > 1e-9 {
         (q_k20 - q_k1) / q_k1 * 100.0
     } else {
@@ -472,9 +471,8 @@ fn bench_gram_goat_verdict() {
     let q_t4 = depth_results
         .iter()
         .find(|r| r.depth_t == 4)
-        .map(|r| r.avg_quality)
-        .unwrap_or(0.0);
-    let q_t16 = depth_results.last().map(|r| r.avg_quality).unwrap_or(0.0);
+        .map_or(0.0, |r| r.avg_quality);
+    let q_t16 = depth_results.last().map_or(0.0, |r| r.avg_quality);
     let depth_gain_t4_t16 = if q_t4.abs() > 1e-9 {
         (q_t16 - q_t4) / q_t4 * 100.0
     } else {

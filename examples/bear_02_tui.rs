@@ -466,7 +466,7 @@ fn draw_map(f: &mut Frame, area: Rect, app: &App) {
     let pruner = &app.pruner;
     let anim_pos = app.bear_anim_position();
 
-    let mut lines = Vec::new();
+    let mut lines = Vec::with_capacity(pruner.grid.len());
 
     for r in 0..pruner.grid.len() {
         let mut spans: Vec<Span> = Vec::new();
@@ -519,36 +519,33 @@ fn bear_render_state(
     r: usize,
     c: usize,
 ) -> (bool, bool) {
-    match anim_pos {
-        Some((anim_r, anim_c, _progress)) => {
-            // Determine which row the bear is on (round for hop effect)
-            let bear_row = anim_r.round() as usize;
-            if bear_row != r {
-                return (false, false);
-            }
-
-            // Determine horizontal position
-            let cell_idx = anim_c.floor() as usize;
-            let frac = anim_c - cell_idx as f32;
-
-            if cell_idx == c && frac < 0.35 {
-                // Bear is at this cell
-                (true, false)
-            } else if cell_idx == c && (0.35..0.65).contains(&frac) {
-                // Bear is in the gap after this cell
-                (false, true)
-            } else if cell_idx + 1 == c && frac >= 0.65 {
-                // Bear has arrived at next cell
-                (true, false)
-            } else {
-                (false, false)
-            }
+    if let Some((anim_r, anim_c, _progress)) = anim_pos {
+        // Determine which row the bear is on (round for hop effect)
+        let bear_row = anim_r.round() as usize;
+        if bear_row != r {
+            return (false, false);
         }
-        None => {
-            // Idle: bear at current state position
-            let here = state.r == r && state.c == c;
-            (here, false)
+
+        // Determine horizontal position
+        let cell_idx = anim_c.floor() as usize;
+        let frac = anim_c - cell_idx as f32;
+
+        if cell_idx == c && frac < 0.35 {
+            // Bear is at this cell
+            (true, false)
+        } else if cell_idx == c && (0.35..0.65).contains(&frac) {
+            // Bear is in the gap after this cell
+            (false, true)
+        } else if cell_idx + 1 == c && frac >= 0.65 {
+            // Bear has arrived at next cell
+            (true, false)
+        } else {
+            (false, false)
         }
+    } else {
+        // Idle: bear at current state position
+        let here = state.r == r && state.c == c;
+        (here, false)
     }
 }
 
@@ -762,7 +759,7 @@ fn draw_solution(f: &mut Frame, area: Rect, app: &App) {
         let next_cost = app.states[step_num].total_cost;
         let cost_delta = next_cost - prev_cost;
         let cost_info = if cost_delta > 0 {
-            format!(" (+{})", cost_delta)
+            format!(" (+{cost_delta})")
         } else {
             String::new()
         };

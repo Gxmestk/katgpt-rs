@@ -171,15 +171,11 @@ fn goat_rule_bandit_convergence() {
 
     assert!(
         rate_a > rate_b,
-        "rule_a ({:.2}) should beat rule_b ({:.2})",
-        rate_a,
-        rate_b
+        "rule_a ({rate_a:.2}) should beat rule_b ({rate_b:.2})"
     );
     assert!(
         rate_b > rate_c,
-        "rule_b ({:.2}) should beat rule_c ({:.2})",
-        rate_b,
-        rate_c
+        "rule_b ({rate_b:.2}) should beat rule_c ({rate_c:.2})"
     );
 
     // Best rule selection

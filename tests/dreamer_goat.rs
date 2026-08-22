@@ -45,27 +45,27 @@ const LEARNING_RATE: f32 = 0.1;
 
 /// Epsilon-greedy arm selection.
 fn select_arm(q_values: &[f32], epsilon: f32, rng: &mut Rng) -> usize {
-    match rng.uniform() < epsilon {
-        true => (rng.next() as usize) % q_values.len().max(1),
-        false => {
-            let mut best_idx = 0;
-            let mut best_q = q_values[0];
-            for (i, &q) in q_values.iter().enumerate().skip(1) {
-                if q > best_q {
-                    best_q = q;
-                    best_idx = i;
-                }
+    if rng.uniform() < epsilon {
+        (rng.next() as usize) % q_values.len().max(1)
+    } else {
+        let mut best_idx = 0;
+        let mut best_q = q_values[0];
+        for (i, &q) in q_values.iter().enumerate().skip(1) {
+            if q > best_q {
+                best_q = q;
+                best_idx = i;
             }
-            best_idx
         }
+        best_idx
     }
 }
 
 /// Find the best Q-value in a slice.
 fn best_q(q_values: &[f32]) -> f32 {
-    match q_values.is_empty() {
-        true => 0.0,
-        false => q_values.iter().copied().fold(f32::NEG_INFINITY, f32::max),
+    if q_values.is_empty() {
+        0.0
+    } else {
+        q_values.iter().copied().fold(f32::NEG_INFINITY, f32::max)
     }
 }
 
@@ -74,10 +74,7 @@ fn best_q(q_values: &[f32]) -> f32 {
 /// Simulate a Bernoulli reward for a given arm using REWARD_PROBS.
 fn arm_reward(arm: usize, rng: &mut Rng) -> f32 {
     let prob = REWARD_PROBS[arm % ACTION_COUNT];
-    match rng.uniform() < prob {
-        true => 1.0,
-        false => 0.0,
-    }
+    if rng.uniform() < prob { 1.0 } else { 0.0 }
 }
 
 // ── Go-Scale Helpers (Proofs 3–5) ────────────────────────────
@@ -98,10 +95,7 @@ fn position_reward_rate(pos: usize) -> f32 {
 /// Bernoulli reward for a board position.
 fn bernoulli_reward(pos: usize, rng: &mut Rng) -> f32 {
     let prob = position_reward_rate(pos);
-    match rng.uniform() < prob {
-        true => 1.0,
-        false => 0.0,
-    }
+    if rng.uniform() < prob { 1.0 } else { 0.0 }
 }
 
 /// Find indices of top-N Q-values.
@@ -331,9 +325,10 @@ fn proof_1_dreamer_reduces_arm_count() {
 
             // Verify best Q preserved (within 10%)
             let best_after = best_q(&q_b);
-            let preservation = match best_before.abs() > f32::EPSILON {
-                true => (best_after - best_before).abs() / best_before.abs(),
-                false => 0.0,
+            let preservation = if best_before.abs() > f32::EPSILON {
+                (best_after - best_before).abs() / best_before.abs()
+            } else {
+                0.0
             };
             assert!(
                 preservation < 0.5,
@@ -346,13 +341,15 @@ fn proof_1_dreamer_reduces_arm_count() {
     let arms_b = q_b.len();
     let best_q_a = best_q(&q_a);
     let best_q_b = best_q(&q_b);
-    let q_ratio = match best_q_a.abs() > f32::EPSILON {
-        true => best_q_b / best_q_a,
-        false => 1.0,
+    let q_ratio = if best_q_a.abs() > f32::EPSILON {
+        best_q_b / best_q_a
+    } else {
+        1.0
     };
-    let reward_ratio = match cumulative_reward_a.abs() > f32::EPSILON {
-        true => cumulative_reward_b / cumulative_reward_a,
-        false => 1.0,
+    let reward_ratio = if cumulative_reward_a.abs() > f32::EPSILON {
+        cumulative_reward_b / cumulative_reward_a
+    } else {
+        1.0
     };
 
     // Assert B arm count ≤ 50% of A (or same — consolidation may not always remove)
@@ -489,9 +486,10 @@ fn proof_2_consolidation_compacts_preserving_quality() {
             }
 
             // Verify best Q preserved within 30% (decay can shift values significantly)
-            let q_preserved = match best_before.abs() > f32::EPSILON {
-                true => (best_after - best_before).abs() / best_before.abs() < 0.30,
-                false => true,
+            let q_preserved = if best_before.abs() > f32::EPSILON {
+                (best_after - best_before).abs() / best_before.abs() < 0.30
+            } else {
+                true
             };
             assert!(
                 q_preserved,
@@ -505,9 +503,10 @@ fn proof_2_consolidation_compacts_preserving_quality() {
 
     let initial_arms = arms_history[0];
     let final_arms = *arms_history.last().unwrap_or(&initial_arms);
-    let reduction_pct = match initial_arms > 0 {
-        true => (1.0 - (final_arms as f32 / initial_arms as f32)) * 100.0,
-        false => 0.0,
+    let reduction_pct = if initial_arms > 0 {
+        (1.0 - (final_arms as f32 / initial_arms as f32)) * 100.0
+    } else {
+        0.0
     };
     let initial_best = best_q_history[0];
     let final_best = *best_q_history.last().unwrap_or(&initial_best);
@@ -589,13 +588,15 @@ fn proof_3_dreamer_compacts_go_action_space() {
     let arms_b = state_b.len();
     let best_q_a = best_q(&state_a.q_values);
     let best_q_b = best_q(&state_b.q_values);
-    let q_ratio = match best_q_a.abs() > f32::EPSILON {
-        true => best_q_b / best_q_a,
-        false => 1.0,
+    let q_ratio = if best_q_a.abs() > f32::EPSILON {
+        best_q_b / best_q_a
+    } else {
+        1.0
     };
-    let reward_ratio = match cumulative_reward_a.abs() > f32::EPSILON {
-        true => cumulative_reward_b / cumulative_reward_a,
-        false => 1.0,
+    let reward_ratio = if cumulative_reward_a.abs() > f32::EPSILON {
+        cumulative_reward_b / cumulative_reward_a
+    } else {
+        1.0
     };
     let arm_ratio = arms_b as f32 / arms_a as f32;
     let q_competitive = q_ratio >= 0.5;

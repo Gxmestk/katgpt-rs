@@ -551,8 +551,7 @@ pub fn feature_expand_higher_order<B: KarcBasis<M>, const M: usize, const R: usi
             debug_assert_eq!(idx, d_h_1 * (d_h_1 + 1) / 2, "pair buffer size mismatch");
         }
         _ => panic!(
-            "feature_expand_higher_order: R={} not implemented (only R ∈ {{1,2}})",
-            R
+            "feature_expand_higher_order: R={R} not implemented (only R ∈ {{1,2}})"
         ),
     }
 }
@@ -582,26 +581,28 @@ where
     I: Iterator<Item = &'a [f32]>,
 {
     debug_assert!(out_gram.len() >= d_h * d_h, "gram buffer too small");
-    // Zero the active region.
-    for g in out_gram.iter_mut().take(d_h * d_h) {
-        *g = 0.0;
-    }
+    // Zero the active region (single memset instead of an element loop).
+    out_gram[..d_h * d_h].fill(0.0);
     // Accumulate h_i · h_iᵀ for each row (f64, chunk-4 unrolled inner loop).
     for row in features_iter {
         debug_assert_eq!(row.len(), d_h, "feature row length mismatch");
+        // Slice the row to exactly d_h once — the inner loop then carries no
+        // bounds checks (same FP operations, same order).
+        let row = &row[..d_h];
         for i in 0..d_h {
             let row_i = row[i] as f64;
             let gram_i = i * d_h;
+            let g_row = &mut out_gram[gram_i..gram_i + d_h];
             let mut j = 0;
             while j + 4 <= d_h {
-                out_gram[gram_i + j] += row_i * row[j] as f64;
-                out_gram[gram_i + j + 1] += row_i * row[j + 1] as f64;
-                out_gram[gram_i + j + 2] += row_i * row[j + 2] as f64;
-                out_gram[gram_i + j + 3] += row_i * row[j + 3] as f64;
+                g_row[j] += row_i * row[j] as f64;
+                g_row[j + 1] += row_i * row[j + 1] as f64;
+                g_row[j + 2] += row_i * row[j + 2] as f64;
+                g_row[j + 3] += row_i * row[j + 3] as f64;
                 j += 4;
             }
             while j < d_h {
-                out_gram[gram_i + j] += row_i * row[j] as f64;
+                g_row[j] += row_i * row[j] as f64;
                 j += 1;
             }
         }
@@ -633,16 +634,19 @@ fn accumulate_gram_upper_triangle(gram: &mut [f64], features_buf: &[f32], d_h: u
         let row = &features_buf[row_idx * d_h..(row_idx + 1) * d_h];
         for i in 0..d_h {
             let ri = row[i] as f64;
+            // Slice the Gram row once — the inner loop keeps the identical FP
+            // operation sequence but drops the per-element bounds checks.
+            let g_row = &mut gram[i * d_h..i * d_h + d_h];
             let mut j = i;
             while j + 4 <= d_h {
-                gram[i * d_h + j] += ri * row[j] as f64;
-                gram[i * d_h + j + 1] += ri * row[j + 1] as f64;
-                gram[i * d_h + j + 2] += ri * row[j + 2] as f64;
-                gram[i * d_h + j + 3] += ri * row[j + 3] as f64;
+                g_row[j] += ri * row[j] as f64;
+                g_row[j + 1] += ri * row[j + 1] as f64;
+                g_row[j + 2] += ri * row[j + 2] as f64;
+                g_row[j + 3] += ri * row[j + 3] as f64;
                 j += 4;
             }
             while j < d_h {
-                gram[i * d_h + j] += ri * row[j] as f64;
+                g_row[j] += ri * row[j] as f64;
                 j += 1;
             }
         }
@@ -1086,9 +1090,7 @@ pub fn low_rank_fit(
     assert!(r > 0, "low_rank_fit: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(lambda > 0.0, "low_rank_fit: lambda must be > 0");
     assert!(a_out.len() >= d_out * r, "a_out too small");
@@ -1608,9 +1610,7 @@ pub fn low_rank_fit_warm_start(
     assert!(r > 0, "low_rank_fit_warm_start: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit_warm_start: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit_warm_start: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(lambda > 0.0, "low_rank_fit_warm_start: lambda must be > 0");
     assert!(a_out.len() >= d_out * r, "a_out too small");
@@ -1695,9 +1695,7 @@ pub fn low_rank_fit_b_with_frozen_a(
     assert!(r > 0, "low_rank_fit_b_with_frozen_a: r must be > 0");
     assert!(
         r <= d_h,
-        "low_rank_fit_b_with_frozen_a: r must be <= d_h (got r={}, d_h={})",
-        r,
-        d_h
+        "low_rank_fit_b_with_frozen_a: r must be <= d_h (got r={r}, d_h={d_h})"
     );
     assert!(
         lambda > 0.0,

@@ -113,15 +113,11 @@ fn bench_reconciliation_latency_vs_duration() {
         };
         let status = if pass { "PASS" } else { "FAIL" };
 
-        println!(
-            "│ {:<10} │ {:>7} │ {:>10.1} │ {:>10.1} │ {:>9} │",
-            label, n, p50, p99, status,
-        );
+        println!("│ {label:<10} │ {n:>7} │ {p50:>10.1} │ {p99:>10.1} │ {status:>9} │",);
 
         assert!(
             pass,
-            "P50 latency {:.1} µs exceeds threshold for duration {} ({} points)",
-            p50, label, n,
+            "P50 latency {p50:.1} µs exceeds threshold for duration {label} ({n} points)",
         );
     }
 
@@ -160,7 +156,7 @@ fn bench_reconciliation_k_sweep() {
         let p50 = percentile(&latencies, 50.0);
         let p99 = percentile(&latencies, 99.0);
 
-        println!("│ {:<6} │ {:>9} │ {:>10.1} │ {:>10.1} │", k, k, p50, p99);
+        println!("│ {k:<6} │ {k:>9} │ {p50:>10.1} │ {p99:>10.1} │");
     }
 
     println!("└────────┴───────────┴────────────┴────────────┘");

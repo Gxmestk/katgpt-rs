@@ -281,7 +281,7 @@ fn main() {
         "   Avg regret:   {:.3}",
         cumulative_regret / EPISODES as f32
     );
-    println!("   Compressed:   {:?}", compressed);
+    println!("   Compressed:   {compressed:?}");
     println!();
 
     // ── Reload Timeline ─────────────────────────────────────────

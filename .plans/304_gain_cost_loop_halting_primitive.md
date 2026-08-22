@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-22
 **Research:** [katgpt-rs/.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md](../.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md)
-**Private guide:** [riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md](../../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
+**Private guide:** [riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md](../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
 **Source paper:** [arxiv 2606.18023](https://arxiv.org/abs/2606.18023) — LoopCoder-v2 (Yang et al., 2026)
 **Target:** `crates/katgpt-core/src/gain_cost_halt.rs` (new module) + Cargo feature `gain_cost_halt`
 **Status:** COMPLETE ✅ — GOAT G1-G5 all PASS (G1 mechanics, G2 76.7% crowd savings, G3 no-regression, G4 oscillation detection, G5 feature isolation). 27/27 kernel + 28/28 forward_looped integration tests. Real-world validation deferred to riir-ai Plan 330. Phase 2.5 (TF-Loop wiring) deferred — different semantics. See `.benchmarks/304_gain_cost_halt_goat.md`.

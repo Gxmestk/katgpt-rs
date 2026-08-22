@@ -111,10 +111,7 @@ fn bench_t6_1() {
             });
 
             let ratio_pct = 100.0 * classify_us / fwd_us;
-            println!(
-                "{:>6} {:>4} {:>14.3} {:>14.3} {:>9.2}%",
-                d, k, classify_us, fwd_us, ratio_pct
-            );
+            println!("{d:>6} {k:>4} {classify_us:>14.3} {fwd_us:>14.3} {ratio_pct:>9.2}%");
         }
         println!();
     }
@@ -221,10 +218,7 @@ fn bench_t6_3() {
 
         // Overhead = (regularized − raw) / raw. Report the worst of the two modes.
         let overhead_pct = 100.0 * (rmsnorm_us.max(pinch_us) - raw_us) / raw_us;
-        println!(
-            "{:>6} {:>16.3} {:>16.3} {:>16.3} {:>9.2}%",
-            d, raw_us, rmsnorm_us, pinch_us, overhead_pct
-        );
+        println!("{d:>6} {raw_us:>16.3} {rmsnorm_us:>16.3} {pinch_us:>16.3} {overhead_pct:>9.2}%");
     }
 
     println!();

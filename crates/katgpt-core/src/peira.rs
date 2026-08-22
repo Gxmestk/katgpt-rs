@@ -41,7 +41,7 @@ fn simd_outer_product_ema_f64(
     {
         let _ = (s_scratch, t_scratch); // unused in NEON path
         unsafe {
-            neon_outer_product_ema_f64(dst_sigma, dst_n, student, teacher, k, alpha, first_step)
+            neon_outer_product_ema_f64(dst_sigma, dst_n, student, teacher, k, alpha, first_step);
         }
     }
     #[cfg(target_arch = "x86_64")]
@@ -49,19 +49,21 @@ fn simd_outer_product_ema_f64(
         if crate::simd::simd_level() == crate::simd::SimdLevel::Avx2 {
             let _ = (s_scratch, t_scratch); // unused in AVX2 path
             unsafe {
-                avx2_outer_product_ema_f64(dst_sigma, dst_n, student, teacher, k, alpha, first_step)
+                avx2_outer_product_ema_f64(
+                    dst_sigma, dst_n, student, teacher, k, alpha, first_step,
+                );
             }
         } else {
             scalar_outer_product_ema_f64(
                 dst_sigma, dst_n, student, teacher, k, alpha, first_step, s_scratch, t_scratch,
-            )
+            );
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
         scalar_outer_product_ema_f64(
             dst_sigma, dst_n, student, teacher, k, alpha, first_step, s_scratch, t_scratch,
-        )
+        );
     }
 }
 
@@ -91,12 +93,12 @@ fn simd_outer_product_f64(
             let _ = (s_scratch, t_scratch); // unused in AVX2 path
             unsafe { avx2_outer_product_f64(dst_sigma, dst_n, student, teacher, k) }
         } else {
-            scalar_outer_product_f64(dst_sigma, dst_n, student, teacher, k, s_scratch, t_scratch)
+            scalar_outer_product_f64(dst_sigma, dst_n, student, teacher, k, s_scratch, t_scratch);
         }
     }
     #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
-        scalar_outer_product_f64(dst_sigma, dst_n, student, teacher, k, s_scratch, t_scratch)
+        scalar_outer_product_f64(dst_sigma, dst_n, student, teacher, k, s_scratch, t_scratch);
     }
 }
 

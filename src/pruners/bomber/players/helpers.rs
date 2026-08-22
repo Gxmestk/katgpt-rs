@@ -5,8 +5,6 @@
 //! zone checks, escape route search, policy-based action scoring, and LoRA
 //! inference helpers.
 
-use std::collections::VecDeque;
-
 use super::{
     ArenaGrid, BOMB_FUSE_TICKS, BomberAction, DEFAULT_BLAST_RANGE, GameEvent, GridPos, KnownBomb,
     KnownOpponent,
@@ -112,12 +110,9 @@ pub(crate) fn is_in_single_blast(
             let step = dx.signum();
             let mut x = bx + step;
             while x != pos.x {
-                match grid.get(x, by) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) = grid.get(x, by) {
                         return false;
                     }
-                    _ => {}
-                }
                 x += step;
             }
             return true;
@@ -131,12 +126,9 @@ pub(crate) fn is_in_single_blast(
             let step = dy.signum();
             let mut y = by + step;
             while y != pos.y {
-                match grid.get(bx, y) {
-                    Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) => {
+                if let Cell::FixedWall | Cell::DestructibleWall | Cell::PowerUpHidden(_) = grid.get(bx, y) {
                         return false;
                     }
-                    _ => {}
-                }
                 y += step;
             }
             return true;
@@ -323,7 +315,13 @@ pub(crate) fn has_escape_route(
     // Fixed-size visited bitmap for the 13×13 arena — replaces HashSet allocation
     // (this runs per is_safe_action(Bomb) per tick per player).
     let mut visited = [false; ARENA_W * ARENA_H];
-    let mut queue: VecDeque<((i32, i32), i32)> = VecDeque::new();
+    // Fixed-capacity FIFO replaces the heap `VecDeque`. Every cell is marked
+    // before being pushed, so at most `ARENA_W * ARENA_H` in-bounds cells enter
+    // the queue, plus the seed cell (which may be out of bounds and therefore
+    // unmarkable) — hence the `+ 1`. Pop order is identical to `pop_front`.
+    let mut queue = [((0i32, 0i32), 0i32); ARENA_W * ARENA_H + 1];
+    let mut head = 0usize;
+    let mut tail = 0usize;
 
     // Inline bomb-entity blocking check: linear scan over existing bombs +
     // the new bomb position. Avoids allocating a HashSet and a Vec<KnownBomb>.
@@ -334,10 +332,14 @@ pub(crate) fn has_escape_route(
         existing_bombs.iter().any(|(p, _, _)| p.0 == x && p.1 == y)
     };
 
-    // Stack-allocated combined bomb list for blast-zone checks.
-    // BOMB_FUSE_TICKS worth of capacity is plenty (existing + 1 new).
-    let mut all_bombs: Vec<KnownBomb> = existing_bombs.to_vec();
-    all_bombs.push((new_bomb_pos, blast_range, BOMB_FUSE_TICKS));
+    // Blast-zone test against `existing_bombs` followed by the hypothetical new
+    // bomb. This is exactly what the old `all_bombs = existing_bombs.to_vec() +
+    // push(new)` list produced (same bombs, same short-circuit order) minus the
+    // per-call `Vec` allocation — this function runs up to 8× per tick per player.
+    let in_any_blast = |p: GridPos| {
+        in_blast_zone(p, grid, existing_bombs)
+            || is_in_single_blast(p, grid, new_bomb_pos, blast_range)
+    };
 
     let mark = |visited: &mut [bool; ARENA_W * ARENA_H], x: i32, y: i32| {
         if x >= 0 && (x as usize) < ARENA_W && y >= 0 && (y as usize) < ARENA_H {
@@ -352,16 +354,19 @@ pub(crate) fn has_escape_route(
         }
     };
 
-    queue.push_back(((player_pos.x, player_pos.y), 0));
+    queue[tail] = ((player_pos.x, player_pos.y), 0);
+    tail += 1;
     mark(&mut visited, player_pos.x, player_pos.y);
 
-    while let Some(((cx, cy), steps)) = queue.pop_front() {
+    while head < tail {
+        let ((cx, cy), steps) = queue[head];
+        head += 1;
         if steps > max_steps {
             continue;
         }
 
         // Is this cell safe from ALL bombs (with wall blocking)?
-        if !in_blast_zone(GridPos { x: cx, y: cy }, grid, &all_bombs) {
+        if !in_any_blast(GridPos { x: cx, y: cy }) {
             return true;
         }
 
@@ -374,7 +379,8 @@ pub(crate) fn has_escape_route(
             // HashSet::insert semantics (unwalkable cells still get marked).
             mark(&mut visited, nx, ny);
             if grid.is_walkable(nx, ny) && !is_blocked(nx, ny) {
-                queue.push_back(((nx, ny), steps + 1));
+                queue[tail] = ((nx, ny), steps + 1);
+                tail += 1;
             }
         }
     }
@@ -479,16 +485,28 @@ pub(crate) fn is_reverse(action: BomberAction, prev: Option<BomberAction>) -> bo
 
 /// Count destructible walls within manhattan range.
 pub(crate) fn wall_density(grid: &ArenaGrid, pos: GridPos, range: i32) -> i32 {
+    // Out-of-bounds reads return `FixedWall` from `ArenaGrid::get`, which never
+    // counts, so clamping the window to the grid is equivalent to the previous
+    // `grid.get` calls — but it lifts the row lookup out of the inner loop and
+    // drops one bounds check plus one pointer hop per cell. `score_action` runs
+    // this twice per move action, i.e. ~8×48 cells per tick per player.
+    let y0 = (pos.y - range).max(0);
+    let y1 = (pos.y + range).min(grid.height as i32 - 1);
+    let x0 = (pos.x - range).max(0);
+    let x1 = (pos.x + range).min(grid.width as i32 - 1);
+    if y0 > y1 || x0 > x1 {
+        return 0;
+    }
+
     let mut count = 0;
-    for dy in -range..=range {
-        for dx in -range..=range {
-            if dx == 0 && dy == 0 {
+    for y in y0..=y1 {
+        let row = &grid.cells[y as usize][x0 as usize..=x1 as usize];
+        let skip_center = y == pos.y;
+        for (i, cell) in row.iter().enumerate() {
+            if skip_center && x0 + i as i32 == pos.x {
                 continue;
             }
-            match grid.get(pos.x + dx, pos.y + dy) {
-                Cell::DestructibleWall | Cell::PowerUpHidden(_) => count += 1,
-                _ => {}
-            }
+            if let Cell::DestructibleWall | Cell::PowerUpHidden(_) = cell { count += 1 }
         }
     }
     count
@@ -521,7 +539,12 @@ pub(crate) fn escape_distance(
     // Fixed-size visited bitmap for the 13×13 arena — avoids HashSet allocation
     // and hashing overhead on every BFS call (this runs per action per tick).
     let mut visited = [false; ARENA_W * ARENA_H];
-    let mut queue: VecDeque<((i32, i32), i32)> = VecDeque::new();
+    // Fixed-capacity FIFO replaces the heap `VecDeque` (see `has_escape_route`):
+    // cells are marked before being pushed, so the queue is bounded by the grid
+    // size plus the (possibly out-of-bounds, hence unmarkable) seed cell.
+    let mut queue = [((0i32, 0i32), 0i32); ARENA_W * ARENA_H + 1];
+    let mut head = 0usize;
+    let mut tail = 0usize;
 
     let mark = |visited: &mut [bool; ARENA_W * ARENA_H], x: i32, y: i32| {
         if x >= 0 && (x as usize) < ARENA_W && y >= 0 && (y as usize) < ARENA_H {
@@ -536,10 +559,13 @@ pub(crate) fn escape_distance(
         }
     };
 
-    queue.push_back(((pos.x, pos.y), 0));
+    queue[tail] = ((pos.x, pos.y), 0);
+    tail += 1;
     mark(&mut visited, pos.x, pos.y);
 
-    while let Some(((cx, cy), dist)) = queue.pop_front() {
+    while head < tail {
+        let ((cx, cy), dist) = queue[head];
+        head += 1;
         for (nx, ny) in [(cx, cy - 1), (cx, cy + 1), (cx - 1, cy), (cx + 1, cy)] {
             if is_visited(&visited, nx, ny) {
                 continue;
@@ -556,7 +582,8 @@ pub(crate) fn escape_distance(
             if !in_blast_zone(GridPos { x: nx, y: ny }, grid, bombs) {
                 return Some(next_dist);
             }
-            queue.push_back(((nx, ny), next_dist));
+            queue[tail] = ((nx, ny), next_dist);
+            tail += 1;
         }
     }
 
@@ -618,16 +645,20 @@ pub(crate) fn score_action(
 
             // Collect: move toward nearby revealed power-ups (high priority)
             if !powerups.is_empty() {
-                let current_min = powerups
-                    .iter()
-                    .map(|&(px, py)| (pos.x - px).abs() + (pos.y - py).abs())
-                    .min()
-                    .unwrap_or(i32::MAX);
-                let target_min = powerups
-                    .iter()
-                    .map(|&(px, py)| (target.x - px).abs() + (target.y - py).abs())
-                    .min()
-                    .unwrap_or(i32::MAX);
+                // Single pass over `powerups` for both minima (min is
+                // order-independent, so the results are identical).
+                let mut current_min = i32::MAX;
+                let mut target_min = i32::MAX;
+                for &(px, py) in powerups {
+                    let c = (pos.x - px).abs() + (pos.y - py).abs();
+                    if c < current_min {
+                        current_min = c;
+                    }
+                    let t = (target.x - px).abs() + (target.y - py).abs();
+                    if t < target_min {
+                        target_min = t;
+                    }
+                }
                 if target_min == 0 {
                     score += 3.0; // Standing on power-up — instant collect
                 } else if target_min < current_min {

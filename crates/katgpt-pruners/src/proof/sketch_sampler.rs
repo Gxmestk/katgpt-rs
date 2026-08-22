@@ -203,12 +203,12 @@ impl SketchSampler {
     ///
     /// Returns `None` if population is empty.
     pub fn sample(&self, rng: &mut Rng) -> Option<&SketchEntry> {
-        match self.population.is_empty() {
-            true => None,
-            false => match should_use_population() {
-                true => self.sample_p_ucb(rng),
-                false => self.sample_fallback_ucb(rng),
-            },
+        if self.population.is_empty() {
+            None
+        } else if should_use_population() {
+            self.sample_p_ucb(rng)
+        } else {
+            self.sample_fallback_ucb(rng)
         }
     }
 
@@ -217,17 +217,17 @@ impl SketchSampler {
     /// Same as [`sample`](Self::sample) but returns a mutable reference
     /// for visit tracking.
     pub fn sample_mut(&mut self, rng: &mut Rng) -> Option<&mut SketchEntry> {
-        match self.population.is_empty() {
-            true => None,
-            false => {
-                let id = match should_use_population() {
-                    true => self.pick_p_ucb_id(rng),
-                    false => self.pick_fallback_id(rng),
-                };
-                match id {
-                    Some(id) => self.population.get_mut(&id),
-                    None => None,
-                }
+        if self.population.is_empty() {
+            None
+        } else {
+            let id = if should_use_population() {
+                self.pick_p_ucb_id(rng)
+            } else {
+                self.pick_fallback_id(rng)
+            };
+            match id {
+                Some(id) => self.population.get_mut(&id),
+                None => None,
             }
         }
     }
@@ -246,34 +246,33 @@ impl SketchSampler {
     pub fn sample_p_ucb(&self, rng: &mut Rng) -> Option<&SketchEntry> {
         // Prefer unvisited entries; fall back to all if none unvisited
         let eligible = self.population.sample_eligible(MIN_SAMPLE_VISITS);
-        let candidates: Vec<&SketchEntry> = match eligible.is_empty() {
-            true => self.population.sorted_by_elo(),
-            false => eligible,
+        let candidates: Vec<&SketchEntry> = if eligible.is_empty() {
+            self.population.sorted_by_elo()
+        } else {
+            eligible
         };
 
-        match candidates.is_empty() {
-            true => None,
-            false => {
-                let total = self.population.total_visits();
-                let (elo_min, elo_max) = match self.population.elo_range() {
-                    Some(range) => range,
-                    None => return candidates.first().copied(),
-                };
+        if candidates.is_empty() {
+            None
+        } else {
+            let total = self.population.total_visits();
+            let (elo_min, elo_max) = match self.population.elo_range() {
+                Some(range) => range,
+                None => return candidates.first().copied(),
+            };
 
-                let best = candidates.iter().max_by(|a, b| {
-                    let score_a = a.p_ucb_score(total, elo_min, elo_max, self.config.c);
-                    let score_b = b.p_ucb_score(total, elo_min, elo_max, self.config.c);
-                    score_a.total_cmp(&score_b)
-                });
+            let best = candidates.iter().max_by(|a, b| {
+                let score_a = a.p_ucb_score(total, elo_min, elo_max, self.config.c);
+                let score_b = b.p_ucb_score(total, elo_min, elo_max, self.config.c);
+                score_a.total_cmp(&score_b)
+            });
 
-                match best {
-                    Some(entry) => Some(*entry),
-                    None => {
-                        // Tiebreak: random selection from candidates
-                        let idx = rng.usize(0..candidates.len());
-                        Some(candidates[idx])
-                    }
-                }
+            if let Some(entry) = best {
+                Some(*entry)
+            } else {
+                // Tiebreak: random selection from candidates
+                let idx = rng.usize(0..candidates.len());
+                Some(candidates[idx])
             }
         }
     }
@@ -292,14 +291,14 @@ impl SketchSampler {
     ///
     /// Returns `None` if population is empty.
     pub fn sample_epsilon_greedy(&self, rng: &mut Rng) -> Option<&SketchEntry> {
-        match self.population.is_empty() {
-            true => None,
-            false => {
-                let roll = rng.f64();
-                match roll < self.config.epsilon {
-                    true => self.sample_random(rng),
-                    false => self.sample_best_elo(),
-                }
+        if self.population.is_empty() {
+            None
+        } else {
+            let roll = rng.f64();
+            if roll < self.config.epsilon {
+                self.sample_random(rng)
+            } else {
+                self.sample_best_elo()
             }
         }
     }

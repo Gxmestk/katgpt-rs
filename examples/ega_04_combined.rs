@@ -172,7 +172,7 @@ fn main() {
 
     // Use the first query row for all single-query comparisons
     let query_attn = &baseline_attn[0..SEQ_LEN];
-    println!("  Baseline attn (query 0): {:?}", query_attn);
+    println!("  Baseline attn (query 0): {query_attn:?}");
     println!();
 
     // ── Phase 2: Baseline (No Enhancement) ────────────────────
@@ -320,13 +320,7 @@ fn main() {
     println!("║  SdpaOutputGate applies learned sigmoid to attention out.   ║");
     println!("║  Combined pipeline applies all three in sequence.           ║");
     println!("║                                                             ║");
-    println!(
-        "║  Best L2:  combined = {:.4}                            ║",
-        combined_l2
-    );
-    println!(
-        "║  Worst L2: baseline = {:.4}                            ║",
-        baseline_l2
-    );
+    println!("║  Best L2:  combined = {combined_l2:.4}                            ║");
+    println!("║  Worst L2: baseline = {baseline_l2:.4}                            ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
 }

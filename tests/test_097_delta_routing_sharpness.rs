@@ -108,10 +108,7 @@ fn test_routing_sharpness_increases_with_depth() {
         );
     }
 
-    println!(
-        "✅ Routing sharpness sustains ≥ 0.4 across n_layer={:?}",
-        layer_counts
-    );
+    println!("✅ Routing sharpness sustains ≥ 0.4 across n_layer={layer_counts:?}");
 }
 
 #[test]

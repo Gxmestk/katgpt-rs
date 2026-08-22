@@ -57,7 +57,7 @@ pub fn speculative_step_rollback_paged(
 
     if paths.is_empty() {
         let fallback = sample_from_distribution(
-            marginals.first().map(|m| m.as_slice()).unwrap_or(&[1.0]),
+            marginals.first().map_or(&[1.0], |m| m.as_slice()),
             rng,
         );
         return (vec![fallback], 1);
@@ -126,6 +126,9 @@ pub fn speculative_step_rollback_paged(
         softmax_scaled(&mut p_dist, 1.0 / target_config.temperature);
 
         for (i, &draft_tok) in path.iter().enumerate() {
+            // Array-literal default in a plain-let position: the map_or form
+            // E0308s (expected `&[_; 0]`, found `&[f32]`) — the healer's
+            // array-literal guard is load-bearing here (probed 2026-08-18).
             let q_dist = marginals.get(i).map(|m| m.as_slice()).unwrap_or(&[]);
             let q_i = q_dist.get(draft_tok).copied().unwrap_or(0.0);
             let p_i = p_dist.get(draft_tok).copied().unwrap_or(0.0);

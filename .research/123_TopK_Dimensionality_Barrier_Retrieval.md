@@ -4,6 +4,8 @@
 **Raw:** `.raw/TopK/`
 **Updated:** 2026-05-27 (deep analysis from raw experimental data)
 
+> **Complement (worst-case direction):** Weller et al. [arXiv:2508.21038 "On the Theoretical Limitations of Embedding-Based Retrieval"] (ICLR 2026) — distilled in **Research 472**. This note proves the *positive, k-sparse-conditional* bound `d = Θ(k log n)`; 2508.21038 proves the *negative, worst-case* bound `d ≥ ln C(n,k)/ln(1+1/γ)`, i.e. for any fixed `d` there exist relevance structures no single-vector index can realize. It also supplies the LIMIT adversarial construction protocol and shows lexical/multi-vector/rerank escapes. **The Theoretical Sufficiency Check table below omits every default-on 8-D index** (`ShardIndex` `hla_moments`, `ItemEmbedIndex`, `riir-rag` `LatentQuery`) — tracked in Issue 579; `ItemEmbedIndex` at `d=8`, `n=25,943`, `k=5` is **2.4× under** the worst-case bound.
+
 ## Summary
 
 Proves that near-optimal retrieval margin is achievable in dimension d = O(k log n), where k = query sparsity and n = corpus size. Connects retrieval margin quality to compressed sensing (RIP) and shows sigmoid loss dramatically outperforms InfoNCE for margin.
@@ -122,6 +124,32 @@ Given our actual system parameters:
 | RtTurbo | 16 | ~4 | ~128K | 4×11.8 = 47 | ⚠️ Under bound, but k=4 is generous |
 | EmbeddingRouter | 64 | ~2 | ~1M | 2×13.8 = 28 | ✅ Comfortable |
 | GoStyleEncoder | 32 | ~4 | ~100 | 4×4.6 = 18 | ✅ Well over bound |
+
+### Sufficiency Check — the default-on 8-D indexes (added 2026-08-10, Issue 579 T1)
+
+The table above omitted every **8-dimensional** index in the stack, which are the most exposed and all
+default-on. Audited here against both bounds — this note's positive `Θ(k log n)` and Research 472's
+worst-case Theorem 1 (γ=0.1, via `dim_capacity_required` / `dim_capacity_ceiling`):
+
+| Component | d | k | n | `Θ(k log n)` (1.5·k·ln n) | Thm 1 required d | Thm 1 ceiling on n | Verdict |
+|---|---|---|---|---|---|---|---|
+| `ShardIndex.hla_moments` | 8 | ~2 | ~1K zones | 21 | 6 | 20,706 | ⚠️ under positive bound; worst-case OK |
+| `ShardIndex` (k-NN heal) | 8 | 8 | ~1K | 83 | 19 | 44 | ❌ **23× past worst-case ceiling** |
+| `ItemEmbedIndex` | 8 | 5 | **25,943** | 77 | **20** | **122** | ❌ **213× past ceiling**, 2.4× under on d |
+| `riir-rag` `LatentQuery` | 8 | 16 | ~1K chunks | 166 | 34 | 30 | ❌ **33× past ceiling** |
+| `ExperienceGraph.task_embedding` | 8 | 8 | 1K (bench) | 83 | 19 | 44 | ❌ **23× past ceiling** |
+
+**The k-free statement** (Research 472 §2.2b, `dim_capacity_floor`): the ceiling is U-shaped in `k`, and
+its minimum over all `k` is `≈ d·log₂(1+1/γ)` — **30 documents at d=8**. So no choice of `k` rescues an
+8-D index above ~30 docs in the worst case; every row above is past it.
+
+**Read this as headroom, not breakage.** Every one of those components has a passing GOAT gate, because
+the *realized* relevance structures are benign (schema-centroid clustering, near-linear lineage chains).
+Theorem 1 is worst-case over relevance structures and cannot say a priori which ones fail. The finding is
+that there is no margin left for relevance notions that get more combinatorial — and that the two bounds
+disagree in an informative way here: the positive `Θ(k log n)` bound flags `ShardIndex` k=2 as
+under-provisioned where the worst-case bound says it is fine, while for larger `k` the worst-case bound is
+far more damning. They answer different questions; neither subsumes the other.
 
 ## GOAT Verdict
 

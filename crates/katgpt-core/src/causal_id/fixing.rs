@@ -92,15 +92,19 @@ impl Admg {
     pub fn district_of(&self, v: NodeId) -> Vec<NodeId> {
         let mut district: Vec<NodeId> = vec![v];
         let mut frontier: Vec<NodeId> = vec![v];
+        // `next` is hoisted out of the BFS step loop and `clear`ed instead of
+        // freshly allocated per frontier pop (one malloc/free per BFS step
+        // before). Same push order, so `frontier` sees the same sequence.
+        let mut next: Vec<NodeId> = Vec::new();
         while let Some(u) = frontier.pop() {
-            let mut next: Vec<NodeId> = Vec::new();
+            next.clear();
             self.for_each_bidir_neighbor(u, |w| {
                 if !district.contains(&w) {
                     district.push(w);
                     next.push(w);
                 }
             });
-            frontier.extend(next);
+            frontier.extend(next.iter().copied());
         }
         district
     }
@@ -227,15 +231,18 @@ impl Admg {
     pub fn ancestors(&self, seed: &[NodeId]) -> Vec<NodeId> {
         let mut an: Vec<NodeId> = seed.to_vec();
         let mut frontier: Vec<NodeId> = seed.to_vec();
+        // `parents` is hoisted out of the BFS step loop and `clear`ed instead of
+        // freshly allocated per frontier pop. Same push order into `frontier`.
+        let mut parents: Vec<NodeId> = Vec::new();
         while let Some(v) = frontier.pop() {
-            let mut parents: Vec<NodeId> = Vec::new();
+            parents.clear();
             self.for_each_parent(v, |p| {
                 if !an.contains(&p) {
                     an.push(p);
                     parents.push(p);
                 }
             });
-            frontier.extend(parents);
+            frontier.extend(parents.iter().copied());
         }
         an
     }

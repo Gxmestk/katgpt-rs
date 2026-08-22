@@ -606,8 +606,8 @@ fn test_late_game_bomb_placement_rate() {
     if total_first_half_ticks > 0 && total_second_half_ticks > 0 {
         let first_rate = total_first_half_bombs as f64 / total_first_half_ticks as f64;
         let second_rate = total_second_half_bombs as f64 / total_second_half_ticks as f64;
-        println!("First half rate:  {:.3} bombs/tick", first_rate);
-        println!("Second half rate: {:.3} bombs/tick", second_rate);
+        println!("First half rate:  {first_rate:.3} bombs/tick");
+        println!("Second half rate: {second_rate:.3} bombs/tick");
 
         // The issue: second half bomb rate should not be dramatically lower
         // If it drops to near zero, players wander without placing bombs
@@ -677,7 +677,7 @@ fn test_scoreboard_resource_updates_during_game() {
         if nonzero {
             any_nonzero = true;
         }
-        println!("  Game {seed}: ScoreBoard = {:?}", scores);
+        println!("  Game {seed}: ScoreBoard = {scores:?}");
     }
 
     println!("\n🧪 ScoreBoard Resource Sync Check");

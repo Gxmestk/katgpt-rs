@@ -75,23 +75,20 @@ impl ActivationExtractor for LookupExtractor {
         _layer: usize,
         scratch: &'a mut [f32],
     ) -> &'a [f32] {
-        match self.activations.get(candidate) {
-            Some(act) => {
-                let len = act.len().min(scratch.len());
-                scratch[..len].copy_from_slice(&act[..len]);
-                // Zero any trailing scratch the activation doesn't cover so the
-                // probe reads deterministic bytes.
-                for v in scratch[len..].iter_mut() {
-                    *v = 0.0;
-                }
-                scratch
+        if let Some(act) = self.activations.get(candidate) {
+            let len = act.len().min(scratch.len());
+            scratch[..len].copy_from_slice(&act[..len]);
+            // Zero any trailing scratch the activation doesn't cover so the
+            // probe reads deterministic bytes.
+            for v in scratch[len..].iter_mut() {
+                *v = 0.0;
             }
-            None => {
-                for v in scratch.iter_mut() {
-                    *v = 0.0;
-                }
-                scratch
+            scratch
+        } else {
+            for v in scratch.iter_mut() {
+                *v = 0.0;
             }
+            scratch
         }
     }
 }

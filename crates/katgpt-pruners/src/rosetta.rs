@@ -161,7 +161,7 @@ impl<P: ConstraintPruner + ?Sized> ConstraintPruner for RosettaPruner<P> {
         let len = candidates.len().min(results.len());
 
         // Check concept map for all candidates first (batch fast path)
-        let mut need_slow_path = Vec::new();
+        let mut need_slow_path = Vec::with_capacity(len);
         for i in 0..len {
             if let Some(&agreement) = pin.get(&(depth, candidates[i])) {
                 if agreement >= self.threshold {

@@ -6,7 +6,7 @@
 //!
 //! Run: `cargo test --features rat_plus_bridge --test bench_225_rat_bridge -- --nocapture`
 
-use katgpt_attn::rat_bridge::{DilatedKvAccessor, RatBridgeState, rat_decode_step};
+use katgpt_attn::rat_bridge::{rat_decode_step, DilatedKvAccessor, RatBridgeState};
 use katgpt_core::types::DilationConfig;
 
 // ── T6.2: Decode Latency Benchmarks ─────────────────────────────
@@ -72,7 +72,7 @@ fn bench_bridge_projection_overhead() {
     }
     let elapsed = start.elapsed();
     let per_gate = elapsed / 10000;
-    println!("Gate computation: {:.2?} per call", per_gate);
+    println!("Gate computation: {per_gate:.2?} per call");
     assert!(per_gate < std::time::Duration::from_micros(10));
 }
 
@@ -165,14 +165,8 @@ fn test_goat_gate_decision() {
 
     // Quality: would need real model evaluation to measure.
     // For now, verify the mechanism works correctly.
-    println!(
-        "GOAT: D=16 meets ≥8× FLOPs reduction (actual: {:.0}×)",
-        d16_reduction
-    );
-    println!(
-        "GOAT: D=64 meets ≥40× FLOPs reduction (actual: {:.0}×)",
-        d64_reduction
-    );
+    println!("GOAT: D=16 meets ≥8× FLOPs reduction (actual: {d16_reduction:.0}×)");
+    println!("GOAT: D=64 meets ≥40× FLOPs reduction (actual: {d64_reduction:.0}×)");
     println!("GOAT: Quality validation requires real model evaluation");
     println!("GOAT: Decision — keep rat_plus_bridge as opt-in until real quality benchmarks pass");
 }

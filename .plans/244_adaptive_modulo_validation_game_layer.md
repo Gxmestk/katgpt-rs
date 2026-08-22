@@ -4,8 +4,18 @@
 **Date:** 2026-06-10
 **Research:** `.research/212_Gemini_Fourier_LatCal_Fusion_Verdict.md` (Pillar 5: L2L)
 **Depends On:** `game_sync_cache` (Plan 210), `mux_latent_wire` (Plan 243), riir-chain `chain_penalty` (Plan 212)
-**Feature Gate:** `game_adaptive_validation` (DEFAULT, GOAT-promoted — 5.91× dense-zone, zero chain bypass)
+**Feature Gate:** `game_adaptive_validation` (DEFAULT, GOAT-promoted — 5.91× dense-zone*, zero chain bypass)
 **GOAT Criteria:** Dense-zone throughput ≥ 2× vs full-validation, zero chain-layer bypass
+
+> \*Derivation audit (2026-08-20, riir-game-sdk Bench 018 addendum +
+> `crates/riir-e2e/README.md`): 5.91× exceeds the **4.0× structural ceiling** of the
+> in-tree AV2 bench (`av2_dense_zone_throughput_mod1_vs_mod4` — with validation work
+> free, gain caps at the mod), as does AV2's own 5.05× debug reading; both are consistent
+> with a baseline-loop warmup artifact or a mod-8 simulation — and mod 8 is unreachable
+> at any realistic density (the ladder's mod-8 entry fires only at `usize::MAX`,
+> `adaptive_validation.rs:233`, unchanged since the original commit `87e2db1b7`). Honest
+> cite: **≈4× at the reachable dense-zone mod (4); ~1.4× diluted end-to-end** (the mmorpg
+> G2 suite-level note). The promotion stands — the bar was ≥2×.
 
 ---
 
@@ -304,7 +314,7 @@ Cold (chain — FORBIDDEN)
 - [x] Security test: chain-layer types cannot reach adaptive path (compile fail)
 - [x] Security test: panic guard triggers if somehow bypassed
 - [x] Catch-up test: inject cheat on unchecked tick, verify caught at next check tick
-- [x] GOAT gate: promote to default if ≥ 2× dense-zone perf + zero chain-layer bypass — 5.91× dense-zone + zero bypass, PROMOTED ✅
+- [x] GOAT gate: promote to default if ≥ 2× dense-zone perf + zero chain-layer bypass — 5.91× dense-zone* + zero bypass, PROMOTED ✅ (*see the header derivation-audit note — honest cite ≈4× at the reachable mod; the ≥2× bar is cleared either way)
 
 ### Phase 6: Examples & Docs ✅ DONE
 - [x] Example: `adaptive_validation_demo` — show mod 1/2/4/8 throughput

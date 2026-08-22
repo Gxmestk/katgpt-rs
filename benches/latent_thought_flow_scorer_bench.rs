@@ -807,8 +807,7 @@ fn run_g3(kernel: &LatentThoughtKernel, projection: &[f32]) {
 
     println!();
     println!(
-        "── G3: Latency (DIM={}, VOCAB={}, N={}, K={}) ────────────────",
-        DIM, VOCAB, N_TRAJECTORIES, k
+        "── G3: Latency (DIM={DIM}, VOCAB={VOCAB}, N={N_TRAJECTORIES}, K={k}) ────────────────"
     );
     println!(
         "{:<40} {:>9.1} ns",
@@ -879,8 +878,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
     println!(
-        "Config: DIM={}, VOCAB={}, N_TRAJECTORIES={}, N_QUERIES={}, λ_c={}, K_CANDIDATES={:?}",
-        DIM, VOCAB, N_TRAJECTORIES, N_QUERIES, LAMBDA_C, K_CANDIDATES
+        "Config: DIM={DIM}, VOCAB={VOCAB}, N_TRAJECTORIES={N_TRAJECTORIES}, N_QUERIES={N_QUERIES}, λ_c={LAMBDA_C}, K_CANDIDATES={K_CANDIDATES:?}"
     );
 
     // Build the kernel + projection + queries.

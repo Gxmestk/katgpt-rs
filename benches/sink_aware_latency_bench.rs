@@ -55,7 +55,7 @@ fn rand_matrix(n: usize, d: usize, seed: u64) -> Vec<Vec<f32>> {
 
 /// Flatten a Vec<Vec<f32>> row-major into a single contiguous Vec<f32>.
 fn flatten(rows: &[Vec<f32>]) -> Vec<f32> {
-    let d = rows.first().map(|r| r.len()).unwrap_or(0);
+    let d = rows.first().map_or(0, |r| r.len());
     let mut out = Vec::with_capacity(rows.len() * d);
     for r in rows {
         out.extend_from_slice(r);

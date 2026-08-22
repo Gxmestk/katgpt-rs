@@ -96,8 +96,7 @@ mod tests {
         // All 10 tokens should be accepted after interval closure.
         assert!(
             results.iter().all(|&v| v),
-            "scattered rejects should be filled: {:?}",
-            results
+            "scattered rejects should be filled: {results:?}"
         );
     }
 

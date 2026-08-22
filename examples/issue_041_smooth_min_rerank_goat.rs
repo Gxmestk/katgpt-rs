@@ -193,7 +193,7 @@ fn main() {
 
     print!("{:<30}", "Method");
     for k in &ks {
-        print!("  recall@{:>2}", k);
+        print!("  recall@{k:>2}");
     }
     println!();
 
@@ -231,9 +231,9 @@ fn main() {
             smoothmin_aligned_recall5 = recalls[2];
         }
 
-        print!("{:<30}", name);
+        print!("{name:<30}");
         for r in &recalls {
-            print!("  {:>10.4}", r);
+            print!("  {r:>10.4}");
         }
         println!();
     }

@@ -241,7 +241,7 @@ fn g2_causal_invariant_to_bystander_fraction_attention_mass_degrades() {
         } else {
             "tie/agree"
         };
-        eprintln!("{:>12} {:>14.3} {:>14.3} {:>10}", n_byst, cj, aj, verdict);
+        eprintln!("{n_byst:>12} {cj:>14.3} {aj:>14.3} {verdict:>10}");
     }
 }
 

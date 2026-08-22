@@ -56,8 +56,7 @@ fn bench_shape(name: &str, w: usize, h: usize, k: usize, n_orient: usize) -> f64
     let total_cells = w * h * n_orient;
     let per_cell_ns = med_ns / (total_cells as f64);
     println!(
-        "  {:<24} ({}×{}×{}×{}×{}): median {:>8.2} µs  ({:.2} ns/cell, {} total cells)",
-        name, w, h, n_orient, k, k, med_us, per_cell_ns, total_cells
+        "  {name:<24} ({w}×{h}×{n_orient}×{k}×{k}): median {med_us:>8.2} µs  ({per_cell_ns:.2} ns/cell, {total_cells} total cells)"
     );
     med_us
 }
@@ -89,8 +88,7 @@ fn bench_projection(name: &str, w: usize, h: usize, n_orient: usize, integr: boo
     let med_ns = median_ns(&mut samples);
     let med_us = med_ns / 1000.0;
     println!(
-        "  {:<24} ({}×{}×{}):        median {:>8.2} µs",
-        name, w, h, n_orient, med_us
+        "  {name:<24} ({w}×{h}×{n_orient}):        median {med_us:>8.2} µs"
     );
     med_us
 }

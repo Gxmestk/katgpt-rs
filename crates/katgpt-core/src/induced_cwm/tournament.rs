@@ -983,7 +983,7 @@ mod tests {
     fn player_stats_display_formats() {
         let mut s = PlayerStats::default();
         s.record(1.0, 0.0);
-        let out = format!("{}", s);
+        let out = format!("{s}");
         assert!(out.contains("win_rate="));
         assert!(out.contains("avg_reward="));
     }
@@ -1064,8 +1064,7 @@ mod tests {
         let off_diag_sum = h2h[0][1] + h2h[1][0];
         assert!(
             off_diag_sum <= 1.0 + 1e-6,
-            "off-diagonal sum must be ≤ 1.0 (chess-scoring); got {}",
-            off_diag_sum
+            "off-diagonal sum must be ≤ 1.0 (chess-scoring); got {off_diag_sum}"
         );
     }
 
@@ -1137,8 +1136,7 @@ mod tests {
             let idx = pick_ucb1(&visits, &total, 10, &mut rng);
             assert!(
                 idx == 1 || idx == 3,
-                "unvisited idx must be picked; got {}",
-                idx
+                "unvisited idx must be picked; got {idx}"
             );
         }
     }

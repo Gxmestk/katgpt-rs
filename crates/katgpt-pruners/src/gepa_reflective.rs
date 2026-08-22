@@ -617,7 +617,7 @@ mod tests {
     fn test_config_variant_arm_roundtrip() {
         for arm in 0..NUM_ARMS {
             let variant = ConfigVariant::from_arm(arm);
-            assert_eq!(variant.to_arm(), arm, "roundtrip failed for arm {}", arm);
+            assert_eq!(variant.to_arm(), arm, "roundtrip failed for arm {arm}");
         }
     }
 
@@ -634,8 +634,7 @@ mod tests {
         let sum: f32 = w.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-6,
-            "weights should sum to 1.0, got {}",
-            sum
+            "weights should sum to 1.0, got {sum}"
         );
     }
 
@@ -791,9 +790,7 @@ mod tests {
         let q1 = gepa.q_value(1);
         assert!(
             q0 > q1,
-            "arm 0 (q={}) should be preferred over arm 1 (q={})",
-            q0,
-            q1,
+            "arm 0 (q={q0}) should be preferred over arm 1 (q={q1})",
         );
 
         // best_config should return arm 0's config.

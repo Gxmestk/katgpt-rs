@@ -124,7 +124,7 @@ fn main() {
         .collect();
 
     println!("=== KARC + Conformal Overlay (Plan 340 Phase 2 T2.2) ===");
-    println!("System: Lorenz-63 (σ={}, ρ={}, β={:.4})", SIGMA, RHO, BETA);
+    println!("System: Lorenz-63 (σ={SIGMA}, ρ={RHO}, β={BETA:.4})");
     println!(
         "KARC shape: D={}, M={}, K={} (d_h = {})",
         D,
@@ -132,7 +132,7 @@ fn main() {
         K,
         K * D * M
     );
-    println!("n_train={}, n_test={}, dt={}", n_train, n_test, dt);
+    println!("n_train={n_train}, n_test={n_test}, dt={dt}");
     println!("Trajectory normalized to [-1, 1] per channel (Chebyshev requires |x| ≤ 1)");
     println!();
 
@@ -294,7 +294,7 @@ fn main() {
     }
 
     println!();
-    println!("Target coverage (1−α): {:.4}", target_cov);
+    println!("Target coverage (1−α): {target_cov:.4}");
     println!("Coverage gate: [0.90, 1.00] (chaotic regime, widened from Phase 1 [0.93, 0.97])");
     if all_pass {
         println!(

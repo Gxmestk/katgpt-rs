@@ -64,7 +64,7 @@ fn dh_18720_parallel_timing() {
     use std::time::Instant;
 
     let d_h = 18_720_usize;
-    eprintln!("Issue 187 T6: d_h = {} parallel Householder+QL timing trial", d_h);
+    eprintln!("Issue 187 T6: d_h = {d_h} parallel Householder+QL timing trial");
     eprintln!(
         "rayon thread pool: {} threads",
         rayon::current_num_threads()
@@ -88,7 +88,7 @@ fn dh_18720_parallel_timing() {
     symmetric_eig_par(&mut eigvals, &mut eigvecs, &a, &mut scratch, d_h, 30);
     let dt = t0.elapsed();
 
-    eprintln!("RESULT: d_h = {}, parallel wall = {:.2?}", d_h, dt);
+    eprintln!("RESULT: d_h = {d_h}, parallel wall = {dt:.2?}");
     eprintln!(
         "        ({:.2}× the ≤30 min feasibility target)",
         dt.as_secs_f64() / 1800.0
@@ -102,18 +102,16 @@ fn dh_18720_parallel_timing() {
     let sum_eig: f64 = eigvals.iter().sum();
     let trace_err = (trace_a - sum_eig).abs() / trace_a.abs().max(1e-300);
     eprintln!(
-        "sanity: trace(A) = {:.6e}, sum(eigvals) = {:.6e}, rel err = {:.2e}",
-        trace_a, sum_eig, trace_err
+        "sanity: trace(A) = {trace_a:.6e}, sum(eigvals) = {sum_eig:.6e}, rel err = {trace_err:.2e}"
     );
     assert!(
         trace_err < 1e-10,
-        "trace sanity check failed: rel err = {:.2e}",
-        trace_err
+        "trace sanity check failed: rel err = {trace_err:.2e}"
     );
 
     // Sanity: eigenvalues finite.
     for (i, &v) in eigvals.iter().enumerate() {
-        assert!(v.is_finite(), "eigvals[{}] = {} not finite", i, v);
+        assert!(v.is_finite(), "eigvals[{i}] = {v} not finite");
     }
 
     // Report verdict.
@@ -121,8 +119,7 @@ fn dh_18720_parallel_timing() {
     let actual_secs = dt.as_secs_f64();
     if actual_secs <= target_secs {
         eprintln!(
-            "VERDICT: T6 PASS — parallel wall {:.2?} ≤ 30 min target",
-            dt
+            "VERDICT: T6 PASS — parallel wall {dt:.2?} ≤ 30 min target"
         );
     } else {
         eprintln!(

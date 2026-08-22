@@ -140,9 +140,7 @@ fn g1_accuracy_substrate_matches_baseline() {
     // Substrate should have fewer alive neurons (intersection)
     assert!(
         substrate_alive <= baseline_alive,
-        "substrate alive ({}) should be ≤ baseline alive ({})",
-        substrate_alive,
-        baseline_alive,
+        "substrate alive ({substrate_alive}) should be ≤ baseline alive ({baseline_alive})",
     );
 
     // ── Step 3: Manually compute "reference" substrate output ──
@@ -205,17 +203,13 @@ fn g1_accuracy_substrate_matches_baseline() {
     let relative_error = if l2_ref > 1e-6 { l2_diff / l2_ref } else { 0.0 };
     assert!(
         relative_error < 0.01,
-        "G1 FAIL: relative L2 error vs reference too high: {:.6} (l2_diff={:.6}, l2_ref={:.6})",
-        relative_error,
-        l2_diff,
-        l2_ref,
+        "G1 FAIL: relative L2 error vs reference too high: {relative_error:.6} (l2_diff={l2_diff:.6}, l2_ref={l2_ref:.6})",
     );
 
     // Alive counts should match
     assert_eq!(
         substrate_alive, ref_alive,
-        "G1: substrate alive ({}) should match reference alive ({})",
-        substrate_alive, ref_alive,
+        "G1: substrate alive ({substrate_alive}) should match reference alive ({ref_alive})",
     );
 
     eprintln!(
@@ -326,16 +320,14 @@ fn g2_throughput_substrate_faster_when_sparse() {
 
     // Log the ratio for CI visibility — substrate should be ≤ 1.0x (same or faster)
     eprintln!(
-        "G2 throughput: substrate/baseline = {:.3}x (substrate={}ns, baseline={}ns)",
-        ratio, substrate_ns, baseline_ns,
+        "G2 throughput: substrate/baseline = {ratio:.3}x (substrate={substrate_ns}ns, baseline={baseline_ns}ns)",
     );
 
     // At minimum, the substrate path should not be >2x slower.
     // With a 20% active mask, intersection reduces FLOPs significantly.
     assert!(
         ratio < 2.0,
-        "G2 FAIL: substrate path is >2x slower than baseline (ratio={:.3})",
-        ratio,
+        "G2 FAIL: substrate path is >2x slower than baseline (ratio={ratio:.3})",
     );
 }
 
@@ -394,19 +386,15 @@ fn g3_flops_reduction_verified_by_execution() {
 
     assert!(
         baseline_alive > 0,
-        "G3: baseline should have some alive channels, got {}",
-        baseline_alive,
+        "G3: baseline should have some alive channels, got {baseline_alive}",
     );
     assert!(
         substrate_alive > 0,
-        "G3: substrate should have some alive channels, got {}",
-        substrate_alive,
+        "G3: substrate should have some alive channels, got {substrate_alive}",
     );
     assert!(
         substrate_alive < baseline_alive,
-        "G3: substrate alive ({}) should be less than baseline alive ({})",
-        substrate_alive,
-        baseline_alive,
+        "G3: substrate alive ({substrate_alive}) should be less than baseline alive ({baseline_alive})",
     );
 
     // Verify the theoretical reduction matches actual
@@ -414,9 +402,7 @@ fn g3_flops_reduction_verified_by_execution() {
 
     assert!(
         actual_reduction > 0.0,
-        "G3 FAIL: no FLOPs reduction observed (actual={:.3}, theoretical={:.3})",
-        actual_reduction,
-        theoretical_reduction,
+        "G3 FAIL: no FLOPs reduction observed (actual={actual_reduction:.3}, theoretical={theoretical_reduction:.3})",
     );
 
     // The actual and theoretical reductions should be in the same ballpark.
@@ -549,8 +535,7 @@ fn g4_cna_mask_from_activation_patterns() {
             .count();
         assert_eq!(
             layer_count, top_k,
-            "G4: layer {} should have {} channels, got {}",
-            layer, top_k, layer_count,
+            "G4: layer {layer} should have {top_k} channels, got {layer_count}",
         );
     }
 
@@ -670,17 +655,13 @@ fn g5_ddtree_with_substrate_screening_pruner() {
             let rel = pruner.relevance(d, t, &[]);
             assert!(
                 (0.0..=1.0).contains(&rel),
-                "G5: relevance out of bounds at depth={} token={}: {}",
-                d,
-                t,
-                rel,
+                "G5: relevance out of bounds at depth={d} token={t}: {rel}",
             );
         }
     }
 
     eprintln!(
-        "G5 DDTree: substrate_nodes={} noscreen_nodes={}",
-        substrate_node_count, noscreen_node_count,
+        "G5 DDTree: substrate_nodes={substrate_node_count} noscreen_nodes={noscreen_node_count}",
     );
 }
 
@@ -874,24 +855,20 @@ fn g6_zero_overhead_none_mask_identical() {
         let diff = (baseline_out[r] - sub_out[r]).abs();
         assert!(
             diff < 1e-6,
-            "G6: output mismatch at row {} (diff={:.8})",
-            r,
-            diff,
+            "G6: output mismatch at row {r} (diff={diff:.8})",
         );
     }
 
     let ratio = substrate_ns as f64 / baseline_ns as f64;
     eprintln!(
-        "G6 zero overhead: full_mask/baseline = {:.3}x (substrate={}ns, baseline={}ns)",
-        ratio, substrate_ns, baseline_ns,
+        "G6 zero overhead: full_mask/baseline = {ratio:.3}x (substrate={substrate_ns}ns, baseline={baseline_ns}ns)",
     );
 
     // Overhead should be minimal: the full mask just adds the intersection scan,
     // which passes all channels through. Allow up to 2x overhead for the scan.
     assert!(
         ratio < 2.0,
-        "G6 FAIL: full mask overhead too high: {:.3}x",
-        ratio,
+        "G6 FAIL: full mask overhead too high: {ratio:.3}x",
     );
 
     // Also verify NoSubstrateRouter is zero-cost
@@ -936,9 +913,7 @@ fn g7_mask_round_trip_preserves_all_properties() {
             assert_eq!(
                 restored.get(layer, ch),
                 mask.get(layer, ch),
-                "channel mismatch at layer={} ch={}",
-                layer,
-                ch,
+                "channel mismatch at layer={layer} ch={ch}",
             );
         }
     }
@@ -956,15 +931,13 @@ fn g7_branch_score_uses_sigmoid() {
     let score = substrate_branch_score(1.0, 0.5, 1.0);
     assert!(
         (score - 0.5).abs() < 0.01,
-        "sigmoid(0) = 0.5, score should be ~0.5, got {}",
-        score,
+        "sigmoid(0) = 0.5, score should be ~0.5, got {score}",
     );
 
     // High recovery → sigmoid → ~1.0
     let score_high = substrate_branch_score(1.0, 10.0, 1.0);
     assert!(
         score_high > 0.99,
-        "high recovery should give score close to 1.0, got {}",
-        score_high,
+        "high recovery should give score close to 1.0, got {score_high}",
     );
 }

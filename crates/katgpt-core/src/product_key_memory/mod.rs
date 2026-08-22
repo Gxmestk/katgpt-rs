@@ -91,7 +91,7 @@ pub use freeze::FrozenProductKeyMemory;
 #[cfg(feature = "product_key_memory_episodic")]
 pub mod episodic;
 #[cfg(feature = "product_key_memory_episodic")]
-pub use episodic::PkmEpisodicStore;
+pub use episodic::{BackgroundAccessStats, PkmEpisodicStore};
 
 pub mod kernel;
 pub mod types;

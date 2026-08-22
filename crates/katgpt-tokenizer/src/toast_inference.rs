@@ -27,7 +27,7 @@ impl ToastTokenizerImpl {
                     Self::encode_pretoken(tokenizer, &bytes[start..i], &mut token_ids);
                 }
                 // Encode whitespace byte directly via routed lookup
-                match tokenizer.vocab_lookup(&bytes[i..i + 1]) {
+                match tokenizer.vocab_lookup(&bytes[i..=i]) {
                     Some(id) => token_ids.push(id),
                     None => token_ids.push(tokenizer.unk_id),
                 }
@@ -50,17 +50,14 @@ impl ToastTokenizerImpl {
         }
 
         // Look up split tree
-        match tokenizer.trees.get(pretoken) {
-            Some(tree) => {
-                Self::recursive_descent(tree, 0, tokenizer, token_ids, tokenizer.unk_id);
-            }
-            None => {
-                // Fallback: encode byte by byte
-                for &b in pretoken {
-                    match tokenizer.vocab_lookup(&[b]) {
-                        Some(id) => token_ids.push(id),
-                        None => token_ids.push(tokenizer.unk_id),
-                    }
+        if let Some(tree) = tokenizer.trees.get(pretoken) {
+            Self::recursive_descent(tree, 0, tokenizer, token_ids, tokenizer.unk_id);
+        } else {
+            // Fallback: encode byte by byte
+            for &b in pretoken {
+                match tokenizer.vocab_lookup(&[b]) {
+                    Some(id) => token_ids.push(id),
+                    None => token_ids.push(tokenizer.unk_id),
                 }
             }
         }
@@ -85,17 +82,14 @@ impl ToastTokenizerImpl {
         }
 
         // Otherwise, recurse into children
-        match (node.left, node.right) {
-            (Some(l), Some(r)) => {
-                Self::recursive_descent(tree, l, tokenizer, tokens, unk_id);
-                Self::recursive_descent(tree, r, tokenizer, tokens, unk_id);
-            }
-            _ => {
-                // Leaf node (single byte) — must be in vocab by construction
-                match tokenizer.vocab_lookup(span) {
-                    Some(id) => tokens.push(id),
-                    None => tokens.push(unk_id),
-                }
+        if let (Some(l), Some(r)) = (node.left, node.right) {
+            Self::recursive_descent(tree, l, tokenizer, tokens, unk_id);
+            Self::recursive_descent(tree, r, tokenizer, tokens, unk_id);
+        } else {
+            // Leaf node (single byte) — must be in vocab by construction
+            match tokenizer.vocab_lookup(span) {
+                Some(id) => tokens.push(id),
+                None => tokens.push(unk_id),
             }
         }
     }

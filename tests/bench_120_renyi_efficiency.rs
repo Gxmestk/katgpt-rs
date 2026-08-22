@@ -182,7 +182,7 @@ mod tests {
             *word_counts.entry(word).or_default() += 1;
         }
 
-        let mut trees = HashMap::new();
+        let mut trees = HashMap::with_capacity(word_counts.len());
         let builder = SplitTreeBuilder::new(&ngram_counts, 1);
 
         for (word, &count) in &word_counts {
@@ -312,8 +312,7 @@ mod tests {
         let unique = count_unique_tokens(&toast_ids);
         assert!(
             unique >= 20,
-            "ToaST should use at least 20 unique tokens on validation data, got {}",
-            unique,
+            "ToaST should use at least 20 unique tokens on validation data, got {unique}",
         );
 
         println!(
@@ -400,7 +399,7 @@ mod tests {
             let h = renyi_entropy(&toast_ids, alpha);
             let eff = renyi_efficiency(&toast_ids, toast.vocab_size(), alpha);
 
-            println!("│ {:>6.1} │ {:>12.6} │ {:>12.6} │", alpha, h, eff);
+            println!("│ {alpha:>6.1} │ {h:>12.6} │ {eff:>12.6} │");
 
             // Entropy should be non-negative and finite
             assert!(

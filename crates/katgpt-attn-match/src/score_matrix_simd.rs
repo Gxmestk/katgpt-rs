@@ -125,9 +125,15 @@ pub fn dot_8wide(a: &[f32], b: &[f32], d: usize) -> f32 {
     // Simple loop — LLVM auto-vectorizes this to optimal SIMD FMA on every
     // target we ship (NEON, AVX2). The single accumulator maps to one SIMD
     // register; the final reduction is a single horizontal add.
+    //
+    // The lengths are only `debug_assert`ed, so in release builds `a[k]`/`b[k]`
+    // carried per-element bounds checks against unknown slice lengths. Slicing
+    // the `..d` prefixes up front turns those `2·d` checks into two range checks
+    // outside the loop, leaving a clean unguarded FMA chain for the vectorizer.
+    // Same k order, same single accumulator → bit-identical.
     let mut dot = 0.0f32;
-    for k in 0..d {
-        dot += a[k] * b[k];
+    for (&x, &y) in a[..d].iter().zip(b[..d].iter()) {
+        dot += x * y;
     }
     dot
 }
@@ -180,8 +186,7 @@ mod tests {
                 .fold(f32::NEG_INFINITY, f32::max);
             assert!(
                 (row_max - 0.0).abs() < 1e-6,
-                "stabilized row max should be 0, got {}",
-                row_max
+                "stabilized row max should be 0, got {row_max}"
             );
         }
     }
@@ -198,7 +203,7 @@ mod tests {
         let mut out = vec![0.0f32; n * t];
         compute_score_matrix_simd(&queries, &keys, n, t, d, inv_sqrt_d, &mut out, true);
         for &v in &out {
-            assert!(v <= 1e-6, "stabilized value {} should be ≤ 0", v);
+            assert!(v <= 1e-6, "stabilized value {v} should be ≤ 0");
         }
     }
 
@@ -219,11 +224,7 @@ mod tests {
         compute_score_matrix_simd(&queries, &keys, n, t, d, inv_sqrt_d, &mut simd, false);
 
         for i in 0..n * t {
-            assert!(
-                (scalar[i] - simd[i]).abs() < 1e-6,
-                "odd-d mismatch at {}",
-                i
-            );
+            assert!((scalar[i] - simd[i]).abs() < 1e-6, "odd-d mismatch at {i}");
         }
     }
 
@@ -297,8 +298,7 @@ mod tests {
         let total_ns = start.elapsed().as_nanos();
         let per_call_ns = total_ns / iters as u128;
         eprintln!(
-            "simd_throughput: n={}, t={}, d={}, {} iters, {} ns total, {} ns/call",
-            n, t, d, iters, total_ns, per_call_ns
+            "simd_throughput: n={n}, t={t}, d={d}, {iters} iters, {total_ns} ns total, {per_call_ns} ns/call"
         );
         // Throughput guard: each call must complete in under 5 ms at this size
         // (n=8, t=512, d=64 = 262K multiply-adds + the max-shift pass). This is a
@@ -308,8 +308,7 @@ mod tests {
         // without asserting a false speedup claim.
         assert!(
             per_call_ns < 5_000_000,
-            "simd throughput regression: {} ns/call > 5 ms ceiling",
-            per_call_ns
+            "simd throughput regression: {per_call_ns} ns/call > 5 ms ceiling"
         );
     }
 

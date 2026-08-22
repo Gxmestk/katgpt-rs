@@ -105,13 +105,10 @@ impl SequenceConstraint {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.first.to_le_bytes());
         hasher.update(&self.second.to_le_bytes());
-        match self.third {
-            Some(t) => {
-                hasher.update(&t.to_le_bytes());
-            }
-            None => {
-                hasher.update(&[0u8; 8]);
-            }
+        if let Some(t) = self.third {
+            hasher.update(&t.to_le_bytes());
+        } else {
+            hasher.update(&[0u8; 8]);
         }
         hasher.update(&self.acceptance_rate.to_le_bytes());
         *hasher.finalize().as_bytes()
@@ -370,7 +367,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut constraints = Vec::new();
+        let mut constraints = Vec::with_capacity(patterns.len());
         for pattern in &patterns {
             if let Some(c) = SequenceConstraint::from_pattern(pattern, miner.min_acceptance) {
                 constraints.push(c);

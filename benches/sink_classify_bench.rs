@@ -104,10 +104,7 @@ fn main() {
 
             let sr_value = stable_rank_update_into(&o_rand, &mut scratch, 5);
 
-            println!(
-                "{:>5} {:>5} {:>14.3} {:>14.3} {:>10.3}",
-                n, d, us_rand, us_rank1, sr_value
-            );
+            println!("{n:>5} {d:>5} {us_rand:>14.3} {us_rank1:>14.3} {sr_value:>10.3}");
         }
     }
     println!();
@@ -165,7 +162,7 @@ fn main() {
         let d = classify_sink_at(0, &attn_column, &values, Some(&o_rand), &cfg, &mut scratch);
         std::hint::black_box(d);
     });
-    println!("  n=32, d_h=64 classify_sink_at: {:.3} µs", us);
+    println!("  n=32, d_h=64 classify_sink_at: {us:.3} µs");
     println!(
         "  G2.4 target <1µs: {}",
         if us < 1.0 {

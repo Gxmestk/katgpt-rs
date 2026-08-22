@@ -86,15 +86,12 @@ fn main() {
         let decision_str = match decision {
             HaltDecision::Continue => "Continue".to_string(),
             HaltDecision::Halt { reason } => {
-                format!("HALT ({:?})", reason)
+                format!("HALT ({reason:?})")
             }
             HaltDecision::RefusedFloor => "RefusedFloor".to_string(),
         };
 
-        println!(
-            "{:<10} {:>14.6} {:>10.4} {:>12.4} {:>28}",
-            tau, gain, cost_floor, cos_theta, decision_str
-        );
+        println!("{tau:<10} {gain:>14.6} {cost_floor:>10.4} {cos_theta:>12.4} {decision_str:>28}");
 
         // Roll state for the next loop.
         prev_step = curr_step;
@@ -108,27 +105,22 @@ fn main() {
     }
 
     println!("{}", "-".repeat(78));
-    match halted_at {
-        Some(idx) => {
-            let saved = n_loops - idx;
-            let pct = 100.0 * saved as f32 / n_loops as f32;
-            println!(
-                "Halted at loop {idx}/{n_loops} — saved {saved} dead-compute loops ({pct:.0}%)."
-            );
-            // Verify the halt reason is GainBelowCost (no oscillation in this trace).
-            // Re-run the deciding loop to capture the reason cleanly.
-            let step_at_halt = 1.0_f32 * 0.5f32.powi((idx - 1) as i32);
-            assert!(
-                step_at_halt < cost_floor,
-                "halt must be at the gain/cost crossover"
-            );
-            println!(
-                "  crossover: step_size({step_at_halt:.4}) < cost_floor({cost_floor}) → GainBelowCost ✓"
-            );
-        }
-        None => {
-            println!("Ran all {n_loops} loops without halting (gain never dropped below cost).");
-        }
+    if let Some(idx) = halted_at {
+        let saved = n_loops - idx;
+        let pct = 100.0 * saved as f32 / n_loops as f32;
+        println!("Halted at loop {idx}/{n_loops} — saved {saved} dead-compute loops ({pct:.0}%).");
+        // Verify the halt reason is GainBelowCost (no oscillation in this trace).
+        // Re-run the deciding loop to capture the reason cleanly.
+        let step_at_halt = 1.0_f32 * 0.5f32.powi((idx - 1) as i32);
+        assert!(
+            step_at_halt < cost_floor,
+            "halt must be at the gain/cost crossover"
+        );
+        println!(
+            "  crossover: step_size({step_at_halt:.4}) < cost_floor({cost_floor}) → GainBelowCost ✓"
+        );
+    } else {
+        println!("Ran all {n_loops} loops without halting (gain never dropped below cost).");
     }
 
     // Sanity: confirm the oscillation path also works on a reversing trace.

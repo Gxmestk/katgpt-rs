@@ -90,7 +90,7 @@ mod tests {
         // log π = [-1.0, -2.0, -3.0, -4.0] → sum = -10 → mean neg = 10/4 = 2.5
         let log_probs = [-1.0f32, -2.0, -3.0, -4.0];
         let s_lp = learning_potential(log_probs.len(), |t| log_probs[t]);
-        assert!((s_lp - 2.5).abs() < 1e-6, "expected 2.5, got {}", s_lp);
+        assert!((s_lp - 2.5).abs() < 1e-6, "expected 2.5, got {s_lp}");
     }
 
     #[test]

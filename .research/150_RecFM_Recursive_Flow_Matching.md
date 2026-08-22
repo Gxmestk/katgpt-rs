@@ -5,6 +5,7 @@
 **Related Research:** 034 (D2F Discrete Diffusion Forcing), 073 (LT2 Looped Transformers), 091 (SpecHop Multi-Hop), 131 (DiffusionBlocks)
 **Related Plans:** 066 (D2F), 108 (LT2 Pipeline), 131 (SpecHop), 136 (Training-Free Loop Wrapper), 168 (RecFM Recursive Consistency — proposed)
 **Domain:** katgpt-rs (open, general-purpose inference infrastructure)
+> **PASS-Redirects (synthesis):** Tong et al. [arXiv:2608.05811 "Energy-Guided Flow Matching"](https://arxiv.org/abs/2608.05811) — PASS. Pixel-space image generation training recipe (PixelDiT/DeCo on ImageNet) that replaces the fixed clean endpoint with a heat-kernel-filtered moving endpoint releasing low→high image-frequency content via sample-adaptive spectral-energy scheduling. Mechanism is entirely training-time target construction — the paper explicitly states inference uses the same backbone/solver/NFE with no FFT/heat-kernel/bisection at runtime. We don't ship generative image models; our flow matching (this note, R375, R369) is latent-reasoning-only; our heat kernel (`katgpt-dec/src/heat_kernel.rs`) is a DEC spatial-field operator, not a flow-matching endpoint filter; coarse-to-fine latent refinement is already shipped via KARC/ReestimationScheduler/LT2 via different mechanisms.
 
 ---
 

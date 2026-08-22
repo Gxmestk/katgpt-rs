@@ -113,7 +113,7 @@ fn main() {
         for &alpha in alphas {
             let gates = compute_energy_gate(&energy, alpha, tau);
             println!();
-            println!("  α = {:.1}, τ = {:.2}", alpha, tau);
+            println!("  α = {alpha:.1}, τ = {tau:.2}");
             println!("  ┌────┬──────────────────────────────────────────┐");
             println!("  │ pos│ gate value                                │");
             println!("  ├────┼──────────────────────────────────────────┤");
@@ -145,8 +145,7 @@ fn main() {
             let gmin = gates.iter().cloned().fold(f32::INFINITY, f32::min);
             let gmax = gates.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             println!(
-                "  {:>5.2}  │    {:>2}     │    {:>2}     │ [{:.4}, {:.4}]",
-                tau, above, below, gmin, gmax
+                "  {tau:>5.2}  │    {above:>2}     │    {below:>2}     │ [{gmin:.4}, {gmax:.4}]"
             );
         }
     }
@@ -176,8 +175,8 @@ fn main() {
         }
 
         println!();
-        println!("  Energy (ascending): {:?}", test_energies);
-        println!("  Gates:  {:.4?}", gates);
+        println!("  Energy (ascending): {test_energies:?}");
+        println!("  Gates:  {gates:.4?}");
         println!();
         if monotonic {
             println!("  ✅ PASS: gate values are monotonically non-decreasing with energy");
@@ -233,7 +232,7 @@ fn main() {
         println!("  Head configurations:");
         for (i, (_, label)) in heads.iter().enumerate() {
             let pc = heads[i].0.parameter_count();
-            println!("    Head {}: w_proj = {} ({} params)", i, label, pc);
+            println!("    Head {i}: w_proj = {label} ({pc} params)");
         }
         println!();
         println!("  pos │ type   │ head_0  │ head_1  │ head_2  │ head_3");
@@ -248,7 +247,7 @@ fn main() {
             } else {
                 "fill"
             };
-            print!("  {:>2}  │ {}  ", pos, kind);
+            print!("  {pos:>2}  │ {kind}  ");
             for row in &energy_profiles {
                 print!("│ {:>7.4} ", row[pos]);
             }
@@ -267,7 +266,7 @@ fn main() {
             } else {
                 "fill"
             };
-            print!("  {:>2}  │ {}  ", pos, kind);
+            print!("  {pos:>2}  │ {kind}  ");
             for h in 0..4 {
                 let gates =
                     compute_energy_gate(&energy_profiles[h], heads[h].0.alpha, heads[h].0.tau);

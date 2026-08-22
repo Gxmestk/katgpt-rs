@@ -6,6 +6,7 @@
 > **Related Research:** 158 (MUX — the paper's soft-token baseline), 177 (Domino — decoupled causal spec), 232/265 (ColliderPruner — hidden-state candidate scoring, partial prior art), 367 (QuasiMoTTo — QMC TTS), 175 (ThoughtFold)
 > **Related Plans:** 178 (MUX — modelless distillations shipped), 265 (CCCP ColliderPruner — DEFAULT-ON), 329 (BranchRouter — dot-product routing), 271 (Attention Matching)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** DyTopo [arXiv:2602.06039 "DyTopo: Dynamic Topology Routing for Multi-Agent Reasoning via Semantic Matching"] (Lu et al., Feb 2026) — PASS. DyTopo's per-round sparse directed routing via Q("need")·K("offer") matching is the cross-entity sibling of this primitive's post-candidate-set attention routing; both route via Q·K attention onto frozen direction vectors. DyTopo's "agent as LLM forward pass" compute unit translates to our per-NPC cognition pass (R368 lesson). The hard-threshold binary mask (A_ij = I(Q·K > τ)) is a trivial sparsification of the sigmoid gate this primitive already ships; the manager-set round goal is covered by Motivation Brain (P392). Covered by Plan 377 (this) + Plan 354 (Set Attention) + Plan 570 (CLR-weighted Set Attention).
 
 ---
 

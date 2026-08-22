@@ -329,8 +329,7 @@ fn run_goat_gate(teacher_q: &[f32], num_games: usize, board_size: usize, rng: &m
         println!("  ✅ GOAT PASSED — SDPG(oracle) > HL on {board_size}×{board_size}");
     } else {
         println!(
-            "  ❌ GOAT FAILED — SDPG(oracle) {} ≤ HL {} on {board_size}×{board_size}",
-            sdpg_wins, hl_wins_count
+            "  ❌ GOAT FAILED — SDPG(oracle) {sdpg_wins} ≤ HL {hl_wins_count} on {board_size}×{board_size}"
         );
     }
 

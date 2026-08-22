@@ -182,17 +182,14 @@ fn subspace_adapter_recovers_planted_signal() {
     let frac_positive = n_positive as f32 / cosines.len().max(1) as f32;
     assert!(
         mean_cos > 0.0,
-        "mean cross-model cosine {mean_cos} should be > 0 on planted shared subspace (got {:?})",
-        cosines
+        "mean cross-model cosine {mean_cos} should be > 0 on planted shared subspace (got {cosines:?})"
     );
     assert!(
         frac_positive >= 0.6,
-        "fraction of positive cosines {frac_positive} should be >= 0.6 (got {:?})",
-        cosines
+        "fraction of positive cosines {frac_positive} should be >= 0.6 (got {cosines:?})"
     );
     eprintln!(
-        "P1 smoke: mean cos = {mean_cos:.4}, frac positive = {frac_positive:.2} (cosines: {:?})",
-        cosines
+        "P1 smoke: mean cos = {mean_cos:.4}, frac positive = {frac_positive:.2} (cosines: {cosines:?})"
     );
 
     // 3. Round-trip a canonical direction through both adapters.

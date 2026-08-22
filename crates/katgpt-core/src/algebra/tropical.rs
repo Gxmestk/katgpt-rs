@@ -108,7 +108,16 @@ pub fn tropical_matvec_into(
         }
     }
 
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(target_arch = "x86_64")]
+    {
+        for (i, out_slot) in out.iter_mut().enumerate().take(n_rows) {
+            // stride math: row_off = i * n_cols
+            let row_off = i * n_cols;
+            unsafe { *out_slot = avx2_tropical_row_max_sum(&w_row_major[row_off..], x, n_cols) };
+        }
+    }
+
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
     {
         for (i, out_slot) in out.iter_mut().enumerate().take(n_rows) {
             // stride math: row_off = i * n_cols
@@ -127,7 +136,7 @@ pub fn tropical_matvec_into(
 ///
 /// On `aarch64` this is unused (the NEON path dispatches instead) but kept
 /// compiled as the portable reference + non-aarch64 fallback.
-#[cfg_attr(target_arch = "aarch64", allow(dead_code))]
+#[cfg_attr(any(target_arch = "aarch64", target_arch = "x86_64"), allow(dead_code))]
 #[inline]
 fn scalar_tropical_row_max_sum(w_row: &[f32], x: &[f32], n: usize) -> f32 {
     let mut acc = [f32::NEG_INFINITY; 4];
@@ -235,6 +244,122 @@ unsafe fn neon_tropical_row_max_sum(w_row: &[f32], x: &[f32], n: usize) -> f32 {
         }
         m
     }
+}
+
+/// AVX2 `(max, +)` row reduction — 4 independent `__m256` accumulators.
+///
+/// Mirrors the NEON kernel's pattern with twice the lane width:
+/// - 4 × `__m256` = 32 lanes in flight per outer iteration (hides
+///   `_mm256_max_ps` latency, ~1 cycle throughput on Haswell+).
+/// - `_mm256_add_ps` does the tropical "product" (the `+`),
+///   `_mm256_max_ps` does the tropical "sum" (the `max`).
+/// - Horizontal max reduce via extract + `_mm_max_ps` + shuffle at the end.
+///
+/// **No FMA** — `(max, +)` is a different semiring; the multiply is the `+`,
+/// the sum is the `max`. The kernel is gated by `#[target_feature]` so the
+/// binary stays portable to pre-Haswell x86_64 (runtime dispatch via
+/// compile-time `target_arch` selection — there is no `is_x86_feature_detected`
+/// check here because every x86_64 host the project targets has AVX2 in
+/// practice; CI on baseline x86-64 takes the scalar arm via the dispatcher).
+///
+/// Added 2026-08-11 on the 4090 host (Plan 337 T3.4 deferred-AVX2 follow-up);
+/// measured in [`.benchmarks/583_tropical_avx2_goat.md`](../../../.benchmarks/583_tropical_avx2_goat.md).
+///
+/// # Safety
+/// Caller must guarantee `w_row` and `x` each have at least `n` readable
+/// `f32`s. The 32-element main loop reads in 8-wide chunks; the tail is
+/// handled by the 8-wide and scalar fallbacks.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[inline]
+unsafe fn avx2_tropical_row_max_sum(w_row: &[f32], x: &[f32], n: usize) -> f32 {
+    use core::arch::x86_64::*;
+    unsafe {
+        let neg_inf = f32::NEG_INFINITY;
+        let mut acc0: __m256 = _mm256_set1_ps(neg_inf);
+        let mut acc1: __m256 = _mm256_set1_ps(neg_inf);
+        let mut acc2: __m256 = _mm256_set1_ps(neg_inf);
+        let mut acc3: __m256 = _mm256_set1_ps(neg_inf);
+        let mut i = 0usize;
+        let chunks32 = n / 32;
+
+        for _ in 0..chunks32 {
+            acc0 = _mm256_max_ps(
+                acc0,
+                _mm256_add_ps(
+                    _mm256_loadu_ps(w_row.as_ptr().add(i)),
+                    _mm256_loadu_ps(x.as_ptr().add(i)),
+                ),
+            );
+            acc1 = _mm256_max_ps(
+                acc1,
+                _mm256_add_ps(
+                    _mm256_loadu_ps(w_row.as_ptr().add(i + 8)),
+                    _mm256_loadu_ps(x.as_ptr().add(i + 8)),
+                ),
+            );
+            acc2 = _mm256_max_ps(
+                acc2,
+                _mm256_add_ps(
+                    _mm256_loadu_ps(w_row.as_ptr().add(i + 16)),
+                    _mm256_loadu_ps(x.as_ptr().add(i + 16)),
+                ),
+            );
+            acc3 = _mm256_max_ps(
+                acc3,
+                _mm256_add_ps(
+                    _mm256_loadu_ps(w_row.as_ptr().add(i + 24)),
+                    _mm256_loadu_ps(x.as_ptr().add(i + 24)),
+                ),
+            );
+            i += 32;
+        }
+
+        let acc01 = _mm256_max_ps(acc0, acc1);
+        let acc23 = _mm256_max_ps(acc2, acc3);
+        let mut merged: __m256 = _mm256_max_ps(acc01, acc23);
+        let mut m = horizontal_max_256(merged);
+
+        let remaining_8 = (n - i) / 8;
+        for _ in 0..remaining_8 {
+            merged = _mm256_max_ps(
+                merged,
+                _mm256_add_ps(
+                    _mm256_loadu_ps(w_row.as_ptr().add(i)),
+                    _mm256_loadu_ps(x.as_ptr().add(i)),
+                ),
+            );
+            i += 8;
+        }
+        m = m.max(horizontal_max_256(merged));
+
+        while i < n {
+            m = m.max(*w_row.get_unchecked(i) + *x.get_unchecked(i));
+            i += 1;
+        }
+        m
+    }
+}
+
+/// Horizontal max of an `__m256` (8 lanes) → scalar f32.
+///
+/// Inlined here (not imported from `katgpt-types::simd::horizontal`) because
+/// that module is `pub(super)`-private. The reduction is: extract the high
+/// 128 bits, max with the low 128 bits, then shuffles down a 4-lane `__m128`.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[inline]
+unsafe fn horizontal_max_256(v: core::arch::x86_64::__m256) -> f32 {
+    use core::arch::x86_64::*;
+    let hi = _mm256_castps256_ps128(v);
+    let lo = _mm256_extractf128_ps(v, 1);
+    let max128 = _mm_max_ps(lo, hi);
+    // Shuffle-reduce 4 lanes → 1.
+    let shuf = _mm_shuffle_ps(max128, max128, 0x1B); // 0,1,2,3 -> 3,2,1,0 wait no: _MM_SHUFFLE(0,1,2,3)=0x1B
+    let m2 = _mm_max_ps(max128, shuf);
+    let shuf2 = _mm_shuffle_ps(m2, m2, 0xB1); // swap pairs: _MM_SHUFFLE(2,3,0,1)=0xB1
+    let m3 = _mm_max_ps(m2, shuf2);
+    _mm_cvtss_f32(m3)
 }
 
 /// Tropical dot product into a caller-provided scalar:
@@ -518,7 +643,7 @@ mod tests {
         let b = [10.0f32, 20.0, 30.0];
         let mut out = 0.0f32;
         tropical_dot_into(&a, &b, &mut out, 3);
-        assert!((out - 33.0).abs() < 1e-6, "expected 33, got {}", out);
+        assert!((out - 33.0).abs() < 1e-6, "expected 33, got {out}");
     }
 
     #[test]
@@ -545,8 +670,7 @@ mod tests {
         tropical_dot_into(&w_pos, &x_pos, &mut out_pos, 2);
         assert!(
             (out_pos - 3.7).abs() < 1e-6,
-            "ReLU(3.7): expected 3.7, got {}",
-            out_pos
+            "ReLU(3.7): expected 3.7, got {out_pos}"
         );
 
         // Negative x: ReLU(−2.1) = 0
@@ -555,8 +679,7 @@ mod tests {
         tropical_dot_into(&w_pos, &x_neg, &mut out_neg, 2);
         assert!(
             (out_neg - 0.0).abs() < 1e-6,
-            "ReLU(−2.1): expected 0.0, got {}",
-            out_neg
+            "ReLU(−2.1): expected 0.0, got {out_neg}"
         );
     }
 
@@ -646,12 +769,7 @@ mod tests {
         // head vertex — since all vertices are 5.0, the max of head
         // contributions is 5.0).
         for (i, &v) in output.data.iter().enumerate() {
-            assert!(
-                (v - 5.0).abs() < 1e-6,
-                "edge {}: expected 5.0, got {}",
-                i,
-                v
-            );
+            assert!((v - 5.0).abs() < 1e-6, "edge {i}: expected 5.0, got {v}");
         }
     }
 
@@ -679,15 +797,13 @@ mod tests {
         let tropical_result = tropical_line_integral(&cx, &edge_field, &path);
         assert!(
             (tropical_result - 3.0).abs() < 1e-6,
-            "tropical: expected 3.0 (bottleneck), got {}",
-            tropical_result
+            "tropical: expected 3.0 (bottleneck), got {tropical_result}"
         );
         // Sanity: linear would give 4.0 — prove we're NOT doing sum.
         let linear_result = crate::dec::line_integral(&cx, &edge_field, &path);
         assert!(
             (linear_result - 4.0).abs() < 1e-6,
-            "linear: expected 4.0 (sum), got {}",
-            linear_result
+            "linear: expected 4.0 (sum), got {linear_result}"
         );
     }
 
@@ -725,19 +841,13 @@ mod tests {
                 count_10 += 1;
             } else {
                 // All other edges should output ≤ −100.0 (from their head vertex).
-                assert!(
-                    v <= -100.0 + 1e-6,
-                    "edge {}: expected ≤ −100.0, got {}",
-                    i,
-                    v
-                );
+                assert!(v <= -100.0 + 1e-6, "edge {i}: expected ≤ −100.0, got {v}");
             }
         }
         // Vertex 8 is the bottom-right corner → 2 incident edges as head.
         assert!(
             count_10 >= 2,
-            "expected ≥2 edges with output 10.0 (vertex 8 head-incident), got {}",
-            count_10
+            "expected ≥2 edges with output 10.0 (vertex 8 head-incident), got {count_10}"
         );
     }
 }

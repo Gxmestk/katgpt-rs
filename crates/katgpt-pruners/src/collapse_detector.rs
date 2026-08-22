@@ -403,16 +403,13 @@ impl S2FCollapseDetector {
     #[cfg(all(feature = "collapse_aware_thinking", feature = "temporal_deriv"))]
     #[inline]
     pub fn observe_entropy(&mut self, entropy: f32) -> f32 {
-        match self.derivative_collapse.as_mut() {
-            Some(kernel) => {
-                let derivative = kernel.observe(&[entropy]);
-                self.last_entropy_derivative = derivative[0];
-                derivative[0]
-            }
-            None => {
-                self.last_entropy_derivative = 0.0;
-                0.0
-            }
+        if let Some(kernel) = self.derivative_collapse.as_mut() {
+            let derivative = kernel.observe(&[entropy]);
+            self.last_entropy_derivative = derivative[0];
+            derivative[0]
+        } else {
+            self.last_entropy_derivative = 0.0;
+            0.0
         }
     }
 
@@ -674,9 +671,10 @@ pub fn check_collapse_action(
     if !thinking_mode {
         return CollapseAction::Continue;
     }
-    match detector.check_collapse(token_id, position) {
-        true => CollapseAction::ForceExit,
-        false => CollapseAction::Continue,
+    if detector.check_collapse(token_id, position) {
+        CollapseAction::ForceExit
+    } else {
+        CollapseAction::Continue
     }
 }
 
@@ -918,9 +916,10 @@ mod tests {
         }
 
         fn decide_route(collapsed: bool) -> ComputeRoute {
-            match collapsed {
-                true => ComputeRoute::Cpu,
-                false => ComputeRoute::Gpu,
+            if collapsed {
+                ComputeRoute::Cpu
+            } else {
+                ComputeRoute::Gpu
             }
         }
 
@@ -1339,7 +1338,7 @@ mod tests {
 
             let mut false_neg_without = 0u32;
             let mut false_neg_with = 0u32;
-            let mut detected_step_with = Vec::new();
+            let mut detected_step_with = Vec::with_capacity(N_TRACES);
 
             for i in 0..N_TRACES {
                 // Spread e_star across [0.30, 0.70].
@@ -1383,8 +1382,7 @@ mod tests {
             if improvement < 0.20 {
                 let mut dbg = String::new();
                 dbg.push_str(&format!(
-                    "\nG4 FAIL: improvement={:.3} (< 0.20) without={}, with={}\n",
-                    improvement, false_neg_without, false_neg_with
+                    "\nG4 FAIL: improvement={improvement:.3} (< 0.20) without={false_neg_without}, with={false_neg_with}\n"
                 ));
                 dbg.push_str("detected traces (i, e_star, tau, step):\n");
                 for (i, e_star, tau, step) in &detected_step_with {
@@ -1399,15 +1397,12 @@ mod tests {
             // gradual-convergence trace (no hesitation tokens emitted).
             assert_eq!(
                 false_neg_without, N_TRACES as u32,
-                "hesitation-only arm must miss all gradual-convergence traces (no hesitation tokens), got {} / {}",
-                false_neg_without, N_TRACES
+                "hesitation-only arm must miss all gradual-convergence traces (no hesitation tokens), got {false_neg_without} / {N_TRACES}"
             );
             // The derivative channel must catch at least one (sanity).
             assert!(
                 false_neg_with < false_neg_without,
-                "derivative channel must strictly reduce false negatives: without={}, with={}",
-                false_neg_without,
-                false_neg_with
+                "derivative channel must strictly reduce false negatives: without={false_neg_without}, with={false_neg_with}"
             );
         }
 
@@ -1423,15 +1418,13 @@ mod tests {
             let baseline = detector.last_entropy_derivative().abs();
             assert!(
                 baseline < 0.05,
-                "derivative must be near zero after long constant stream, got {}",
-                baseline
+                "derivative must be near zero after long constant stream, got {baseline}"
             );
             // Step up: derivative must be positive on the first rising sample.
             let d_up = detector.observe_entropy(2.0);
             assert!(
                 d_up > 0.0,
-                "rising entropy must produce a positive derivative, got {}",
-                d_up
+                "rising entropy must produce a positive derivative, got {d_up}"
             );
             // Warm back down to constant 0.5.
             for _ in 0..150 {
@@ -1441,8 +1434,7 @@ mod tests {
             let d_down = detector.observe_entropy(0.0);
             assert!(
                 d_down < 0.0,
-                "falling entropy must produce a negative derivative, got {}",
-                d_down
+                "falling entropy must produce a negative derivative, got {d_down}"
             );
         }
 
@@ -1489,9 +1481,7 @@ mod tests {
             }
             assert!(
                 loose_step.unwrap_or(usize::MAX) <= tight_step.unwrap_or(usize::MAX),
-                "looser tau must fire no later than tight tau: loose={:?} tight={:?}",
-                loose_step,
-                tight_step
+                "looser tau must fire no later than tight tau: loose={loose_step:?} tight={tight_step:?}"
             );
         }
 

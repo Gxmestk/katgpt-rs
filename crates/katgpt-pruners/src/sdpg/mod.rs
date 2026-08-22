@@ -242,8 +242,8 @@ mod tests {
 
         // Arm 2 should have highest Q-value
         let q = sdpg.q_values();
-        assert!(q[2] > q[0], "arm 2 should dominate arm 0: q={:?}", q);
-        assert!(q[2] > q[1], "arm 2 should dominate arm 1: q={:?}", q);
+        assert!(q[2] > q[0], "arm 2 should dominate arm 0: q={q:?}");
+        assert!(q[2] > q[1], "arm 2 should dominate arm 1: q={q:?}");
     }
 
     #[test]
@@ -301,8 +301,7 @@ mod tests {
         let rel = sdpg.relevance(0, 0, &[]);
         assert!(
             (rel - 1.0).abs() < 1e-6,
-            "should delegate to UnitPruner, got {}",
-            rel
+            "should delegate to UnitPruner, got {rel}"
         );
     }
 

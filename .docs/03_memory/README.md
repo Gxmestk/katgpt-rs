@@ -16,6 +16,7 @@
         ├── product_key_memory.md (O(√N) factored retrieval)
         ├── engram.md (hash-addressed conditional pattern memory)
         ├── micro_belief.md (attractor / leaky belief kernel)
+        ├── drift_segment.md (drift-segmented multi-state memory, katgpt-kv)
         └── chunked_content_store.md (content-addressed Merkle blob store)
               │
               ▼
@@ -29,6 +30,7 @@
 | [`engram.md`](engram.md) | Engram — hash-addressed conditional pattern memory (Plan 299) |
 | [`micro_belief.md`](micro_belief.md) | MicroRecurrentBeliefState — attractor + leaky belief kernel (Plan 276) |
 | [`sense_composition.md`](sense_composition.md) | NPC sense composition (Plans 221/230/235/236/237) |
+| [`drift_segment.md`](drift_segment.md) | DriftSegmentStore — training-free drift-segmented multi-state memory (Issue 652 / Research 482, katgpt-kv, opt-in — Bench 635 GOAT PASS) |
 | [`chunked_content_store.md`](chunked_content_store.md) | ChunkedContentStore — Lore-distilled content-addressed Merkle blob store (Plan 448, default-ON since Phase 19b promotion fix-up 2026-07-18) |
 | [`sleep_consolidation.md`](sleep_consolidation.md) | Sleep consolidation — offline recursive memory consolidation at eviction (Plan 154, default-ON) |
 

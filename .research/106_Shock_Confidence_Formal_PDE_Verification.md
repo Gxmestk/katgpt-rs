@@ -152,7 +152,7 @@ The prover's most valuable property: **it knows when it can't prove something** 
 
 3. **Mutation strategy comparison**: The paper shows different flux limiters have different proof success rates. For our proof sketch evolution (Plan 128), we should **benchmark multiple mutation strategies** rather than committing to one.
 
-**Not a GOAT pillar** per the [decision matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md) — this is proof methodology infrastructure, not directly MMO-productive. No game-specific code needed. Lives entirely in `katgpt-rs`.
+**Not a GOAT pillar** per the [decision matrix](../../riir-ai/.docs/03_pillars/README.md) — this is proof methodology infrastructure, not directly MMO-productive. No game-specific code needed. Lives entirely in `katgpt-rs`.
 
 **Domain:** `katgpt-rs` only — generic proof methodology. No `riir-ai` plan needed. Phase 4 (Percepta mutation strategy benchmarking) is super-GOAT — feature-gated behind `proof_cert` + `percepta`, kept as a selling point.
 

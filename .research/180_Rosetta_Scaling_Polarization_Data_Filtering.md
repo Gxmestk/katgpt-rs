@@ -5,6 +5,8 @@
 **Status**: Verdict + Distillation
 **Extends**: Research 178 (original Rosetta Neurons paper)
 
+> **PASS-Redirects (synthesis):** Liu & Han [arXiv:2606.11722 "ICA Lens: Interpreting Language Models Without Training Another Dictionary"] — Gain (NOT PASS, goes to Plan 475). This note's polarization effect (excess kurtosis = monosemanticity/selectivity metric) IS the signal ICA Lens explicitly maximizes via FastICA — the paper's Figure 3 shows ICA directions have ~100× the excess kurtosis of random directions, validating the kurtosis-as-interpretability thesis this note distills from the Rosetta scaling paper. The Plan 203 `excess_kurtosis()` function this note motivated is consumed directly by Plan 475 as the per-direction non-Gaussianity ranker for ICA's recovered directions. The FastICA fixed-point iteration is the missing joint optimization (vs Plan 203's post-hoc ranking of PCA directions).
+
 ---
 
 ## 0. Paper TL;DR

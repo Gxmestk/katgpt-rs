@@ -28,7 +28,7 @@ fn fmt_tps(tps: f64) -> String {
     match tps {
         t if t >= 1_000_000.0 => format!("{:.1}M/s", t / 1_000_000.0),
         t if t >= 1_000.0 => format!("{:.0}K/s", t / 1_000.0),
-        t => format!("{:.0}/s", t),
+        t => format!("{t:.0}/s"),
     }
 }
 
@@ -36,7 +36,7 @@ fn fmt_tps(tps: f64) -> String {
 fn fmt_us(us: f64) -> String {
     match us {
         u if u >= 1000.0 => format!("{:.1}ms", u / 1000.0),
-        u => format!("{:.2}µs", u),
+        u => format!("{u:.2}µs"),
     }
 }
 
@@ -527,9 +527,7 @@ fn bench_simd_feasibility_summary() {
     // 30K CCU @ 20Hz = 600K tok/s required
     let required_tps = 600_000.0;
     let cores_needed = (required_tps / single_core_tps).ceil() as usize;
-    let cores_available = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1);
+    let cores_available = std::thread::available_parallelism().map_or(1, |n| n.get());
 
     let headroom_8c = (single_core_tps * 8.0) / required_tps;
     let headroom_full = (single_core_tps * cores_available as f64) / required_tps;

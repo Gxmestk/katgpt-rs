@@ -76,10 +76,7 @@ fn main() {
     println!();
 
     // ── Phase 1: ECHO ON ────────────────────────────────────────────
-    println!(
-        "▶ Phase 1: ECHO Environment Predictor ON ({} episodes)",
-        EPISODES
-    );
+    println!("▶ Phase 1: ECHO Environment Predictor ON ({EPISODES} episodes)");
 
     let mut integration = EchoEnvIntegration::new(game_forward_model, FEATURE_DIM, VOCAB);
 
@@ -141,7 +138,7 @@ fn main() {
     println!();
 
     // ── Phase 2: ECHO OFF (baseline) ────────────────────────────────
-    println!("▶ Phase 2: ECHO OFF — Baseline ({} episodes)", EPISODES);
+    println!("▶ Phase 2: ECHO OFF — Baseline ({EPISODES} episodes)");
 
     let mut baseline_bp = BanditPruner::new(
         katgpt_rs::speculative::NoScreeningPruner,

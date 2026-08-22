@@ -123,19 +123,16 @@ fn test_goat_flow_score_overhead() {
     let debug_overhead_cap = 5.0; // debug-mode informational
 
     eprintln!("═══ GOAT T5.1: Flow Score Overhead ═══");
-    eprintln!("  V={} T={}: {:.1}μs/call", vocab, positions, per_call_us);
-    eprintln!("  Inference estimate: {:.0}μs/token", inference_us);
+    eprintln!("  V={vocab} T={positions}: {per_call_us:.1}μs/call");
+    eprintln!("  Inference estimate: {inference_us:.0}μs/token");
     eprintln!(
-        "  Overhead: {:.4}% (debug cap: {}%)",
-        overhead_pct, debug_overhead_cap
+        "  Overhead: {overhead_pct:.4}% (debug cap: {debug_overhead_cap}%)"
     );
     eprintln!("  NOTE: Release build expected <1%. Debug is ~5-10x slower.");
 
     assert!(
         overhead_pct < debug_overhead_cap,
-        "flow_score overhead must be < {}% of inference (debug), got {:.4}%",
-        debug_overhead_cap,
-        overhead_pct
+        "flow_score overhead must be < {debug_overhead_cap}% of inference (debug), got {overhead_pct:.4}%"
     );
 }
 
@@ -197,8 +194,7 @@ fn test_goat_flow_score_vs_max_prob() {
         let flow_best_score = flow_score(marginals, &candidates[best_flow]);
         let (base, det) = flow_components(marginals, &candidates[best_flow]);
         eprintln!(
-            "  {}: flow_best=#{} max_best=#{} agree={} score={:.4} (base={:.4} det={:.4})",
-            name, best_flow, best_max_idx, agree, flow_best_score, base, det
+            "  {name}: flow_best=#{best_flow} max_best=#{best_max_idx} agree={agree} score={flow_best_score:.4} (base={base:.4} det={det:.4})"
         );
     }
 
@@ -279,7 +275,7 @@ fn test_goat_flow_gate_discrimination() {
     let bot_count = n_sequences / 4;
 
     eprintln!("═══ GOAT T5.3: FlowGate Discrimination ═══");
-    eprintln!("  {} sequences, alpha={}", n_sequences, alpha);
+    eprintln!("  {n_sequences} sequences, alpha={alpha}");
     eprintln!(
         "  Top quartile acceptance: {}/{} ({:.0}%)",
         top_accept,
@@ -296,9 +292,7 @@ fn test_goat_flow_gate_discrimination() {
     // Core claim: top quartile should be accepted more than bottom quartile
     assert!(
         top_accept > bot_accept,
-        "Top quartile should be accepted more than bottom: {} vs {}",
-        top_accept,
-        bot_accept
+        "Top quartile should be accepted more than bottom: {top_accept} vs {bot_accept}"
     );
 }
 
@@ -352,21 +346,20 @@ fn test_goat_flow_budget_distribution() {
     let sum: usize = int_budgets.iter().sum();
 
     eprintln!("═══ GOAT T5.4: FlowBudget Distribution ═══");
-    eprintln!("  Scores: {:?}", scores);
-    eprintln!("  Weights: {:?}", weights);
-    eprintln!("  Budgets: {:?} (sum={})", int_budgets, sum);
+    eprintln!("  Scores: {scores:?}");
+    eprintln!("  Weights: {weights:?}");
+    eprintln!("  Budgets: {int_budgets:?} (sum={sum})");
 
     // Assertions
-    assert_eq!(sum, total_budget, "Budgets must sum to {}", total_budget);
+    assert_eq!(sum, total_budget, "Budgets must sum to {total_budget}");
     for (i, &b) in int_budgets.iter().enumerate() {
-        assert!(b >= 1, "Branch {} should get at least 1, got {}", i, b);
+        assert!(b >= 1, "Branch {i} should get at least 1, got {b}");
     }
     // Monotonically non-decreasing (allowing ties for close scores)
     for i in 1..int_budgets.len() {
         assert!(
             int_budgets[i] >= int_budgets[i - 1],
-            "Budget should be monotonically non-decreasing: {:?}",
-            int_budgets
+            "Budget should be monotonically non-decreasing: {int_budgets:?}"
         );
     }
 }
@@ -417,21 +410,15 @@ fn test_goat_flow_score_numerical_stability() {
 
         assert!(
             score.is_finite(),
-            "{}: flow_score produced non-finite: {}",
-            name,
-            score
+            "{name}: flow_score produced non-finite: {score}"
         );
         assert!(
             base.is_finite(),
-            "{}: base_logprob produced non-finite: {}",
-            name,
-            base
+            "{name}: base_logprob produced non-finite: {base}"
         );
         assert!(
             det.is_finite(),
-            "{}: log_det produced non-finite: {}",
-            name,
-            det
+            "{name}: log_det produced non-finite: {det}"
         );
     }
 }
@@ -464,20 +451,17 @@ fn test_goat_flow_score_entropy_discrimination() {
 
     eprintln!("═══ GOAT T5.6: Entropy Discrimination (Core NF-CoT Insight) ═══");
     eprintln!(
-        "  Peaked:   score={:.6} base={:.6} det={:.6}",
-        score_a_peaked, base_a, det_a
+        "  Peaked:   score={score_a_peaked:.6} base={base_a:.6} det={det_a:.6}"
     );
     eprintln!(
-        "  Uniform:  score={:.6} base={:.6} det={:.6}",
-        score_b_uniform, base_b, det_b
+        "  Uniform:  score={score_b_uniform:.6} base={base_b:.6} det={det_b:.6}"
     );
-    eprintln!("  Entropy peaked:  {:?}", entropy_peaked);
-    eprintln!("  Entropy uniform: {:?}", entropy_uniform);
+    eprintln!("  Entropy peaked:  {entropy_peaked:?}");
+    eprintln!("  Entropy uniform: {entropy_uniform:?}");
     eprintln!(
-        "  log_det peaked:  {:.6} (should be very negative — confident)",
-        det_a
+        "  log_det peaked:  {det_a:.6} (should be very negative — confident)"
     );
-    eprintln!("  log_det uniform: {:.6} (should be ≈0 — uncertain)", det_b);
+    eprintln!("  log_det uniform: {det_b:.6} (should be ≈0 — uncertain)");
 
     // Core assertions:
     // 1. Uniform marginals have higher entropy than peaked
@@ -485,9 +469,7 @@ fn test_goat_flow_score_entropy_discrimination() {
     let avg_entropy_uniform = entropy_uniform.iter().sum::<f32>() / entropy_uniform.len() as f32;
     assert!(
         avg_entropy_uniform > avg_entropy_peaked,
-        "Uniform entropy ({}) should exceed peaked ({})",
-        avg_entropy_uniform,
-        avg_entropy_peaked
+        "Uniform entropy ({avg_entropy_uniform}) should exceed peaked ({avg_entropy_peaked})"
     );
 
     // 2. log_det is more negative for peaked (confident) than uniform (uncertain)
@@ -495,24 +477,18 @@ fn test_goat_flow_score_entropy_discrimination() {
     // sigmoid(high_entropy) ≈ 1.0 → log(1.0) = 0
     assert!(
         det_b > det_a,
-        "log_det(uniform) should be > log_det(peaked): {} vs {}",
-        det_b,
-        det_a
+        "log_det(uniform) should be > log_det(peaked): {det_b} vs {det_a}"
     );
 
     // 3. The log_det term actually discriminates — not zero, not identical
     let det_diff = (det_b - det_a).abs();
     assert!(
         det_diff > 0.01,
-        "log_det should discriminate: |{:.6} - {:.6}| = {:.6} (should be > 0.01)",
-        det_b,
-        det_a,
-        det_diff
+        "log_det should discriminate: |{det_b:.6} - {det_a:.6}| = {det_diff:.6} (should be > 0.01)"
     );
 
     eprintln!(
-        "  ✓ log_det discrimination: {:.4} (peaked det is more negative)",
-        det_diff
+        "  ✓ log_det discrimination: {det_diff:.4} (peaked det is more negative)"
     );
     eprintln!(
         "  ✓ NF-CoT insight validated: uncertain regions carry more information, \
@@ -579,8 +555,7 @@ fn test_bench_flow_score_vs_max_prob_selection() {
                 agreements += 1;
             }
             eprintln!(
-                "    {}: flow=#{} max=#{} agree={}",
-                name, best_flow, best_max_idx, agree
+                "    {name}: flow=#{best_flow} max=#{best_max_idx} agree={agree}"
             );
         }
         assert_eq!(
@@ -624,12 +599,10 @@ fn test_bench_flow_score_vs_max_prob_selection() {
         let logprob_b = total_log_prob(&marginals_b, &selected_b);
 
         eprintln!(
-            "    A (p=0.99): base={:.6} det={:.6} flow={:.6} logprob={:.6}",
-            base_a, det_a, flow_a, logprob_a
+            "    A (p=0.99): base={base_a:.6} det={det_a:.6} flow={flow_a:.6} logprob={logprob_a:.6}"
         );
         eprintln!(
-            "    B (p=0.95): base={:.6} det={:.6} flow={:.6} logprob={:.6}",
-            base_b, det_b, flow_b, logprob_b
+            "    B (p=0.95): base={base_b:.6} det={det_b:.6} flow={flow_b:.6} logprob={logprob_b:.6}"
         );
 
         // max-prob prefers A (p=0.99 > p=0.95)
@@ -643,9 +616,7 @@ fn test_bench_flow_score_vs_max_prob_selection() {
         // log_det for B should be less negative than A (more entropy → sigmoid closer to 1 → log closer to 0)
         assert!(
             det_b > det_a,
-            "log_det(B) should be > log_det(A): {} vs {}",
-            det_b,
-            det_a
+            "log_det(B) should be > log_det(A): {det_b} vs {det_a}"
         );
         eprintln!(
             "    ✓ log_det discriminates: det_B ({:.6}) > det_A ({:.6}), diff={:.6}",
@@ -658,14 +629,12 @@ fn test_bench_flow_score_vs_max_prob_selection() {
         let flow_prefers = if flow_a > flow_b { 'A' } else { 'B' };
         let maxprob_prefers = if logprob_a > logprob_b { 'A' } else { 'B' };
         eprintln!(
-            "    flow_score prefers: {} | max-prob prefers: {}",
-            flow_prefers, maxprob_prefers
+            "    flow_score prefers: {flow_prefers} | max-prob prefers: {maxprob_prefers}"
         );
 
         if flow_prefers != maxprob_prefers {
             eprintln!(
-                "    ✓ Ranking disagreement: flow_score prefers {}, max-prob prefers {}",
-                flow_prefers, maxprob_prefers
+                "    ✓ Ranking disagreement: flow_score prefers {flow_prefers}, max-prob prefers {maxprob_prefers}"
             );
         } else {
             eprintln!(
@@ -728,9 +697,7 @@ fn test_bench_flow_score_vs_max_prob_selection() {
         let base_diff = (base_x - base_y).abs();
         assert!(
             base_diff < 0.001,
-            "base_logprobs should be equal: X={} vs Y={}",
-            base_x,
-            base_y
+            "base_logprobs should be equal: X={base_x} vs Y={base_y}"
         );
 
         // Y has lower entropy (mass concentrated on token 1) → lower sigmoid → more negative log_det
@@ -752,9 +719,7 @@ fn test_bench_flow_score_vs_max_prob_selection() {
         // X (uniform) should have higher entropy → higher sigmoid → higher log_det → higher flow_score
         assert!(
             det_x > det_y,
-            "log_det(X) should be > log_det(Y): {} vs {}",
-            det_x,
-            det_y
+            "log_det(X) should be > log_det(Y): {det_x} vs {det_y}"
         );
         assert!(
             base_x + det_x > base_y + det_y,

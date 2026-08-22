@@ -560,9 +560,10 @@ impl SketchEntry {
 ///
 /// Returns 0.5 if min == max (degenerate case).
 fn normalize_to_01(value: f64, min: f64, max: f64) -> f64 {
-    match max > min {
-        true => (value - min) / (max - min),
-        false => 0.5,
+    if max > min {
+        (value - min) / (max - min)
+    } else {
+        0.5
     }
 }
 

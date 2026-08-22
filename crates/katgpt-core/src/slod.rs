@@ -598,8 +598,7 @@ pub fn frechet_mean(
         .iter()
         .enumerate()
         .max_by(|a, b| a.1.total_cmp(b.1))
-        .map(|(i, _)| i)
-        .unwrap_or(0);
+        .map_or(0, |(i, _)| i);
 
     let mut mu = embeddings[start_idx * dim..(start_idx + 1) * dim].to_vec();
 
@@ -735,20 +734,18 @@ impl crate::traits::ConstraintPruner for SlodPruner {
         parent_tokens: &[usize],
         results: &mut [bool],
     ) {
-        let tier = match self.tier_index(depth) {
-            Some(t) => t,
-            None => {
-                let len = candidates.len().min(results.len());
-                results[..len].fill(true);
-                return;
-            }
+        let tier = if let Some(t) = self.tier_index(depth) {
+            t
+        } else {
+            let len = candidates.len().min(results.len());
+            results[..len].fill(true);
+            return;
         };
-        match self.tier_pruners.get(tier) {
-            Some(pruner) => pruner.batch_is_valid(depth, candidates, parent_tokens, results),
-            None => {
-                let len = candidates.len().min(results.len());
-                results[..len].fill(true);
-            }
+        if let Some(pruner) = self.tier_pruners.get(tier) {
+            pruner.batch_is_valid(depth, candidates, parent_tokens, results)
+        } else {
+            let len = candidates.len().min(results.len());
+            results[..len].fill(true);
         }
     }
 

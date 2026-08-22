@@ -209,8 +209,7 @@ mod bake_store {
             self.entries
                 .pin()
                 .get(&entity_hash)
-                .map(|e| e.mean)
-                .unwrap_or([0.0; 8])
+                .map_or([0.0; 8], |e| e.mean)
         }
 
         /// Evict entity (for LFU cache eviction). Returns the evicted entry.
@@ -388,8 +387,7 @@ mod tests {
         let penalty = bake_regularize(&mu_old, &lambda, &mu_current, 1.0);
         assert!(
             penalty > 3.0,
-            "penalty should be high when deviating from high-precision prior, got {}",
-            penalty
+            "penalty should be high when deviating from high-precision prior, got {penalty}"
         );
     }
 
@@ -596,13 +594,11 @@ mod tests {
             for d in 0..8 {
                 assert!(
                     (result.mean[d] - before.mean[d]).abs() < 1e-6,
-                    "empty session should not change mean, diff at dim {}",
-                    d
+                    "empty session should not change mean, diff at dim {d}"
                 );
                 assert!(
                     (result.precision[d] - before.precision[d]).abs() < 1e-6,
-                    "empty session should not change precision, diff at dim {}",
-                    d
+                    "empty session should not change precision, diff at dim {d}"
                 );
             }
         }

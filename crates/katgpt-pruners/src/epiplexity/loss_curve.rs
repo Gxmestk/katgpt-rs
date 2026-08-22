@@ -234,8 +234,7 @@ impl PerPositionLossTracker {
     pub fn step_count(&self, position: usize) -> usize {
         self.position_losses
             .get(position)
-            .map(|buf| buf.len())
-            .unwrap_or(0)
+            .map_or(0, |buf| buf.len())
     }
 
     /// Get the loss history for a specific position.

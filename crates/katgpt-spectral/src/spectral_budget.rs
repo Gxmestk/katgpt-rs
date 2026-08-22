@@ -203,10 +203,7 @@ impl SpectralBudgetConfig {
     /// Get NS iteration count for a specific layer index.
     #[inline]
     pub fn ns_iterations(&self, layer_idx: usize) -> u8 {
-        self.layers
-            .get(layer_idx)
-            .map(|c| c.ns_iterations)
-            .unwrap_or(5)
+        self.layers.get(layer_idx).map_or(5, |c| c.ns_iterations)
     }
 
     /// Get retention fraction for a specific layer index.
@@ -214,8 +211,7 @@ impl SpectralBudgetConfig {
     pub fn retention(&self, layer_idx: usize) -> f32 {
         self.layers
             .get(layer_idx)
-            .map(|c| c.retention_fraction)
-            .unwrap_or(0.5)
+            .map_or(0.5, |c| c.retention_fraction)
     }
 
     /// Count layers that need more than 5 NS iterations.

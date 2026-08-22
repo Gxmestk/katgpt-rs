@@ -145,8 +145,7 @@ fn bench_g2_operator_overhead() {
 
         let overhead = (apply_ns / baseline_ns - 1.0) * 100.0;
         println!(
-            "{:>6} {:>14.1} {:>14.1} {:>9.1}%",
-            width, apply_ns, baseline_ns, overhead
+            "{width:>6} {apply_ns:>14.1} {baseline_ns:>14.1} {overhead:>9.1}%"
         );
     }
     println!();
@@ -186,8 +185,7 @@ fn bench_g2_late_early_pair() {
 
     let overhead = (pair_ns / baseline_ns - 1.0) * 100.0;
     println!(
-        "LateEarly pair (D={}): {:.1} ns vs baseline {:.1} ns → overhead {:.1}%",
-        width, pair_ns, baseline_ns, overhead
+        "LateEarly pair (D={width}): {pair_ns:.1} ns vs baseline {baseline_ns:.1} ns → overhead {overhead:.1}%"
     );
     println!();
 }
@@ -244,8 +242,7 @@ fn bench_g3_scan_overhead() {
 
         let overhead = (scan_ns / hand_ns - 1.0) * 100.0;
         println!(
-            "{:>6} {:>10} {:>18.1} {:>18.1} {:>9.1}%",
-            n_stages, n_cells, scan_ns, hand_ns, overhead
+            "{n_stages:>6} {n_cells:>10} {scan_ns:>18.1} {hand_ns:>18.1} {overhead:>9.1}%"
         );
     }
     println!();
@@ -352,7 +349,7 @@ fn bench_g1_classify_latency() {
         let ns = time_ns(iters, || {
             black_box(map.classify_two_cluster());
         });
-        println!("classify_two_cluster ({}×{}): {:.1} ns/call", n, n, ns);
+        println!("classify_two_cluster ({n}×{n}): {ns:.1} ns/call");
     }
     println!();
 }

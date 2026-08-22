@@ -212,7 +212,7 @@ The region-membership profile `{g_k(x)}` (K sigmoid gates) crosses the sync boun
 **(e) `NeuronShard` (`riir-neuron-db/src/`):**
 The MFA artifact is a `RegionSubspaceShard` subtype. Layout: `[zone_hash(32) | centroids(K·D·4) | loadings(K·R·D·4) | log_pi(K·4) | psi_inv(D·4) | version(4) | blake3(32)]`. At K=8, D=8, R=2: 32 + 256 + 512 + 32 + 32 + 4 + 32 = 900 bytes, padded to 1024. `MerkleFrozenEnvelope` wraps it. The archetype library (K frozen NeuronShards, one per region centroid+loadings pair) is a separate frozen artifact referenced by hash.
 
-**(f) DEC Stokes-calculus (`katgpt-core/src/dec/`):**
+**(f) DEC Stokes-calculus (`katgpt-dec/src/`):**
 DEC `hodge_decompose` splits a flow into 3 channels (exact/harmonic/coexact) — a 3-region decomposition with fixed regions. MFA generalizes to K *learned* regions with data-driven boundaries. The DEC substrate provides the *infrastructure* for region-structured cochains; MFA provides the *learned region partition*. **Curse-of-dimensionality caveat:** DEC boundary-flux wins only for d ≤ 3 (game maps); MFA on HLA (d=8) or shards (d=64) does not benefit from boundary-only computation.
 
 ---

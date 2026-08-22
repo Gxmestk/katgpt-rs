@@ -229,14 +229,8 @@ fn main() {
     let cur_hi = forecaster.curiosity_sq(&c_hi);
 
     println!("── Two contexts ──");
-    println!(
-        "  c_lo = {:?}  (on-manifold)   curiosity = {:.4}",
-        c_lo, cur_lo
-    );
-    println!(
-        "  c_hi = {:?}  (off-manifold)  curiosity = {:.4}",
-        c_hi, cur_hi
-    );
+    println!("  c_lo = {c_lo:?}  (on-manifold)   curiosity = {cur_lo:.4}");
+    println!("  c_hi = {c_hi:?}  (off-manifold)  curiosity = {cur_hi:.4}");
     println!();
 
     // ── Build the catalog (same toy 4-direction catalog as T3.1) ───────────
@@ -273,14 +267,8 @@ fn main() {
     println!("  {:<10} {:>14} {:>14}", "context", "curiosity", "slot p_i");
     let p_lo = c_prime_lo.slots[0].predictability;
     let p_hi = c_prime_hi.slots[0].predictability;
-    println!(
-        "  c_lo       {:>14.4} {:>14.6}   (HIGH p → predictable)",
-        cur_lo, p_lo
-    );
-    println!(
-        "  c_hi       {:>14.4} {:>14.6}   (LOW  p → unpredictable)",
-        cur_hi, p_hi
-    );
+    println!("  c_lo       {cur_lo:>14.4} {p_lo:>14.6}   (HIGH p → predictable)");
+    println!("  c_hi       {cur_hi:>14.4} {p_hi:>14.6}   (LOW  p → unpredictable)");
     println!();
     println!("  Verdict: high-curiosity context c_hi gets LOW predictability across");
     println!("  the whole catalog — no direction anticipates it. c_lo gets HIGH p.");
@@ -302,25 +290,19 @@ fn main() {
     };
 
     println!("── consume() — gate flips with curiosity ──");
-    println!("  query q = {:?} in both contexts. fresh_think(q) = −q.", q);
+    println!("  query q = {q:?} in both contexts. fresh_think(q) = −q.");
     println!();
 
     let (best_lo, gate_lo) = consume_gate(&q, &c_prime_lo, TAU, BETA);
     let out_lo = consume(&q, &c_prime_lo, TAU, BETA, fresh_think);
     println!("  in c_lo (low curiosity):");
-    println!(
-        "    best slot i* = {best_lo}  gate = {:.6}  (HIGH → precomputed)",
-        gate_lo
-    );
+    println!("    best slot i* = {best_lo}  gate = {gate_lo:.6}  (HIGH → precomputed)");
     println!("    out = {}  ≈ precomputed slot", fmt_array(&out_lo));
 
     let (best_hi, gate_hi) = consume_gate(&q, &c_prime_hi, TAU, BETA);
     let out_hi = consume(&q, &c_prime_hi, TAU, BETA, fresh_think);
     println!("  in c_hi (high curiosity):");
-    println!(
-        "    best slot i* = {best_hi}  gate = {:.6}  (LOW → fresh think)",
-        gate_hi
-    );
+    println!("    best slot i* = {best_hi}  gate = {gate_hi:.6}  (LOW → fresh think)");
     println!("    out = {}  ≈ fresh_think output", fmt_array(&out_hi));
     println!();
     println!("  Same query, same catalog, same τ/β — different verdict. That's the");
@@ -364,8 +346,7 @@ fn main() {
         let should = model.should_pre_compute(sleep_cost, n_consumers, e_gate);
         let should_str = if should { "YES ✓" } else { "no ✗" };
         println!(
-            "  {label:<10} {:>12.4} {:>12.4} {:>16}   (curiosity={cur:.4})",
-            e_gate, factor, should_str
+            "  {label:<10} {e_gate:>12.4} {factor:>12.4} {should_str:>16}   (curiosity={cur:.4})"
         );
     }
     println!();
@@ -389,6 +370,6 @@ fn main() {
 // ── Display helpers ────────────────────────────────────────────────────────
 
 fn fmt_array<const D: usize>(a: &[f32; D]) -> String {
-    let parts: Vec<String> = a.iter().map(|x| format!("{:.3}", x)).collect();
+    let parts: Vec<String> = a.iter().map(|x| format!("{x:.3}")).collect();
     format!("[{}]", parts.join(", "))
 }

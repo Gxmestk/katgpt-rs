@@ -637,8 +637,7 @@ mod tests {
         for i in 1..eig.k() {
             assert!(
                 eig.eigenvalues[i - 1] >= eig.eigenvalues[i],
-                "eigenvalues not sorted descending at index {}",
-                i
+                "eigenvalues not sorted descending at index {i}"
             );
         }
         // Each eigenvector is unit-norm.
@@ -647,9 +646,7 @@ mod tests {
             let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
             assert!(
                 (norm - 1.0).abs() < 1e-3,
-                "eigenvector {} has norm {} (expected ~1.0)",
-                ki,
-                norm
+                "eigenvector {ki} has norm {norm} (expected ~1.0)"
             );
         }
     }
@@ -681,10 +678,7 @@ mod tests {
             let residual = residual_sq.sqrt();
             assert!(
                 residual < 0.5,
-                "eigenvector {} residual too large: {} (λ={:.4})",
-                ki,
-                residual,
-                lambda_k
+                "eigenvector {ki} residual too large: {residual} (λ={lambda_k:.4})"
             );
         }
     }
@@ -732,10 +726,7 @@ mod tests {
         // O(dt²) = O(0.0001) per mode. Relative error should be < 0.5%.
         assert!(
             rel < 0.005,
-            "heat kernel vs Euler at t=dt (full decomp): rel dist {} > 0.005 (dist={}, scale={})",
-            rel,
-            dist,
-            scale
+            "heat kernel vs Euler at t=dt (full decomp): rel dist {rel} > 0.005 (dist={dist}, scale={scale})"
         );
     }
 
@@ -782,11 +773,7 @@ mod tests {
         }
         assert!(
             max_rel < 0.05,
-            "heat kernel single-mode: max rel error {:.4} (expected scale={}, a_k={}, t={})",
-            max_rel,
-            exact_scale,
-            a_k,
-            t
+            "heat kernel single-mode: max rel error {max_rel:.4} (expected scale={exact_scale}, a_k={a_k}, t={t})"
         );
 
         // Euler: (1 + dt·a_k)^T · v_k. This drifts from exp(T·dt·a_k).
@@ -798,15 +785,12 @@ mod tests {
         // Euler's relative drift grows with T·dt². At T=50, dt=0.1: visible.
         assert!(
             euler_rel > 0.01,
-            "Euler single-mode drift too small ({:.6}) — test not exercising drift regime",
-            euler_rel
+            "Euler single-mode drift too small ({euler_rel:.6}) — test not exercising drift regime"
         );
         // And the heat kernel is more accurate than Euler.
         assert!(
             max_rel < euler_rel,
-            "heat kernel rel error {} should be < Euler rel error {}",
-            max_rel,
-            euler_rel
+            "heat kernel rel error {max_rel} should be < Euler rel error {euler_rel}"
         );
     }
 
@@ -890,8 +874,7 @@ mod tests {
         }
         assert!(
             max_dev < 1e-5,
-            "multi-channel decoupling: channel 0 max dev {} > 1e-5",
-            max_dev
+            "multi-channel decoupling: channel 0 max dev {max_dev} > 1e-5"
         );
     }
 
@@ -919,8 +902,7 @@ mod tests {
             .fold(0.0f32, f32::max);
         assert!(
             max_dev < 1e-6,
-            "allocating vs into variant max dev {} > 1e-6",
-            max_dev
+            "allocating vs into variant max dev {max_dev} > 1e-6"
         );
     }
 
@@ -945,9 +927,7 @@ mod tests {
         let max_val = hk.data.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
         assert!(
             max_val < c,
-            "stable decay: max val {} should be < initial {}",
-            max_val,
-            c
+            "stable decay: max val {max_val} should be < initial {c}"
         );
     }
 
@@ -986,7 +966,7 @@ mod tests {
         let dist = l2_dist(&hk, &h0);
         let scale = l2_norm(&h0).max(1e-6);
         let rel = dist / scale;
-        assert!(rel < 1e-3, "t=0 identity: rel dist {} > 1e-3", rel);
+        assert!(rel < 1e-3, "t=0 identity: rel dist {rel} > 1e-3");
     }
 
     // ── Extra: heat kernel matches 4-term Taylor series ───────────────────────
@@ -1038,7 +1018,7 @@ mod tests {
         let scale = l2_norm(&h0).max(1e-6);
         let rel = dist / scale;
         // 4-term Taylor is accurate to O(t⁴). At t=0.01, this is ~1e-8.
-        assert!(rel < 0.001, "heat kernel vs Taylor: rel {} > 0.001", rel);
+        assert!(rel < 0.001, "heat kernel vs Taylor: rel {rel} > 0.001");
     }
 
     // ── Extra: eigensolver completeness (identity reconstruction) ──────────────
@@ -1231,7 +1211,7 @@ mod tests {
             for i in 0..n {
                 h0_d.data[i] = h0.data[i * dim + d];
             }
-            let h_d = heat_kernel_trajectory_krylov(&cx, &h0_d, &motor[d..d + 1], 1, 5.0, n);
+            let h_d = heat_kernel_trajectory_krylov(&cx, &h0_d, &motor[d..=d], 1, 5.0, n);
             for i in 0..n {
                 let err = (h_full.data[i * dim + d] - h_d.data[i]).abs();
                 assert!(

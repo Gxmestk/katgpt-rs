@@ -4,7 +4,7 @@
 > **Authors:** Zhizhan Zheng, Feiyun Zhang, Shuchun Liu, Tian Xia, Xi Liu, Dasheng Hu, Hongquan Zhou (Shanghai Yichuang, Fudan University)
 > **Date:** May 2026
 > **Verdict:** ⚠️ Partial distill — validation only, no new code.
-> **GOAT Pillar:** ❌ Not a pillar — general transformer architecture, not game-specific. Evaluated against [MMO GOAT Pillars](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md): fails MMO-product (required), fails LoRA-independent (high). Stays in `katgpt-rs` domain.
+> **GOAT Pillar:** ❌ Not a pillar — general transformer architecture, not game-specific. Evaluated against [MMO GOAT Pillars](../../riir-ai/.docs/03_pillars/README.md): fails MMO-product (required), fails LoRA-independent (high). Stays in `katgpt-rs` domain.
 > **Domain:** `katgpt-rs` — validates our existing `delta_routing` (Plan 097) design. No game IP, no selling point, no secret.
 >
 > MGR's AttnPool is structurally identical to our `depth_route()`. The novel parts (multi-stream residuals + gated lerp) are **training-time only**, requiring n× stream memory and weight format changes. Our codebase is inference-focused. Distill only the **convex-combination stability proof** (§3.2) for documentation. No new feature gate needed.
@@ -98,7 +98,7 @@ MGR is fundamentally a **model architecture** change, not a modelless technique.
 
 ## GOAT Pillar Evaluation
 
-Evaluated against [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md):
+Evaluated against [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md):
 
 | Criterion | Weight | Score | Reason |
 |-----------|--------|-------|--------|

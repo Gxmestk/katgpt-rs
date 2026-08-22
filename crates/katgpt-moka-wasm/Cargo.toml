@@ -13,7 +13,19 @@ crate-type = ["cdylib", "rlib"]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 katgpt-types = { path = "../katgpt-types" }
+katgpt-nn = { path = "../katgpt-nn" }
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
-wasmi = "1.0"
+wasmi = { version = "1.0", features = ["simd"] }
+
+[features]
+# Research hooks for the Issue 565 / Research 463 quant-error-LoRA defend-wrong PoC.
+# Exposes MokaWeights field accessors + conv2d/linear primitives + a corrected
+# forward pass (forward_corrected_with_scratch) so the riir-poc bench can test
+# quantization-compensation strategies (weight-space SVD, output-space SVD,
+# sparse bypass) against the real Moka v1 weights without reimplementing the
+# forward pass. The feature is OFF by default — the WASM browser build never
+# enables it. Native-only; used by riir-ai/crates/riir-poc.
+default = []
+research = []

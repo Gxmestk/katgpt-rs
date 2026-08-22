@@ -73,8 +73,7 @@ impl SharedBanditStats {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0)
+            .map_or(0, |(i, _)| i)
     }
 
     /// Whether an arm has been compressed (hard-blocked).

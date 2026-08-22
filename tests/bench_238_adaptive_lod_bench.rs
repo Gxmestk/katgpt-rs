@@ -296,8 +296,7 @@ fn bench_adaptive_compression_ratio_distribution() {
         };
 
         println!(
-            "║  {:<14} │ {:>8} │ {:>4} │ {:>4} │ {:>4} │ {:>11.1} ║",
-            label, seg_count, x4_count, x8_count, x16_count, avg_ratio,
+            "║  {label:<14} │ {seg_count:>8} │ {x4_count:>4} │ {x8_count:>4} │ {x16_count:>4} │ {avg_ratio:>11.1} ║",
         );
     }
 
@@ -330,9 +329,7 @@ fn bench_adaptive_compression_ratio_distribution() {
 
     assert!(
         repetitive_avg >= diverse_avg,
-        "Repetitive content should get higher compression (avg span {:.1}) than diverse (avg span {:.1})",
-        repetitive_avg,
-        diverse_avg,
+        "Repetitive content should get higher compression (avg span {repetitive_avg:.1}) than diverse (avg span {diverse_avg:.1})",
     );
 
     println!();

@@ -140,8 +140,7 @@ fn main() {
     println!("=== Plan 298 G3 — CosineSmearClassifier::classify latency ===");
     if is_debug {
         println!(
-            "⚠️  DEBUG build — target scaled 5× ({:.0}→{:.0} ns).",
-            TARGET_NS_K8_D32, effective_target
+            "⚠️  DEBUG build — target scaled 5× ({TARGET_NS_K8_D32:.0}→{effective_target:.0} ns)."
         );
         println!("    Rerun with --release for the authoritative plasma-tier target.");
     }
@@ -169,7 +168,7 @@ fn main() {
             } else {
                 "—"
             };
-            println!("{:>4} {:>4} {:>14.1} {:>10}", k, d, ns, verdict);
+            println!("{k:>4} {d:>4} {ns:>14.1} {verdict:>10}");
             results.push((k, d, ns));
         }
     }

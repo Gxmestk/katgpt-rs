@@ -224,7 +224,7 @@ fn run_round(
                             bombs: bombs.clone(),
                             bomb_types: vec![],
                             powerups: powerups.clone(),
-                            action: actions[i].map(|a| a.as_usize() as u8).unwrap_or(0),
+                            action: actions[i].map_or(0, |a| a.as_usize() as u8),
                             quality: 0.0, // backfilled later
                             tick,
                             round: 0, // backfilled later
@@ -254,9 +254,9 @@ fn run_round(
 
     // Compute scores from events
     let mut scores = [0i32; 4];
-    let mut deaths = Vec::new();
-    let mut kills = Vec::new();
-    let mut powerups = Vec::new();
+    let mut deaths = Vec::with_capacity(all_events.len());
+    let mut kills = Vec::with_capacity(all_events.len());
+    let mut powerups = Vec::with_capacity(all_events.len());
     let mut survivors = Vec::new();
 
     for event in &all_events {

@@ -35,10 +35,7 @@ fn cos_sim(a: &[f32], b: &[f32]) -> f32 {
         norm_b += y * y;
     }
     let denom = norm_a.sqrt() * norm_b.sqrt();
-    match denom < 1e-12 {
-        true => 0.0,
-        false => dot / denom,
-    }
+    if denom < 1e-12 { 0.0 } else { dot / denom }
 }
 
 /// Reference attention: full score matrix materialization with row-wise softmax.
@@ -173,10 +170,7 @@ fn bench_tiled_attention_throughput() {
     for &seq_len in SEQ_LENS {
         let (ref_us, tiled_us, similarity) = bench_single(seq_len, DIM);
 
-        let ratio = match ref_us > 0.0 {
-            true => tiled_us / ref_us,
-            false => 0.0,
-        };
+        let ratio = if ref_us > 0.0 { tiled_us / ref_us } else { 0.0 };
 
         // Verify no NaN/Inf in similarity
         assert!(
@@ -190,10 +184,7 @@ fn bench_tiled_attention_throughput() {
             all_pass = false;
         }
 
-        let status = match sim_pass {
-            true => "✓",
-            false => "✗",
-        };
+        let status = if sim_pass { "✓" } else { "✗" };
 
         eprintln!(
             "║ {seq_len:>8} │ {ref_us:>10.1} │ {tiled_us:>11.1} │ {ratio:>7.2}x │ {similarity:>7.5}{status} │"
@@ -262,9 +253,10 @@ fn bench_tiled_attention_peak_memory_estimate() {
             + seq_len * DIM * 4; // output
         let tiled_kb = tiled_bytes as f64 / 1024.0;
 
-        let savings = match full_kb > 0.0 {
-            true => full_kb / tiled_kb,
-            false => 1.0,
+        let savings = if full_kb > 0.0 {
+            full_kb / tiled_kb
+        } else {
+            1.0
         };
 
         eprintln!("║ {seq_len:>8} │ {full_kb:>9.1} │ {tiled_kb:>10.1} │ {savings:>6.1}×  │");

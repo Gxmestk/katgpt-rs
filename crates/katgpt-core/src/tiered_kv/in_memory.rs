@@ -184,12 +184,12 @@ impl<F: Fn(&[f32], &[usize], usize, usize) -> Vec<f32>> TieredKvStore for InMemo
         let mut ws = WorkingSet::empty();
 
         // Collect all chunks to fetch: sink + local + selected.
+        // The `sort_unstable` + `dedup` below already removes duplicates, so the
+        // old per-element `all_chunks.contains(&c)` guard was redundant work —
+        // it made this O(n²) in the chunk count for an identical result.
         let mut all_chunks = sink_local.all_chunks();
-        for &c in selected_chunks {
-            if !all_chunks.contains(&c) {
-                all_chunks.push(c);
-            }
-        }
+        all_chunks.reserve(selected_chunks.len());
+        all_chunks.extend_from_slice(selected_chunks);
         all_chunks.sort_unstable();
         all_chunks.dedup();
 
@@ -221,12 +221,11 @@ impl<F: Fn(&[f32], &[usize], usize, usize) -> Vec<f32>> TieredKvStore for InMemo
                 if !should_fetch {
                     continue;
                 }
-                // Fetch all tokens in this group.
+                // Fetch all tokens in this group. The tail clamp is hoisted into
+                // the range bound instead of a per-token `break` check.
                 let token_start = g * self.group_size;
-                for t in token_start..token_start + self.group_size {
-                    if t >= self.chunk_size {
-                        break;
-                    }
+                let token_end = (token_start + self.group_size).min(self.chunk_size);
+                for t in token_start..token_end {
                     let key = &chunk.keys[t * d..(t + 1) * d];
                     let value = &chunk.values[t * d..(t + 1) * d];
                     ws.push_token(key, value, chunk.positions[t]);

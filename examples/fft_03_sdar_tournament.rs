@@ -243,7 +243,7 @@ fn main() {
     let mut total_matrix: [[usize; 7]; 7] = [[0; 7]; 7];
 
     // Per-strategy stats
-    let mut stats: HashMap<Strategy, StrategyStats> = HashMap::new();
+    let mut stats: HashMap<Strategy, StrategyStats> = HashMap::with_capacity(strategies.len());
     for &s in strategies {
         stats.insert(s, StrategyStats::new());
     }
@@ -417,18 +417,16 @@ fn main() {
         let label = party_strat.label();
         print!("| {label:<14}|");
         for j in 0..n {
-            let cell = match i == j {
-                true => "—".to_string(),
-                false => {
-                    let wins = win_matrix[i][j];
-                    let total = total_matrix[i][j];
-                    match total {
-                        0 => "—".to_string(),
-                        _ => {
-                            let pct = wins as f64 / total as f64 * 100.0;
-                            format!("{pct:.0}%")
-                        }
-                    }
+            let cell = if i == j {
+                "—".to_string()
+            } else {
+                let wins = win_matrix[i][j];
+                let total = total_matrix[i][j];
+                if total == 0 {
+                    "—".to_string()
+                } else {
+                    let pct = wins as f64 / total as f64 * 100.0;
+                    format!("{pct:.0}%")
                 }
             };
             print!(" {cell:>width$} |", width = col_width);

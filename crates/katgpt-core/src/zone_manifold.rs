@@ -521,7 +521,7 @@ fn compute_grouped<'a>(
             let mut local_mean = [0.0f32; 8];
             let mut local_v = [0.0f32; 8];
             let mut local_w = [0.0f32; 8];
-            debug_assert!(d <= 8, "compute_grouped requires d ≤ 8 (got {})", d);
+            debug_assert!(d <= 8, "compute_grouped requires d ≤ 8 (got {d})");
             let local_cov = &mut local_cov[..dd];
             let local_mean = &mut local_mean[..d];
             let local_v = &mut local_v[..d];
@@ -918,14 +918,12 @@ mod tests {
         let axis0 = &report.zone_axes[0..d];
         assert!(
             axis0[0].abs() > 0.9,
-            "axis 0 should align with e_0, got {:?}",
-            axis0
+            "axis 0 should align with e_0, got {axis0:?}"
         );
         let axis1 = &report.zone_axes[d..2 * d];
         assert!(
             axis1[1].abs() > 0.9,
-            "axis 1 should align with e_1, got {:?}",
-            axis1
+            "axis 1 should align with e_1, got {axis1:?}"
         );
         let ratio = report.eigenvalues[0] / report.eigenvalues[1].max(1e-10);
         assert!(
@@ -1150,9 +1148,7 @@ mod tests {
         for (a, b) in serial.iter().zip(parallel.iter()) {
             assert!(
                 (a - b).abs() < 1e-2,
-                "parallel/serial drift too large: {} vs {}",
-                a,
-                b
+                "parallel/serial drift too large: {a} vs {b}"
             );
         }
     }

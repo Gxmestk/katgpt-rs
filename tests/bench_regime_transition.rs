@@ -82,10 +82,7 @@ fn bench_collapse_classification_throughput() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "bench_collapse_classification: {} iterations in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
-    );
+    println!("bench_collapse_classification: {n} iterations in {elapsed:?} ({ns_per:.1} ns/op)");
     assert!(ns_per < 10_000.0, "Classification too slow: {ns_per} ns/op");
 }
 
@@ -104,10 +101,7 @@ fn bench_gate_evaluation_throughput() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "bench_gate_evaluation: {} iterations in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
-    );
+    println!("bench_gate_evaluation: {n} iterations in {elapsed:?} ({ns_per:.1} ns/op)");
     assert!(
         ns_per < 10_000.0,
         "Gate evaluation too slow: {ns_per} ns/op"
@@ -129,8 +123,7 @@ fn bench_provenance_chain_recording() {
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
     println!(
-        "bench_provenance_chain_record: {} records in {:?} ({:.1} ns/op, blake3)",
-        n, elapsed, ns_per
+        "bench_provenance_chain_record: {n} records in {elapsed:?} ({ns_per:.1} ns/op, blake3)"
     );
     assert!(
         ns_per < 10_000.0,
@@ -160,10 +153,7 @@ fn bench_adversarial_breaker_throughput() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "bench_adversarial_breaker_is_valid: {} calls in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
-    );
+    println!("bench_adversarial_breaker_is_valid: {n} calls in {elapsed:?} ({ns_per:.1} ns/op)");
     assert!(
         ns_per < 10_000.0,
         "AdversarialBreaker too slow: {ns_per} ns/op"
@@ -192,8 +182,7 @@ fn bench_four_regime_router_selection() {
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
     println!(
-        "bench_four_regime_router_select_update: {} cycles in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
+        "bench_four_regime_router_select_update: {n} cycles in {elapsed:?} ({ns_per:.1} ns/op)"
     );
     assert!(
         ns_per < 10_000.0,
@@ -217,10 +206,7 @@ fn bench_scheduler_concurrency_control() {
     let elapsed = start.elapsed();
     let ns_per = elapsed.as_nanos() as f64 / n as f64;
 
-    println!(
-        "bench_scheduler_acquire_release: {} cycles in {:?} ({:.1} ns/op)",
-        n, elapsed, ns_per
-    );
+    println!("bench_scheduler_acquire_release: {n} cycles in {elapsed:?} ({ns_per:.1} ns/op)");
     assert!(
         ns_per < 10_000.0,
         "Scheduler acquire/release too slow: {ns_per} ns/op"
@@ -270,8 +256,7 @@ fn bench_regime_transition_overhead_vs_baseline() {
     let overhead_pct = overhead_ns / baseline.as_nanos() as f64 * 100.0;
 
     println!(
-        "bench_regime_transition_overhead: baseline={:?}, with_regime={:?}, overhead={:.1}%",
-        baseline, with_regime, overhead_pct
+        "bench_regime_transition_overhead: baseline={baseline:?}, with_regime={with_regime:?}, overhead={overhead_pct:.1}%"
     );
     // Note: overhead is high because baseline is just is_valid calls (trivial),
     // while regime path includes Vec-allocating trace construction, blake3 hashes,
@@ -334,10 +319,7 @@ fn bench_full_pipeline_end_to_end() {
     let elapsed = start.elapsed();
     let us_per = elapsed.as_micros() as f64 / n as f64;
 
-    println!(
-        "bench_full_pipeline_e2e: {} iterations in {:?} ({:.1} µs/iter)",
-        n, elapsed, us_per
-    );
+    println!("bench_full_pipeline_e2e: {n} iterations in {elapsed:?} ({us_per:.1} µs/iter)");
     assert!(chain.verify(), "Provenance chain integrity check failed");
     assert!(us_per < 1000.0, "Full pipeline too slow: {us_per} µs/iter");
 }

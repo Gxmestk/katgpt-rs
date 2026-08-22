@@ -244,10 +244,7 @@ fn uniform_n_produces_identical_selections_baseline() {
     let epsilon = 0.05;
     let n_trials = 5000;
 
-    println!(
-        "\n=== T5 baseline: uniform n (K={}, ε={}, {} trials) ===",
-        k, epsilon, n_trials
-    );
+    println!("\n=== T5 baseline: uniform n (K={k}, ε={epsilon}, {n_trials} trials) ===");
     println!(
         "{:>6} | {:>14} | {:>14} | verdict",
         "n", "regret_beta", "regret_mle"
@@ -269,7 +266,7 @@ fn uniform_n_produces_identical_selections_baseline() {
         } else {
             "DIFF (unexpected!)"
         };
-        println!("{:>6} | {:>14.6} | {:>14.6} | {}", n, rb, rm, verdict);
+        println!("{n:>6} | {rb:>14.6} | {rm:>14.6} | {verdict}");
     }
 
     // Assert the baseline: at uniform n, regrets are identical (within float
@@ -285,9 +282,7 @@ fn uniform_n_produces_identical_selections_baseline() {
     );
     assert!(
         (rb - rm).abs() < 1e-6,
-        "uniform n must produce identical selections (got beta={:.6} vs mle={:.6})",
-        rb,
-        rm
+        "uniform n must produce identical selections (got beta={rb:.6} vs mle={rm:.6})"
     );
 }
 
@@ -300,10 +295,7 @@ fn beta_beats_mle_with_variable_observation_counts() {
     let epsilon = 0.05;
     let n_trials = 5000;
 
-    println!(
-        "\n=== T5: variable n (K={}, ε={}, {} trials) ===",
-        k, epsilon, n_trials
-    );
+    println!("\n=== T5: variable n (K={k}, ε={epsilon}, {n_trials} trials) ===");
     println!(
         "{:>8} | {:>14} | {:>14} | {:>12} | verdict",
         "n_mean", "regret_beta", "regret_mle", "improvement"
@@ -340,7 +332,7 @@ fn beta_beats_mle_with_variable_observation_counts() {
         );
     }
 
-    println!("\nBeta wins at {} of 6 variable-n levels.", beta_wins);
+    println!("\nBeta wins at {beta_wins} of 6 variable-n levels.");
     // The honest expectation: Beta wins with variable n. We assert it wins
     // at low mean n (most heteroscedastic noise).
     let (rb_low, rm_low) = run_experiment(
@@ -354,9 +346,7 @@ fn beta_beats_mle_with_variable_observation_counts() {
     );
     assert!(
         rb_low < rm_low,
-        "Beta must beat MLE at variable n_mean=4 (got beta={:.6} vs mle={:.6})",
-        rb_low,
-        rm_low
+        "Beta must beat MLE at variable n_mean=4 (got beta={rb_low:.6} vs mle={rm_low:.6})"
     );
 }
 
@@ -370,10 +360,7 @@ fn beta_beats_mle_on_low_data_stress_test() {
     let epsilon = 0.05;
     let n_trials = 5000;
 
-    println!(
-        "\n=== T5: one-low-data stress (K={}, ε={}, {} trials) ===",
-        k, epsilon, n_trials
-    );
+    println!("\n=== T5: one-low-data stress (K={k}, ε={epsilon}, {n_trials} trials) ===");
     println!(
         "{:>6} {:>4} | {:>14} | {:>14} | {:>12} | verdict",
         "n_mean", "n_lo", "regret_beta", "regret_mle", "improvement"
@@ -424,9 +411,7 @@ fn beta_beats_mle_on_low_data_stress_test() {
     );
     assert!(
         rb < rm,
-        "Beta must beat MLE on the n_lo=2 stress test (got beta={:.6} vs mle={:.6})",
-        rb,
-        rm
+        "Beta must beat MLE on the n_lo=2 stress test (got beta={rb:.6} vs mle={rm:.6})"
     );
 }
 
@@ -449,22 +434,19 @@ fn beta_and_mle_converge_at_high_observation_count() {
     );
 
     println!(
-        "\n=== T5 convergence (K={}, Variable n_mean=512, ε={}, {} trials) ===",
-        k, epsilon, n_trials
+        "\n=== T5 convergence (K={k}, Variable n_mean=512, ε={epsilon}, {n_trials} trials) ==="
     );
-    println!("  regret_beta = {:.6}", rb);
-    println!("  regret_mle  = {:.6}", rm);
+    println!("  regret_beta = {rb:.6}");
+    println!("  regret_mle  = {rm:.6}");
 
     // Both should be small (enough data on average).
     assert!(
         rb < 0.05,
-        "Beta regret should be small at n_mean=512 (got {:.4})",
-        rb
+        "Beta regret should be small at n_mean=512 (got {rb:.4})"
     );
     assert!(
         rm < 0.05,
-        "MLE regret should be small at n_mean=512 (got {:.4})",
-        rm
+        "MLE regret should be small at n_mean=512 (got {rm:.4})"
     );
 }
 
@@ -476,10 +458,7 @@ fn beta_conservatism_sweep_variable_n() {
     let n_mean = 8;
     let n_trials = 3000;
 
-    println!(
-        "\n=== T5: ε sweep (K={}, Variable n_mean={}, {} trials) ===",
-        k, n_mean, n_trials
-    );
+    println!("\n=== T5: ε sweep (K={k}, Variable n_mean={n_mean}, {n_trials} trials) ===");
     println!(
         "{:>8} | {:>14} | {:>14} | verdict",
         "ε", "regret_beta", "regret_mle"
@@ -503,7 +482,7 @@ fn beta_conservatism_sweep_variable_n() {
         } else {
             "MLE wins"
         };
-        println!("{:>8.2} | {:>14.6} | {:>14.6} | {}", eps, rb, rm, verdict);
+        println!("{eps:>8.2} | {rb:>14.6} | {rm:>14.6} | {verdict}");
     }
     // Descriptive only — no threshold assertion.
 }
@@ -521,10 +500,7 @@ fn beta_full_report_for_benchmark_doc() {
     let k = 8;
 
     println!("## Selection regret (θ_best − θ_selected), lower is better\n");
-    println!(
-        "### K={} candidates, θ ∈ [0.3, 0.9], {} trials\n",
-        k, n_trials
-    );
+    println!("### K={k} candidates, θ ∈ [0.3, 0.9], {n_trials} trials\n");
 
     println!("\n--- Uniform n (baseline: Beta should TIE MLE) ---\n");
     println!(
@@ -547,7 +523,7 @@ fn beta_full_report_for_benchmark_doc() {
         } else {
             "DIFF"
         };
-        println!("{:>6} | {:>14.6} | {:>14.6} | {}", n, rb, rm, verdict);
+        println!("{n:>6} | {rb:>14.6} | {rm:>14.6} | {verdict}");
     }
 
     println!("\n--- Variable n (real-world: Beta should WIN at low n_mean) ---\n");

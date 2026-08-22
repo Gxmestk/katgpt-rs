@@ -232,15 +232,9 @@ fn goat_p10_forward_batch_valid_logits() {
     let vocab = Config::micro().vocab_size;
     assert_eq!(results.len(), batch.len() * vocab);
     for (i, chunk) in results.chunks(vocab).enumerate() {
-        assert_eq!(chunk.len(), vocab, "batch logits[{}] wrong length", i);
+        assert_eq!(chunk.len(), vocab, "batch logits[{i}] wrong length");
         for (j, &v) in chunk.iter().enumerate() {
-            assert!(
-                v.is_finite(),
-                "batch logits[{}][{}] not finite: {}",
-                i,
-                j,
-                v
-            );
+            assert!(v.is_finite(), "batch logits[{i}][{j}] not finite: {v}");
         }
     }
     assert_eq!(router.stats().total_inferences, 5);
@@ -257,7 +251,7 @@ fn goat_p11_forward_batch_matches_sequential() {
     let mut ctx1 = ForwardContext::new(&config);
     let mut cache1 = MultiLayerKVCache::new(&config);
     let mut router1 = InferenceRouter::new(fast_gate_config(), config.clone(), false, false);
-    let mut sequential = Vec::new();
+    let mut sequential = Vec::with_capacity(4);
     for i in 0..4 {
         let logits = router1.forward(&mut ctx1, &weights, &mut cache1, i, i);
         sequential.push(logits.to_vec());

@@ -88,7 +88,7 @@ fn main() {
         } else {
             "redundant"
         };
-        println!("  {:>4}  {:>12.4}  {}", i, score, category);
+        println!("  {i:>4}  {score:>12.4}  {category}");
     }
     println!();
 
@@ -180,7 +180,7 @@ fn main() {
             FoldDecision::Anchor => "Anchor",
         };
         let anchor = context.boundaries[i].is_anchor;
-        println!("  {:>4}  {:>10}  {:>8}", i, label, anchor);
+        println!("  {i:>4}  {label:>10}  {anchor:>8}");
     }
     println!();
 
@@ -214,7 +214,7 @@ fn main() {
     );
 
     let essential_positions = cache.essential_token_positions(&context.boundaries);
-    println!("  Essential token positions: {:?}", essential_positions);
+    println!("  Essential token positions: {essential_positions:?}");
     println!();
 
     // ── Section 5: Bandit Self-Tuning ──────────────────────────────

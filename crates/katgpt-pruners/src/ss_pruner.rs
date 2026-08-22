@@ -141,8 +141,7 @@ mod tests {
         for depth in 0..64 {
             assert!(
                 pruner.is_valid(depth, 0, &[]),
-                "depth {} should be valid with no decay",
-                depth
+                "depth {depth} should be valid with no decay"
             );
         }
     }
@@ -161,15 +160,13 @@ mod tests {
         for depth in 0..=3 {
             assert!(
                 pruner.is_valid(depth, 0, &[]),
-                "depth {} should be valid",
-                depth
+                "depth {depth} should be valid"
             );
         }
         for depth in 4..32 {
             assert!(
                 !pruner.is_valid(depth, 0, &[]),
-                "depth {} should be pruned",
-                depth
+                "depth {depth} should be pruned"
             );
         }
     }
@@ -223,10 +220,7 @@ mod tests {
             let actual = pruner.influence_at(depth);
             assert!(
                 (actual - expected).abs() < 1e-6,
-                "depth {}: cache {:.10} != expected {:.10}",
-                depth,
-                actual,
-                expected
+                "depth {depth}: cache {actual:.10} != expected {expected:.10}"
             );
         }
     }
@@ -244,14 +238,12 @@ mod tests {
             assert_eq!(
                 pruner_uniform.influence_at(depth),
                 pruner_vec.influence_at(depth),
-                "depth {} influence mismatch",
-                depth
+                "depth {depth} influence mismatch"
             );
             assert_eq!(
                 pruner_uniform.is_valid(depth, 0, &[]),
                 pruner_vec.is_valid(depth, 0, &[]),
-                "depth {} validity mismatch",
-                depth
+                "depth {depth} validity mismatch"
             );
         }
     }
@@ -292,10 +284,7 @@ mod tests {
             let influence = pruner.influence_at(depth);
             assert!(
                 (score - influence).abs() < 1e-7,
-                "depth {}: manifold_score {:.10} != influence {:.10}",
-                depth,
-                score,
-                influence
+                "depth {depth}: manifold_score {score:.10} != influence {influence:.10}"
             );
         }
     }

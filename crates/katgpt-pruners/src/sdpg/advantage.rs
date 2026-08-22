@@ -160,7 +160,7 @@ mod tests {
         let adv = centered_log_ratio(&q, &q, 1.0);
         // All advantages should be ~0 when student == teacher
         for a in &adv {
-            assert!((a).abs() < 1e-5, "advantage should be ~0, got {}", a);
+            assert!((a).abs() < 1e-5, "advantage should be ~0, got {a}");
         }
     }
 
@@ -173,9 +173,7 @@ mod tests {
         // Teacher-prefers arm should have p̄ > q̄ → positive log-ratio
         assert!(
             p_bar[0] > q_bar[0],
-            "teacher should assign more mass to arm 0: p={:?} q={:?}",
-            p_bar,
-            q_bar
+            "teacher should assign more mass to arm 0: p={p_bar:?} q={q_bar:?}"
         );
         // Centered advantage for arm 0: D̄ - log(p̄/q̄)
         // When teacher prefers arm 0, log(p̄[0]/q̄[0]) is above average → advantage is
@@ -257,9 +255,7 @@ mod tests {
             - adv_high.iter().cloned().fold(f32::INFINITY, f32::min);
         assert!(
             range_low > range_high,
-            "low temp should have wider advantage range: {} vs {}",
-            range_low,
-            range_high
+            "low temp should have wider advantage range: {range_low} vs {range_high}"
         );
     }
 
@@ -270,8 +266,7 @@ mod tests {
         let sum: f32 = sm.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-5,
-            "softmax should sum to 1, got {}",
-            sum
+            "softmax should sum to 1, got {sum}"
         );
     }
 
@@ -284,8 +279,7 @@ mod tests {
         for a in &adv {
             assert!(
                 a.abs() < 1e-6,
-                "sigmoid advantage should be ~0 for identical Q, got {}",
-                a
+                "sigmoid advantage should be ~0 for identical Q, got {a}"
             );
         }
     }
@@ -304,9 +298,7 @@ mod tests {
         for (i, &adv_i) in adv.iter().enumerate().skip(1).take(2) {
             assert!(
                 adv_i.abs() < 1e-6,
-                "arm {} should have ~0 advantage, got {}",
-                i,
-                adv_i
+                "arm {i} should have ~0 advantage, got {adv_i}"
             );
         }
     }
@@ -358,13 +350,11 @@ mod tests {
         // Both teacher Q > student Q → both advantages positive → sum > 0
         assert!(
             sum > 0.0,
-            "sum of sigmoid advantages should be > 0 when teacher prefers all arms, got {}",
-            sum
+            "sum of sigmoid advantages should be > 0 when teacher prefers all arms, got {sum}"
         );
         assert!(
             adv[0] > 0.0 && adv[1] > 0.0,
-            "both arms should have positive advantage, got {:?}",
-            adv
+            "both arms should have positive advantage, got {adv:?}"
         );
     }
 
@@ -397,8 +387,7 @@ mod tests {
         for a in &adv {
             assert!(
                 a.abs() < 1e-6,
-                "raw delta should be 0 for identical Q, got {}",
-                a
+                "raw delta should be 0 for identical Q, got {a}"
             );
         }
     }

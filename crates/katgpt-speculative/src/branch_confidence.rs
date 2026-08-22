@@ -114,16 +114,14 @@ mod tests {
         let mult = MultiplicativeScorer.total_confidence(&scores);
         let union = UnionBoundScorer.total_confidence(&scores);
         // Union bound always <= multiplicative (Boole's inequality)
-        assert!(union >= 0.0, "union should be >= 0, got {}", union);
+        assert!(union >= 0.0, "union should be >= 0, got {union}");
         assert!(
             union <= mult,
-            "union {} should <= mult {} (Boole bound)",
-            union,
-            mult
+            "union {union} should <= mult {mult} (Boole bound)"
         );
         // But both are non-trivially positive
-        assert!(union > 0.5, "union {} should be > 0.5", union);
-        assert!(mult > 0.5, "mult {} should be > 0.5", mult);
+        assert!(union > 0.5, "union {union} should be > 0.5");
+        assert!(mult > 0.5, "mult {mult} should be > 0.5");
     }
 
     #[test]
@@ -158,11 +156,7 @@ mod tests {
             "mult should degrade with more positions"
         );
         // Union bound never goes negative (clamped)
-        assert!(
-            long_union >= 0.0,
-            "union should be >= 0, got {}",
-            long_union
-        );
+        assert!(long_union >= 0.0, "union should be >= 0, got {long_union}");
     }
 
     #[test]

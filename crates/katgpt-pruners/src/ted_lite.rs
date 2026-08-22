@@ -45,34 +45,31 @@ impl PrunerDivergence {
     ) -> Self {
         // Threshold divergence: L1 / N
         let n_thresh = current_thresholds.len().max(original_thresholds.len());
-        let threshold_divergence = match n_thresh {
-            0 => 0.0,
-            _ => {
-                let sum: f32 = current_thresholds
-                    .iter()
-                    .zip(original_thresholds.iter())
-                    .map(|(c, o)| (c - o).abs())
-                    .sum();
-                // Handle unequal lengths: count missing elements as full divergence
-                let extra =
-                    (current_thresholds.len() as f32 - original_thresholds.len() as f32).abs();
-                (sum + extra) / n_thresh as f32
-            }
+        let threshold_divergence = if n_thresh == 0 {
+            0.0
+        } else {
+            let sum: f32 = current_thresholds
+                .iter()
+                .zip(original_thresholds.iter())
+                .map(|(c, o)| (c - o).abs())
+                .sum();
+            // Handle unequal lengths: count missing elements as full divergence
+            let extra = (current_thresholds.len() as f32 - original_thresholds.len() as f32).abs();
+            (sum + extra) / n_thresh as f32
         };
 
         // Topology divergence: Hamming distance / N
         let n_branch = current_branches.len().max(original_branches.len());
-        let topology_divergence = match n_branch {
-            0 => 0.0,
-            _ => {
-                let matching = current_branches
-                    .iter()
-                    .zip(original_branches.iter())
-                    .filter(|(c, o)| c == o)
-                    .count();
-                let hamming = n_branch - matching;
-                hamming as f32 / n_branch as f32
-            }
+        let topology_divergence = if n_branch == 0 {
+            0.0
+        } else {
+            let matching = current_branches
+                .iter()
+                .zip(original_branches.iter())
+                .filter(|(c, o)| c == o)
+                .count();
+            let hamming = n_branch - matching;
+            hamming as f32 / n_branch as f32
         };
 
         let lambda_t = lambda_t.max(0.0);

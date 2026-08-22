@@ -88,7 +88,7 @@ fn main() {
     for depth in [3, 5, 7] {
         let ratio = OctreeLod::depth_to_ratio(depth);
         let slots = OctreeLod::slot_count(depth);
-        println!("  Depth {depth}: {} slots, {:?}", slots, ratio);
+        println!("  Depth {depth}: {slots} slots, {ratio:?}");
     }
     println!();
 

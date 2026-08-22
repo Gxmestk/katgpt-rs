@@ -29,6 +29,10 @@
 //!   `_kurtosis`, `_domino`, `_manifold`, `_lodestar`, `_gdsd`, …) → stay in
 //!   `katgpt-rs/src/speculative/dd_tree.rs` because they reference root-only
 //!   sibling modules (`super::belief_drafter`, `super::spec_generator`, etc.).
+//! - **Bigram Markov head** (`bigram_markov` feature, Issue 659) → the
+//!   modelless sequential drafter: deterministic CSR top-m bigram table +
+//!   zero-alloc greedy-chain marginal emission, dropping straight into
+//!   `build_dd_tree`. The trained-MLP sibling is `belief_drafter`.
 
 pub mod blueprint;
 pub mod branch_confidence;
@@ -78,6 +82,18 @@ pub mod selectivity_router;
 pub mod belief_cache;
 #[cfg(feature = "belief_drafter")]
 pub mod belief_drafter;
+// Bigram Markov head — the modelless sequential drafter (Issue 659,
+// Research 316 §3.5 path 2). belief_drafter above is the trained-MLP
+// drafter (NextLat); this is its table-lookup sibling: deterministic CSR
+// top-m bigram table + zero-alloc greedy-chain marginal emission into the
+// build_dd_tree seam.
+#[cfg(feature = "bigram_markov")]
+pub mod bigram_markov;
+// Pair-scored path selection — the modelless DFlash 2 selector (Issue 671,
+// Research 490): t-step marginal propagation (the U_t parallel drafter) +
+// adjacent-pair coherence from the same table, walked greedily.
+#[cfg(feature = "bigram_markov")]
+pub mod pair_select;
 // NFCoT FlowScore Generator + QGF Fusion (Plan 229 / Plan 268 T6). nf_flow
 // (the scorer core) is already ungated above; these two compose it with
 // spec_generator / QGuidedDrafter and are gated on both parents.

@@ -178,10 +178,7 @@ fn least_squares_slope_vs_index(ys: &[f32]) -> f32 {
         num = dx.mul_add(y - y_mean, num);
         den = dx.mul_add(dx, den);
     }
-    match den < 1e-30 {
-        true => 0.0,
-        false => num / den,
-    }
+    if den < 1e-30 { 0.0 } else { num / den }
 }
 
 // ── Public API: classify ──────────────────────────────────────────────────
@@ -275,12 +272,11 @@ pub fn classify_chain(
         let magnitude = sum_sq.sqrt();
         scratch.magnitude_series.push(magnitude);
 
-        let rank_t = match sum_quartic < 1e-12 {
-            true => 0.0, // zero vector → peaked (BeliefRankPruner convention)
-            false => {
-                let pr = (sum_sq * sum_sq) / (d_f * sum_quartic);
-                pr.clamp(0.0, 1.0)
-            }
+        let rank_t = if sum_quartic < 1e-12 {
+            0.0
+        } else {
+            let pr = (sum_sq * sum_sq) / (d_f * sum_quartic);
+            pr.clamp(0.0, 1.0)
         };
         scratch.rank_series.push(rank_t);
 

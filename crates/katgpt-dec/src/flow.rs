@@ -100,7 +100,7 @@ impl DecFlowField {
         let n_vertices = potential.n_cells();
         let s = 2 * n_vertices - n_edges;
         let width = solve_grid_width(n_vertices, s);
-        let height = if width > 0 { n_vertices / width } else { 1 };
+        let height = n_vertices.checked_div(width).unwrap_or(1);
 
         Self {
             width,
@@ -704,8 +704,7 @@ mod tests {
         // Soft constraint: should complete in reasonable time (< 5 seconds per iter)
         assert!(
             per_iter.as_secs() < 5,
-            "DecFlowField 64×64 took {:?} per iteration — too slow",
-            per_iter
+            "DecFlowField 64×64 took {per_iter:?} per iteration — too slow"
         );
     }
 

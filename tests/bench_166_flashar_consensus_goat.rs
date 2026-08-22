@@ -413,7 +413,7 @@ fn bench_t9_flashar_consensus_metrics() {
     println!("T9 Benchmark (flashar_consensus, draft_width={draft_width}, n={n_runs}):");
     println!("  Average tokens/call:  {avg_tokens:.2}");
     println!("  Total accepted:       {total_accepted}");
-    println!("  Total time:           {:.2?}", elapsed);
+    println!("  Total time:           {elapsed:.2?}");
     println!("  Time per token:       {time_per_token:.6}s");
 
     // Sanity checks

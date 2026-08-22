@@ -159,10 +159,7 @@ fn test_wealth_pruner_vs_ucb1_convergence() {
     // Both should find the optimal arm
     let wp_best = wp.best_arm();
     let wp_q_values: Vec<f64> = (0..10).map(|i| wp.arm(i).unwrap().q_value).collect();
-    println!(
-        "WealthPruner: best={wp_best}, found_at={:?}, Q-values={wp_q_values:?}",
-        wp_found_at,
-    );
+    println!("WealthPruner: best={wp_best}, found_at={wp_found_at:?}, Q-values={wp_q_values:?}",);
     println!(
         "UCB1: best={}, found_optimal={}",
         ucb_result.best_arm,
@@ -224,10 +221,7 @@ fn test_goat_g1_relevance_overhead() {
     let dur_bp = start_bp.elapsed();
 
     let overhead = dur_wp.as_nanos() as f64 / dur_bp.as_nanos() as f64;
-    println!(
-        "G1: WealthPruner {:?} vs BanditPruner {:?} → overhead = {overhead:.2}x",
-        dur_wp, dur_bp
-    );
+    println!("G1: WealthPruner {dur_wp:?} vs BanditPruner {dur_bp:?} → overhead = {overhead:.2}x");
 
     // WealthPruner should be within 2x of BanditPruner (BanditPruner does more work with UCB1)
     // The plan says ≤1% overhead, but BanditPruner's relevance is already complex (soft_route, etc.)

@@ -882,13 +882,11 @@ mod tests {
         let r = within_class_effective_rank_owned(&states, &labels);
         assert!(
             r > 0.6 * dim as f32,
-            "isotropic within-class rank should be > 0.6 * dim={}, got {r}",
-            dim
+            "isotropic within-class rank should be > 0.6 * dim={dim}, got {r}"
         );
         assert!(
             r <= dim as f32 + 0.05,
-            "within-class rank should be <= dim={}, got {r}",
-            dim
+            "within-class rank should be <= dim={dim}, got {r}"
         );
     }
 

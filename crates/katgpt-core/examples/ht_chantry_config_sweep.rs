@@ -86,8 +86,7 @@ fn ensure_connected(map: &mut GridMap) {
             .iter()
             .enumerate()
             .max_by_key(|(_, s)| *s)
-            .map(|(i, _)| i as i32)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i as i32);
         'outer: for wy in 0..h {
             for wx in 0..w {
                 if map.is_passable(wx, wy) {
@@ -289,8 +288,7 @@ fn main() {
         let (throughput, max_stops) = run_sim(&map, n_agents, steps, 42, cfg);
         let elapsed = start.elapsed().as_secs_f64();
         println!(
-            "  w_phi={:>2}, alpha={:.1}, rounds={}: throughput={:>6.2}, max_stops={:>4}, time={:.1}s  [{label}]",
-            w_phi, alpha, rounds, throughput, max_stops, elapsed
+            "  w_phi={w_phi:>2}, alpha={alpha:.1}, rounds={rounds}: throughput={throughput:>6.2}, max_stops={max_stops:>4}, time={elapsed:.1}s  [{label}]"
         );
     }
 
@@ -308,8 +306,7 @@ Density scaling (w_phi=5, alpha=1.0, rounds=2 — paper default):"
         let elapsed = start.elapsed().as_secs_f64();
         let per_agent = throughput / n_agents as f64;
         println!(
-            "  {n_agents:>4} agents: throughput={:>6.2}, per-agent={:.5}, max_stops={:>4}, time={:.1}s",
-            throughput, per_agent, max_stops, elapsed
+            "  {n_agents:>4} agents: throughput={throughput:>6.2}, per-agent={per_agent:.5}, max_stops={max_stops:>4}, time={elapsed:.1}s"
         );
     }
 

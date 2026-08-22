@@ -255,3 +255,5 @@ To promote `rt_turbo` from opt-in to default-on, we need:
 - FlexPrefill (Lai et al., 2025) — context-aware sparse prefill
 - DeepSeek Sparse Attention (DeepSeek-AI, 2025) — native sparse training
 - Kimi Delta Attention (Kimi Team, 2025) — linear attention architecture
+
+> **PASS-Redirects (synthesis):** Bertsch et al. [arXiv:2608.10296 "Cracks in the Foundation: Seemingly Minor Architectural Choices Impact Long Context Extension"] — maturity caveat from OlmPool: at 140B tokens (early pretraining), retrieval-head scores were near-zero across ALL 26 models at generation time — head-calibration à la this note needs mature pretrained checkpoints, not young ones. Also: QK-norm models placed less attention on needle tokens at prefill (weaker retrieval signal to calibrate against). Compound-degradation recipe → riir-train Research 420; no action here.

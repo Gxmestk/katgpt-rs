@@ -408,9 +408,9 @@ impl FloorComparisonReport {
             OverallVerdict::Mixed => {
                 "🟠 MIXED — better on some metrics, worse on others (judgment call)".to_string()
             }
-            OverallVerdict::NotApplicable { reason } => format!("⚪ N/A — {}", reason),
+            OverallVerdict::NotApplicable { reason } => format!("⚪ N/A — {reason}"),
         };
-        println!("Overall: {}", verdict_str);
+        println!("Overall: {verdict_str}");
     }
 }
 
@@ -444,7 +444,7 @@ impl TrajectoryCorpus {
             values.push(phase.sin() + noise);
         }
         Self {
-            name: format!("stationary_seasonal_m{}_sigma{}_n{}", m, sigma, n),
+            name: format!("stationary_seasonal_m{m}_sigma{sigma}_n{n}"),
             values,
             recommended_warmup: (4 * m).min(n / 4),
         }
@@ -461,7 +461,7 @@ impl TrajectoryCorpus {
             values.push(rng.gaussian(sigma));
         }
         Self {
-            name: format!("white_noise_sigma{}_n{}", sigma, n),
+            name: format!("white_noise_sigma{sigma}_n{n}"),
             values,
             recommended_warmup: 64.min(n / 4),
         }
@@ -836,7 +836,7 @@ mod tests {
         assert_eq!(a.values, b.values, "same seed → identical corpus");
         // Mean should be near 0 (sin wave centered at 0 + zero-mean Gaussian).
         let mean: f32 = a.values.iter().sum::<f32>() / a.values.len() as f32;
-        assert!(mean.abs() < 0.3, "mean {} should be near 0", mean);
+        assert!(mean.abs() < 0.3, "mean {mean} should be near 0");
     }
 
     #[test]
@@ -858,11 +858,10 @@ mod tests {
         let iv = out.interval.expect("floor should produce interval");
         // σ=0.1 noise → 95% interval width ≈ 4σ = 0.4. Allow generous bound.
         let width = iv.upper - iv.lower;
-        assert!(width > 0.0, "interval width {} should be > 0", width);
+        assert!(width > 0.0, "interval width {width} should be > 0");
         assert!(
             width < 2.0,
-            "interval width {} should be < 2.0 for σ=0.1",
-            width
+            "interval width {width} should be < 2.0 for σ=0.1"
         );
     }
 

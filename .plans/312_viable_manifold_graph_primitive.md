@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-23
 **Research:** [katgpt-rs/.research/294_Viable_Manifold_Graph_Primitive.md](../.research/294_Viable_Manifold_Graph_Primitive.md)
-**Private Super-GOAT guide:** [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md)
+**Private Super-GOAT guide:** [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md)
 **Source paper:** [arxiv 2206.00106](https://arxiv.org/abs/2206.00106) — González-Duque et al., *Mario Plays on a Manifold*, 2022
 **Target:** `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` (new module) + Cargo feature `viable_manifold_graph`
 **Status:** ✅ COMPLETE (2026-06-24) — PROMOTED to DEFAULT-ON. All gates (G1–G7 correctness + perf bench) PASS after the CSR adjacency fix closed the perf gate (7.10 ns/step ≤ 100 ns/step). `viable_manifold_graph` in `default = [...]` of both Cargo.toml files.
@@ -169,7 +169,7 @@ This plan ships the open primitive only. The riir-ai-side wiring (G8–G12 from 
 ## Cross-Refs
 
 - [katgpt-rs/.research/294_Viable_Manifold_Graph_Primitive.md](../.research/294_Viable_Manifold_Graph_Primitive.md) — research note (this plan's source)
-- [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md) — private Super-GOAT guide
+- [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md) — private Super-GOAT guide
 - [katgpt-rs/.plans/301_runtime_subspace_phase_gate_primitive.md](301_runtime_subspace_phase_gate_primitive.md) — ships `jacobian_svd_at` (substrate)
 - [katgpt-rs/.plans/309_latent_field_steering_primitive.md](309_latent_field_steering_primitive.md) — complement (top-down injection)
 - [katgpt-rs/.plans/252_cubical_category_interval_topology.md](252_cubical_category_interval_topology.md) — raw-space geodesic cousin

@@ -788,10 +788,7 @@ fn g2_funcattn_vs_parallax_vs_sdpa() {
 
     // ── Init diagnostics ────────────────────────────────────────────────
     eprintln!("\n=== G2: FUNCATTN vs Parallax vs SDPA on sinusoidal regression ===");
-    eprintln!(
-        "model: n={}, d={}, k={}, steps={} (FD-SGD, LR={}, FD_EPS={})\n",
-        N, D, K, STEPS, LR, FD_EPS
-    );
+    eprintln!("model: n={N}, d={D}, k={K}, steps={STEPS} (FD-SGD, LR={LR}, FD_EPS={FD_EPS})\n");
     {
         let mut fa_scratch = FuncAttnScratch::new(N, D, K);
         let mut fa_out = vec![0.0f32; N * D];
@@ -826,8 +823,7 @@ fn g2_funcattn_vs_parallax_vs_sdpa() {
         );
         let y_norm: f32 = y.iter().map(|v| v * v).sum::<f32>().sqrt();
         eprintln!(
-            "init: ||y|| = {:.4}   funcattn mse = {:.6}   sdpa mse = {:.6}   parallax mse = {:.6}",
-            y_norm, fa_init_mse, sd_init_mse, px_init_mse,
+            "init: ||y|| = {y_norm:.4}   funcattn mse = {fa_init_mse:.6}   sdpa mse = {sd_init_mse:.6}   parallax mse = {px_init_mse:.6}",
         );
     }
 
@@ -890,8 +886,8 @@ fn g2_funcattn_vs_parallax_vs_sdpa() {
         if px_finite { "" } else { "  [DNF]" },
     );
     eprintln!();
-    eprintln!("  funcattn / sdpa     (mse) = {:.4}", fa_vs_sd);
-    eprintln!("  funcattn / parallax (mse) = {:.4}", fa_vs_px);
+    eprintln!("  funcattn / sdpa     (mse) = {fa_vs_sd:.4}");
+    eprintln!("  funcattn / parallax (mse) = {fa_vs_px:.4}");
     eprintln!();
     eprintln!("  Plan 286 T3.2 strict gate:");
     eprintln!(
@@ -989,21 +985,15 @@ fn g2_funcattn_vs_parallax_vs_sdpa() {
 
     assert!(
         !fa_mse.is_finite() || fa_mse < fa_init_mse,
-        "G2 sanity: FUNCATTN regressed (mse {} ≥ init {})",
-        fa_mse,
-        fa_init_mse,
+        "G2 sanity: FUNCATTN regressed (mse {fa_mse} ≥ init {fa_init_mse})",
     );
     assert!(
         !sd_mse.is_finite() || sd_mse < sd_init_mse,
-        "G2 sanity: SDPA regressed (mse {} ≥ init {})",
-        sd_mse,
-        sd_init_mse,
+        "G2 sanity: SDPA regressed (mse {sd_mse} ≥ init {sd_init_mse})",
     );
     assert!(
         !px_mse.is_finite() || px_mse < px_init_mse,
-        "G2 sanity: Parallax regressed (mse {} ≥ init {})",
-        px_mse,
-        px_init_mse,
+        "G2 sanity: Parallax regressed (mse {px_mse} ≥ init {px_init_mse})",
     );
 
     // If the strict gate ever passes, surface it loudly so the human can

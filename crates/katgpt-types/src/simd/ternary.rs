@@ -550,16 +550,29 @@ pub fn simd_ternary_matmul_batch(w: &TernaryWeights, x: &[f32], batch: usize, y:
         for b in 0..batch {
             let x_off = b * w.cols;
             let y_off = b * w.rows;
-            simd_ternary_matvec(w, &x[x_off..], &mut y[y_off..]);
+            // Slice EXACTLY: simd_ternary_matvec asserts x.len() == w.cols, so
+            // an open-ended `&x[x_off..]` panics for 2 <= batch < 4 (batch 1
+            // happens to match, batch >= 4 takes the par_chunks path which
+            // slices exactly). Pre-existing since Plan 148; found by Issue 578's
+            // G4 batch test.
+            simd_ternary_matvec(
+                w,
+                &x[x_off..x_off + w.cols],
+                &mut y[y_off..y_off + w.rows],
+            );
         }
     } else {
         use rayon::prelude::*;
+        // `zip(x.par_chunks(w.cols))` rather than indexing with an open-ended
+        // `&x[x_off..]`: simd_ternary_matvec asserts x.len() == w.cols, so the
+        // open-ended form panicked on every worker for batch >= 2. Matches the
+        // binary tier, which had this right. Pre-existing since Plan 148.
         y.par_chunks_mut(w.rows)
+            .zip(x.par_chunks(w.cols))
             .enumerate()
-            .for_each(|(b, y_chunk)| {
+            .for_each(|(b, (y_chunk, x_chunk))| {
                 if b < batch {
-                    let x_off = b * w.cols;
-                    simd_ternary_matvec(w, &x[x_off..], y_chunk);
+                    simd_ternary_matvec(w, x_chunk, y_chunk);
                 }
             });
     }

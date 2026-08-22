@@ -120,7 +120,7 @@ impl TreeBuilder {
         if chain_seed {
             // ── Phase A: Build greedy chain backbone ──────────────
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -145,11 +145,7 @@ impl TreeBuilder {
                 }
 
                 cumulative_score += self.log_marginals[depth][token_idx];
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -189,10 +185,10 @@ impl TreeBuilder {
                             .filter_map(|(&i, &v)| {
                                 if v {
                                     Some(TreeNode {
-                                        score: marginals[0][i].ln(),
+                                        score: self.log_marginals[0][i],
                                         depth: 0,
                                         token_idx: i,
-                                        parent_path: i as u128,
+                                        parent_path: TreePath::root(i as u32),
                                     })
                                 } else {
                                     None
@@ -204,10 +200,10 @@ impl TreeBuilder {
                         for (&i, &v) in self.candidates_buf.iter().zip(self.valid_buf.iter()) {
                             if v {
                                 self.heap.push(TreeNode {
-                                    score: marginals[0][i].ln(),
+                                    score: self.log_marginals[0][i],
                                     depth: 0,
                                     token_idx: i,
-                                    parent_path: i as u128,
+                                    parent_path: TreePath::root(i as u32),
                                 });
                             }
                         }
@@ -216,10 +212,10 @@ impl TreeBuilder {
                     for (i, &prob) in marginals[0].iter().enumerate() {
                         if prob > 0.0 && pruner.is_valid(0, i, &[]) {
                             self.heap.push(TreeNode {
-                                score: prob.ln(),
+                                score: self.log_marginals[0][i],
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             });
                         }
                     }
@@ -236,7 +232,7 @@ impl TreeBuilder {
 
                     // Parent tokens for pruning: chain tokens at depths 0..depth-1
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -246,15 +242,10 @@ impl TreeBuilder {
                             continue;
                         }
                         if prob > 0.0 && pruner.is_valid(depth, i, sibling_parent_tokens) {
-                            let sibling_path = if depth == 0 {
-                                i as u128
-                            } else {
-                                let ancestor_path = chain_node.parent_path >> 16;
-                                (ancestor_path << 16) | (i as u128)
-                            };
+                            let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                             self.heap.push(TreeNode {
-                                score: parent_chain_score + prob.ln(),
+                                score: parent_chain_score + self.log_marginals[depth][i],
                                 depth,
                                 token_idx: i,
                                 parent_path: sibling_path,
@@ -275,10 +266,10 @@ impl TreeBuilder {
                     for (i, &prob) in marginals[next_depth].iter().enumerate() {
                         if prob > 0.0 && pruner.is_valid(next_depth, i, parent_tokens) {
                             self.heap.push(TreeNode {
-                                score: last.score + prob.ln(),
+                                score: last.score + self.log_marginals[next_depth][i],
                                 depth: next_depth,
                                 token_idx: i,
-                                parent_path: (last.parent_path << 16) | (i as u128),
+                                parent_path: last.parent_path.push(i as u32, next_depth),
                             });
                         }
                     }
@@ -308,10 +299,10 @@ impl TreeBuilder {
                         .filter_map(|(&i, &v)| {
                             if v {
                                 Some(TreeNode {
-                                    score: marginals[0][i].ln(),
+                                    score: self.log_marginals[0][i],
                                     depth: 0,
                                     token_idx: i,
-                                    parent_path: i as u128,
+                                    parent_path: TreePath::root(i as u32),
                                 })
                             } else {
                                 None
@@ -323,10 +314,10 @@ impl TreeBuilder {
                     for (&i, &v) in self.candidates_buf.iter().zip(self.valid_buf.iter()) {
                         if v {
                             self.heap.push(TreeNode {
-                                score: marginals[0][i].ln(),
+                                score: self.log_marginals[0][i],
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             });
                         }
                     }
@@ -335,10 +326,10 @@ impl TreeBuilder {
                 for (i, &prob) in marginals[0].iter().enumerate() {
                     if prob > 0.0 && pruner.is_valid(0, i, &[]) {
                         self.heap.push(TreeNode {
-                            score: prob.ln(),
+                            score: self.log_marginals[0][i],
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         });
                     }
                 }
@@ -416,7 +407,7 @@ impl TreeBuilder {
                             score: best.score + log_m[best_idx],
                             depth: next_depth,
                             token_idx: best_idx,
-                            parent_path: (best.parent_path << 16) | (best_idx as u128),
+                            parent_path: best.parent_path.push(best_idx as u32, next_depth),
                         });
                     }
                 } else {
@@ -427,7 +418,7 @@ impl TreeBuilder {
                                 score: best.score + log_m[i],
                                 depth: next_depth,
                                 token_idx: i,
-                                parent_path: (best.parent_path << 16) | (i as u128),
+                                parent_path: best.parent_path.push(i as u32, next_depth),
                             });
                         }
                     }
@@ -500,7 +491,7 @@ impl TreeBuilder {
         if chain_seed {
             // ── Phase A: Build greedy chain backbone with screening ──
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -530,11 +521,7 @@ impl TreeBuilder {
                 // Blended score: ln(P_llm) + ln(R). Use the cached ln(prob).
                 cumulative_score +=
                     self.log_marginals[depth][token_idx] + relevance.ln();
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -568,10 +555,10 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             })
                         })
                         .collect();
@@ -586,10 +573,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         });
                     }
                 }
@@ -603,7 +590,7 @@ impl TreeBuilder {
                     };
 
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -619,15 +606,10 @@ impl TreeBuilder {
                         if relevance <= threshold {
                             continue;
                         }
-                        let sibling_path = if depth == 0 {
-                            i as u128
-                        } else {
-                            let ancestor_path = chain_node.parent_path >> 16;
-                            (ancestor_path << 16) | (i as u128)
-                        };
+                        let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -652,10 +634,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
-                            parent_path: (last.parent_path << 16) | (i as u128),
+                            parent_path: last.parent_path.push(i as u32, next_depth),
                         });
                     }
                 }
@@ -676,10 +658,10 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         })
                     })
                     .collect();
@@ -694,10 +676,10 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
-                        parent_path: i as u128,
+                        parent_path: TreePath::root(i as u32),
                     });
                 }
             }
@@ -764,7 +746,7 @@ impl TreeBuilder {
                         score: best.score + log_m[i] + relevance.ln(),
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: (best.parent_path << 16) | (i as u128),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }
@@ -857,7 +839,7 @@ impl TreeBuilder {
         if chain_seed {
             // ── Phase A: Build greedy chain backbone with balanced scoring ──
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -885,11 +867,7 @@ impl TreeBuilder {
                 }
 
                 cumulative_score += balanced_score(prob, relevance, depth);
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -924,7 +902,7 @@ impl TreeBuilder {
                                 score: balanced_score(prob, relevance, 0),
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             })
                         })
                         .collect();
@@ -942,7 +920,7 @@ impl TreeBuilder {
                             score: balanced_score(prob, relevance, 0),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         });
                     }
                 }
@@ -956,7 +934,7 @@ impl TreeBuilder {
                     };
 
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -972,12 +950,7 @@ impl TreeBuilder {
                         if relevance <= threshold {
                             continue;
                         }
-                        let sibling_path = if depth == 0 {
-                            i as u128
-                        } else {
-                            let ancestor_path = chain_node.parent_path >> 16;
-                            (ancestor_path << 16) | (i as u128)
-                        };
+                        let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                         self.heap.push(TreeNode {
                             score: parent_chain_score + balanced_score(prob, relevance, depth),
@@ -1008,7 +981,7 @@ impl TreeBuilder {
                             score: last.score + balanced_score(prob, relevance, next_depth),
                             depth: next_depth,
                             token_idx: i,
-                            parent_path: (last.parent_path << 16) | (i as u128),
+                            parent_path: last.parent_path.push(i as u32, next_depth),
                         });
                     }
                 }
@@ -1032,7 +1005,7 @@ impl TreeBuilder {
                             score: balanced_score(prob, relevance, 0),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         })
                     })
                     .collect();
@@ -1050,7 +1023,7 @@ impl TreeBuilder {
                         score: balanced_score(prob, relevance, 0),
                         depth: 0,
                         token_idx: i,
-                        parent_path: i as u128,
+                        parent_path: TreePath::root(i as u32),
                     });
                 }
             }
@@ -1120,7 +1093,7 @@ impl TreeBuilder {
                         score: best.score + log_m[i] + backward_weight * r_safe.ln() + flow_bonus,
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: (best.parent_path << 16) | (i as u128),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }
@@ -1186,7 +1159,7 @@ impl TreeBuilder {
         if chain_seed {
             // ── Phase A: Build greedy chain backbone with progressive budget ──
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -1221,11 +1194,7 @@ impl TreeBuilder {
                 // cache_log_marginals (computed once per build).
                 cumulative_score +=
                     self.log_marginals[depth][token_idx] + relevance.ln();
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -1258,10 +1227,10 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             })
                         })
                         .collect();
@@ -1280,10 +1249,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         });
                     }
                 }
@@ -1297,7 +1266,7 @@ impl TreeBuilder {
                     };
 
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -1313,15 +1282,10 @@ impl TreeBuilder {
                         if relevance <= threshold {
                             continue;
                         }
-                        let sibling_path = if depth == 0 {
-                            i as u128
-                        } else {
-                            let ancestor_path = chain_node.parent_path >> 16;
-                            (ancestor_path << 16) | (i as u128)
-                        };
+                        let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1346,10 +1310,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
-                            parent_path: (last.parent_path << 16) | (i as u128),
+                            parent_path: last.parent_path.push(i as u32, next_depth),
                         });
                     }
                 }
@@ -1370,10 +1334,10 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         })
                     })
                     .collect();
@@ -1392,10 +1356,10 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
-                        parent_path: i as u128,
+                        parent_path: TreePath::root(i as u32),
                     });
                 }
             }
@@ -1475,7 +1439,7 @@ impl TreeBuilder {
                         score: best.score + log_m[i] + relevance.ln(),
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: (best.parent_path << 16) | (i as u128),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }
@@ -1522,7 +1486,7 @@ impl TreeBuilder {
 
         if chain_seed {
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -1554,11 +1518,7 @@ impl TreeBuilder {
 
                 cumulative_score +=
                     self.log_marginals[depth][token_idx] + relevance.ln();
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -1589,10 +1549,10 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
-                        parent_path: i as u128,
+                        parent_path: TreePath::root(i as u32),
                     });
                 }
             } else {
@@ -1605,7 +1565,7 @@ impl TreeBuilder {
                     };
 
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -1621,15 +1581,10 @@ impl TreeBuilder {
                         if relevance <= threshold {
                             continue;
                         }
-                        let sibling_path = if depth == 0 {
-                            i as u128
-                        } else {
-                            let ancestor_path = chain_node.parent_path >> 16;
-                            (ancestor_path << 16) | (i as u128)
-                        };
+                        let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1654,10 +1609,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
-                            parent_path: (last.parent_path << 16) | (i as u128),
+                            parent_path: last.parent_path.push(i as u32, next_depth),
                         });
                     }
                 }
@@ -1676,10 +1631,10 @@ impl TreeBuilder {
                     continue;
                 }
                 self.heap.push(TreeNode {
-                    score: prob.ln() + relevance.ln(),
+                    score: self.log_marginals[0][i] + relevance.ln(),
                     depth: 0,
                     token_idx: i,
-                    parent_path: i as u128,
+                    parent_path: TreePath::root(i as u32),
                 });
             }
         }
@@ -1749,7 +1704,7 @@ impl TreeBuilder {
                     score: score + log_m[i] + relevance.ln(),
                     depth: next_depth,
                     token_idx: i,
-                    parent_path: (best.parent_path << 16) | (i as u128),
+                    parent_path: best.parent_path.push(i as u32, next_depth),
                 });
             }
         }
@@ -1799,7 +1754,7 @@ impl TreeBuilder {
         if chain_seed {
             // ── Phase A: Build greedy chain backbone with screening + RecFM ──
             let mut cumulative_score: f32 = 0.0;
-            let mut parent_path: u128 = 0;
+            let mut parent_path = TreePath::default();
 
             for (depth, marginal) in marginals.iter().enumerate() {
                 if self.tree.len() >= config.tree_budget {
@@ -1845,11 +1800,7 @@ impl TreeBuilder {
                 // Blended score: ln(P_llm) + ln(R). Use the cached ln(prob).
                 cumulative_score +=
                     self.log_marginals[depth][token_idx] + relevance.ln();
-                let node_path = if depth == 0 {
-                    token_idx as u128
-                } else {
-                    (parent_path << 16) | (token_idx as u128)
-                };
+                let node_path = parent_path.push(token_idx as u32, depth);
 
                 let node = TreeNode {
                     score: cumulative_score,
@@ -1879,10 +1830,10 @@ impl TreeBuilder {
                                 return None;
                             }
                             Some(TreeNode {
-                                score: prob.ln() + relevance.ln(),
+                                score: self.log_marginals[0][i] + relevance.ln(),
                                 depth: 0,
                                 token_idx: i,
-                                parent_path: i as u128,
+                                parent_path: TreePath::root(i as u32),
                             })
                         })
                         .collect();
@@ -1897,10 +1848,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         });
                     }
                 }
@@ -1914,7 +1865,7 @@ impl TreeBuilder {
                     };
 
                     let sibling_parent_tokens = extract_parent_tokens_into(
-                        chain_node.parent_path >> 16,
+                        chain_node.parent_path.parent(chain_node.depth),
                         depth,
                         &mut self.parent_tokens_buf,
                     );
@@ -1930,15 +1881,10 @@ impl TreeBuilder {
                         if relevance <= threshold {
                             continue;
                         }
-                        let sibling_path = if depth == 0 {
-                            i as u128
-                        } else {
-                            let ancestor_path = chain_node.parent_path >> 16;
-                            (ancestor_path << 16) | (i as u128)
-                        };
+                        let sibling_path = chain_node.parent_path.parent(chain_node.depth).push(i as u32, depth);
 
                         self.heap.push(TreeNode {
-                            score: parent_chain_score + prob.ln() + relevance.ln(),
+                            score: parent_chain_score + self.log_marginals[depth][i] + relevance.ln(),
                             depth,
                             token_idx: i,
                             parent_path: sibling_path,
@@ -1963,10 +1909,10 @@ impl TreeBuilder {
                             continue;
                         }
                         self.heap.push(TreeNode {
-                            score: last.score + prob.ln() + relevance.ln(),
+                            score: last.score + self.log_marginals[next_depth][i] + relevance.ln(),
                             depth: next_depth,
                             token_idx: i,
-                            parent_path: (last.parent_path << 16) | (i as u128),
+                            parent_path: last.parent_path.push(i as u32, next_depth),
                         });
                     }
                 }
@@ -1986,10 +1932,10 @@ impl TreeBuilder {
                             return None;
                         }
                         Some(TreeNode {
-                            score: prob.ln() + relevance.ln(),
+                            score: self.log_marginals[0][i] + relevance.ln(),
                             depth: 0,
                             token_idx: i,
-                            parent_path: i as u128,
+                            parent_path: TreePath::root(i as u32),
                         })
                     })
                     .collect();
@@ -2004,10 +1950,10 @@ impl TreeBuilder {
                         continue;
                     }
                     self.heap.push(TreeNode {
-                        score: prob.ln() + relevance.ln(),
+                        score: self.log_marginals[0][i] + relevance.ln(),
                         depth: 0,
                         token_idx: i,
-                        parent_path: i as u128,
+                        parent_path: TreePath::root(i as u32),
                     });
                 }
             }
@@ -2104,7 +2050,7 @@ impl TreeBuilder {
                         score: best.score + log_m[i] + relevance.ln(),
                         depth: next_depth,
                         token_idx: i,
-                        parent_path: (best.parent_path << 16) | (i as u128),
+                        parent_path: best.parent_path.push(i as u32, next_depth),
                     });
                 }
             }

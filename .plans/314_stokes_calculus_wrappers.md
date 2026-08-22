@@ -119,8 +119,8 @@ Each primitive gets an A/B benchmark vs the naive alternative. **Promote the win
 ## Architecture
 
 ```
-katgpt-rs/crates/katgpt-core/src/dec/
-├── mod.rs              — add `mod stokes_calculus;` behind `dec_operators`
+katgpt-rs/crates/katgpt-dec/src/
+├── lib.rs              — add `pub mod stokes_calculus;` (re-exported as `katgpt_core::dec` behind `dec_operators`)
 ├── operators.rs        — EXISTING (d, δ, Δ) — wrapped, not modified
 ├── hodge.rs            — EXISTING (hodge_decompose) — wrapped, not modified
 ├── flow.rs             — EXISTING (DecFlowField) — orthogonal

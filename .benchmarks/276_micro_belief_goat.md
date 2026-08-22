@@ -205,3 +205,47 @@ cargo test -p katgpt-core --no-default-features \
 ## TL;DR
 
 **G2.1 FAIL.** Attractor family flips **569× (K=1) / 560× (K=3)** more than the leaky integrator (**1 flip**) on the 1000-step coherence benchmark. The plan's hysteresis hypothesis does not hold at random init — it would require trained weights. Per T5.2: **attractor DEMOTED to Gain**; trait unification + `LeakyIntegrator` are the only promotable outputs. Combined with the pre-existing G1.4 latency failure (~273 ns/step), the attractor family stays behind `micro_belief` as an opt-in experiment. All 45 micro_belief tests pass (G1.1–G1.3, G1.5, G1.6 + the G2.1 informational test).
+
+---
+
+## Addendum (2026-08-04) — the "needs training" blocker, revisited by Plan 567
+
+This note's root-cause analysis reads: *"the attractor's hysteresis property is
+real but it is a property of TRAINED attractor networks, not of randomly-initialised
+ones. To make the attractor competitive on G2.1, the recurrent weights would need to
+be trained (or hand-set) so that the target beliefs correspond to actual stable fixed
+points."*
+
+[Plan 567](../.plans/567_cp_hopfield_top_eigenvector_recall.md) tested whether
+CP^(d-1) symmetric-space recall (Galitski 2026) removes the *training* half of that
+requirement. It does. Re-measured at dim=8 with all arms re-run
+([Bench 567 §G5](567_cp_hopfield_goat.md)):
+
+| Kernel | Flips | Tracking (argmax correct in settled phases) |
+|---|---|---|
+| `LeakyIntegrator` | 1 | 1.000 |
+| `AttractorKernel` (random init) | 347 | **0.000** |
+| CP² recall, task-aligned memories | **3** | **1.000** |
+| CP² recall, Haar-random memories | 0 | **0.000** |
+
+Three things this changes about the picture above:
+
+1. **`AttractorKernel`'s failure is worse than flip-flopping.** Its tracking score
+   is 0.000 — at random init it never represents the correct belief at all, in
+   either driven phase. The flip count alone understated the problem.
+2. **The training requirement is genuinely lifted.** A deterministic Hebbian
+   construction (`push_memory`, no gradient descent) reaches 3 flips at tracking
+   1.000. So "hysteresis needs trained weights" is false as stated — what it needs
+   is *aligned* weights, and CP^(d-1) supplies the geometry that makes an aligned
+   frozen memory set into stable fixed points.
+3. **The alignment requirement stands.** Haar-random memories fail at tracking
+   0.000 across 20 (seed, snap) cells. This note's parenthetical "(or hand-set)"
+   turns out to be the operative clause: alignment is still required, only the
+   gradient descent is not.
+
+**This does not re-promote `AttractorKernel`.** The passing arm is not
+`AttractorKernel` under a new parameterization — it is a different kernel (a
+leaky + CP-snap hybrid on CP²), behind the opt-in `cp_hopfield` feature, and its
+margin is sensitive to a snap hyperparameter with no principled setting
+(non-monotone sweep 48 → 1 → 3 → 21 → 9). `LeakyIntegrator` remains the Plan 276
+winner and the default. Family A stays demoted.

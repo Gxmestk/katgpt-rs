@@ -16,10 +16,10 @@
 //! - **This primitive** — input is a flat array of equally-spaced samples on
 //!   a *periodic* 1D domain (time-series window, cyclic HLA channel, ring
 //!   buffer). O(N log N), no topological setup, no CellComplex required.
-//! - **DEC `exterior_derivative`** (`crates/katgpt-core/src/dec/operators.rs`)
-//!   — general case on arbitrary cell complexes (irregular meshes, 2D/3D
-//!   grids, manifolds with boundary). Slower per-call due to boundary-operator
-//!   assembly, but handles anything.
+//! - **DEC `exterior_derivative`** (`crates/katgpt-dec/src/operators.rs`,
+//!   re-exported as `katgpt_core::dec`) — general case on arbitrary cell
+//!   complexes (irregular meshes, 2D/3D grids, manifolds with boundary).
+//!   Slower per-call due to boundary-operator assembly, but handles anything.
 //!
 //! ## Why modelless
 //!
@@ -208,13 +208,11 @@ impl SpecDiffScratch {
         let needed = self
             .fwd_plan
             .as_ref()
-            .map(|p| p.get_inplace_scratch_len())
-            .unwrap_or(0)
+            .map_or(0, |p| p.get_inplace_scratch_len())
             .max(
                 self.inv_plan
                     .as_ref()
-                    .map(|p| p.get_inplace_scratch_len())
-                    .unwrap_or(0),
+                    .map_or(0, |p| p.get_inplace_scratch_len()),
             );
         if self.fft_scratch.capacity() < needed {
             self.fft_scratch
@@ -370,28 +368,33 @@ pub fn spectral_differentiate_into(
         }
         1 => {
             // (iω)^1 = i·ω. Multiply by (0 + i·ω) = rotate +90° and scale.
-            for j in 0..n {
-                // Zero the Nyquist bin for odd orders on even-length signals
-                // to keep the output real.
-                if is_even_n && j == nyquist_idx {
-                    scratch.freq_buf[j] = Complex::new(0.0, 0.0);
-                    continue;
-                }
+            //
+            // `iter_mut().enumerate()` drops three bounds checks per bin, and
+            // the Nyquist zeroing is hoisted out of the loop body (it used to
+            // be a branch evaluated on every bin). Multiplying the Nyquist bin
+            // and *then* overwriting it with zero gives the same final value as
+            // skipping it, so the result is unchanged.
+            for (j, bin) in scratch.freq_buf.iter_mut().enumerate() {
                 let k = signed_freq_index(j, n) as f32;
                 let omega = two_pi_over_nh * k;
                 // (i·ω) · (a + bi) = (-ω·b) + i·(ω·a)
-                let a = scratch.freq_buf[j].re;
-                let b = scratch.freq_buf[j].im;
-                scratch.freq_buf[j] = Complex::new(-omega * b, omega * a);
+                let a = bin.re;
+                let b = bin.im;
+                *bin = Complex::new(-omega * b, omega * a);
+            }
+            // Zero the Nyquist bin for odd orders on even-length signals
+            // to keep the output real.
+            if is_even_n {
+                scratch.freq_buf[nyquist_idx] = Complex::new(0.0, 0.0);
             }
         }
         2 => {
             // (iω)^2 = -ω². Real multiplier, no rotation.
-            for j in 0..n {
+            for (j, bin) in scratch.freq_buf.iter_mut().enumerate() {
                 let k = signed_freq_index(j, n) as f32;
                 let omega = two_pi_over_nh * k;
                 let mult = -omega * omega;
-                scratch.freq_buf[j] *= mult;
+                *bin *= mult;
             }
         }
         _ => {

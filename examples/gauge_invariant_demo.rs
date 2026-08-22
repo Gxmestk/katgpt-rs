@@ -167,8 +167,7 @@ fn main() {
         let ratio_after = sigma_a_after / sigma_b_after;
 
         println!(
-            "  {label}: σ_max(A)/σ_max(B)  before = {:>7.3}  →  after = {:>6.3}",
-            ratio_before, ratio_after
+            "  {label}: σ_max(A)/σ_max(B)  before = {ratio_before:>7.3}  →  after = {ratio_after:>6.3}"
         );
         let _ = idx;
     }

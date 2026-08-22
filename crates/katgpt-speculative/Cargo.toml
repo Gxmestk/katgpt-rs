@@ -170,6 +170,13 @@ acceptance_forecast = []
 belief_drafter = ["katgpt-core/belief_drafter", "dep:papaya", "dep:blake3", "fastrand", "dep:bytemuck"]
 # Best Buddies Drafting — mutual NN filter (Plan 199). Zero deps beyond katgpt-core traits.
 best_buddies = []
+# Bigram Markov head — the modelless sequential drafter (Issue 659, Research
+# 316 §3.5 path 2): deterministic CSR top-m bigram table + zero-alloc greedy-
+# chain marginal emission into the build_dd_tree seam. The Metal-viable
+# alternative drafter (table lookup, not a forward pass — no Bench 656 mode 2).
+# Opt-in until the riir-ai Bonsai consumer gate proves the gain (Issue 659 T4).
+# Zero deps beyond the crate's mandatory katgpt-types/katgpt-core.
+bigram_markov = []
 # Domino Causal Correction — PrefixCorrectionTable + domino_score (Plan 197).
 # Pulls blake3 for prefix hashing.
 domino_correction = ["dep:blake3"]

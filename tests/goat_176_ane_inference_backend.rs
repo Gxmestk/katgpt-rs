@@ -111,7 +111,7 @@ fn goat_p6_cpu_backend_generation_valid_tokens() {
     let mut cdf = Vec::with_capacity(config.vocab_size);
 
     let mut token = config.bos_token;
-    let mut generated = Vec::new();
+    let mut generated = Vec::with_capacity(10);
 
     for pos in 0..10 {
         let logits = backend.forward(&mut ctx, &weights, &mut cache, token, pos, &config);

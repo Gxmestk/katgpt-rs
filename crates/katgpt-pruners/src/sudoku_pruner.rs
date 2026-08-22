@@ -25,7 +25,7 @@ impl SudokuPruner {
     /// Create a pruner from a Sudoku board.
     /// Automatically discovers empty cells in row-major order.
     pub fn new(board: Sudoku9x9) -> Self {
-        let mut positions = Vec::new();
+        let mut positions = Vec::with_capacity(9);
         for r in 0..9 {
             for c in 0..9 {
                 if board.grid[r][c] == 0 {
@@ -77,8 +77,8 @@ impl SudokuPruner {
 /// existing examples/tests are unaffected — MRV is strictly opt-in.
 ///
 /// Why this matters for the speculate drafter: the DDTree primitive is
-/// hard-capped at 8-deep (`TreeNode.parent_path: u128` packs 16-bit tokens →
-/// 128/16 = 8). With row-major ordering, Inkala's first 8 empties all have
+/// hard-capped at 8-deep (`TreeNode.parent_path` is a `TreePath` of one
+/// `u32` slot per level → 8 slots). With row-major ordering, Inkala's first 8 empties all have
 /// 2–4 candidates and zero naked singles, so the latent drafter (Option B)
 /// can't sharpen marginals inside the window. MRV reorders so any forced
 /// cells (1 candidate) sit at depths 0–7, where the drafter assigns `p=1.0`

@@ -572,8 +572,7 @@ mod tests {
         let capacity_after = sel.candidates_buf_capacity();
         assert_eq!(
             capacity_before, capacity_after,
-            "G5 zero-alloc gate: candidates_buf capacity must stay stable across 1000 steps (before={}, after={})",
-            capacity_before, capacity_after
+            "G5 zero-alloc gate: candidates_buf capacity must stay stable across 1000 steps (before={capacity_before}, after={capacity_after})"
         );
     }
 

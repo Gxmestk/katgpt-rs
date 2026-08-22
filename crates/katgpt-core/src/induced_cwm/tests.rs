@@ -277,16 +277,14 @@ fn verify_transition_detects_wrong_step_size() {
             // expected_post should have counter=13, step_size=3.
             assert!(
                 actual_post_debug.contains("counter: 14"),
-                "actual: {}",
-                actual_post_debug
+                "actual: {actual_post_debug}"
             );
             assert!(
                 expected_post_debug.contains("counter: 13"),
-                "expected: {}",
-                expected_post_debug
+                "expected: {expected_post_debug}"
             );
         }
-        other => panic!("expected StateMismatch, got {:?}", other),
+        other => panic!("expected StateMismatch, got {other:?}"),
     }
 }
 
@@ -306,7 +304,7 @@ fn verify_transition_legal_actions_mismatch_path() {
             assert_eq!(actual.len(), 3, "kernel reports 3 actions");
             assert_eq!(expected.len(), 2, "test expected 2");
         }
-        other => panic!("expected LegalActionsMismatch, got {:?}", other),
+        other => panic!("expected LegalActionsMismatch, got {other:?}"),
     }
 }
 
@@ -341,7 +339,7 @@ fn verify_transition_state_mismatch_path() {
     };
     match verify_transition(&test) {
         Err(TransitionTestFailure::StateMismatch { .. }) => {}
-        other => panic!("expected StateMismatch, got {:?}", other),
+        other => panic!("expected StateMismatch, got {other:?}"),
     }
 }
 

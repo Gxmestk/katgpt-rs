@@ -150,9 +150,7 @@ mod tests {
         let expected = 1.0 / (1.0 + (-2.0f32).exp());
         assert!(
             (v - expected).abs() < 1e-6,
-            "got {}, expected {}",
-            v,
-            expected
+            "got {v}, expected {expected}"
         );
     }
 
@@ -191,8 +189,7 @@ mod tests {
         let v = verifier.verify(&claim, 0);
         assert!(
             (v - 0.5).abs() < 1e-6,
-            "orthogonal claim should give 0.5, got {}",
-            v
+            "orthogonal claim should give 0.5, got {v}"
         );
     }
 
@@ -205,7 +202,7 @@ mod tests {
             payload: (),
         };
         let v = verifier.verify(&claim, 0);
-        assert!(v < 0.5, "negative dot should give < 0.5, got {}", v);
+        assert!(v < 0.5, "negative dot should give < 0.5, got {v}");
     }
 
     #[test]

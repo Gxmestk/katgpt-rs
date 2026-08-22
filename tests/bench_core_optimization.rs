@@ -33,7 +33,7 @@ const SHORT_ITERS: usize = 2_000;
 fn fmt_us(us: f64) -> String {
     match us {
         u if u >= 1000.0 => format!("{:.1}ms", u / 1000.0),
-        u if u >= 1.0 => format!("{:.2}us", u),
+        u if u >= 1.0 => format!("{u:.2}us"),
         u => format!("{:.0}ns", u * 1000.0),
     }
 }
@@ -102,7 +102,7 @@ fn bench_02_simd_primitives() {
     for &dim in dims {
         let a = vec![0.5f32; dim];
         let b = vec![0.3f32; dim];
-        bench_mut(&format!("dot [{}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("dot [{dim}]"), WARMUP, ITERS, || {
             let _ = black_box(simd_dot_f32(&a, &b, dim));
         });
     }
@@ -114,7 +114,7 @@ fn bench_02_simd_primitives() {
     println!("  {}", "-".repeat(52));
     for &dim in dims {
         let mut x = vec![1.0f32; dim];
-        bench_mut(&format!("scale [{}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("scale [{dim}]"), WARMUP, ITERS, || {
             simd_scale_inplace(&mut x, 0.5);
         });
     }
@@ -127,7 +127,7 @@ fn bench_02_simd_primitives() {
     for &dim in dims {
         let mut dst = vec![1.0f32; dim];
         let src = vec![0.5f32; dim];
-        bench_mut(&format!("add_inplace [{}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("add_inplace [{dim}]"), WARMUP, ITERS, || {
             simd_add_inplace(&mut dst, &src);
         });
     }
@@ -139,7 +139,7 @@ fn bench_02_simd_primitives() {
     println!("  {}", "-".repeat(52));
     for &dim in dims {
         let x: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.1).sin()).collect();
-        bench_mut(&format!("max [{}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("max [{dim}]"), WARMUP, ITERS, || {
             let _ = black_box(simd_max_f32(&x));
         });
     }
@@ -166,7 +166,7 @@ fn bench_03_math_utilities() {
     for &vocab in vocab_sizes {
         let init: Vec<f32> = (0..vocab).map(|i| (i as f32 * 0.1).sin()).collect();
         let mut x = init.clone();
-        bench_mut(&format!("softmax [vocab={}]", vocab), WARMUP, ITERS, || {
+        bench_mut(&format!("softmax [vocab={vocab}]"), WARMUP, ITERS, || {
             softmax(&mut x);
             x.copy_from_slice(&init);
         });
@@ -182,7 +182,7 @@ fn bench_03_math_utilities() {
         let init: Vec<f32> = (0..vocab).map(|i| (i as f32 * 0.1).sin()).collect();
         let mut x = init.clone();
         bench_mut(
-            &format!("softmax_scaled [vocab={}]", vocab),
+            &format!("softmax_scaled [vocab={vocab}]"),
             WARMUP,
             ITERS,
             || {
@@ -200,7 +200,7 @@ fn bench_03_math_utilities() {
     let norm_dims: &[usize] = &[16, 32, 64, 128, 256, 512, 1024, 2048];
     for &dim in norm_dims {
         let mut x = vec![1.0f32; dim];
-        bench_mut(&format!("rmsnorm [dim={}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("rmsnorm [dim={dim}]"), WARMUP, ITERS, || {
             rmsnorm(&mut x);
             x.fill(1.0);
         });
@@ -215,7 +215,7 @@ fn bench_03_math_utilities() {
         let mut x = vec![1.0f32; dim];
         let gamma: Vec<f32> = (0..dim).map(|i| 1.0 + (i as f32 * 0.01)).collect();
         bench_mut(
-            &format!("rmsnorm_with_gamma [dim={}]", dim),
+            &format!("rmsnorm_with_gamma [dim={dim}]"),
             WARMUP,
             ITERS,
             || {
@@ -234,7 +234,7 @@ fn bench_03_math_utilities() {
         let probs = vec![1.0f32 / vocab as f32; vocab];
         let mut rng = Rng::new(42);
         bench_mut(
-            &format!("sample_token [vocab={}]", vocab),
+            &format!("sample_token [vocab={vocab}]"),
             WARMUP,
             ITERS,
             || {
@@ -424,7 +424,7 @@ fn bench_05_gegelu() {
         let gate: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.1).sin()).collect();
         let up: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.2).cos()).collect();
 
-        bench_mut(&format!("gegelu [dim={}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("gegelu [dim={dim}]"), WARMUP, ITERS, || {
             gegelu(&mut hidden, &gate, &up);
         });
     }
@@ -439,7 +439,7 @@ fn bench_05_gegelu() {
         let gate: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.1).sin()).collect();
         let up: Vec<f32> = (0..dim).map(|i| (i as f32 * 0.2).cos()).collect();
 
-        bench_mut(&format!("gegelu_tanh [dim={}]", dim), WARMUP, ITERS, || {
+        bench_mut(&format!("gegelu_tanh [dim={dim}]"), WARMUP, ITERS, || {
             gegelu_tanh(&mut hidden, &gate, &up);
         });
     }
@@ -835,8 +835,7 @@ fn bench_07_component_breakdown() {
     let gamma_speedup = t_rmsnorm / t_rmsnorm_gamma;
     println!();
     println!(
-        "  RMSNorm: no-gamma {:.2}us vs gamma {:.2}us ({:.2}x)",
-        t_rmsnorm, t_rmsnorm_gamma, gamma_speedup
+        "  RMSNorm: no-gamma {t_rmsnorm:.2}us vs gamma {t_rmsnorm_gamma:.2}us ({gamma_speedup:.2}x)"
     );
 }
 
@@ -979,7 +978,7 @@ fn bench_09_summary() {
 
     println!();
     println!("  Config::game key metrics:");
-    println!("    RMSNorm [embd={}]:        {:.2} us", n, rmsnorm_us);
+    println!("    RMSNorm [embd={n}]:        {rmsnorm_us:.2} us");
     println!(
         "    Softmax [vocab={}]:       {:.2} us",
         config.vocab_size, softmax_us
@@ -988,7 +987,7 @@ fn bench_09_summary() {
         "    MLP w1 [{}x{}]:    {:.2} us",
         config.mlp_hidden, n, mlp_us
     );
-    println!("    Forward (pos=0):          {:.2} us/tok", fwd_us);
+    println!("    Forward (pos=0):          {fwd_us:.2} us/tok");
     println!("    Forward throughput:       {:.0} tok/s", 1000.0 / fwd_us);
     println!();
     println!("  SIMD level: {:?}", katgpt_core::simd::simd_level());

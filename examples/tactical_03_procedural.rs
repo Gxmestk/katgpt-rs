@@ -305,32 +305,28 @@ fn main() {
             .with_treasures(2)
             .with_wall_density(0.15);
 
-        let map = match generator.generate_single_floor() {
-            Some(m) => m,
-            None => {
-                println!(
-                    "{:<6} {:<10} {:<8} {:<8} {:<12} {:<8} ❌ gen failed",
-                    seed, "—", "—", "—", "—", "—"
-                );
-                single_results.push(SolveResult {
-                    solvable: false,
-                    steps: None,
-                    elapsed_us: 0,
-                    cost: None,
-                    nodes: 0,
-                });
-                continue;
-            }
+        let map = if let Some(m) = generator.generate_single_floor() {
+            m
+        } else {
+            println!(
+                "{:<6} {:<10} {:<8} {:<8} {:<12} {:<8} ❌ gen failed",
+                seed, "—", "—", "—", "—", "—"
+            );
+            single_results.push(SolveResult {
+                solvable: false,
+                steps: None,
+                elapsed_us: 0,
+                cost: None,
+                nodes: 0,
+            });
+            continue;
         };
 
         let map_str = map.to_map_string();
         let pruner = TacticalPruner::new(&map_str);
         let result = solve_strategic(&pruner);
 
-        let status = match result.solvable {
-            true => "✅",
-            false => "❌",
-        };
+        let status = if result.solvable { "✅" } else { "❌" };
         let steps_str = match result.steps {
             Some(s) => format!("{s}"),
             None => "—".into(),
@@ -379,33 +375,30 @@ fn main() {
             .with_treasures(1)
             .with_wall_density(0.15);
 
-        match generator.generate_multi_floor(num_floors) {
-            Some(dungeon) => {
-                dungeon_successes += 1;
-                let stats = DungeonStats::from_dungeon(&dungeon);
-                let wall_pct = (stats.total_walls as f64 / stats.total_tiles as f64) * 100.0;
+        if let Some(dungeon) = generator.generate_multi_floor(num_floors) {
+            dungeon_successes += 1;
+            let stats = DungeonStats::from_dungeon(&dungeon);
+            let wall_pct = (stats.total_walls as f64 / stats.total_tiles as f64) * 100.0;
+            println!(
+                "  Seed {seed}: {num_floors} floors, {} monsters, {} treasures, {:.1}% walls ✅",
+                stats.total_monsters, stats.total_treasures, wall_pct
+            );
+
+            for floor in &stats.floors {
                 println!(
-                    "  Seed {seed}: {num_floors} floors, {} monsters, {} treasures, {:.1}% walls ✅",
-                    stats.total_monsters, stats.total_treasures, wall_pct
+                    "    Floor {}: {}×{}, {}M {}T {}#",
+                    floor.floor_idx,
+                    floor.size.0,
+                    floor.size.1,
+                    floor.monsters,
+                    floor.treasures,
+                    floor.walls
                 );
-
-                for floor in &stats.floors {
-                    println!(
-                        "    Floor {}: {}×{}, {}M {}T {}#",
-                        floor.floor_idx,
-                        floor.size.0,
-                        floor.size.1,
-                        floor.monsters,
-                        floor.treasures,
-                        floor.walls
-                    );
-                }
-
-                dungeon_stats.push(stats);
             }
-            None => {
-                println!("  Seed {seed}: {num_floors} floors — generation failed ❌");
-            }
+
+            dungeon_stats.push(stats);
+        } else {
+            println!("  Seed {seed}: {num_floors} floors — generation failed ❌");
         }
     }
 
@@ -434,9 +427,10 @@ fn main() {
 
     let avg_steps = {
         let solved_steps: Vec<usize> = single_results.iter().filter_map(|r| r.steps).collect();
-        match solved_steps.is_empty() {
-            true => 0.0,
-            false => solved_steps.iter().sum::<usize>() as f64 / solved_steps.len() as f64,
+        if solved_steps.is_empty() {
+            0.0
+        } else {
+            solved_steps.iter().sum::<usize>() as f64 / solved_steps.len() as f64
         }
     };
 
@@ -446,23 +440,25 @@ fn main() {
             .filter(|r| r.solvable)
             .map(|r| r.elapsed_us)
             .collect();
-        match solved_times.is_empty() {
-            true => 0.0,
-            false => solved_times.iter().sum::<u128>() as f64 / solved_times.len() as f64,
+        if solved_times.is_empty() {
+            0.0
+        } else {
+            solved_times.iter().sum::<u128>() as f64 / solved_times.len() as f64
         }
     };
 
     let avg_time_display = if avg_time_us > 1000.0 {
         format!("{:.2}ms", avg_time_us / 1000.0)
     } else {
-        format!("{:.0}µs", avg_time_us)
+        format!("{avg_time_us:.0}µs")
     };
 
     let avg_cost = {
         let costs: Vec<u32> = single_results.iter().filter_map(|r| r.cost).collect();
-        match costs.is_empty() {
-            true => 0.0,
-            false => costs.iter().sum::<u32>() as f64 / costs.len() as f64,
+        if costs.is_empty() {
+            0.0
+        } else {
+            costs.iter().sum::<u32>() as f64 / costs.len() as f64
         }
     };
 

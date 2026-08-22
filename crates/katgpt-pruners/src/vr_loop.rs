@@ -261,22 +261,22 @@ mod tests {
             let mut rejected_tokens = Vec::new();
 
             for (pos, &token) in candidate.iter().enumerate() {
-                match token % 2 == 0 {
-                    true => continue,
-                    false => {
-                        rejected_positions.push(pos);
-                        rejected_tokens.push(token);
-                    }
+                if token % 2 == 0 {
+                    continue;
+                } else {
+                    rejected_positions.push(pos);
+                    rejected_tokens.push(token);
                 }
             }
 
-            match rejected_positions.is_empty() {
-                true => Ok(()),
-                false => Err(VrRoundFeedback {
+            if rejected_positions.is_empty() {
+                Ok(())
+            } else {
+                Err(VrRoundFeedback {
                     rejected_positions,
                     rejected_tokens,
                     failure_description: "odd tokens found".into(),
-                }),
+                })
             }
         }
     }

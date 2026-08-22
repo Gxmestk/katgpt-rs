@@ -321,8 +321,7 @@ fn g6_roaring_memory_reduction() {
 
     assert!(
         reduction >= 4.0,
-        "G6 FAIL: CompactBitmap should be ≥4× smaller, got {:.1}× (bool={bool_bytes}B, compact={compact_bytes}B)",
-        reduction
+        "G6 FAIL: CompactBitmap should be ≥4× smaller, got {reduction:.1}× (bool={bool_bytes}B, compact={compact_bytes}B)"
     );
 }
 

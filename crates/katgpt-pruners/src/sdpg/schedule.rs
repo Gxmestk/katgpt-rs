@@ -124,8 +124,7 @@ mod tests {
         let beta = s.beta();
         assert!(
             beta > 0.0 && beta < 0.1,
-            "mid-decay should be 0 < β < β_base, got {}",
-            beta
+            "mid-decay should be 0 < β < β_base, got {beta}"
         );
     }
 

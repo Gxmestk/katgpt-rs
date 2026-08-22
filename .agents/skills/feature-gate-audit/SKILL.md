@@ -1,6 +1,6 @@
 ---
 name: feature-gate-audit
-description: Audit feature-gate status claims across the 7-repo stack (katgpt-rs, riir-ai, riir-chain, riir-neuron-db, riir-train, riir-game-sdk, seal-online-remaster). Use when a doc/plan/issue/commit-message claims a "promotion discrepancy", "not yet wired", or "Default-off until..." state, when fixing stale feature-gate comments, before promoting or demoting any feature flag, or quarterly as a feature-gate-hygiene gate. Enforces three defenses (1) source-code verification of every wiring claim — grep the production tick path, don't trust the doc; (2) multi-surface grep for stale comments across 5 documentation surfaces (source .rs, lib.rs module doc, Cargo.toml default block, downstream Cargo.toml, .benchmarks/*_promotion_review.md); (3) layer-split awareness — engine-layer DEFAULT-ON + game-layer OPT-IN is a deliberate pattern when each layer gates a different concern (generic runtime vs IP-bearing content), NOT a missed propagation. Sibling to goat-audit + doc-sync.
+description: Audit feature-gate status claims across the multi-repo stack. Use when a doc/plan/issue/commit-message claims a "promotion discrepancy", "not yet wired", or "Default-off until..." state, when fixing stale feature-gate comments, before promoting or demoting any feature flag, or quarterly as a feature-gate-hygiene gate. Enforces four defenses (1) source-code verification of every wiring claim — grep the production tick path, don't trust the doc; (2) multi-surface grep for stale comments across 5 documentation surfaces (source .rs, lib.rs module doc, Cargo.toml default block, downstream Cargo.toml, .benchmarks/*_promotion_review.md); (3) layer-split awareness — engine-layer DEFAULT-ON + game-layer OPT-IN is a deliberate pattern when each layer gates a different concern (generic runtime vs IP-bearing content), NOT a missed propagation; (4) gate-chain resolution — own cfg plus every ancestor mod plus the crate default list, settled by a build not a read. Sibling to goat-audit + doc-sync.
 ---
 
 # feature-gate-audit — Verify feature-gate claims against production code
@@ -34,7 +34,7 @@ landed. Apply them to every feature-gate claim you encounter.
 - Quarterly as a feature-gate-hygiene gate (alongside `doc-sync` and
   `goat-audit`)
 
-## The three defenses
+## The four defenses
 
 ### Defense 1 — Verify every "discrepancy" / "not yet wired" claim against production code
 
@@ -166,6 +166,67 @@ should NOT be propagated.
 3. If same concern → it's a real discrepancy. Propagate the promotion
    and update all 5 surfaces per Defense 2.
 
+### Defense 4 — "Is it gated?" is a question about a CHAIN, not a line
+
+A gating claim sourced from a bare `grep 'pub mod X'` is **inadmissible**. The
+matched line almost never carries the whole answer, and each missing link has
+already produced a wrong verdict in this workspace:
+
+| link | what it looks like when missed | real case |
+|---|---|---|
+| the item's own `#[cfg]` | you read line N (`pub mod X;`) and miss line N-1 (`#[cfg(...)]`) | riir-ai Issue 741 / Proposal 041 called `transformer/gemma2_train` **UNGATED** and used "largest AND ungated" to set eviction priority. Line 41 was the `pub mod`; line **40** was `#[cfg(feature = "gemma_lora")]`. It was gated at the exact commit measured. |
+| every **ancestor** `mod` up to `lib.rs` | the item is bare, so you call it ungated — but its parent module is gated | riir-ai Issue 744 §4: `deltanet/{lm_head_lora_train,backward}` are bare, so a first pass claimed "compiled into every build, default included". The parent is `#[cfg(feature = "deltanet_inference")] pub mod deltanet;` (`lib.rs:90`). Never in a default build. |
+| the crate's `default = [...]` | the list is read with the wrong instrument, and "no match" is mistaken for "no features" | A Python regex `^(\w+)\s*=\s*\[(.*?)\]\s*$` over `riir-engine/Cargo.toml` returned nothing, and that was written up as *"riir-engine declares no default features at all"* — in a riir-ai issue, a proposal, and **this table**. Measured with `cargo metadata`: **59 default features on a single 14,288-character line**, closure **76**, including `deltanet_inference` and `lora_still`. The wrong reading survived two rounds of "correction" and inverted a real finding (1,507 LOC of BPTT+AdamW *were* in every default build). **`cargo metadata --no-deps` is the authority; a regex over Cargo.toml is not.** |
+| a consumer's `required-features` / dep-declaration features | you walk the `[features]` table and conclude a feature is unreachable | riir-ai Issue 744 §5: a closure walk of `riir-examples`' `[features]` "proved" `deltanet_ternary_inference` unreachable from `default`. It arrives via the `bonsai-*` rows, and the `riir-engine` dep is `default-features = false`. |
+
+Note the first two are the **same mistake at different depths** — and the second
+one was made *while writing the correction for the first*. That is the signature
+of this defense being skipped rather than applied once.
+
+`grep -B2` is **necessary but not sufficient**: it fixes link 1 and is blind to
+links 2-4.
+
+```bash
+# The admissible form. All four links, for one item.
+F=crates/riir-engine/src/deltanet/lm_head_lora_train.rs
+grep -rnB2 "pub mod lm_head_lora_train;" crates/riir-engine/src/deltanet/mod.rs  # link 1
+grep -rnB2 "pub mod deltanet;"           crates/riir-engine/src/lib.rs           # link 2 (repeat per ancestor)
+python3 -c "import re,io;print(re.search(r'(?m)^default\s*=\s*\[(.*?)\]',io.open('crates/riir-engine/Cargo.toml').read()))"  # link 3
+```
+
+**Resolve the closure with the tool that owns it.** Manifests defeat regexes:
+arrays span lines, or are one 14 kB line, or nest.
+
+```bash
+# The authority. Never a regex over Cargo.toml.
+cargo metadata --no-deps --format-version 1 | python3 -c "
+import json,sys
+p=[x for x in json.load(sys.stdin)['packages'] if x['name']=='CRATE'][0]
+f=p['features']; seen=set(); stack=list(f.get('default',[]))
+while stack:
+    k=stack.pop()
+    if k in seen: continue
+    seen.add(k); stack += [t for t in f.get(k,[]) if '/' not in t]
+print(len(f.get('default',[])),'direct /',len(seen),'in closure'); print(sorted(seen))"
+```
+
+**And the closing rule: settle it with a build, not a read.** Every one of the
+four cases above was a *reading* that survived review and died on first contact
+with `cargo`. A feature matrix is cheap and decisive:
+
+```bash
+# rc=0 on every arm you claim works; the load-bearing arm is the one where the
+# gate is supposed to EXCLUDE something and the crate must still compile.
+for f in "" deltanet_inference deltanet_ternary_inference; do ...; done
+```
+
+Two traps when you do run it, both of which have reported a **false verdict**
+here: `cargo ... 2>&1 | tail` makes `$?` the *tail's* exit, so a failed build
+reports success; and in zsh `args="--features foo"; cargo check $args` passes one
+argv entry (`error: unexpected argument '--features foo'`), so every arm of a
+matrix loop "fails" while the code is fine. Redirect to a file and read `rc`
+from cargo directly; pass flags via `"$@"`.
+
 ## Output format
 
 After running an audit, produce a per-feature verdict table:
@@ -175,6 +236,15 @@ After running an audit, produce a per-feature verdict table:
 | `npc_sleep_time` | ✅ L44-66 | ✅ L629-642 | ✅ engine default-on | ✅ civ opt-in by design | ✅ bench 341 | deliberate-split |
 | `<feature>` | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + file | see verdicts |
 | `conformal_predictive_intervals` (post-Plan-468 audit, 2026-07-20) | ✅ no stale `//!` claims in `crates/katgpt-core/src/conformal/` | ✅ `crates/katgpt-core/src/lib.rs` L75-97 — promotion comment accurate (DEFAULT-ON since Plan 468, consumer gates STAY opt-in) | ✅ in `default = [...]` with Phase 21 comment | ✅ 7 consumer gates stay opt-in (deliberate three-layer split — see Defense 3 table) | ✅ Bench 340 + 560/562/563/564/565/567/568 all accurate | deliberate-split (clean after re-audit caught 3 missed surfaces: Bench 565 L7 header, `conformal_uq.md` §1.3 table rows 1/4/5, Plan 508 L8 Feature Gate line — all exhibited the append-only anti-pattern: header was updated, body was not) |
+| **2026-08-15 quarterly audit** — 11 katgpt-core promotions since 2026-07-17 goat-audit window (focus set: poincare/chunked/causal/conformal/karc/hope/hebbian/ane_fused/clr/phase_separation/similarity_inference) | — | — | — | — | — | **7 fix-1-surface + 4 clean** — see the 2026-08-15 rows below |
+| `similarity_inference` (2026-08-15) | ✅ mod.rs clean | ❌ lib.rs "Opt-in — Phases 2–7 pending" → FIXED (DEFAULT-ON 2026-08-11, Bench 579) | ⚠️ in default but NO phase-chain comment → added Phase 26 | ✅ no downstream | ✅ Bench 579 accurate | fix-2-surfaces |
+| `phase_separation` (2026-08-15) | ✅ mod.rs clean | ❌ lib.rs "Opt-in until G1–G4 PASS — Phase 1 skeleton ships now" → FIXED (DEFAULT-ON 2026-08-07) | ✅ default + Phase 25 | ✅ riir-engine `phase_separation_salience` notes DEFAULT-ON | ✅ bench_571 accurate | fix-1-surface |
+| `causal_identification` (2026-08-15) | ❌ mod.rs "G4 DEFERRED" → FIXED in place (closed 2026-07-18, Issue 183 / Bench 465 informational PASS) | ✅ | ✅ default + Phase 20 | ✅ `causal_id_consumer` clean | ✅ Bench 464/465 | fix-1-surface |
+| `hebbian_kernel_memory` (2026-08-15) | ✅ lib.rs accurate (DEFAULT-ON + Defense-3 split) | ✅ | ✅ default + Phase 24 | ✅ neuron-db `hebbian_fact_store` "(now default-on)" accurate | ❌ bench_559 .rs G5 "BLOCKED/.issues/027" + "stays opt-in" println → FIXED (G5 PASS Bench 462 2026-07-25; .issues/027 resolved+removed) | fix-1-surface |
+| `poincare_navigator` (2026-08-15) | ✅ | ✅ | ✅ default + Phase 19 | ✅ riir-engine `poincare_imagination` STAYS-OPT-IN-PERMANENTLY documented (Plan 497 quality refute) | ❌ Bench 449 L52 in-text "ships **opt-in**" — append-only anti-pattern (banner exists, body not fixed) → FIXED in place w/ post-promotion annotation | fix-1-surface |
+| `karc_forecaster` (2026-08-15) | ✅ | ✅ | ✅ default + Phase 22 | ✅ `karc_runtime` default-on, probes opt-in by design | ❌ Bench 308 Phase-1 TL;DR "Feature stays opt-in" — append-only anti-pattern (§Phase 5.3 update exists) → FIXED in place w/ Post-Phase-5.3 annotation | fix-1-surface |
+| `clr_weighted_set_attention` (2026-08-15) | ✅ no lib.rs status text | ✅ | ⚠️ in default, feature-def comment records promotion, but NO phase-chain comment → added Phase 24b (the 19b precedent) | ✅ Bench 354 update accurate | ✅ | fix-1-surface (convention) |
+| `chunked_content_store`, `conformal_predictive_intervals`, `hope_capacity`, `ane_fused_chain` + 14 lib.rs STAYS-OPT-IN claims + fresh set (`multistep` pending-gate, `drift_segment`, `product_key_memory_episodic` "unchanged by Issue 650", FlashAR Eq21/`greedy_draft`, SoftmaxArgmax) + `.docs/01_orientation/overview.md` rows (2026-08-15) | ✅ | ✅ | ✅ | ✅ | ✅ | clean |
 
 **Verdicts:**
 

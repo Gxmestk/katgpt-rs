@@ -483,17 +483,13 @@ fn g3_sigmoid_matches_softmax() {
         let out_norm: f32 = probe_out.iter().map(|x| x * x).sum::<f32>().sqrt();
         let y_norm: f32 = y.iter().map(|x| x * x).sum::<f32>().sqrt();
         eprintln!(
-            "init diagnostic: ||out|| = {:.4}, ||y|| = {:.4}, mse = {:.6}",
-            out_norm, y_norm, probe_mse
+            "init diagnostic: ||out|| = {out_norm:.4}, ||y|| = {y_norm:.4}, mse = {probe_mse:.6}"
         );
     }
 
     // ── Train both variants ─────────────────────────────────────────────
     eprintln!("\n=== G3: sigmoid-vs-softmax FUNCATTN basis gate ===");
-    eprintln!(
-        "model: n={}, d={}, k={}, steps={} (FD-SGD, LR={}, FD_EPS={})\n",
-        N, D, K, STEPS, LR, FD_EPS
-    );
+    eprintln!("model: n={N}, d={D}, k={K}, steps={STEPS} (FD-SGD, LR={LR}, FD_EPS={FD_EPS})\n");
 
     let (softmax_mse, softmax_loss) = train_variant(
         &x_basis,
@@ -522,16 +518,10 @@ fn g3_sigmoid_matches_softmax() {
     let ratio = sigmoid_loss / softmax_loss.max(1e-20);
     let mse_ratio = sigmoid_mse / softmax_mse.max(1e-20);
     eprintln!("\n=== G3 verdict ===");
-    eprintln!(
-        "  softmax  mse = {:.6}  rel-L2 = {:.6}",
-        softmax_mse, softmax_loss
-    );
-    eprintln!(
-        "  sigmoid  mse = {:.6}  rel-L2 = {:.6}",
-        sigmoid_mse, sigmoid_loss
-    );
-    eprintln!("  sigmoid / softmax  (rel-L2) = {:.4}", ratio);
-    eprintln!("  sigmoid / softmax  (mse)    = {:.4}", mse_ratio);
+    eprintln!("  softmax  mse = {softmax_mse:.6}  rel-L2 = {softmax_loss:.6}");
+    eprintln!("  sigmoid  mse = {sigmoid_mse:.6}  rel-L2 = {sigmoid_loss:.6}");
+    eprintln!("  sigmoid / softmax  (rel-L2) = {ratio:.4}");
+    eprintln!("  sigmoid / softmax  (mse)    = {mse_ratio:.4}");
     eprintln!("  gate: sigmoid ≤ softmax × 1.05  (PASS within 5%)");
     eprintln!("        sigmoid ≤ softmax × 1.10  (must hold else escalate issue)");
 
@@ -578,14 +568,10 @@ fn g3_sigmoid_matches_softmax() {
     );
     assert!(
         sigmoid_mse < init_mse,
-        "G3 sanity: sigmoid did not learn (mse {} ≥ init {})",
-        sigmoid_mse,
-        init_mse
+        "G3 sanity: sigmoid did not learn (mse {sigmoid_mse} ≥ init {init_mse})"
     );
     assert!(
         softmax_mse < init_mse,
-        "G3 sanity: softmax did not learn (mse {} ≥ init {})",
-        softmax_mse,
-        init_mse
+        "G3 sanity: softmax did not learn (mse {softmax_mse} ≥ init {init_mse})"
     );
 }

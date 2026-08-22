@@ -78,12 +78,11 @@ impl<'a, G: ProcedureGraph> PathEnumerator<'a, G> {
     pub fn sample(&self, n: usize, rng: &mut fastrand::Rng) -> Vec<Trajectory<G::NodeId>> {
         let all_paths = self.enumerate();
 
-        match all_paths.is_empty() {
-            true => Vec::new(),
-            false => {
-                let requested = n.min(all_paths.len());
-                self.weighted_sample(&all_paths, requested, rng)
-            }
+        if all_paths.is_empty() {
+            Vec::new()
+        } else {
+            let requested = n.min(all_paths.len());
+            self.weighted_sample(&all_paths, requested, rng)
         }
     }
 
@@ -188,18 +187,16 @@ impl<'a, G: ProcedureGraph> PathEnumerator<'a, G> {
         let mut remaining_indices: Vec<usize> = (0..paths.len()).collect();
 
         for _ in 0..n {
-            match remaining_indices.is_empty() {
-                true => break,
-                false => {
-                    let rem_weights: Vec<f64> =
-                        remaining_indices.iter().map(|&i| weights[i]).collect();
-                    let rem_total: f64 = rem_weights.iter().sum();
+            if remaining_indices.is_empty() {
+                break;
+            } else {
+                let rem_weights: Vec<f64> = remaining_indices.iter().map(|&i| weights[i]).collect();
+                let rem_total: f64 = rem_weights.iter().sum();
 
-                    let pick = self.weighted_pick(&rem_weights, rem_total, rng);
-                    sampled.push(paths[remaining_indices[pick]].clone());
-                    // Remove picked index to avoid duplicates
-                    remaining_indices.swap_remove(pick);
-                }
+                let pick = self.weighted_pick(&rem_weights, rem_total, rng);
+                sampled.push(paths[remaining_indices[pick]].clone());
+                // Remove picked index to avoid duplicates
+                remaining_indices.swap_remove(pick);
             }
         }
 

@@ -477,9 +477,12 @@ fn estimate_local_tangent_into(
     }
     for &idx in neighbor_indices {
         let row = &natural_pool[idx * d..(idx + 1) * d];
-        for j in 0..d {
-            mean[j] += row[j];
-        }
+        // `simd_fused_scale_acc(dst, src, 1.0)` is element-wise
+        // `dst[j] = fma(1.0, src[j], dst[j])`. `1.0 * src[j]` is exact, so the
+        // FMA rounds exactly once on `src[j] + dst[j]` — identical to the scalar
+        // `mean[j] += row[j]`. Element-wise (not a reduction), so lane order is
+        // irrelevant and the accumulation order across neighbours is unchanged.
+        simd_fused_scale_acc(mean, row, 1.0, d);
     }
     let inv_k = 1.0 / k as f32;
     for v in mean.iter_mut() {
@@ -488,10 +491,14 @@ fn estimate_local_tangent_into(
 
     // Form centered matrix S_i (k×d, row-major): each row = neighbor - mean.
     let centered = &mut centered_neighbors[..k * d];
-    for (i, &idx) in neighbor_indices.iter().enumerate() {
+    // Pre-slice the destination row once per neighbour instead of recomputing
+    // `i * d + j` (and its bounds check) per element. `centered` is exactly
+    // `k * d` long and `neighbor_indices.len() == k` (asserted above), so
+    // `chunks_exact_mut(d)` yields exactly as many rows as indices.
+    for (&idx, dst) in neighbor_indices.iter().zip(centered.chunks_exact_mut(d)) {
         let row = &natural_pool[idx * d..(idx + 1) * d];
-        for j in 0..d {
-            centered[i * d + j] = row[j] - mean[j];
+        for (o, (&x, &m)) in dst.iter_mut().zip(row.iter().zip(mean.iter())) {
+            *o = x - m;
         }
     }
 
@@ -586,8 +593,18 @@ pub fn tangent_erasure_direction_into(
     for v in direction.iter_mut() {
         *v = 0.0;
     }
+    // `alpha` is loop-invariant and its documented default is exactly 1.0, where
+    // `powf` is an identity that still costs a full libm call per basis vector.
+    // IEEE 754 requires `pow(x, 1) == x` exactly for every finite x (and the
+    // sigmas here are non-negative singular values), so the fast path yields the
+    // bit-identical weight.
+    let alpha_is_one = alpha == 1.0;
     for j in 0..r {
-        let weight = sigma[j].powf(alpha);
+        let weight = if alpha_is_one {
+            sigma[j]
+        } else {
+            sigma[j].powf(alpha)
+        };
         let coeff = weight * coords[j];
         if coeff == 0.0 {
             continue;
@@ -1440,9 +1457,7 @@ mod tests {
             let norm = simd_dot_f32(col_j, col_j, d).sqrt();
             assert!(
                 (norm - 1.0).abs() < 1e-4 || norm < 1e-6,
-                "Column {} norm = {}, expected ~1.0 or ~0",
-                j,
-                norm
+                "Column {j} norm = {norm}, expected ~1.0 or ~0"
             );
         }
         // Check orthogonality between columns 0 and 1.
@@ -1450,7 +1465,7 @@ mod tests {
             let col_0 = &basis[0..d];
             let col_1 = &basis[d..2 * d];
             let dot = simd_dot_f32(col_0, col_1, d);
-            assert!(dot.abs() < 1e-4, "Columns not orthogonal: dot = {}", dot);
+            assert!(dot.abs() < 1e-4, "Columns not orthogonal: dot = {dot}");
         }
     }
 
@@ -1487,9 +1502,7 @@ mod tests {
         let e2_component = direction[1].abs();
         assert!(
             e1_component > e2_component,
-            "High-σ axis should dominate: e1={} vs e2={}",
-            e1_component,
-            e2_component
+            "High-σ axis should dominate: e1={e1_component} vs e2={e2_component}"
         );
     }
 
@@ -1635,9 +1648,7 @@ mod tests {
 
         assert!(
             out_align < x_align,
-            "Erasure should reduce target alignment: before={}, after={}",
-            x_align,
-            out_align
+            "Erasure should reduce target alignment: before={x_align}, after={out_align}"
         );
     }
 
@@ -1667,8 +1678,7 @@ mod tests {
         let proj = simd_dot_f32(&out, &d_mean, d);
         assert!(
             proj.abs() < 1e-5,
-            "LEACE should zero the class-mean direction: proj = {}",
-            proj
+            "LEACE should zero the class-mean direction: proj = {proj}"
         );
     }
 
@@ -1902,18 +1912,16 @@ mod tests {
         );
         assert_eq!(infos_u.len(), infos_c.len(), "Round count must match");
         for (i, (iu, ic)) in infos_u.iter().zip(infos_c.iter()).enumerate() {
-            assert_eq!(iu.lambda, ic.lambda, "Round {} lambda mismatch", i);
+            assert_eq!(iu.lambda, ic.lambda, "Round {i} lambda mismatch");
             assert_eq!(
                 iu.displacement, ic.displacement,
-                "Round {} displacement mismatch",
-                i
+                "Round {i} displacement mismatch"
             );
             assert_eq!(
                 iu.local_radius, ic.local_radius,
-                "Round {} local_radius mismatch",
-                i
+                "Round {i} local_radius mismatch"
             );
-            assert_eq!(iu.alignment, ic.alignment, "Round {} alignment mismatch", i);
+            assert_eq!(iu.alignment, ic.alignment, "Round {i} alignment mismatch");
         }
     }
 

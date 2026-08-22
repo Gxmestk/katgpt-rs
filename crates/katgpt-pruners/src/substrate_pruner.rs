@@ -170,8 +170,7 @@ mod tests {
         let rel = pruner.relevance(0, 0, &[]);
         assert!(
             rel > 0.7,
-            "high recovery should give high relevance, got {}",
-            rel,
+            "high recovery should give high relevance, got {rel}",
         );
     }
 
@@ -184,8 +183,7 @@ mod tests {
         let rel = pruner.relevance(0, 0, &[]);
         assert!(
             rel < 0.2,
-            "low recovery should give low relevance, got {}",
-            rel,
+            "low recovery should give low relevance, got {rel}",
         );
     }
 
@@ -200,8 +198,7 @@ mod tests {
         let rel = pruner.relevance(0, 0, &[]);
         assert!(
             (0.0..=1.0).contains(&rel),
-            "mid recovery should give valid relevance, got {}",
-            rel,
+            "mid recovery should give valid relevance, got {rel}",
         );
     }
 
@@ -216,10 +213,7 @@ mod tests {
                 let rel = pruner.relevance(depth, token, &[]);
                 assert!(
                     (0.0..=1.0).contains(&rel),
-                    "relevance should be in [0, 1], got {} for depth={} token={}",
-                    rel,
-                    depth,
-                    token,
+                    "relevance should be in [0, 1], got {rel} for depth={depth} token={token}",
                 );
             }
         }
@@ -272,8 +266,7 @@ mod tests {
         let rel = pruner.relevance(0, 0, &[]);
         assert!(
             (0.0..=1.0).contains(&rel),
-            "built pruner should produce valid relevance, got {}",
-            rel,
+            "built pruner should produce valid relevance, got {rel}",
         );
     }
 

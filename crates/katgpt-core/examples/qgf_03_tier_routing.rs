@@ -91,7 +91,7 @@ fn main() {
         ("Freeze", "NoGuidanceOracle", "qgf_oracle", "0.0"),
     ];
     for (tier, oracle, feat, conf) in tiers {
-        println!("  {:<10} {:<32} {:<14} {:<14}", tier, oracle, feat, conf);
+        println!("  {tier:<10} {oracle:<32} {feat:<14} {conf:<14}");
     }
     println!();
     println!("  Latency targets per tier (paper §4, our T9 mapping):");
@@ -112,7 +112,7 @@ fn main() {
     let mut buf = [0.0f32; 4];
     oracle.q_gradient_into(&(), &(), &mut buf);
     let conf = oracle.confidence(&());
-    println!("  q_gradient_into(&mut [0.0; 4]) → {:?}", buf);
+    println!("  q_gradient_into(&mut [0.0; 4]) → {buf:?}");
     println!("  confidence() = {conf}");
     println!();
     println!("  Reading: zero gradient + zero confidence → adaptive guidance weight");

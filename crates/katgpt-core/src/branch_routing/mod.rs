@@ -479,8 +479,7 @@ mod tests {
         // win ≥95% of the time.
         assert!(
             counts[1] >= 950,
-            "low-temp counts = {:?}, expected idx=1 >= 950",
-            counts
+            "low-temp counts = {counts:?}, expected idx=1 >= 950"
         );
     }
 
@@ -500,10 +499,7 @@ mod tests {
         for (i, &c) in counts.iter().enumerate() {
             assert!(
                 c > 750 && c < 1250,
-                "high-temp counts = {:?}: idx={} count={} outside [750, 1250]",
-                counts,
-                i,
-                c
+                "high-temp counts = {counts:?}: idx={i} count={c} outside [750, 1250]"
             );
         }
     }
@@ -553,8 +549,7 @@ mod tests {
             let idx = router.route_sampled(&parent, &cands, bad_temp, &mut rng);
             assert_eq!(
                 idx, 1,
-                "NaN/negative temp should fall back to argmax (idx=1), got {}",
-                idx
+                "NaN/negative temp should fall back to argmax (idx=1), got {idx}"
             );
         }
     }
@@ -635,8 +630,7 @@ mod tests {
         }
         assert!(
             counts[1] >= 950,
-            "collider low-temp counts = {:?}, expected idx=1 >= 950",
-            counts
+            "collider low-temp counts = {counts:?}, expected idx=1 >= 950"
         );
     }
 
@@ -675,8 +669,7 @@ mod tests {
         let mean = sum / n as f64;
         assert!(
             mean.abs() < 0.1,
-            "Logistic(0,1) empirical mean = {}, expected ≈ 0",
-            mean
+            "Logistic(0,1) empirical mean = {mean}, expected ≈ 0"
         );
     }
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/katopz/katgpt-rs/compare/katgpt-personality-v0.1.2...katgpt-personality-v0.1.3) - 2026-08-22
+
+### Other
+
+- updated the following local packages: katgpt-types
+
 ## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-personality-v0.1.1...katgpt-personality-v0.1.2) - 2026-07-31
 
 ### Added

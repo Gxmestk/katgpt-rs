@@ -30,9 +30,10 @@ fn test_planning_decision_variants() {
     // Each variant should be unique
     for (i, a) in decisions.iter().enumerate() {
         for (j, b) in decisions.iter().enumerate() {
-            match i == j {
-                true => assert_eq!(a, b),
-                false => assert_ne!(a, b),
+            if i == j {
+                assert_eq!(a, b)
+            } else {
+                assert_ne!(a, b)
             }
         }
     }

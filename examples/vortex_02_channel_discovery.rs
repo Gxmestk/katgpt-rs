@@ -71,12 +71,12 @@ fn main() {
         let g_end = (g_start + group_size).min(HEAD_DIM);
         let critical_in_group = (g_start..g_end).filter(|&d| mask.channels[d]).count();
         let total_in_group = g_end - g_start;
-        let status = match critical_in_group == total_in_group {
-            true => "CRITICAL",
-            false => match critical_in_group > 0 {
-                true => "PARTIAL",
-                false => "non-critical",
-            },
+        let status = if critical_in_group == total_in_group {
+            "CRITICAL"
+        } else if critical_in_group > 0 {
+            "PARTIAL"
+        } else {
+            "non-critical"
         };
         println!(
             "    Group {group} (dims {g_start}-{g_end}): {critical_in_group}/{total_in_group} critical [{status}]"
@@ -116,9 +116,10 @@ fn main() {
 
     println!("  Channel-aware routing (top-{TOP_K}):");
     for (rank, &block) in decision_channel.blocks.iter().enumerate() {
-        let marker = match block == target_block {
-            true => " ← target",
-            false => "",
+        let marker = if block == target_block {
+            " ← target"
+        } else {
+            ""
         };
         println!(
             "    #{rank}: block {block}, weight={:.4}{marker}",
@@ -139,9 +140,10 @@ fn main() {
 
     println!("\n  Full-dim routing (top-{TOP_K}):");
     for (rank, &(block, score)) in full_scores.iter().take(TOP_K).enumerate() {
-        let marker = match block == target_block {
-            true => " ← target",
-            false => "",
+        let marker = if block == target_block {
+            " ← target"
+        } else {
+            ""
         };
         println!("    #{rank}: block {block}, score={score:.4}{marker}");
     }

@@ -190,6 +190,8 @@ This is structurally `s_t = clamp(s_{t-1} + clamp(lr · f(x_t), max_delta), -1, 
 - Our related: 073/108 (LT2 looped), 097/136 (training-free loop), 192/217 (NextLat drafter), 070/105 (Gated DeltaNet-2), 241/275 (SwiR switch-thinking), 255 (ANE-Latent NPC Brain), 262 (Latent Physics Primitives).
 - riir-ai: 123 (Latent Functor), 126 (CGSP guide), 127 (this paper's private guide).
 
+> **PASS-Redirects (synthesis):** Yang, Veseli, Barloy, Cadilhac, Krebs, Paperman, Straubing & Hahn [arXiv:2608.13433 "Algebraic Decomposition Theory for Transformer Length Generalization"] — first complete algebraic characterization of which regular languages transformers length-generalize on (C-RASP ∩ REG = iterated wreath products of bounded-depth Dyck monoids over ℤ; poly-time decision via R-class iteration over balanced relational morphisms). Counting is the only length-generalizable loop primitive — flip-flop (U2) and simple groups are NOT C-RASP-expressible. This theory-seals Bench 276's empirical result (the monotone additive LeakyIntegrator beats AttractorKernel's basin flip-flops 569× on coherence) and refines this note's log-depth ceiling claim: the C-RASP subclass length-generalizes at constant depth (GPT-2 trained@50 → near-perfect@500).
+
 ---
 
 ## TL;DR

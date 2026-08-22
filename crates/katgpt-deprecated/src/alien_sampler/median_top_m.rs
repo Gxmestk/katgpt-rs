@@ -129,7 +129,7 @@ impl MedianTopMAvailability {
             m >= 1,
             "MedianTopMAvailability::new: m must be >= 1, got {m}"
         );
-        let dim = community_bank.first().map(Vec::len).unwrap_or(0);
+        let dim = community_bank.first().map_or(0, Vec::len);
         for (i, item) in community_bank.iter().enumerate() {
             assert_eq!(
                 item.len(),

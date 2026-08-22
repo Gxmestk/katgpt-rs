@@ -173,14 +173,8 @@ const LR_RANK: usize = 8; // low-rank target rank
 
 fn main() {
     println!("KARC Phase 2 benchmark: higher-order + low-rank on double-scroll");
-    println!(
-        "  params: D={}, M={}, K={}, R={}, r={}",
-        D, M, K, R, LR_RANK
-    );
-    println!(
-        "  N_train={}, dt={}, Lyapunov time ≈ {} units",
-        N_TRAIN, DT, LYAPUNOV_TIME_UNITS
-    );
+    println!("  params: D={D}, M={M}, K={K}, R={R}, r={LR_RANK}");
+    println!("  N_train={N_TRAIN}, dt={DT}, Lyapunov time ≈ {LYAPUNOV_TIME_UNITS} units");
 
     // Generate trajectory.
     let traj_raw = generate_double_scroll(N_TRAIN + K + 50, DT, 1000, SUBSTEPS);
@@ -208,7 +202,7 @@ fn main() {
         }
     }
     let n_total = traj.len() / D;
-    println!("  accumulated {} samples (normalized)", n_total);
+    println!("  accumulated {n_total} samples (normalized)");
 
     // ── Config 1: First-order full-rank baseline ──
     println!("\n── Config 1: first-order full-rank (Phase 1 baseline) ──");
@@ -238,7 +232,7 @@ fn main() {
     println!("\n── Config 2: higher-order R=2 full-rank (chunked Gram) ──");
     let d_h_1 = K * D * M;
     let d_h_ho = higher_order_feature_count(d_h_1, R);
-    println!("  d_h_1 = {}, d_h(R=2) = {}", d_h_1, d_h_ho);
+    println!("  d_h_1 = {d_h_1}, d_h(R=2) = {d_h_ho}");
     // Build Gram and Cov via streaming (chunked_gram_into for G, manual for Cov).
     let lambda64 = lambda as f64;
     let mut gram_ho = vec![0.0f64; d_h_ho * d_h_ho];
@@ -328,12 +322,9 @@ fn main() {
     let sigma_ho = mean_sigma(&truth_ho, D);
     let thr_sample_ho = threshold_time(&pred_ho, &truth_ho, D, 0.1, sigma_ho);
     let thr_lt_ho = thr_sample_ho as f64 / SAMPLES_PER_LT;
-    println!("  NRMSE(1 LT) = {:.6e}", nrmse_2);
-    println!(
-        "  threshold (ε=0.1): {} samples = {:.2} LT",
-        thr_sample_ho, thr_lt_ho
-    );
-    println!("  σ(u) mean per-coord: {:.4}", sigma_ho);
+    println!("  NRMSE(1 LT) = {nrmse_2:.6e}");
+    println!("  threshold (ε=0.1): {thr_sample_ho} samples = {thr_lt_ho:.2} LT");
+    println!("  σ(u) mean per-coord: {sigma_ho:.4}");
     println!(
         "  G1 NRMSE  ≤ 1.0e-3 : {}",
         if nrmse_2 <= 1.0e-3 {
@@ -353,7 +344,7 @@ fn main() {
     println!("  paper reference: NRMSE 5.3e-4, threshold 16.7 LT");
 
     // ── Config 3: First-order low-rank r=8 ──
-    println!("\n── Config 3: first-order low-rank r={} (ALS) ──", LR_RANK);
+    println!("\n── Config 3: first-order low-rank r={LR_RANK} (ALS) ──");
     f1.fit_low_rank(LR_RANK, lambda, 100, 1e-10)
         .expect("fit_low_rank");
     let nrmse_3 = autonomous_rollout_low_rank(&mut f1, &traj, &traj_raw, &scale, &offset, n_total);
@@ -366,20 +357,11 @@ fn main() {
 
     // ── Summary ──
     println!("\n── T2.5 summary ────────────────────────────────────────────");
-    println!("  first-order full-rank:  NRMSE = {:.6e}", nrmse_1);
-    println!(
-        "  higher-order R=2 full:  NRMSE = {:.6e}  (paper headline 5.3e-4)",
-        nrmse_2
-    );
-    println!(
-        "  first-order low-rank:   NRMSE = {:.6e}  (r={})",
-        nrmse_3, LR_RANK
-    );
+    println!("  first-order full-rank:  NRMSE = {nrmse_1:.6e}");
+    println!("  higher-order R=2 full:  NRMSE = {nrmse_2:.6e}  (paper headline 5.3e-4)");
+    println!("  first-order low-rank:   NRMSE = {nrmse_3:.6e}  (r={LR_RANK})");
     let ratio = nrmse_3 / nrmse_1.max(1e-12);
-    println!(
-        "  low-rank / full-rank ratio: {:.3}× (target ≤ 1.5×)",
-        ratio
-    );
+    println!("  low-rank / full-rank ratio: {ratio:.3}× (target ≤ 1.5×)");
     if ratio <= 1.5 {
         println!("  T2.5 gate: PASS ✅");
     } else {

@@ -4,6 +4,7 @@
 **Source:** Gabriel Lespérance, "Going recursive (part I): Applying RLM-GEPA to AppWorld" (X article)
 **Papers:** [RLM arXiv:2512.24601](https://arxiv.org/abs/2512.24601), [GEPA arXiv:2507.19457](https://arxiv.org/abs/2507.19457) (ICLR 2026 Oral)
 **Status:** GOAT Verdict Pending
+**PASS-Redirects (synthesis):** Prime Intellect [arXiv:2512.24601 "Recursive Language Models"] + Prime Agent blog (<https://www.primeintellect.ai/blog/prime-agent>, August 2026) — **PASS, this note already covered it.** Prime Agent's RLM instantiation (persistent IPython REPL as the only tool, subagent delegation as async function calls) is the same RLM mechanism this note verdict'd as "RLM adds nothing new" in 2026-05-31. Our DDTree + LT2 (Plan 108) + SpecHop (Plan 131) + FederationComposer (Plan 231) ship recursive/looped/multi-hop inference modellessly; Prime Agent's IPython-REPL is an LLM-as-REPL instantiation of the same pattern. The Prime Agent verdict also splits off Continual Harness (`/refine` self-improvement = AIDE²-class LLM-dependent per R440; H=(ρ,G,K,M) CRUD state model = narrow Gain, riir-ai R333 §2.4, deferred). See [riir-ai/.research/333](../../riir-ai/.research/333_prime_agent_rlm_continual_harness_verdict.md) for the full Prime Agent verdict.
 
 ---
 
@@ -148,3 +149,15 @@ The gain is in the SR²AM → reflection → config evolution loop. Implementati
 - Alex L. Zhang, Tim Kraska, Omar Khattab. "Recursive Language Models." arXiv:2512.24601 v3, May 2026.
 - Lakshya A. Agrawal et al. "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning." ICLR 2026 Oral. arXiv:2507.19457 v2, Feb 2026.
 - Gabriel Lespérance. "Going recursive (part I): Applying RLM-GEPA to AppWorld." X article, May 2026.
+
+---
+
+## PASS-Redirects Addendum (2026-08-13)
+
+> Zhou, Wan et al. [arXiv:2502.02533 "Multi-Agent Design: Optimizing Agents with Better Prompts and Topologies"](https://arxiv.org/abs/2502.02533) (ICLR 2026, the **Mass** framework) — **PASS, outside modelless scope.**
+>
+> Mass jointly optimizes LLM-MAS prompts (MIPRO/APE/DSPy) and workflow topologies (aggregate/reflect/debate/summarize/tool-use) via a 3-stage interleave (block-PO → topology → workflow-PO) for *LLM inference calls*. The headline finding ("prompts matter more than topology; optimize agents locally before scaling topology") is a finding about LLM-MAS specifically — it does not transfer to our modelless stack, where (a) there are no LLM prompts in the hot path (NPC cognitive stacks are modelless runtimes: HLA, MAG, KARC, CLR, CGSP), (b) the dev tools that touch LLM-shaped patterns (riir-clippy's TernaryDraftModel, riir-agents' BLAKE3-deterministic latent reasoning) are explicitly modelless, not LLM-orchestration, and (c) "topology" in our vocabulary means node-tier chain consensus / spatial crowd structure / cognitive-stack layers — not LLM workflow graphs.
+>
+> The modelless core of Mass (softmax-influence rejection sampling for topology pruning, `p_a = Softmax(I_a, t)`, reject if `u > p_a`) is generic NAS/MAB-style search with dense prior art (ADAS, AFlow, GPTSwarm, DyLAN, Archon — all cited in-paper; 119 citations on the paper itself). Too thin to be a Super-GOAT primitive — it's standard influence-weighted rejection sampling.
+>
+> Same verdict class as the RLM/GEPA line at the top of this note: LLM-orchestration optimization does not map onto modelless direction-vector / freeze-thaw / shard / LatCal substrates. No `.plans/`, no `.issues/` filed.

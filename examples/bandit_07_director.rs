@@ -213,8 +213,7 @@ impl Director {
             BanditStrategy::ThompsonSampling => (0..Encounter::ALL.len())
                 .map(|i| (i, self.stats.thompson_sample(i, rng)))
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i)
-                .unwrap_or(0),
+                .map_or(0, |(i, _)| i),
             BanditStrategy::VarianceEpsilon { epsilon, .. } => {
                 if rng.uniform() < *epsilon {
                     (rng.uniform() * Encounter::ALL.len() as f32) as usize % Encounter::ALL.len()

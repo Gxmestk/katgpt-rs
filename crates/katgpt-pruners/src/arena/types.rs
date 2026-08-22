@@ -52,20 +52,20 @@ impl MatchupResult {
 
     /// Win rate for player at given index (0.0–1.0).
     pub fn win_rate(&self, idx: usize) -> f64 {
-        match self.games.is_empty() {
-            true => 0.0,
-            false => self.wins_for(idx) as f64 / self.games.len() as f64,
+        if self.games.is_empty() {
+            0.0
+        } else {
+            self.wins_for(idx) as f64 / self.games.len() as f64
         }
     }
 
     /// Average game duration.
     pub fn avg_duration(&self) -> Duration {
-        match self.games.is_empty() {
-            true => Duration::ZERO,
-            false => {
-                let total: Duration = self.games.iter().map(|g| g.duration).sum();
-                total / self.games.len() as u32
-            }
+        if self.games.is_empty() {
+            Duration::ZERO
+        } else {
+            let total: Duration = self.games.iter().map(|g| g.duration).sum();
+            total / self.games.len() as u32
         }
     }
 }
@@ -159,10 +159,7 @@ impl EloCalculator {
     /// Update ratings after a game. Returns (new_a, new_b).
     pub fn update(&self, rating_a: f64, rating_b: f64, a_won: bool) -> (f64, f64) {
         let expected_a = self.expected(rating_a, rating_b);
-        let actual_a = match a_won {
-            true => 1.0,
-            false => 0.0,
-        };
+        let actual_a = if a_won { 1.0 } else { 0.0 };
         let actual_b = 1.0 - actual_a;
 
         let new_a = rating_a + self.k * (actual_a - expected_a);

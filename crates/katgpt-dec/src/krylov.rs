@@ -590,8 +590,7 @@ mod tests {
         );
         assert!(
             vec_approx_eq(&result, &h0, 1e-6),
-            "t=0 should return h0, got {:?}",
-            result
+            "t=0 should return h0, got {result:?}"
         );
     }
 
@@ -610,9 +609,7 @@ mod tests {
         let expected: Vec<f32> = h0.iter().map(|&x| x * scale).collect();
         assert!(
             vec_approx_eq(&result, &expected, 1e-4),
-            "exp({t}·I)·b = {:?} != {:?}",
-            result,
-            expected
+            "exp({t}·I)·b = {result:?} != {expected:?}"
         );
     }
 
@@ -636,9 +633,7 @@ mod tests {
         let expected = vec![t.exp(), (-t).exp(), (2.0 * t).exp(), (-2.0 * t).exp()];
         assert!(
             vec_approx_eq(&result, &expected, 1e-3),
-            "krylov diag exact: {:?} != {:?}",
-            result,
-            expected
+            "krylov diag exact: {result:?} != {expected:?}"
         );
     }
 
@@ -692,9 +687,7 @@ mod tests {
         krylov_expmv_into(&mut a_apply, &h0, t, 4, &mut into_result);
         assert!(
             vec_approx_eq(&alloc_result, &into_result, 1e-6),
-            "alloc {:?} != into {:?}",
-            alloc_result,
-            into_result
+            "alloc {alloc_result:?} != into {into_result:?}"
         );
     }
 
@@ -720,9 +713,7 @@ mod tests {
         let expected: Vec<f32> = h0.iter().map(|&x| x * scale).collect();
         assert!(
             vec_approx_eq(&result, &expected, 1e-4),
-            "breakdown: {:?} != {:?}",
-            result,
-            expected
+            "breakdown: {result:?} != {expected:?}"
         );
     }
 
@@ -740,9 +731,7 @@ mod tests {
         let expected = vec![(1.0f32).exp(); 10];
         assert!(
             vec_approx_eq(&result, &expected, 1e-4),
-            "k cap: {:?} != {:?}",
-            result,
-            expected
+            "k cap: {result:?} != {expected:?}"
         );
     }
 }

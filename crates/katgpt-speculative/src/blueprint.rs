@@ -19,8 +19,7 @@ impl BlueprintPass {
                 m.iter()
                     .enumerate()
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                    .map(|(idx, _)| idx)
-                    .unwrap_or(0)
+                    .map_or(0, |(idx, _)| idx)
             })
             .collect()
     }

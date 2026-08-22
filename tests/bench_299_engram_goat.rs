@@ -119,8 +119,7 @@ fn g1_lookup_latency() -> GateResult {
     println!("  Hits:      {total_hits} total across {n_iters} calls");
     println!("  Total:     {:.2} µs / call", ns_per_call / 1000.0);
     println!(
-        "  Amortized: {:.2} ns / retrieval (target < {target_ns_per_retrieval:.0})",
-        ns_per_retrieval
+        "  Amortized: {ns_per_retrieval:.2} ns / retrieval (target < {target_ns_per_retrieval:.0})"
     );
     println!("  Verdict:   {}", if pass { "PASS ✅" } else { "FAIL ❌" });
     println!();

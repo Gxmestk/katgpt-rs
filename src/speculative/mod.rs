@@ -229,8 +229,8 @@ pub use crate::dllm::D2fContext;
 pub use d2f::{
     D2fBlockResult, D2fBlockState, D2fDecodeConfig, D2fPipeline, D2fPipelineResult, ScheduleKind,
     d2f_decode_block, d2f_decode_block_with, d2f_decode_block_with_prompt,
-    d2f_decode_block_with_prompt_with, d2f_decode_block_with_target,
-    d2f_decode_block_with_target_with,
+    d2f_decode_block_with_prompt_with, d2f_decode_block_with_prompt_with_q,
+    d2f_decode_block_with_target, d2f_decode_block_with_target_with,
 };
 
 // ── DMax Soft Parallel Decode Re-exports (Plan 109, feature: dmax_spd) ──
@@ -258,7 +258,7 @@ pub use katgpt_speculative::weaver;
 
 // ── D2F Drafter Verifier Re-exports (Plan 089, Tri-Mode) ───
 #[cfg(feature = "tri_mode")]
-pub use d2f_verifier::D2fDrafterVerifier;
+pub use d2f_verifier::{D2fDrafterVerifier, DraftAcceptPolicy};
 
 // ── DiffusionSampler Re-exports (Plan 116, Tri-Mode) ──────────
 #[cfg(feature = "tri_mode")]

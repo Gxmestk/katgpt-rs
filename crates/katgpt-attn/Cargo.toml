@@ -109,3 +109,37 @@ hga = ["katgpt-core/hga"]
 # katgpt-transformer so LayerWeights.mlp_w_up resolves. Gates the SwiGLU
 # MLP path in gdn2/forward.rs, gdn2/tree_forward.rs, and dash_attn/forward.rs.
 gated_mlp = ["katgpt-forward/gated_mlp", "katgpt-transformer/gated_mlp"]
+# MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
+# Implements the decoupled-RoPE latent attention from DeepSeek-V2 with the
+# Kimi-K3 output-gate extension (Proposal 032 Phase 2, Research 327). Pulls
+# katgpt-kv for RopeFreqs (the cached sin/cos RoPE substrate). Opt-in,
+# default-off until Phase 6 real-model GOAT.
+mla_attention = ["dep:katgpt-kv", "katgpt-kv/shard_kv"]
+# MLA analytic backward pass (Plan 318 Phase C C4). The CPU reference for
+# the GPU backward. Implies `mla_attention`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+mla_backward = ["mla_attention"]
+# KDA (Kimi Delta Attention) — Kimi Linear (arxiv 2510.26692) §3-4.
+# Implements the per-token decode forward for KDA linear attention. The
+# recurrent kernel is REUSED from `gdn2_attention` (Gdn2GateConfig::Kda);
+# this feature adds the KDA-specific forward layer (projections + ShortConv1D
+# + Swish + L2Norm + low-rank α + sigmoid β + output gate + head-wise RMSNorm).
+# Proposal 032 Phase 4, Research 329. Opt-in, default-off until Phase 6 GOAT.
+kda_linear = ["gdn2_attention"]
+# KDA analytic backward pass (Issue 389 T4). The CPU reference for the GPU
+# backward (Plan 318 Phase C C5). Implies `kda_linear`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+kda_backward = ["kda_linear"]
+# FlashMemory-style periodic sparse attention for MLA (Issue 584 Phase 1).
+# Implements the lookahead periodic sparse selection from FlashMemory-DeepSeek-V4
+# (arXiv:2606.09079, Research 436) adapted for Multi-head Latent Attention.
+# Implies `mla_attention` (MLA types + forward) + `dash_attn` (VortexFlow scratch
+# types). Opt-in, default-off until GOAT gate (Issue 584 Phase 3).
+flashmemory_sparse = ["mla_attention", "dash_attn"]
+# Trained dual-encoder indexer for FlashMemory (Plan 337 Phase B). Two tiny
+# MLPs (Q-Indexer + K-Indexer) that replace the modelless centroid-dot scorer.
+# Requires training (riir-train Plan 337) → NEVER default-on (modelless-first
+# mandate). The modelless FlashMemorySelector is the production default.
+trained_indexer = ["flashmemory_sparse"]

@@ -205,23 +205,20 @@ mod go_analytics_tests {
             let analytics = compute_analytics(&replay);
 
             // Structural GOAT: garbage_move_ratio must be consistent with garbage_start_move
-            match analytics.garbage_start_move {
-                Some(start) => {
-                    let expected_ratio =
-                        (analytics.total_moves - start) as f32 / analytics.total_moves as f32;
-                    assert!(
-                        (analytics.garbage_move_ratio - expected_ratio).abs() < 0.01,
-                        "game {i}: ratio={:.3} but expected={expected_ratio:.3} from start={start}",
-                        analytics.garbage_move_ratio,
-                    );
-                }
-                None => {
-                    assert!(
-                        analytics.garbage_move_ratio == 0.0,
-                        "game {i}: garbage_start is None but ratio={:.3}",
-                        analytics.garbage_move_ratio,
-                    );
-                }
+            if let Some(start) = analytics.garbage_start_move {
+                let expected_ratio =
+                    (analytics.total_moves - start) as f32 / analytics.total_moves as f32;
+                assert!(
+                    (analytics.garbage_move_ratio - expected_ratio).abs() < 0.01,
+                    "game {i}: ratio={:.3} but expected={expected_ratio:.3} from start={start}",
+                    analytics.garbage_move_ratio,
+                );
+            } else {
+                assert!(
+                    analytics.garbage_move_ratio == 0.0,
+                    "game {i}: garbage_start is None but ratio={:.3}",
+                    analytics.garbage_move_ratio,
+                );
             }
 
             // Ratio is always in [0, 1]

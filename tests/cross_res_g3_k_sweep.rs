@@ -167,8 +167,7 @@ fn g3_k_sweep_characterization() {
     let personality_basis = random_orthonormal(D_SRC, INTRINSIC_K, &mut basis_rng);
 
     println!(
-        "\nG3 K-SWEEP (d_src={}, d_dst={}, intrinsic_k={}, n_samples={} per cell)",
-        D_SRC, D_DST, INTRINSIC_K, N_SAMPLES
+        "\nG3 K-SWEEP (d_src={D_SRC}, d_dst={D_DST}, intrinsic_k={INTRINSIC_K}, n_samples={N_SAMPLES} per cell)"
     );
     println!("======================================================================");
     print!("{:<8}", "k\\bf");
@@ -271,7 +270,7 @@ fn g3_k_sweep_characterization() {
         .expect("reverse bases should construct");
         let mut scratch = CrossResScratch::new(k);
 
-        print!("{:<8}", k);
+        print!("{k:<8}");
         for &bf in BAND_FRACS {
             let mut sum_cos = 0.0f32;
             for _ in 0..N_SAMPLES {
@@ -287,14 +286,13 @@ fn g3_k_sweep_characterization() {
                 sum_cos += cosine(&src, &recon);
             }
             let mean = sum_cos / N_SAMPLES as f32;
-            print!("{:>12.4}", mean);
+            print!("{mean:>12.4}");
         }
         println!();
     }
     println!("======================================================================");
     println!(
-        "\nInterpretation: when k < intrinsic_k={}, the transport basis cannot fully",
-        INTRINSIC_K
+        "\nInterpretation: when k < intrinsic_k={INTRINSIC_K}, the transport basis cannot fully"
     );
     println!("capture the personality subspace → cos drops. When k ≥ intrinsic_k, the");
     println!("transport is lossless on the personality subspace → cos ≈ sqrt(bf).");

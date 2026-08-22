@@ -365,18 +365,11 @@ fn main() {
     println!("║  Plan 319 — G8c: Formation Robustness Simulation            ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
+    println!("  Pool: {POOL_SIZE} NPCs (80% specialists, 20% generalists), D={DIM}");
     println!(
-        "  Pool: {} NPCs (80% specialists, 20% generalists), D={}",
-        POOL_SIZE, DIM
+        "  Party: {PARTY_SIZE} NPCs, {N_ROLES} roles (Tank/Healer/DPS/Support), role_τ={ROLE_TAU}"
     );
-    println!(
-        "  Party: {} NPCs, {} roles (Tank/Healer/DPS/Support), role_τ={}",
-        PARTY_SIZE, N_ROLES, ROLE_TAU
-    );
-    println!(
-        "  Combat: {} rounds max, HP={}, damage={}/threat",
-        MAX_ROUNDS, START_HP, DAMAGE_PER_THREAT
-    );
+    println!("  Combat: {MAX_ROUNDS} rounds max, HP={START_HP}, damage={DAMAGE_PER_THREAT}/threat");
     println!(
         "  Trials: {}, target: complementarity survival ≥ {:.0}% of similarity",
         N_TRIALS,
@@ -412,18 +405,14 @@ fn main() {
             })
             .collect();
         let total_coverage: usize = role_counts.iter().filter(|&&c| c > 0).count();
-        println!(
-            "  {}: roles covered = {}/{}  counts={:?}",
-            label, total_coverage, N_ROLES, role_counts
-        );
+        println!("  {label}: roles covered = {total_coverage}/{N_ROLES}  counts={role_counts:?}");
         for (i, &npc_idx) in party.iter().enumerate() {
             let dominant_role = pool[npc_idx]
                 .roles
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
-                .map(|(r, _)| r)
-                .unwrap_or(0);
+                .map_or(0, |(r, _)| r);
             let role_names = ["Tank", "Heal", "DPS", "Supp"];
             println!(
                 "    NPC {}: dominant={}, competencies={:?}",
@@ -458,14 +447,8 @@ fn main() {
         N_TRIALS,
         elapsed.as_secs_f64() * 1.0e3
     );
-    println!(
-        "  Complementarity (wedge): mean={:.1} rounds, median={}",
-        comp_mean, comp_median
-    );
-    println!(
-        "  Similarity (dot):        mean={:.1} rounds, median={}",
-        sim_mean, sim_median
-    );
+    println!("  Complementarity (wedge): mean={comp_mean:.1} rounds, median={comp_median}");
+    println!("  Similarity (dot):        mean={sim_mean:.1} rounds, median={sim_median}");
     println!(
         "  Survival ratio:          {:.3}×  (target ≥ {:.2}×)  {}",
         ratio,

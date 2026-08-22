@@ -63,7 +63,7 @@ fn test_phase1_state_prediction_convergence() {
     let key = hasher.hash_key(&features);
     let value = hasher.hash_value(&[0.4, -0.2, 0.7]);
 
-    let mut errors = Vec::new();
+    let mut errors = Vec::with_capacity(200);
     for i in 0..200 {
         // Read before write to measure prediction quality
         let prediction = state.read(&key);
@@ -115,7 +115,7 @@ fn test_phase1_state_interference() {
 
     // Write association A many times
     let key_a = hasher.hash_key(&[1.0, 0.0, 0.0, 0.0, 0.0]);
-    let val_a = hasher.hash_value(&[0.0, 1.0, 0.0]);
+    let val_a = hasher.hash_value(&[0.0, 1.0, 0.0, 0.0, 0.0]);
     for _ in 0..50 {
         state.write(&key_a, &val_a);
     }
@@ -123,7 +123,7 @@ fn test_phase1_state_interference() {
 
     // Write association B many times (should partially interfere)
     let key_b = hasher.hash_key(&[0.0, 0.0, 0.0, 0.0, 1.0]);
-    let val_b = hasher.hash_value(&[1.0, 0.0, 0.0]);
+    let val_b = hasher.hash_value(&[1.0, 0.0, 0.0, 0.0, 0.0]);
     for _ in 0..50 {
         state.write(&key_b, &val_b);
     }
@@ -316,8 +316,7 @@ fn test_phase2_correction_modes_sweep() {
         let rel = pruner.relevance(3, 1, &[0, 1]);
         assert!(
             (0.0..=1.0).contains(&rel),
-            "Mode {:?}: relevance should be in [0, 1], got {rel}",
-            mode
+            "Mode {mode:?}: relevance should be in [0, 1], got {rel}"
         );
     }
 }

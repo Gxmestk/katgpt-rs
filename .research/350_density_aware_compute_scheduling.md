@@ -8,7 +8,7 @@
 > **Status:** Active
 > **Related Research:** 128 (zone-density cognitive gating), 219 (DEC substrate), 246 (manifold power-iteration MoE router), 296 (Stokes vocabulary crosswalk)
 > **Related Plans:** 251 (DEC operators), 305 (ZoneGatingProfile cognitive tier), 314 (Stokes wrappers, G-A FAILED as ICT detector), 334 (Stokes→HLA wiring), 242 (Fourier crowd flow — already cites Treuille 2006, **different application**), 001-Phase-1 zone manifold (just shipped)
-> **Cross-ref (riir-ai):** [Plan 305](../../riir-ai/.plans/305_*.md) (existing density-tiered cognitive gating), [Plan 334](../../riir-ai/.plans/334_stokes_calculus_hla_wiring.md) (DEC→HLA wiring), [Plan 242](../.plans/242_Fourier_Smoothed_Potential_Fields_LEO.md) (Fourier crowd flow, different Treuille application)
+> **Cross-ref (riir-ai):** [Plan 305](../../riir-ai/.plans/305_zone_density_dynamic_functor_gating.md) (existing density-tiered cognitive gating), [Plan 334](../../riir-ai/.plans/334_stokes_calculus_hla_wiring.md) (DEC→HLA wiring), [Plan 242](../.plans/242_Fourier_Smoothed_Potential_Fields_LEO.md) (Fourier crowd flow, different Treuille application)
 > **Classification:** Public (katgpt-rs)
 
 ---

@@ -36,7 +36,20 @@ impl IntervalMask {
     /// if i and k are valid then j is valid. O(n) single-pass scan.
     #[inline]
     pub fn is_interval_closed(&self) -> bool {
-        self.gap_count() == 0
+        // Early-exit on the first InGap→InValid transition instead of counting
+        // every gap over the whole (vocab-sized) mask. `gap_count() == 0` iff no
+        // such transition exists, so the result is identical.
+        let mut state = State::LeadingInvalid;
+        for &v in &self.mask {
+            state = match (state, v) {
+                (State::LeadingInvalid, true) | (State::InValid, true) => State::InValid,
+                (State::LeadingInvalid, false) => State::LeadingInvalid,
+                (State::InValid, false) => State::InGap,
+                (State::InGap, true) => return false,
+                (State::InGap, false) => State::InGap,
+            };
+        }
+        true
     }
 
     /// Merge nearby valid ranges. If the gap between two valid ranges is
@@ -50,9 +63,8 @@ impl IntervalMask {
         }
 
         let intervals = self.valid_intervals();
-        match intervals.len() {
-            0 | 1 => return self.clone(),
-            _ => {}
+        if let 0 | 1 = intervals.len() {
+            return self.clone();
         }
 
         let mut result = self.mask.clone();
@@ -261,16 +273,12 @@ impl<P: ConstraintPruner> ConstraintPruner for IntervalPruner<P> {
         // Build mask only over the batch slice.
         // Compute intervals directly from `results` (no Vec<bool> allocation,
         // no IntervalMask wrapper), then fill gaps in place.
-        match self.gap_threshold {
-            0 => { /* no merging */ }
-            _ => {
-                let intervals = valid_intervals_from_slice(&results[..len]);
-                match intervals.len() {
-                    0 | 1 => {}
-                    _ => {
-                        close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold)
-                    }
-                }
+        if self.gap_threshold == 0 { /* no merging */
+        } else {
+            let intervals = valid_intervals_from_slice(&results[..len]);
+            if let 0 | 1 = intervals.len() {
+            } else {
+                close_intervals_inplace(&mut results[..len], &intervals, self.gap_threshold);
             }
         }
     }

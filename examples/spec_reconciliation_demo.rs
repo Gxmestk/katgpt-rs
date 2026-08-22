@@ -342,10 +342,7 @@ fn scenario_5_adaptive() {
 
     println!();
     println!("  ┌──────────────────────────────────────────────┐");
-    println!(
-        "  │  Adaptive Bandit Summary ({} episodes)       │",
-        total_episodes
-    );
+    println!("  │  Adaptive Bandit Summary ({total_episodes} episodes)       │");
     println!("  ├──────────────────────────────────────────────┤");
     println!(
         "  │  Accuracy:          {:>5} / {} ({:.1}%)       │",

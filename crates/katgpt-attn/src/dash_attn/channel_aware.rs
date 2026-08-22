@@ -6,7 +6,7 @@
 //!
 //! Feature gate: `vortex_flow` (Plan 196, Phase 2, default-OFF).
 
-use super::block_topk::{BlockTopKRouter, argtopk, argtopk_with_scratch, sigmoid};
+use super::block_topk::{BlockTopKRouter, argtopk_with_scratch, sigmoid};
 use super::vortex_flow::{RoutingDecision, VortexFlow, VortexScratch};
 
 // ---------------------------------------------------------------------------
@@ -155,9 +155,10 @@ impl RoutingChannelDiscovery {
 
         // If no channels are critical, fall back to all (safer default)
         let has_critical = critical.iter().any(|&c| c);
-        match has_critical {
-            true => RoutingChannelMask { channels: critical },
-            false => RoutingChannelMask::all(head_dim),
+        if has_critical {
+            RoutingChannelMask { channels: critical }
+        } else {
+            RoutingChannelMask::all(head_dim)
         }
     }
 
@@ -184,41 +185,50 @@ impl RoutingChannelDiscovery {
         let scale = 1.0 / (head_dim as f32).sqrt();
         let mut total_overlap = 0.0f32;
 
+        // Scratch hoisted out of the per-query loop: every buffer below is
+        // fully overwritten (scores) or cleared by `argtopk` (indices) on each
+        // iteration, so reuse is observationally identical while dropping four
+        // heap allocations per query.
+        let mut full_scores = vec![0.0f32; n_blocks];
+        let mut masked_scores = vec![0.0f32; n_blocks];
+        let mut full_indices = Vec::with_capacity(top_k);
+        let mut masked_indices = Vec::with_capacity(top_k);
+        let mut topk_pairs: Vec<(usize, f32)> = Vec::new();
+
         for qi in 0..n_queries {
             let query = &queries[qi * head_dim..(qi + 1) * head_dim];
 
             // Full-dim baseline scores
-            let mut full_scores = vec![0.0f32; n_blocks];
-            for bi in 0..n_blocks {
-                let centroid = &block_centroids[bi * head_dim..(bi + 1) * head_dim];
-                full_scores[bi] = query
+            for (score, centroid) in full_scores
+                .iter_mut()
+                .zip(block_centroids.chunks_exact(head_dim))
+            {
+                *score = query
                     .iter()
                     .zip(centroid.iter())
                     .map(|(a, b)| a * b)
                     .sum::<f32>()
                     * scale;
             }
-            let mut full_indices = Vec::new();
-            argtopk(&full_scores, top_k, &mut full_indices);
-            let full_set: Vec<usize> = full_indices;
+            argtopk_with_scratch(&full_scores, top_k, &mut full_indices, &mut topk_pairs);
 
             // Masked routing scores (only routing channels)
-            let mut masked_scores = vec![0.0f32; n_blocks];
-            for bi in 0..n_blocks {
-                let centroid = &block_centroids[bi * head_dim..(bi + 1) * head_dim];
+            for (score, centroid) in masked_scores
+                .iter_mut()
+                .zip(block_centroids.chunks_exact(head_dim))
+            {
                 let dot: f32 = routing_channels
                     .iter()
                     .map(|&d| query[d] * centroid[d])
                     .sum();
-                masked_scores[bi] = dot * scale;
+                *score = dot * scale;
             }
-            let mut masked_indices = Vec::new();
-            argtopk(&masked_scores, top_k, &mut masked_indices);
+            argtopk_with_scratch(&masked_scores, top_k, &mut masked_indices, &mut topk_pairs);
 
             // Overlap fraction
             let overlap = masked_indices
                 .iter()
-                .filter(|idx| full_set.contains(idx))
+                .filter(|idx| full_indices.contains(idx))
                 .count() as f32;
             total_overlap += overlap / top_k as f32;
         }
@@ -348,36 +358,33 @@ impl VortexFlow for ChannelAwareRouter {
         let full_centroid = &mut cache.full_keys[start..start + head_dim];
         full_centroid.fill(0.0);
 
-        match block_size {
-            0 => {
-                // Zero-length block: zero centroids
-                if cache.routing_dim > 0 {
-                    let r_start = block_idx * cache.routing_dim;
-                    cache.routing_keys[r_start..r_start + cache.routing_dim].fill(0.0);
-                }
+        if block_size == 0 {
+            // Zero-length block: zero centroids
+            if cache.routing_dim > 0 {
+                let r_start = block_idx * cache.routing_dim;
+                cache.routing_keys[r_start..r_start + cache.routing_dim].fill(0.0);
             }
-            _ => {
-                // Mean pooling → full centroid. Use the crate SIMD kernels so the
-                // accumulation and final 1/N scaling are vectorized on NEON/AVX2
-                // instead of relying on the autovectorizer.
-                for t in 0..block_size {
-                    let k_start = t * head_dim;
-                    katgpt_core::simd::simd_add_inplace(
-                        full_centroid,
-                        &keys[k_start..k_start + head_dim],
-                    );
-                }
-                let inv = 1.0 / block_size as f32;
-                katgpt_core::simd::simd_scale_inplace(full_centroid, inv);
+        } else {
+            // Mean pooling → full centroid. Use the crate SIMD kernels so the
+            // accumulation and final 1/N scaling are vectorized on NEON/AVX2
+            // instead of relying on the autovectorizer.
+            for t in 0..block_size {
+                let k_start = t * head_dim;
+                katgpt_core::simd::simd_add_inplace(
+                    full_centroid,
+                    &keys[k_start..k_start + head_dim],
+                );
+            }
+            let inv = 1.0 / block_size as f32;
+            katgpt_core::simd::simd_scale_inplace(full_centroid, inv);
 
-                // Extract routing channels from full centroid
-                if !cache.routing_channels.is_empty() {
-                    let r_start = block_idx * cache.routing_dim;
-                    let routing_centroid =
-                        &mut cache.routing_keys[r_start..r_start + cache.routing_dim];
-                    for (ri, &ch) in cache.routing_channels.iter().enumerate() {
-                        routing_centroid[ri] = full_centroid[ch];
-                    }
+            // Extract routing channels from full centroid
+            if !cache.routing_channels.is_empty() {
+                let r_start = block_idx * cache.routing_dim;
+                let routing_centroid =
+                    &mut cache.routing_keys[r_start..r_start + cache.routing_dim];
+                for (ri, &ch) in cache.routing_channels.iter().enumerate() {
+                    routing_centroid[ri] = full_centroid[ch];
                 }
             }
         }
@@ -398,38 +405,34 @@ impl VortexFlow for ChannelAwareRouter {
         }
 
         let hd = query.len();
-        let scale = match self.scale {
-            true => 1.0 / (hd as f32).sqrt(),
-            false => 1.0,
+        let scale = if self.scale {
+            1.0 / (hd as f32).sqrt()
+        } else {
+            1.0
         };
 
         scratch.ensure_capacity(n_blocks);
         let scores = &mut scratch.scores[..n_blocks];
 
-        match cache.routing_channels.is_empty() {
-            // Fallback: full-dim routing using full_keys
-            true => {
-                for (i, score) in scores.iter_mut().enumerate().take(n_blocks) {
-                    let full_key = cache.full_key(i);
-                    *score = simd_dot_f32(query, full_key) * scale;
-                }
+        if cache.routing_channels.is_empty() {
+            for (i, score) in scores.iter_mut().enumerate().take(n_blocks) {
+                let full_key = cache.full_key(i);
+                *score = simd_dot_f32(query, full_key) * scale;
             }
-            // Channel-aware: route using only critical channels
-            false => {
-                let routing_channels = &cache.routing_channels;
-                let routing_dim = cache.routing_dim;
+        } else {
+            let routing_channels = &cache.routing_channels;
+            let routing_dim = cache.routing_dim;
 
-                // Extract routing channels from query into scratch buffer
-                scratch.routing_query_buf.resize(routing_dim, 0.0);
-                for (ri, &ch) in routing_channels.iter().enumerate() {
-                    scratch.routing_query_buf[ri] = query[ch];
-                }
+            // Extract routing channels from query into scratch buffer
+            scratch.routing_query_buf.resize(routing_dim, 0.0);
+            for (ri, &ch) in routing_channels.iter().enumerate() {
+                scratch.routing_query_buf[ri] = query[ch];
+            }
 
-                for (i, score) in scores.iter_mut().enumerate().take(n_blocks) {
-                    let routing_key = cache.routing_key(i);
-                    *score = simd_dot_f32(&scratch.routing_query_buf[..routing_dim], routing_key)
-                        * scale;
-                }
+            for (i, score) in scores.iter_mut().enumerate().take(n_blocks) {
+                let routing_key = cache.routing_key(i);
+                *score =
+                    simd_dot_f32(&scratch.routing_query_buf[..routing_dim], routing_key) * scale;
             }
         }
 

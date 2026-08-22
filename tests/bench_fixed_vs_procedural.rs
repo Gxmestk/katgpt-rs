@@ -54,9 +54,10 @@ fn compute_stats(values: &[f64]) -> Stats {
     let mean = values.iter().sum::<f64>() / n;
     let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
     let std_dev = variance.sqrt();
-    let cv = match mean.abs() < f64::EPSILON {
-        true => f64::INFINITY,
-        false => std_dev / mean.abs(),
+    let cv = if mean.abs() < f64::EPSILON {
+        f64::INFINITY
+    } else {
+        std_dev / mean.abs()
     };
     Stats { mean, std_dev, cv }
 }

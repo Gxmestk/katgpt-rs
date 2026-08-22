@@ -198,10 +198,7 @@ fn bench_dynamic_rank_acceptance_rate() {
     println!("║  Plan 232: DynamicRankPruner Acceptance Rate Benchmark     ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "   Config: vocab={}, lookahead={}, episodes={}",
-        VOCAB, LOOKAHEAD, EPISODES
-    );
+    println!("   Config: vocab={VOCAB}, lookahead={LOOKAHEAD}, episodes={EPISODES}");
     println!("{}", "─".repeat(60));
 
     // Run baseline
@@ -209,10 +206,10 @@ fn bench_dynamic_rank_acceptance_rate() {
         run_baseline_acceptance();
 
     println!("\n   ┌─ BanditPruner Baseline ──────────────────────────┐");
-    println!("   │  Tree nodes:     {:>8}", baseline_nodes);
-    println!("   │  Accepted:       {:>8}", baseline_accepted);
+    println!("   │  Tree nodes:     {baseline_nodes:>8}");
+    println!("   │  Accepted:       {baseline_accepted:>8}");
     println!("   │  Acceptance rate: {:>7.2}%", baseline_rate * 100.0);
-    println!("   │  Total reward:   {:>8.1}", baseline_reward);
+    println!("   │  Total reward:   {baseline_reward:>8.1}");
     println!("   └─────────────────────────────────────────────────┘");
 
     #[cfg(feature = "dynamic_rank")]
@@ -220,10 +217,10 @@ fn bench_dynamic_rank_acceptance_rate() {
         let (dr_rate, dr_reward, dr_accepted, dr_nodes) = run_dynamic_rank_acceptance();
 
         println!("\n   ┌─ DynamicRankPruner + BanditPruner ──────────────┐");
-        println!("   │  Tree nodes:     {:>8}", dr_nodes);
-        println!("   │  Accepted:       {:>8}", dr_accepted);
+        println!("   │  Tree nodes:     {dr_nodes:>8}");
+        println!("   │  Accepted:       {dr_accepted:>8}");
         println!("   │  Acceptance rate: {:>7.2}%", dr_rate * 100.0);
-        println!("   │  Total reward:   {:>8.1}", dr_reward);
+        println!("   │  Total reward:   {dr_reward:>8.1}");
         println!("   └─────────────────────────────────────────────────┘");
 
         let delta = dr_rate - baseline_rate;
@@ -234,10 +231,7 @@ fn bench_dynamic_rank_acceptance_rate() {
         };
 
         println!("\n   ┌─ Comparison ────────────────────────────────────┐");
-        println!(
-            "   │  Rate delta:     {:>+7.2}% ({:+.4})",
-            pct_change, delta
-        );
+        println!("   │  Rate delta:     {pct_change:>+7.2}% ({delta:+.4})");
         println!(
             "   │  Reward delta:   {:>+8.1}",
             dr_reward - baseline_reward

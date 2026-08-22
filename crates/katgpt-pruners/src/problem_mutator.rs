@@ -86,8 +86,7 @@ impl ProblemMutator for GoConfigMutator {
                 difficulty_delta: delta,
                 mutation_kind: MutationKind::GoalReweight,
                 description: format!(
-                    "survival_weight={:.2}, kill_weight={:.2} ({})",
-                    survival, kill, label
+                    "survival_weight={survival:.2}, kill_weight={kill:.2} ({label})"
                 ),
             });
         }
@@ -102,7 +101,7 @@ impl ProblemMutator for GoConfigMutator {
             mutants.push(MutantConfig {
                 difficulty_delta,
                 mutation_kind: MutationKind::ConstrainOutputs,
-                description: format!("grid_size={} ({}x{})", size, size, size),
+                description: format!("grid_size={size} ({size}x{size})"),
             });
         }
 
@@ -114,8 +113,7 @@ impl ProblemMutator for GoConfigMutator {
                 difficulty_delta,
                 mutation_kind: MutationKind::GeneralizeInputs,
                 description: format!(
-                    "opponent_count={} (+{} handicap stones)",
-                    opponent_count, handicap
+                    "opponent_count={opponent_count} (+{handicap} handicap stones)"
                 ),
             });
         }
@@ -424,7 +422,7 @@ mod tests {
             kill_weight: 0.6,
         };
         let mut arena = EvolutionArena::new(base, Box::new(BomberConfigMutator), 100);
-        let mut configs = Vec::new();
+        let mut configs = Vec::with_capacity(10);
         for _ in 0..10 {
             configs.push(arena.next_config());
         }

@@ -40,25 +40,36 @@ impl CountMinSketch {
         }
     }
 
-    /// Derive column index for row `i` from a 32-byte key.
+    /// Derive column index for row `i` from a 32-byte key, in two halves:
+    /// [`Self::fold_key`] (row-invariant) then [`Self::col_from_folded`].
     ///
     /// The key is already a BLAKE3 hash, so we XOR-fold 4×8-byte chunks to get
     /// a single u64, then multiply by the row seed and take modulo 256.
+    ///
+    /// The row-INVARIANT half: XOR-fold the 32-byte key into a single `u64`.
+    /// Split out so `update` / `estimate` do the 4 unaligned loads + 3 XORs
+    /// once instead of once per row.
     #[inline]
-    fn col_index(key: &[u8; 32], row: usize) -> usize {
+    fn fold_key(key: &[u8; 32]) -> u64 {
         let k0 = u64::from_le_bytes(key[0..8].try_into().unwrap());
         let k1 = u64::from_le_bytes(key[8..16].try_into().unwrap());
         let k2 = u64::from_le_bytes(key[16..24].try_into().unwrap());
         let k3 = u64::from_le_bytes(key[24..32].try_into().unwrap());
-        let folded = k0 ^ k1 ^ k2 ^ k3;
+        k0 ^ k1 ^ k2 ^ k3
+    }
+
+    /// The row-DEPENDENT half: mix the folded key with the row seed.
+    #[inline]
+    fn col_from_folded(folded: u64, row: usize) -> usize {
         let mixed = folded.wrapping_mul(SEEDS[row]);
         (mixed as usize) % COLS
     }
 
     /// Increment counters for `key`. Saturates at `u16::MAX` per cell.
     pub fn update(&mut self, key: &[u8; 32]) {
+        let folded = Self::fold_key(key);
         for row in 0..ROWS {
-            let col = Self::col_index(key, row);
+            let col = Self::col_from_folded(folded, row);
             self.counters[row][col] = self.counters[row][col].saturating_add(1);
         }
         self.total_updates = self.total_updates.saturating_add(1);
@@ -69,9 +80,10 @@ impl CountMinSketch {
     /// Returns `u32` to avoid overflow when callers compare against `u32` thresholds.
     #[inline]
     pub fn estimate(&self, key: &[u8; 32]) -> u32 {
+        let folded = Self::fold_key(key);
         let mut min = u16::MAX;
         for row in 0..ROWS {
-            let col = Self::col_index(key, row);
+            let col = Self::col_from_folded(folded, row);
             min = min.min(self.counters[row][col]);
         }
         min as u32

@@ -265,25 +265,24 @@ fn gate_g1_indicator_au_roc() -> GateResult {
     if worst >= threshold {
         let detail = per_indicator
             .iter()
-            .map(|(i, a)| format!("ind{}={:.3}", i, a))
+            .map(|(i, a)| format!("ind{i}={a:.3}"))
             .collect::<Vec<_>>()
             .join(", ");
         GateResult::pass(
             "G1",
             format!(
-                "all 8 indicators AU-ROC ≥ {:.2}; worst = {:.3}; {}",
-                threshold, worst, detail
+                "all 8 indicators AU-ROC ≥ {threshold:.2}; worst = {worst:.3}; {detail}"
             ),
         )
     } else {
         let detail = per_indicator
             .iter()
-            .map(|(i, a)| format!("ind{}={:.3}", i, a))
+            .map(|(i, a)| format!("ind{i}={a:.3}"))
             .collect::<Vec<_>>()
             .join(", ");
         GateResult::fail(
             "G1",
-            format!("worst AU-ROC {:.3} < {:.2}; {}", worst, threshold, detail),
+            format!("worst AU-ROC {worst:.3} < {threshold:.2}; {detail}"),
         )
     }
 }
@@ -392,16 +391,14 @@ fn gate_g2_or_fusion_tpr_fpr() -> GateResult {
         GateResult::pass(
             "G2",
             format!(
-                "transcript-TPR = {:.3} at turn-FPR = {:.3} (≤ 0.05), tau = {:.2}",
-                best_tpr, best_fpr, best_tau
+                "transcript-TPR = {best_tpr:.3} at turn-FPR = {best_fpr:.3} (≤ 0.05), tau = {best_tau:.2}"
             ),
         )
     } else {
         GateResult::fail(
             "G2",
             format!(
-                "best transcript-TPR = {:.3} < 0.85 at turn-FPR ≤ 0.05 (best tau = {:.2}, FPR = {:.3})",
-                best_tpr, best_tau, best_fpr
+                "best transcript-TPR = {best_tpr:.3} < 0.85 at turn-FPR ≤ 0.05 (best tau = {best_tau:.2}, FPR = {best_fpr:.3})"
             ),
         )
     }
@@ -532,8 +529,7 @@ fn gate_g3_cascade_fpr_reduction() -> GateResult {
         GateResult::fail(
             "G3",
             format!(
-                "best cascade FPR reduction {:.1}× (need ≥5×); at best tau={:.2}: FPR {:.3}→{:.3}, TPR {:.3}→{:.3}",
-                best_ratio, best_tau, best_fpr_s1, best_fpr_s2, best_tpr_s1, best_tpr_s2
+                "best cascade FPR reduction {best_ratio:.1}× (need ≥5×); at best tau={best_tau:.2}: FPR {best_fpr_s1:.3}→{best_fpr_s2:.3}, TPR {best_tpr_s1:.3}→{best_tpr_s2:.3}"
             ),
         )
     }
@@ -583,19 +579,17 @@ fn gate_g4_hot_path_latency_and_alloc() -> GateResult {
         GateResult::pass(
             "G4",
             format!(
-                "project_all_into + or_fused_fire: {:.1} ns/call (target < 200ns); {} allocs / {} calls",
-                ns_per_call, allocs, ALLOC_ITERS
+                "project_all_into + or_fused_fire: {ns_per_call:.1} ns/call (target < 200ns); {allocs} allocs / {ALLOC_ITERS} calls"
             ),
         )
     } else {
         let mut reasons = Vec::new();
         if !latency_pass {
-            reasons.push(format!("{:.1} ns/call ≥ 200ns", ns_per_call));
+            reasons.push(format!("{ns_per_call:.1} ns/call ≥ 200ns"));
         }
         if !alloc_pass {
             reasons.push(format!(
-                "{} allocs / {} calls (need 0)",
-                allocs, ALLOC_ITERS
+                "{allocs} allocs / {ALLOC_ITERS} calls (need 0)"
             ));
         }
         GateResult::fail("G4", reasons.join("; "))
@@ -703,16 +697,14 @@ fn gate_g5_similarity_block_recovery() -> GateResult {
         GateResult::pass(
             "G5",
             format!(
-                "cluster(0.6, 0.6) ARI = {:.3} ≥ 0.9 vs planted 4×2 blocks",
-                ari
+                "cluster(0.6, 0.6) ARI = {ari:.3} ≥ 0.9 vs planted 4×2 blocks"
             ),
         )
     } else {
         GateResult::fail(
             "G5",
             format!(
-                "cluster(0.6, 0.6) ARI = {:.3} < 0.9; clusters = {:?}",
-                ari, clusters
+                "cluster(0.6, 0.6) ARI = {ari:.3} < 0.9; clusters = {clusters:?}"
             ),
         )
     }
@@ -741,7 +733,7 @@ fn gate_g7_wire_integrity() -> GateResult {
             "G7",
             "tampered direction byte correctly rejected with HashMismatch",
         ),
-        Err(other) => GateResult::fail("G7", format!("expected HashMismatch, got {:?}", other)),
+        Err(other) => GateResult::fail("G7", format!("expected HashMismatch, got {other:?}")),
         Ok(_) => GateResult::fail(
             "G7",
             "tampered bytes loaded without error (tamper NOT evident)",

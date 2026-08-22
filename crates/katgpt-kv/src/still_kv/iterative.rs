@@ -615,7 +615,7 @@ mod tests {
 
         // Each compacted chunk should have budget tokens
         for (i, c) in compacted.iter().enumerate() {
-            assert_eq!(c.len, 4, "chunk {} should have budget tokens", i);
+            assert_eq!(c.len, 4, "chunk {i} should have budget tokens");
         }
     }
 

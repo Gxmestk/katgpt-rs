@@ -427,10 +427,7 @@ impl TriggerGateMonitor {
                     let guard = gate_clone.lock().expect("gate lock poisoned");
                     let old_tier = guard.current_tier();
                     if let Some(new_tier) = guard.evaluate() {
-                        log::info!(
-                            "trigger-gate-monitor: tier changed {} -> {new_tier}",
-                            old_tier,
-                        );
+                        log::info!("trigger-gate-monitor: tier changed {old_tier} -> {new_tier}",);
                     }
                     drop(guard);
                 }

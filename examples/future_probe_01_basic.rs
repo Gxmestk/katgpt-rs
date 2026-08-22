@@ -37,10 +37,7 @@ fn main() {
     let d_model = 4;
     let direction = vec![1.0, 0.0, 0.0, 0.0];
     let probe = FutureBehaviorProbe::new(direction, -1.0, 7, "refusal");
-    println!(
-        "Probe: d_model={} layer=7 behavior=\"refusal\" bias=-1.0",
-        d_model
-    );
+    println!("Probe: d_model={d_model} layer=7 behavior=\"refusal\" bias=-1.0");
     println!(
         "Artifact hash (first 8 bytes): {}",
         first_8_hex(&probe.artifact_hash())

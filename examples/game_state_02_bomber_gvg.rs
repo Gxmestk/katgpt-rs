@@ -228,9 +228,10 @@ fn mcts_player(
 /// Random player — picks a random legal action.
 fn random_player(state: &BomberState, player_id: u8, rng: &mut fastrand::Rng) -> BomberAction {
     let actions = state.available_actions(player_id);
-    match actions.is_empty() {
-        true => BomberAction::Wait,
-        false => actions[rng.usize(0..actions.len())],
+    if actions.is_empty() {
+        BomberAction::Wait
+    } else {
+        actions[rng.usize(0..actions.len())]
     }
 }
 
@@ -249,7 +250,7 @@ fn greedy_player(state: &BomberState, player_id: u8, rng: &mut fastrand::Rng) ->
     }
 
     let mut best_score = f32::NEG_INFINITY;
-    let mut best_actions = Vec::new();
+    let mut best_actions = Vec::with_capacity(actions.len());
 
     for action in &actions {
         let next = state.advance(action, player_id);
@@ -522,7 +523,7 @@ fn main() {
         ("MCTS(200) vs MCTS(200)", 200, BetaStrategy::Mcts(200)),
     ];
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(matchups.len());
     for (label, budget, strategy) in &matchups {
         let r = run_matchup(label, *budget, *strategy, ROUNDS_PER_MATCHUP);
         println!(
@@ -606,56 +607,60 @@ fn main() {
     let budget_scales = mcts_high_vs_random.alpha_win_rate() > mcts_vs_random.alpha_win_rate();
     let mirror_fair = (mirror.alpha_win_rate() - 50.0).abs() < 25.0;
 
-    match mcts_beats_random {
-        true => println!(
+    if mcts_beats_random {
+        println!(
             "  ✅ MCTS(200) beats Random ({:.1}% vs {:.1}%)",
             mcts_vs_random.alpha_win_rate(),
             mcts_vs_random.beta_win_rate()
-        ),
-        false => println!(
+        );
+    } else {
+        println!(
             "  ❌ MCTS(200) fails to beat Random ({:.1}% vs {:.1}%)",
             mcts_vs_random.alpha_win_rate(),
             mcts_vs_random.beta_win_rate()
-        ),
+        );
     }
 
-    match mcts_beats_greedy {
-        true => println!(
+    if mcts_beats_greedy {
+        println!(
             "  ✅ MCTS(200) beats Greedy ({:.1}% vs {:.1}%)",
             mcts_vs_greedy.alpha_win_rate(),
             mcts_vs_greedy.beta_win_rate()
-        ),
-        false => println!(
+        );
+    } else {
+        println!(
             "  ❌ MCTS(200) loses to Greedy ({:.1}% vs {:.1}%)",
             mcts_vs_greedy.alpha_win_rate(),
             mcts_vs_greedy.beta_win_rate()
-        ),
+        );
     }
 
-    match budget_scales {
-        true => println!(
+    if budget_scales {
+        println!(
             "  ✅ Budget scales: MCTS(1000) ({:.1}%) > MCTS(200) ({:.1}%) vs Random",
             mcts_high_vs_random.alpha_win_rate(),
             mcts_vs_random.alpha_win_rate()
-        ),
-        false => println!(
+        );
+    } else {
+        println!(
             "  ⚠️  Budget plateau: MCTS(1000) ({:.1}%) vs MCTS(200) ({:.1}%)",
             mcts_high_vs_random.alpha_win_rate(),
             mcts_vs_random.alpha_win_rate()
-        ),
+        );
     }
 
-    match mirror_fair {
-        true => println!(
+    if mirror_fair {
+        println!(
             "  ✅ Mirror match balanced: MCTS vs MCTS ({:.1}% vs {:.1}%)",
             mirror.alpha_win_rate(),
             mirror.beta_win_rate()
-        ),
-        false => println!(
+        );
+    } else {
+        println!(
             "  ⚠️  Mirror match imbalance: ({:.1}% vs {:.1}%) — action order bias",
             mirror.alpha_win_rate(),
             mirror.beta_win_rate()
-        ),
+        );
     }
 
     println!();

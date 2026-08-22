@@ -5,7 +5,8 @@
 //! [`crate::types::Config`], [`crate::traits`], and std.
 //!
 //! ## What lives here
-//! - [`types`]: `TreeNode`, `DraftResult`, `DraftEvent`, `RejectionReason`,
+//! - [`types`]: `TreeNode` + `TokenPath` (Issue 670 vocab-widened path),
+//!   `DraftResult`, `DraftEvent`, `RejectionReason`,
 //!   `DecodeStrategy`, `SdeConfig`, `EarlyStopGate<P>`, `FlashPrefillConfig`,
 //!   `BlockScores`, LDT conflict detector (`ConflictDetector`,
 //!   `EntropyConflictDetector`), `TesNode`, `TrajectoryCredit`, and various

@@ -367,14 +367,12 @@ fn test_block_causal_vs_bidirectional_quality() {
                 .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
             let pred_bc = logits_bc[p * vocab..(p + 1) * vocab]
                 .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+                .map_or(0, |(i, _)| i);
 
             if pred_bi == tokens[p] {
                 bi_correct += 1;

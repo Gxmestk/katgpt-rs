@@ -48,8 +48,7 @@ impl BernoulliEnv {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         let optimal_reward = probs[optimal_arm];
         Self {
             probs: probs.to_vec(),
@@ -112,8 +111,7 @@ impl GaussianEnv {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.total_cmp(b))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         let optimal_reward = means[optimal_arm];
         Self {
             means: means.to_vec(),

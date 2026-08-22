@@ -324,7 +324,7 @@ impl GridFlowField {
     pub fn corridor_1wide_count(&self) -> usize {
         self.directions
             .iter()
-            .filter(|d| d.map(|d| d.width == 1).unwrap_or(false))
+            .filter(|d| d.is_some_and(|d| d.width == 1))
             .count()
     }
 
@@ -332,7 +332,7 @@ impl GridFlowField {
     pub fn corridor_2wide_count(&self) -> usize {
         self.directions
             .iter()
-            .filter(|d| d.map(|d| d.width == 2).unwrap_or(false))
+            .filter(|d| d.is_some_and(|d| d.width == 2))
             .count()
     }
 }

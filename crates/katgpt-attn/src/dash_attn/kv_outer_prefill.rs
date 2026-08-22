@@ -182,19 +182,28 @@ impl KvOuterPrefill {
                 .forward_cache(&mut cache, block_keys, block_vals, b, hd);
         }
 
+        // Phase 1b + Phase 2 fused: invert each routing decision into the
+        // reverse index as soon as it is produced, instead of buffering all
+        // `n_queries` decisions first. `build_from_decisions` performs exactly
+        // this q-ascending / block-order push sequence, so `queries_for_block`
+        // ends up identical — but the `Vec<RoutingDecision>` (plus the two
+        // owned Vecs each decision holds, all live simultaneously) is gone.
+        // Each decision is dropped right after use, so the allocator recycles
+        // one small block instead of holding O(n_queries · top_k).
         let mut scratch = VortexScratch::new(n_blocks);
-        let mut decisions: Vec<RoutingDecision> = Vec::with_capacity(n_queries);
+        let mut rev_idx = KvOuterIndex::new(n_blocks);
         for q in 0..n_queries {
             let q_start = q * hd;
             let query = &queries[q_start..q_start + hd];
             let dec = self
                 .router
                 .forward_indexer(query, &cache, n_blocks, top_k, &mut scratch);
-            decisions.push(dec);
+            for &b in &dec.blocks {
+                if b < n_blocks {
+                    rev_idx.queries_for_block[b].push(q);
+                }
+            }
         }
-
-        // Phase 2: Build reverse index.
-        let rev_idx = KvOuterIndex::build_from_decisions(&decisions, n_blocks);
 
         // Phase 3 + 4: Initialize output and LSE, then attend per-block.
         let mut output = vec![0.0f32; n_queries * hd];
@@ -202,6 +211,15 @@ impl KvOuterPrefill {
 
         let hot = rev_idx.hot_blocks();
         let n_blocks_used = hot.len();
+
+        // Per-(block, query) scratch hoisted out of both loops. Previously both
+        // 256-f32 arrays were re-declared inside the inner loop, costing two
+        // 1 KB stack memsets per (block, query) pair. `scores` is fully
+        // overwritten by `compute_scores` before any read, so it never needs
+        // re-zeroing; `local_out` is an accumulator, so only its live
+        // `actual_hd` prefix is cleared each iteration (the tail is never read).
+        let mut scores = [0.0f32; 256];
+        let mut local_out = [0.0f32; 256];
 
         for (block_idx, _query_count) in &hot {
             let b = *block_idx;
@@ -218,7 +236,6 @@ impl KvOuterPrefill {
                 // debug_assert makes silent truncation visible in tests.
                 debug_assert!(bs <= 256, "block_size {bs} exceeds 256-f32 score buffer");
                 debug_assert!(hd <= 256, "head_dim {hd} exceeds 256-f32 local_out buffer");
-                let mut scores = [0.0f32; 256];
                 let actual_bs = bs.min(256);
                 compute_scores(
                     query,
@@ -242,8 +259,8 @@ impl KvOuterPrefill {
                 let lse_local = max_score + sum_exp.ln();
 
                 // Weighted value accumulation: local_out = sum(w_j * v_j)
-                let mut local_out = [0.0f32; 256];
                 let actual_hd = hd.min(256);
+                local_out[..actual_hd].fill(0.0);
                 for t in 0..actual_bs {
                     let w = scores[t] * inv_sum;
                     let v_start = t * hd;

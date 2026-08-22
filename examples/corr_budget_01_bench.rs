@@ -85,7 +85,7 @@ fn bench_ema_convergence() {
     println!("  {}", "-".repeat(36));
     for &alpha in alphas {
         let steps = steps_to_converge(alpha);
-        println!("  {:>12.2} {:>20}", alpha, steps);
+        println!("  {alpha:>12.2} {steps:>20}");
     }
     println!();
 }
@@ -219,7 +219,7 @@ fn bench_ddtree_corr_vs_uniform() {
 
     match overhead_pct.abs() {
         p if p <= 5.0 => {
-            println!("  ✅ Near-zero overhead — correlation budget is production-ready")
+            println!("  ✅ Near-zero overhead — correlation budget is production-ready");
         }
         p if p <= 15.0 => println!("  ⚠️  Low overhead — acceptable for accuracy gains"),
         _ => println!("  ❌ High overhead — investigate allocation hot path"),
@@ -255,8 +255,8 @@ fn bench_ema_update_throughput() {
     let total_updates = n_updates * n_depths;
     let ns_per_update = elapsed.as_nanos() as f64 / total_updates as f64;
 
-    println!("  {total_updates} updates in {:?}", elapsed);
-    println!("  {:.2} ns/update", ns_per_update);
+    println!("  {total_updates} updates in {elapsed:?}");
+    println!("  {ns_per_update:.2} ns/update");
 
     match ns_per_update {
         t if t <= 5.0 => println!("  ✅ <5 ns/update — zero overhead for hot path"),

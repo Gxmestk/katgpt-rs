@@ -92,10 +92,7 @@ fn check_eigenpairs(
     }
     assert!(
         max_err < tol,
-        "A·v ≠ λ·v: max_err = {:e} (n={}, tol={:e})",
-        max_err,
-        n,
-        tol
+        "A·v ≠ λ·v: max_err = {max_err:e} (n={n}, tol={tol:e})"
     );
     max_err
 }
@@ -118,10 +115,7 @@ fn check_orthonormal(eigvecs: &[f64], n: usize, tol: f64) -> f64 {
     }
     assert!(
         max_err < tol,
-        "VᵀV ≠ I: max_err = {:e} (n={}, tol={:e})",
-        max_err,
-        n,
-        tol
+        "VᵀV ≠ I: max_err = {max_err:e} (n={n}, tol={tol:e})"
     );
     max_err
 }
@@ -148,7 +142,7 @@ fn n_equals_2_diagonal() {
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 2, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
     eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    assert!((eigs[0] - 3.0).abs() < 1e-12, "eigvals = {:?}", eigs);
+    assert!((eigs[0] - 3.0).abs() < 1e-12, "eigvals = {eigs:?}");
     assert!((eigs[1] - 5.0).abs() < 1e-12);
     check_eigenpairs(&a, &eigvals, &eigvecs, 2, 1e-12);
 }
@@ -163,7 +157,7 @@ fn n_equals_2_analytic() {
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 2, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
     eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    assert!((eigs[0] - 1.0).abs() < 1e-12, "eigvals = {:?}", eigs);
+    assert!((eigs[0] - 1.0).abs() < 1e-12, "eigvals = {eigs:?}");
     assert!((eigs[1] - 3.0).abs() < 1e-12);
     check_eigenpairs(&a, &eigvals, &eigvecs, 2, 1e-12);
     check_orthonormal(&eigvecs, 2, 1e-12);
@@ -180,7 +174,7 @@ fn n_equals_3_diagonal() {
     let mut eigs: Vec<f64> = eigvals.to_vec();
     eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
     for (got, expected) in eigs.iter().zip(&[1.0_f64, 2.0, 3.0]) {
-        assert!((got - expected).abs() < 1e-12, "eigs = {:?}", eigs);
+        assert!((got - expected).abs() < 1e-12, "eigs = {eigs:?}");
     }
     check_eigenpairs(&a, &eigvals, &eigvecs, 3, 1e-12);
 }
@@ -200,9 +194,7 @@ fn n_equals_3_toeplitz() {
     for (got, exp) in eigs.iter().zip(&expected) {
         assert!(
             (got - exp).abs() < 1e-12,
-            "eigs = {:?} (expected {:?})",
-            eigs,
-            expected
+            "eigs = {eigs:?} (expected {expected:?})"
         );
     }
     check_eigenpairs(&a, &eigvals, &eigvecs, 3, 1e-12);
@@ -221,7 +213,7 @@ fn identity_matrix() {
     let mut scratch = SymmetricEigScratch::new();
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, n, 30);
     for v in &eigvals {
-        assert!((v - 1.0).abs() < 1e-12, "eigvals = {:?}", eigvals);
+        assert!((v - 1.0).abs() < 1e-12, "eigvals = {eigvals:?}");
     }
     check_orthonormal(&eigvecs, n, 1e-12);
 }
@@ -285,9 +277,7 @@ fn parity_vs_jacobi_random_spd() {
             }
             assert!(
                 max_eigval_err < 1e-12,
-                "n={}: eigenvalue parity failed, max_err = {:e}",
-                n,
-                max_eigval_err
+                "n={n}: eigenvalue parity failed, max_err = {max_eigval_err:e}"
             );
 
             // Eigenvector comparison: for each Householder eigenvector v_h
@@ -372,10 +362,7 @@ fn reconstruction_matches_input() {
         let tol = (n as f64) * (n as f64) * 1e-13 * a_max;
         assert!(
             max_err < tol,
-            "n={}: A ≠ V·diag(d)·Vᵀ, max_err = {:e} (tol={:e})",
-            n,
-            max_err,
-            tol
+            "n={n}: A ≠ V·diag(d)·Vᵀ, max_err = {max_err:e} (tol={tol:e})"
         );
     }
 }
@@ -480,8 +467,7 @@ fn timing_householder_vs_jacobi() {
 
         let speedup = jac_min as f64 / hh_min as f64;
         eprintln!(
-            "n={:>4}: householder={:>10} ns  jacobi={:>10} ns  speedup={:>5.2}×",
-            n, hh_min, jac_min, speedup
+            "n={n:>4}: householder={hh_min:>10} ns  jacobi={jac_min:>10} ns  speedup={speedup:>5.2}×"
         );
     }
 }
@@ -528,8 +514,7 @@ fn par_vs_serial_bit_identity_small() {
         let eigvecs_match = eigvecs_s.iter().zip(&eigvecs_p).all(|(a, b)| a.to_bits() == b.to_bits());
         assert!(
             eigvals_match,
-            "n={}: eigvals differ between serial and parallel",
-            n
+            "n={n}: eigvals differ between serial and parallel"
         );
         assert!(
             eigvecs_match,
@@ -577,11 +562,7 @@ fn par_vs_serial_bit_identity_medium() {
             assert_eq!(
                 vs.to_bits(),
                 vp.to_bits(),
-                "n={}, i={}: eigval bits differ ({} vs {})",
-                n,
-                i,
-                vs,
-                vp
+                "n={n}, i={i}: eigval bits differ ({vs} vs {vp})"
             );
         }
         // Bit-identity on eigenvectors.
@@ -591,9 +572,7 @@ fn par_vs_serial_bit_identity_medium() {
             .position(|(a, b)| a.to_bits() != b.to_bits());
         assert!(
             first_diff.is_none(),
-            "n={}: first eigvec diff at byte-index {:?}",
-            n,
-            first_diff
+            "n={n}: first eigvec diff at byte-index {first_diff:?}"
         );
     }
 }
@@ -689,8 +668,7 @@ fn timing_par_vs_serial() {
 
         let speedup = s_min as f64 / p_min as f64;
         eprintln!(
-            "n={:>5}: serial={:>10} ns  parallel={:>10} ns  speedup={:>5.2}×",
-            n, s_min, p_min, speedup
+            "n={n:>5}: serial={s_min:>10} ns  parallel={p_min:>10} ns  speedup={speedup:>5.2}×"
         );
     }
 }

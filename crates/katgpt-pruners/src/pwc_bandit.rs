@@ -253,8 +253,7 @@ mod tests {
         let expected = 0.8 + (0.4 - 0.8) / 2.0; // incremental mean
         assert!(
             (bandit.q_value(0, 0) - expected).abs() < 0.001,
-            "Q-value should be incremental mean: expected={}",
-            expected
+            "Q-value should be incremental mean: expected={expected}"
         );
 
         // Different region should be unaffected
@@ -294,12 +293,7 @@ mod tests {
 
         // Other regions should be unaffected
         for r in 1..5 {
-            assert_eq!(
-                bandit.q_value(0, r),
-                0.0,
-                "region {} should be unaffected",
-                r
-            );
+            assert_eq!(bandit.q_value(0, r), 0.0, "region {r} should be unaffected");
         }
     }
 

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/457_SE2_Equivariant_Lift_Game_Maps.md](../.research/457_SE2_Equivariant_Lift_Game_Maps.md)
 **Source paper:** [arXiv:2403.04807](https://arxiv.org/abs/2403.04807) — Smets, *Mathematics of Neural Networks*, Ch. 3 §3.4 (de-deferred from Research 321 §2.4)
 **Target:** `katgpt-rs/crates/katgpt-dec/src/se2_lift.rs` (new module) + Cargo feature `se2_equivariant_lift`
-**Status:** Active — Phase 1+2 (skeleton + GOAT gate) IN-FLIGHT
+**Status:** ✅ COMPLETE — Phase 1+2+3 ALL DONE (G1+G2 PASS, promoted to default-on). `se2_equivariant_lift` is DEFAULT-ON in `katgpt-dec/Cargo.toml`.
 
 ---
 

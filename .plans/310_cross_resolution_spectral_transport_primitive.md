@@ -29,7 +29,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
 ## Phase 0 — Design (COMPLETE)
 
 - [x] T0.1 Research note created ([Research 291](../.research/291_cross_resolution_spectral_transport_open_primitive.md))
-- [x] T0.2 Private guide created ([riir-neuron-db/.research/004](../../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md))
+- [x] T0.2 Private guide created ([riir-neuron-db/.research/004](../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md))
 - [x] T0.3 Plan created (this file)
 - [x] T0.4 Fusion grep complete: FUNCATTN ships symmetric only (G2 benchmark same-d); zero hits for "cross-resolution", "asymmetric basis transport", "continuous field" in code; closest cousins are FUNCATTN (R257), Deep Manifold (R051), Resolution-Tiered Commitment (R280)
 
@@ -180,7 +180,7 @@ Changes:
 ## Phase 5 — Shard Integration (DEFERRED to riir-neuron-db)
 
 **Status (2026-06-23):** Phase 2 G1–G2 PASS — primitive proven and promoted to default in katgpt-rs. Shard-side wiring blocked on user decision to proceed with riir-neuron-db Plan 004. See
-[riir-neuron-db/.research/004](../../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md)
+[riir-neuron-db/.research/004](../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md)
 for the integration guide.
 
 - [-] T5.1 `NeuronShard::transport_to_tier(d_dst, bases) -> NeuronShard` in
@@ -195,7 +195,7 @@ for the integration guide.
 ## Cross-Refs
 
 - [katgpt-rs/.research/291_cross_resolution_spectral_transport_open_primitive.md](../.research/291_cross_resolution_spectral_transport_open_primitive.md) — research note
-- [riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md](../../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md) — private guide
+- [riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md](../../riir-neuron-db/.research/004_cross_resolution_shard_transport_guide.md) — private guide
 - [katgpt-rs/.plans/286_functional_attention_spectral_transport.md](286_functional_attention_spectral_transport.md) — symmetric FUNCATTN (depends on)
 - [katgpt-rs/.research/257_Functional_Attention_Spectral_Transport_Operator.md](../.research/257_Functional_Attention_Spectral_Transport_Operator.md) — FUNCATTN research
 - [katgpt-rs/.research/219_Topological_Neural_Operators_DEC_Inference.md](../.research/219_Topological_Neural_Operators_DEC_Inference.md) — TNO/DEC (topological cousin)

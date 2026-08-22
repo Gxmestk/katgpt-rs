@@ -747,10 +747,7 @@ mod tests {
             let ni = norm(row);
             assert!(
                 (ni - target).abs() < 1e-4,
-                "row {} norm {} != target {}",
-                i,
-                ni,
-                target
+                "row {i} norm {ni} != target {target}"
             );
         }
         // maxvio should be ~0.
@@ -808,7 +805,7 @@ mod tests {
         let res = manifold_power_iter_router(&mut r, &grams_ref, n, d, 1.0, 1, &mut scratch);
         // All entries finite.
         for x in &r {
-            assert!(x.is_finite(), "non-finite after zero-gram pass: {}", x);
+            assert!(x.is_finite(), "non-finite after zero-gram pass: {x}");
         }
         // λ is well-defined (0 for the zero-gram row).
         assert!(res.lambda_alignment.is_finite());

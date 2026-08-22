@@ -94,13 +94,11 @@ fn ie_discriminates_load_bearing_from_bystanders() {
     for (h, ie) in ies.iter().enumerate().take(K_LOAD_BEARING) {
         assert!(
             *ie > THRESHOLD,
-            "load-bearing head {h} has IE {} <= threshold {THRESHOLD}",
-            ie
+            "load-bearing head {h} has IE {ie} <= threshold {THRESHOLD}"
         );
         assert!(
             (*ie - expected_lb_ie).abs() < 1e-6,
-            "load-bearing head {h} IE {} != expected {expected_lb_ie}",
-            ie
+            "load-bearing head {h} IE {ie} != expected {expected_lb_ie}"
         );
     }
     // Every bystander head (indices K..N) has IE = 0 < threshold.
@@ -112,10 +110,9 @@ fn ie_discriminates_load_bearing_from_bystanders() {
     {
         assert!(
             *ie < THRESHOLD,
-            "bystander head {h} has IE {} >= threshold {THRESHOLD}",
-            ie
+            "bystander head {h} has IE {ie} >= threshold {THRESHOLD}"
         );
-        assert!(ie.abs() < 1e-6, "bystander head {h} IE {} != 0", ie);
+        assert!(ie.abs() < 1e-6, "bystander head {h} IE {ie} != 0");
     }
 }
 

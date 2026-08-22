@@ -3,7 +3,7 @@
 > **Source:** Research 095 — MGR Multi-Gat Residuals (arXiv:2605.23259)
 > **Status:** ✅ Complete (T1–T3 ✓, GOAT norm stability proof passing)
 > **Priority:** Low — Documentation + GOAT proof enhancement
-> **GOAT Pillar:** ❌ Not a pillar — see [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md). General transformer architecture, not game-specific. Stays in `katgpt-rs` domain.
+> **GOAT Pillar:** ❌ Not a pillar — see [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md). General transformer architecture, not game-specific. Stays in `katgpt-rs` domain.
 > **Domain:** `katgpt-rs` — no game IP, no secret, no selling point. The multi-stream residual idea is public knowledge from the paper.
 
 ## Context
@@ -58,7 +58,7 @@ These belong in a training framework (e.g., `riir-ai/riir-engine`), not in our i
 
 ## Domain Decision — katgpt-rs vs riir-ai
 
-Per [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md), MGR is **NOT a GOAT pillar**:
+Per [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md), MGR is **NOT a GOAT pillar**:
 
 | Criterion | Score | Reason |
 |-----------|-------|--------|

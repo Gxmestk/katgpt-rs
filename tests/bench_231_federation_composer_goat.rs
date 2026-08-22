@@ -210,8 +210,7 @@ fn g4_per_query_overhead() {
     let us_per_call = ns_per_call / 1000.0;
 
     println!(
-        "G4: {:.0} ns/call ({:.2} μs/call) over {iterations} iterations",
-        ns_per_call, us_per_call
+        "G4: {ns_per_call:.0} ns/call ({us_per_call:.2} μs/call) over {iterations} iterations"
     );
 
     assert!(

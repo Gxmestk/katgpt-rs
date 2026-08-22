@@ -166,12 +166,12 @@ fn g3_dynamic_rank_correction_improves_diversity() {
         parents[1],
         &rankings[1][..5.min(VOCAB)]
     );
-    println!("   Rankings identical: {}", same);
+    println!("   Rankings identical: {same}");
 
     // The key test: after correction, the wrapper should know the pruner is static
     // and have corrections that differentiate contexts
     let is_static = wrapped.is_static();
-    println!("   Diagnosed as static: {:?}", is_static);
+    println!("   Diagnosed as static: {is_static:?}");
 
     assert!(
         is_static.unwrap_or(false),
@@ -205,12 +205,11 @@ fn g4_zero_overhead_when_dynamic() {
     let diff = (base - direct).abs();
     assert!(
         diff < 1e-6,
-        "Relevance should be identical when dynamic, diff={}",
-        diff
+        "Relevance should be identical when dynamic, diff={diff}"
     );
 
-    println!("   Direct relevance:  {:.6}", direct);
-    println!("   Wrapped relevance: {:.6}", base);
-    println!("   Difference:        {:.6}", diff);
+    println!("   Direct relevance:  {direct:.6}");
+    println!("   Wrapped relevance: {base:.6}");
+    println!("   Difference:        {diff:.6}");
     println!("   ✅ PASS — Zero overhead when inner pruner is dynamic");
 }

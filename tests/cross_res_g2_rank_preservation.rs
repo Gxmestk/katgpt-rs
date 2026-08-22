@@ -300,8 +300,7 @@ fn g2_variant_a_rank_preservation_transported_weights() {
     let median = cosines[cosines.len() / 2];
 
     println!(
-        "\nG2-A RANK PRESERVATION (transported weights, n={}, d_src={}, d_dst={}, k={}, band_frac={}):",
-        N_SAMPLES, D_SRC, D_DST, K, VARIANT_A_BAND_FRAC
+        "\nG2-A RANK PRESERVATION (transported weights, n={N_SAMPLES}, d_src={D_SRC}, d_dst={D_DST}, k={K}, band_frac={VARIANT_A_BAND_FRAC}):"
     );
     println!("  min cos:    {min:.4}");
     println!("  median cos: {median:.4}");

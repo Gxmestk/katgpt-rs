@@ -63,7 +63,7 @@ fn main() {
             .partial_cmp(&ranking.scores[a])
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    println!("CS-KV Probe — top-10 groups (signal = {:?}):", signal_heads);
+    println!("CS-KV Probe — top-10 groups (signal = {signal_heads:?}):");
     for (rank, &g) in idx.iter().take(10).enumerate() {
         let marker = if signal_heads.contains(&g) {
             "★"

@@ -385,8 +385,7 @@ fn g2_global_unrolling() -> bool {
         }
     );
     println!(
-        "    (strict spec: adapter > 0.5 AND beats linear-only by 0.05; beats_linear = {})",
-        beats_linear
+        "    (strict spec: adapter > 0.5 AND beats linear-only by 0.05; beats_linear = {beats_linear})"
     );
     if !beats_linear {
         println!("    NOTE: modelless PCA-tanh does NOT beat linear-only on this fixture.");

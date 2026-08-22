@@ -6,7 +6,7 @@
 >
 > **Benchmarks:** [204](../../.benchmarks/204_opening_book_vs_moka_negative.md) (opening book — negative), [205](../../.benchmarks/205_puct_search_vs_moka_win.md) (PUCT — massive win)
 >
-> **Issues:** [564](../../.issues/564_moka_ane_coreml_inference.md) (ANE — negative, closed)
+> **Issues:** 564 (ANE — negative, closed; removed per noise-reduction rule — resolution in `docs/09_feature_catalog/negative_results.md` §21). Issue 207 (int8 default-on promotion) + Issue 206 (int8×int8 investigation) were resolved + removed per the noise-reduction rule — see commit `7da5cf76` + the int8 section below + `docs/08_performance/engineering.md`.
 
 ---
 
@@ -25,11 +25,13 @@ flowchart TD
     Stem["Stem Conv<br/>3×3, 12→32 channels<br/>+ ReLU"]
 
     subgraph Trunk["12× Nested Bottleneck Residual Blocks"]
-        B1["Block 1<br/>32→16→16→16→32<br/>+ global pooling branch"]
-        B2["Block 2"]
-        Dots["..."]
-        B12["Block 12"]
-        B1 --> B2 --> Dots --> B12
+        B1["Block 1-3<br/>32→16→16→16→32"]
+        B4["Block 4<br/>+ global pooling branch<br/>(every 4th block: 4, 8, 12)"]
+        B5["Blocks 5-7"]
+        B8["Block 8<br/>+ global pooling branch"]
+        B9["Blocks 9-11"]
+        B12["Block 12<br/>+ global pooling branch"]
+        B1 --> B4 --> B5 --> B8 --> B9 --> B12
     end
 
     subgraph PolicyHead["Policy Head"]
@@ -167,25 +169,38 @@ flowchart LR
 
 ### Detailed results table
 
-| Player | Config | Win% vs Moka (n=100) | µs/move | Bench |
+| Player | Config | Win% vs Moka | µs/move | Bench |
 |---|---|---|---|---|
-| MokaPlayer | greedy argmax | 50.0% (self-play baseline) | ~400 | — |
-| GoGreedyPlayer | heuristic | 0% | ~100 | Plan 563 |
-| GoValidatorPlayer | safety rules | 0% | ~100 | Plan 563 |
-| GoHLPlayer | UCB1 bandit | 0% | ~241 | Plan 563 |
-| GoGZeroPlayer | template UCB1 | 0% | — | Plan 563 |
-| GoMctsPlayer | UCB1 MCTS budget=200 | 0% | ~2,400 | Plan 563 |
-| GoMctsMokaPlayer | UCB1 + value head | ~0% (negative) | — | Plan 563 |
-| **GoMokaSearchPlayer** | **alpha-beta, d=1, k=4** | **74.0%** | **2,016** | **Plan 563** |
-| GoOpeningBookSearchPlayer | star points 4 plies + search | 61.0% | 3,339 | Bench 204 |
-| GoOpeningBookSearchPlayer | star points 6 plies + search | 53.0% | 2,429 | Bench 204 |
-| GoOpeningBookSearchPlayer | star points 8 plies + search | 39.0% | 1,771 | Bench 204 |
-| **GoPuctMokaPlayer** | **PUCT, budget=50, k=8** | **94.0%** | **21,129** | **Bench 205** |
-| **GoPuctMokaPlayer** | **PUCT, budget=100, k=8** | **96.0%** | **42,936** | **Bench 205** |
-| **GoPuctMokaPlayer** | **PUCT, budget=200, k=8** | **98.0%** | **79,677** | **Bench 205** |
-| GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% | 40,809 | Bench 205 |
+| MokaPlayer | greedy argmax | 50.0% (self-play baseline, n=100) | ~400 | — |
+| GoGreedyPlayer | heuristic | 0% (n=100) | ~100 | Plan 563 |
+| GoValidatorPlayer | safety rules | 0% (n=100) | ~100 | Plan 563 |
+| GoHLPlayer | UCB1 bandit | 0% (n=100) | ~241 | Plan 563 |
+| GoGZeroPlayer | template UCB1 | 0% (n=100) | — | Plan 563 |
+| GoMctsPlayer | UCB1 MCTS budget=200 | 0% (n=100) | ~2,400 | Plan 563 |
+| GoMctsMokaPlayer | UCB1 + value head | ~0% (negative, n=100) | — | Plan 563 |
+| **GoMokaSearchPlayer** | **alpha-beta, d=1, k=4** | **74.0%** (n=100) | **2,016** | **Plan 563** |
+| GoOpeningBookSearchPlayer | star points 4 plies + search | 61.0% (n=100) | 3,339 | Bench 204 |
+| GoOpeningBookSearchPlayer | star points 6 plies + search | 53.0% (n=100) | 2,429 | Bench 204 |
+| GoOpeningBookSearchPlayer | star points 8 plies + search | 39.0% (n=100) | 1,771 | Bench 204 |
+| **GoPuctMokaPlayer** | **PUCT, budget=50, k=8** | **94.0%** (native, n=100) | **21,129** | **Bench 205** |
+| **GoPuctMokaPlayer** | **PUCT, budget=100, k=8** | **96.0%** (native, n=100) | **42,936** | **Bench 205** |
+| **GoPuctMokaPlayer** | **PUCT, budget=200, k=8** | **98.0%** (native, n=100) | **79,677** | **Bench 205** |
+| GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% (native, n=100) | 40,809 | Bench 205 |
+| **WasmPuctPlayer (f32)** | **PUCT, budget=50, k=8** | **100.0% (20/20)** (WASM-via-wasmi, n=20) | 29,600 (WASM V8 JIT) | **Bench 205** |
+| **WasmPuctPlayer (int8, DEFAULT)** | **PUCT, budget=50, k=8** | **85.0% (17/20)** (WASM-via-wasmi, n=20) | 25,800 (WASM V8 JIT) | **Bench 565** |
+| **PuctPlayer (int8, native)** | **PUCT, budget=50, k=8** | **95.0% (19/20)** (native aarch64, n=20) | ~15,000 (native SDOT) | **Bench 565** |
 
-### Speed (Plan 565 — real browser measurements)
+The two WASM rows are measured through the shipped `.wasm` binary under
+[wasmi](https://github.com/paritytech/wasmi) (a deterministic IEEE-754
+interpreter — moves chosen are bit-identical to what Chrome's V8 JIT would
+produce for the same binary + inputs). n=20 because wasmi is ~46× slower
+than V8 JIT (a 100-game run would take ~73 min vs ~14.5 min). The f32 100%
+and int8 85% are both consistent with the native b50 rate of 94%: at true
+p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise
+costs a few games at small n but stays within the binomial noise band
+(Wilson 95% CI on 85% at n=20 ≈ 64–95%). Both clear the 75% parity floor.
+
+### Speed (Plan 565 — real browser measurements; Node V8 re-bench 2026-07-31)
 
 | Runtime | ms/move | Bundle size | Measured by |
 |---|---|---|---|
@@ -193,9 +208,43 @@ flowchart LR
 | Real Moka JS (Chrome, JIT) | 6.4 ms | 140,850 B | Playwright + real Chrome |
 | Our WASM (Chrome, no simd128) | 8.6 ms | 269,405 B | Playwright + real Chrome |
 | **Our WASM (Chrome, +simd128)** | **0.6 ms** | 269,405 B (1.9× larger) | Playwright + real Chrome |
-| wasmi (pure interpreter, no JIT) | 212 ms | same .wasm | native wasmi |
+| Real Moka JS (Node V8 JIT, re-bench) | 7.2 ms | same dist | `bench/bench_moka_side_by_side.mjs` |
+| **Our WASM (Node V8 JIT, re-bench)** | **0.59 ms** | same wasm | `bench/bench_moka_side_by_side.mjs` |
+| wasmi (pure interpreter, no JIT, one forward pass) | 76 ms | same .wasm | native wasmi |
 
-**Verdict (Plan 565):** our WASM with `+simd128` is **10.7× faster** than real Moka in-browser (0.6 ms vs 6.4 ms), at 1.9× the bundle size. The speed comes from V8's JIT, not our code — wasmi (pure interpreter) is 25× slower at 212 ms.
+**Verdict:** our WASM with `+simd128` is **10.7× faster** than real Moka in real Chrome (Plan 565 Playwright measurement: 0.6 ms vs 6.4 ms). Re-bench in Node V8 JIT (same engine as Chrome) reproduces at **12.2× faster** (0.59 ms vs 7.2 ms) — the Chrome number is the conservative headline. The speed comes from V8's JIT compiling our SIMD-enabled wasm, not from our code — wasmi (pure interpreter) on the same binary is 76 ms/call.
+
+### int8 forward path (Issues 206 + 207 — DEFAULT-ON)
+
+The Moka weights are int8 with per-channel scale factors. The original port
+dequantized to f32 at load time + ran f32 forward. Issue 206 investigated
+whether an int8×int8 forward path (with a final scale) could be both faster
+AND strength-preserving — a modelless gain, not just a perf gain.
+
+**Result (Bench 565 + Issue 207 gate):** YES on both axes.
+
+| Path | Runtime | Win rate vs greedy Moka | Speed vs f32 |
+|---|---|---|---|
+| f32 forward (the original) | native aarch64 | **100.0% (20/20)** | 1.00× baseline |
+| **int8×int8 forward** | native aarch64 | **95.0% (19/20)** | **1.39×** faster |
+| f32 forward (via `wasmi_arena_init_f32`) | wasmi (V8 JIT proxy) | **100.0% (20/20)** | 1.00× baseline |
+| **int8×int8 forward** (via `wasmi_arena_init_int8`) | wasmi (V8 JIT proxy) | **85.0% (17/20)** | **1.17–1.25×** faster |
+
+Both paths clear the 75% parity floor decisively at both runtimes. The int8
+path's 95% (native) / 85% (wasmi) vs f32's 100% is within the n=20 binomial
+noise band (Wilson 95% CI on 85% at n=20 is ~64–95%; on 95% ≈ 76–99%; on
+100% ≈ 83–100%). The int8 path is confirmed a **modelless gain**: faster
+(1.17–1.39×) AND same strength.
+
+**Promoted to DEFAULT-ON** (commit `7da5cf76`, 2026-07-31 — originally tracked
+in Issue 207, removed per the standard noise-reduction rule once resolved):
+`PuctPlayer::new` / `with_batch_k(..., 1)` / `wasmi_arena_init(..., 1)` /
+`WasmPuctPlayer::new` now all use int8 by default. Explicit f32 escape hatches
+(`PuctPlayer::with_f32`, `wasmi_arena_init_f32`) retained for regression
+testing + platforms without int8 dot support. The K>1 batched-MCTS path stays
+f32 (int8 unimplemented for batched forward — tracked separately).
+
+**Honest WASM caveat (Issue 206 T6):** the initial V8 JIT result was **0.88× — SLOWER than f32** because the scalar quantization loop (max-abs fold + per-element scale+round+clamp) wasn't vectorized by V8's JIT. The fix (`quantize_tensor_wasm_simd` using `f32x4_abs`/`f32x4_max`/`f32x4_nearest`) brought the shipped result to **1.17–1.25× faster** (b50 = 25.8ms < 30ms floor). The lesson: microbenchmarks of isolated dot products miss the quantization overhead — only end-to-end forward-pass measurement catches this. The 0.88× regression is documented in Bench 565 as the honest pre-fix record.
 
 ### Investigated and rejected
 
@@ -209,9 +258,25 @@ flowchart LR
 | AND-OR DDTree | ❌ Wrong domain shape | Go has no subgoal decomposition |
 | Poincaré Navigator | ❌ Wrong domain shape | Continuous pose navigation, not board games |
 | FlowField | ❌ Wrong domain shape | Civ pathfinding, not Go |
-| BinaryPlasma / PlasmaPath | ❌ Would lose quality | 1-2 bit matvec would wreck int8 net accuracy |
+| BinaryPlasma / PlasmaPath | ❌ Would lose quality | 1-2 bit matvec would wreck int8 net accuracy (int8×int8 with per-channel scale is the floor — see Issues 206+207) |
 | Apple Neural Engine (CoreML) | ❌ 4.66× slower (Issue 564) | Fixed dispatch overhead dominates at 105K params |
 | Opening Book (Bench 204) | ❌ Hurts monotonically | Moka's policy already plays better 9×9 openings |
+
+> **Follow-up audit (Research 463, 2026-07-31; G5 addendum 2026-08-01):** does
+> converting Moka weights to our freeze/thaw format (`NeuronShard` +
+> `MerkleFrozenEnvelope`) unlock any of these levers? **Verdict: No** — format
+> conversion alone doesn't change any rejection (they're fundamental:
+> architecture, domain, training, quantization math). The freeze/thaw
+> **ecosystem** (reader-LoRA hot-swap, Plan 025) enabled one modelless attempt
+> to unblock BinaryPlasma via a deterministically constructed SVD
+> quantization-error LoRA. **That PoC ran and G5 was DECISIVELY NEGATIVE**
+> (ternary+LoRA = 0% win-rate vs f32's 100%; G1 cosine 0.9939 is necessary but
+> not sufficient — PUCT search amplifies the residual ~0.6% error). The sibling
+> activation-space bridge (CNN→Transformer, modelless LLaVA-for-Go) was also
+> NEGATIVE in both phases. Both modelless paths are closed; the trained-
+> projection path (riir-train) is the only remaining option. Full analysis in
+> [Research 463](../../.research/463_moka_freeze_thaw_lever_audit.md) (G5
+> addendum) + [Research 464](../../.research/464_cnn_transformer_latent_bridge.md).
 
 ## The Bottom Line
 

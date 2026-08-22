@@ -15,43 +15,43 @@ use serde::Deserialize;
 
 use crate::board::{AREA as BOARD_AREA, Board, Cell, SIZE as BOARD_SIZE, flood_group};
 
-const INPUT_PLANES: usize = 12;
-const TRUNK_CHANNELS: usize = 32;
-const BOTTLENECK_CHANNELS: usize = 16;
-const NUM_BLOCKS: usize = 12;
-const GLOBAL_BLOCK_INTERVAL: usize = 4;
-const POLICY_CHANNELS: usize = 4;
+pub(crate) const INPUT_PLANES: usize = 12;
+pub(crate) const TRUNK_CHANNELS: usize = 32;
+pub(crate) const BOTTLENECK_CHANNELS: usize = 16;
+pub(crate) const NUM_BLOCKS: usize = 12;
+pub(crate) const GLOBAL_BLOCK_INTERVAL: usize = 4;
+pub(crate) const POLICY_CHANNELS: usize = 4;
 pub const POLICY_MOVES: usize = 82;
 /// Flat feature-tensor length (`9*9*12`) — the input size `wasmi_infer`'s
 /// raw FFI boundary expects.
 pub const INPUT_ELEMENT_COUNT: usize = BOARD_AREA * INPUT_PLANES;
-const VALUE_CHANNELS: usize = 2;
-const SCORE_HIDDEN_CHANNELS: usize = 32;
+pub(crate) const VALUE_CHANNELS: usize = 2;
+pub(crate) const SCORE_HIDDEN_CHANNELS: usize = 32;
 /// Moka's own training-time komi convention — not this crate's board
 /// convention, whichever that ends up being. The feature plane must match
 /// what the network was trained on.
 const MOKA_KOMI: f32 = 7.0;
 const KOMI_NORMALIZATION: f32 = 15.0;
 
-static MANIFEST_JSON: &str = include_str!("../../katgpt-pruners/assets/moka/go-model.json");
-static WEIGHTS_BIN: &[u8] = include_bytes!("../../katgpt-pruners/assets/moka/go-model.bin");
+pub(crate) static MANIFEST_JSON: &str = include_str!("../../katgpt-pruners/assets/moka/go-model.json");
+pub(crate) static WEIGHTS_BIN: &[u8] = include_bytes!("../../katgpt-pruners/assets/moka/go-model.bin");
 
 #[derive(Deserialize)]
-struct Manifest {
-    tensors: HashMap<String, TensorMeta>,
+pub(crate) struct Manifest {
+    pub(crate) tensors: HashMap<String, TensorMeta>,
 }
 
 #[derive(Deserialize)]
-struct TensorMeta {
+pub(crate) struct TensorMeta {
     #[serde(rename = "dataOffset")]
-    data_offset: usize,
-    dtype: String,
-    shape: Vec<usize>,
+    pub(crate) data_offset: usize,
+    pub(crate) dtype: String,
+    pub(crate) shape: Vec<usize>,
     #[serde(rename = "scaleOffset", default)]
-    scale_offset: Option<usize>,
+    pub(crate) scale_offset: Option<usize>,
 }
 
-fn read_f32(bytes: &[u8], offset: usize, count: usize) -> Vec<f32> {
+pub(crate) fn read_f32(bytes: &[u8], offset: usize, count: usize) -> Vec<f32> {
     (0..count)
         .map(|i| {
             let o = offset + i * 4;
@@ -78,29 +78,29 @@ fn load_dequantized(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &
     out
 }
 
-fn load_bias(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &str) -> Vec<f32> {
+pub(crate) fn load_bias(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &str) -> Vec<f32> {
     let meta = tensors.get(name).unwrap_or_else(|| panic!("moka manifest missing tensor {name}"));
     assert_eq!(meta.dtype, "float32", "expected float32 bias tensor {name}");
     let count: usize = meta.shape.iter().product();
     read_f32(bytes, meta.data_offset, count)
 }
 
-struct Wb {
-    w: Vec<f32>,
-    b: Vec<f32>,
+pub(crate) struct Wb {
+    pub(crate) w: Vec<f32>,
+    pub(crate) b: Vec<f32>,
 }
 
-struct GlobalBranch {
-    hidden: Wb,
-    output: Wb,
+pub(crate) struct GlobalBranch {
+    pub(crate) hidden: Wb,
+    pub(crate) output: Wb,
 }
 
-struct ResidualBlock {
-    reduce: Wb,
-    first: Wb,
-    global: Option<GlobalBranch>,
-    second: Wb,
-    expand: Wb,
+pub(crate) struct ResidualBlock {
+    pub(crate) reduce: Wb,
+    pub(crate) first: Wb,
+    pub(crate) global: Option<GlobalBranch>,
+    pub(crate) second: Wb,
+    pub(crate) expand: Wb,
 }
 
 pub struct MokaWeights {
@@ -152,104 +152,17 @@ impl MokaWeights {
     }
 }
 
-#[inline]
-fn dot_lanes(a: &[f32], b: &[f32], init: f32) -> f32 {
-    debug_assert_eq!(a.len(), b.len());
-    init + katgpt_types::simd::simd_dot_f32(a, b, a.len().min(b.len()))
-}
+// ── NN primitives now live in katgpt-nn (Issue 567 — CNN→Transformer code-path unification Path A).
+// These were local functions (conv2d_into, linear_into, global_mean_max_into, relu_inplace, etc.)
+// extracted into the shared `katgpt-nn` crate so both the CNN and transformer engines import
+// from the same source. Moka-specific weight types + forward graph stay here.
+use katgpt_nn::{
+    conv2d_batched_into, conv2d_into, global_mean_max_batched_into, linear_batched_into,
+    linear_into,
+};
+// Re-export for sibling modules (moka_int8.rs, research.rs access these via crate::moka::*).
+pub(crate) use katgpt_nn::{global_mean_max_into, relu_inplace};
 
-#[allow(clippy::too_many_arguments)]
-fn conv2d_into(
-    input: &[f32],
-    h: usize,
-    w: usize,
-    in_ch: usize,
-    out_ch: usize,
-    k: usize,
-    weight: &[f32],
-    bias: &[f32],
-    patch: &mut [f32],
-    out: &mut [f32],
-) {
-    let patch_len = k * k * in_ch;
-    if k == 1 {
-        for pos in 0..h * w {
-            let pslice = &input[pos * in_ch..pos * in_ch + in_ch];
-            let obase = pos * out_ch;
-            for oc in 0..out_ch {
-                let wbase = oc * in_ch;
-                out[obase + oc] = dot_lanes(pslice, &weight[wbase..wbase + in_ch], bias[oc]);
-            }
-        }
-        return;
-    }
-
-    let pad = k / 2;
-    for y in 0..h {
-        for x in 0..w {
-            patch[..patch_len].fill(0.0);
-            for ky in 0..k {
-                let iy = y + ky;
-                if iy < pad || iy >= h + pad {
-                    continue;
-                }
-                let iy = iy - pad;
-                for kx in 0..k {
-                    let ix = x + kx;
-                    if ix < pad || ix >= w + pad {
-                        continue;
-                    }
-                    let ix = ix - pad;
-                    let src = (iy * w + ix) * in_ch;
-                    let dst = (ky * k + kx) * in_ch;
-                    patch[dst..dst + in_ch].copy_from_slice(&input[src..src + in_ch]);
-                }
-            }
-
-            let obase = (y * w + x) * out_ch;
-            let pslice = &patch[..patch_len];
-            for oc in 0..out_ch {
-                let wbase = oc * patch_len;
-                out[obase + oc] = dot_lanes(pslice, &weight[wbase..wbase + patch_len], bias[oc]);
-            }
-        }
-    }
-}
-
-fn linear_into(input: &[f32], in_dim: usize, out_dim: usize, weight: &[f32], bias: &[f32], out: &mut [f32]) {
-    for o in 0..out_dim {
-        let base = o * in_dim;
-        out[o] = dot_lanes(&input[..in_dim], &weight[base..base + in_dim], bias[o]);
-    }
-}
-
-fn relu_inplace(x: &mut [f32]) {
-    for v in x.iter_mut() {
-        if *v < 0.0 {
-            *v = 0.0;
-        }
-    }
-}
-
-fn global_mean_max_into(x: &[f32], h: usize, w: usize, ch: usize, out: &mut [f32]) {
-    let (mean, max) = out[..ch * 2].split_at_mut(ch);
-    mean.fill(0.0);
-    max.fill(f32::MIN);
-    for pos in 0..h * w {
-        let row = &x[pos * ch..pos * ch + ch];
-        for c in 0..ch {
-            let v = row[c];
-            mean[c] += v;
-            if v > max[c] {
-                max[c] = v;
-            }
-        }
-    }
-    let n = (h * w) as f32;
-    for m in mean.iter_mut() {
-        *m /= n;
-    }
-}
 
 pub struct MokaScratch {
     trunk: Vec<f32>,
@@ -288,6 +201,75 @@ impl MokaScratch {
 impl Default for MokaScratch {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ── Research accessors (Issue 565 / Research 463) ───────────────────────────
+// Behind the `research` feature: expose each weight+bias slice so the PoC
+// bench (in riir-poc) can build per-layer error matrices without
+// reimplementing the forward pass. The fields stay private in the default
+// build (the WASM browser path). These accessors are the minimal surface.
+#[cfg(feature = "research")]
+impl MokaWeights {
+    #[inline]
+    pub fn stem_w(&self) -> (&[f32], &[f32]) { (&self.stem.w, &self.stem.b) }
+    #[inline]
+    #[allow(private_interfaces)] // ResidualBlock stays pub(crate); riir-poc uses only the pub inherent methods below, never names the type
+    pub fn blocks_ref(&self) -> &[ResidualBlock] { &self.blocks }
+    #[inline]
+    pub fn policy_conv_w(&self) -> (&[f32], &[f32]) { (&self.policy_conv.w, &self.policy_conv.b) }
+    #[inline]
+    pub fn policy_linear_w(&self) -> (&[f32], &[f32]) { (&self.policy_linear.w, &self.policy_linear.b) }
+    #[inline]
+    pub fn value_conv_w(&self) -> (&[f32], &[f32]) { (&self.value_conv.w, &self.value_conv.b) }
+    #[inline]
+    pub fn value_hidden_w(&self) -> (&[f32], &[f32]) { (&self.value_hidden.w, &self.value_hidden.b) }
+    #[inline]
+    pub fn value_output_w(&self) -> (&[f32], &[f32]) { (&self.value_output.w, &self.value_output.b) }
+}
+
+#[cfg(feature = "research")]
+impl ResidualBlock {
+    #[inline]
+    pub fn reduce_w(&self) -> (&[f32], &[f32]) { (&self.reduce.w, &self.reduce.b) }
+    #[inline]
+    pub fn first_w(&self) -> (&[f32], &[f32]) { (&self.first.w, &self.first.b) }
+    #[inline]
+    pub fn second_w(&self) -> (&[f32], &[f32]) { (&self.second.w, &self.second.b) }
+    #[inline]
+    pub fn expand_w(&self) -> (&[f32], &[f32]) { (&self.expand.w, &self.expand.b) }
+    #[inline]
+    pub fn global_ref(&self) -> Option<&GlobalBranch> { self.global.as_ref() }
+}
+
+#[cfg(feature = "research")]
+impl GlobalBranch {
+    #[inline]
+    pub fn hidden_w(&self) -> (&[f32], &[f32]) { (&self.hidden.w, &self.hidden.b) }
+    #[inline]
+    pub fn output_w(&self) -> (&[f32], &[f32]) { (&self.output.w, &self.output.b) }
+}
+
+#[cfg(feature = "research")]
+impl MokaScratch {
+    /// Lend out the internal scratch buffers as mutable slices. The corrected
+    /// forward pass (`research::forward_corrected_with_scratch`) destructures
+    /// MokaScratch by field, so it needs `pub` field access OR these
+    /// accessors. We lend all buffers at once via a tuple to keep the borrow
+    /// checker happy (a single &mut borrow split into sub-slices).
+    #[inline]
+    #[allow(clippy::type_complexity)] // 12-buffer scratch lease; see doc comment above
+    pub fn lend_all(
+        &mut self,
+    ) -> (
+        &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32],
+        &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32],
+    ) {
+        (
+            &mut self.trunk, &mut self.expand, &mut self.hidden_a, &mut self.hidden_b,
+            &mut self.head4, &mut self.head2, &mut self.patch, &mut self.pooled,
+            &mut self.gh, &mut self.gbias, &mut self.value_h, &mut self.policy,
+        )
     }
 }
 
@@ -343,6 +325,230 @@ pub fn forward_with_scratch(weights: &MokaWeights, features: &[f32], scratch: &m
     let mut logits = [0f32; POLICY_MOVES];
     logits.copy_from_slice(&policy[..POLICY_MOVES]);
     (logits, value_out[0].tanh())
+}
+
+// ── Batched forward pass (Issue 205) ────────────────────────────────
+//
+// K-wide forward pass for batched MCTS. Same arithmetic as K sequential
+// `forward_with_scratch` calls, but reuses each weight slice across all K
+// samples in the inner loop — the cache-locality win on CPU (the Moka
+// trunk block is ~100 KB, fits L2 not L1; sequential passes reload from
+// L2 K times, batched loads once per out_channel).
+//
+// Layout: all buffers are sample-major (`buffer[s * sample_len..]` is
+// sample s's data). This keeps pointer arithmetic simple + lets the K
+// inner-loop iterations walk contiguous memory for the output writes.
+
+/// K-wide scratch space for batched forward passes. Constructed once at
+/// player init with the max K; the same buffers are reused across every
+/// `select_move` call. Sample-major layout throughout.
+pub struct MokaBatchScratch {
+    pub batch: usize,
+    trunk: Vec<f32>,
+    expand: Vec<f32>,
+    hidden_a: Vec<f32>,
+    hidden_b: Vec<f32>,
+    head4: Vec<f32>,
+    head2: Vec<f32>,
+    patches_3x3_trunk: Vec<f32>,     // batch × (3·3·TRUNK_CHANNELS)  — stem
+    patches_3x3_bottleneck: Vec<f32>, // batch × (3·3·BOTTLENECK_CHANNELS) — first/second
+    pooled: Vec<f32>,                // batch × (BOTTLENECK_CHANNELS·2)
+    gh: Vec<f32>,                    // batch × 8
+    gbias: Vec<f32>,                 // batch × BOTTLENECK_CHANNELS
+    value_h: Vec<f32>,               // batch × SCORE_HIDDEN_CHANNELS
+    policy: Vec<f32>,                // batch × POLICY_MOVES
+    value_out: Vec<f32>,             // batch × 1
+}
+
+impl MokaBatchScratch {
+    pub fn new(batch: usize) -> Self {
+        Self {
+            batch,
+            trunk: vec![0.0; batch * BOARD_AREA * TRUNK_CHANNELS],
+            expand: vec![0.0; batch * BOARD_AREA * TRUNK_CHANNELS],
+            hidden_a: vec![0.0; batch * BOARD_AREA * BOTTLENECK_CHANNELS],
+            hidden_b: vec![0.0; batch * BOARD_AREA * BOTTLENECK_CHANNELS],
+            head4: vec![0.0; batch * BOARD_AREA * POLICY_CHANNELS],
+            head2: vec![0.0; batch * BOARD_AREA * VALUE_CHANNELS],
+            patches_3x3_trunk: vec![0.0; batch * 3 * 3 * TRUNK_CHANNELS],
+            patches_3x3_bottleneck: vec![0.0; batch * 3 * 3 * BOTTLENECK_CHANNELS],
+            pooled: vec![0.0; batch * BOTTLENECK_CHANNELS * 2],
+            gh: vec![0.0; batch * 8],
+            gbias: vec![0.0; batch * BOTTLENECK_CHANNELS],
+            value_h: vec![0.0; batch * SCORE_HIDDEN_CHANNELS],
+            policy: vec![0.0; batch * POLICY_MOVES],
+            value_out: vec![0.0; batch],
+        }
+    }
+}
+
+/// Batched forward pass. `features_batch` is K HWC feature tensors laid out
+/// sample-major (`features_batch[s * INPUT_ELEMENT_COUNT..]` is sample s).
+/// Writes per-sample logits into `policy_batch[s * POLICY_MOVES..]` and
+/// per-sample tanh-value into `value_batch[s]`.
+///
+/// `policy_batch` must be length `≥ batch * POLICY_MOVES`; `value_batch`
+/// must be length `≥ batch`. The caller owns these so the search loop can
+/// read them without copying out of the scratch struct.
+#[allow(clippy::too_many_arguments)]
+pub fn forward_batch_with_scratch(
+    weights: &MokaWeights,
+    features_batch: &[f32],
+    batch: usize,
+    scratch: &mut MokaBatchScratch,
+    policy_batch: &mut [f32],
+    value_batch: &mut [f32],
+) {
+    debug_assert!(scratch.batch >= batch, "scratch must be sized for at least this batch; scratch={}, batch={}", scratch.batch, batch);
+    let MokaBatchScratch {
+        trunk,
+        expand,
+        hidden_a,
+        hidden_b,
+        head4,
+        head2,
+        patches_3x3_trunk,
+        patches_3x3_bottleneck,
+        pooled,
+        gh,
+        gbias,
+        value_h,
+        policy,
+        value_out,
+        batch: _,
+    } = scratch;
+
+    let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+    let bn_len = BOARD_AREA * BOTTLENECK_CHANNELS;
+
+    // Stem: 3×3 conv, 12 → 32 channels. The patch gather happens once per
+    // (sample, position); the weight slice is reused across all K samples.
+    conv2d_batched_into(
+        features_batch, batch,
+        BOARD_SIZE, BOARD_SIZE, INPUT_PLANES, TRUNK_CHANNELS, 3,
+        &weights.stem.w, &weights.stem.b, patches_3x3_trunk, trunk,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut trunk[s * trunk_len..][..trunk_len]);
+    }
+
+    for block in &weights.blocks {
+        // reduce: 1×1 conv, 32 → 16.
+        conv2d_batched_into(
+            trunk, batch,
+            BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1,
+            &block.reduce.w, &block.reduce.b, patches_3x3_trunk, hidden_a,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_a[s * bn_len..][..bn_len]);
+        }
+        // first: 3×3 conv, 16 → 16.
+        conv2d_batched_into(
+            hidden_a, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            &block.first.w, &block.first.b, patches_3x3_bottleneck, hidden_b,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_b[s * bn_len..][..bn_len]);
+        }
+
+        if let Some(g) = &block.global {
+            global_mean_max_batched_into(
+                hidden_b, batch, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, pooled,
+            );
+            let gh_len = g.hidden.b.len();
+            linear_batched_into(
+                pooled, batch, BOTTLENECK_CHANNELS * 2, gh_len,
+                &g.hidden.w, &g.hidden.b, gh,
+            );
+            for s in 0..batch {
+                relu_inplace(&mut gh[s * gh_len..][..gh_len]);
+            }
+            linear_batched_into(
+                gh, batch, gh_len, BOTTLENECK_CHANNELS,
+                &g.output.w, &g.output.b, gbias,
+            );
+            for s in 0..batch {
+                let row = &mut hidden_b[s * bn_len..];
+                let g_s = &gbias[s * BOTTLENECK_CHANNELS..][..BOTTLENECK_CHANNELS];
+                for pos in 0..BOARD_AREA {
+                    let slot = &mut row[pos * BOTTLENECK_CHANNELS..(pos + 1) * BOTTLENECK_CHANNELS];
+                    for c in 0..BOTTLENECK_CHANNELS {
+                        slot[c] += g_s[c];
+                    }
+                }
+            }
+        }
+
+        // second: 3×3 conv, 16 → 16.
+        conv2d_batched_into(
+            hidden_b, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            &block.second.w, &block.second.b, patches_3x3_bottleneck, hidden_a,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_a[s * bn_len..][..bn_len]);
+        }
+        // expand: 1×1 conv, 16 → 32, then residual add into trunk.
+        conv2d_batched_into(
+            hidden_a, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1,
+            &block.expand.w, &block.expand.b, patches_3x3_trunk, expand,
+        );
+        for s in 0..batch {
+            let t = &mut trunk[s * trunk_len..][..trunk_len];
+            let e = &expand[s * trunk_len..][..trunk_len];
+            for i in 0..trunk_len {
+                let v = t[i] + e[i];
+                t[i] = if v < 0.0 { 0.0 } else { v };
+            }
+        }
+    }
+
+    // Policy head.
+    let head4_len = BOARD_AREA * POLICY_CHANNELS;
+    conv2d_batched_into(
+        trunk, batch,
+        BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, POLICY_CHANNELS, 1,
+        &weights.policy_conv.w, &weights.policy_conv.b, patches_3x3_trunk, head4,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut head4[s * head4_len..][..head4_len]);
+    }
+    linear_batched_into(
+        head4, batch, POLICY_CHANNELS * BOARD_AREA, POLICY_MOVES,
+        &weights.policy_linear.w, &weights.policy_linear.b, policy,
+    );
+
+    // Value head.
+    let head2_len = BOARD_AREA * VALUE_CHANNELS;
+    conv2d_batched_into(
+        trunk, batch,
+        BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, VALUE_CHANNELS, 1,
+        &weights.value_conv.w, &weights.value_conv.b, patches_3x3_trunk, head2,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut head2[s * head2_len..][..head2_len]);
+    }
+    let value_hidden_dim = weights.value_hidden.b.len();
+    linear_batched_into(
+        head2, batch, VALUE_CHANNELS * BOARD_AREA, value_hidden_dim,
+        &weights.value_hidden.w, &weights.value_hidden.b, value_h,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut value_h[s * value_hidden_dim..][..value_hidden_dim]);
+    }
+    linear_batched_into(
+        value_h, batch, value_hidden_dim, 1,
+        &weights.value_output.w, &weights.value_output.b, value_out,
+    );
+
+    // Copy out into the caller-owned buffers + tanh the value.
+    for s in 0..batch {
+        policy_batch[s * POLICY_MOVES..(s + 1) * POLICY_MOVES]
+            .copy_from_slice(&policy[s * POLICY_MOVES..(s + 1) * POLICY_MOVES]);
+        value_batch[s] = value_out[s].tanh();
+    }
 }
 
 /// Encode `board` + last-two-plies `history` (`None` = pass) into Moka's
@@ -403,12 +609,10 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
         if history.len() < offset {
             continue;
         }
-        match history[history.len() - offset] {
-            Some((r, c)) => {
+        if let Some((r, c)) = history[history.len() - offset] {
                 let plane = if offset == 1 { 7 } else { 8 };
                 feats[idx(r, c, plane)] = 1.0;
-            }
-            None => {
+            } else {
                 let plane = 8 + offset;
                 for row in 0..size {
                     for col in 0..size {
@@ -416,7 +620,6 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
                     }
                 }
             }
-        }
     }
 
     let next_color: f32 = if board.to_play == Cell::Black { 1.0 } else { -1.0 };
@@ -425,5 +628,92 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
         for col in 0..size {
             feats[idx(row, col, 11)] = komi_value;
         }
+    }
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::*;
+    use crate::board::Board;
+
+    /// G1 gate: for K random boards, the batched forward pass must produce
+    /// output within f32 epsilon of K sequential `forward_with_scratch`
+    /// calls. This is the load-bearing correctness invariant — if it fails,
+    /// the batched MCTS search is invalid (different move choices vs
+    /// sequential PUCT).
+    #[test]
+    fn g1_batched_forward_matches_sequential() {
+        let weights = MokaWeights::load();
+        let k = 8;
+        let mut seq_scratch = MokaScratch::new();
+        let mut batch_scratch = MokaBatchScratch::new(k);
+
+        // Build K distinct mid-game boards by playing different opening
+        // sequences. encode_features needs last-2-plies history, which we
+        // reconstruct per board.
+        let opening_seqs: [[usize; 6]; 8] = [
+            [40, 41, 31, 50, 32, 49],
+            [0, 1, 9, 10, 18, 19],
+            [80, 79, 71, 70, 62, 61],
+            [40, 50, 30, 60, 31, 51],
+            [4, 5, 13, 14, 22, 23],
+            [76, 77, 67, 68, 58, 59],
+            [40, 32, 48, 31, 49, 23],
+            [40, 41, 31, 50, 32, 49], // duplicate of [0] to test same-board
+        ];
+
+        let mut features = vec![0.0; k * INPUT_ELEMENT_COUNT];
+        let mut seq_policy = vec![[0f32; POLICY_MOVES]; k];
+        let mut seq_value = vec![0f32; k];
+
+        for s in 0..k {
+            let mut board = Board::new();
+            let mut hist: Vec<Option<(usize, usize)>> = Vec::new();
+            for &mv in &opening_seqs[s] {
+                if board.is_legal(mv) {
+                    board.play(mv);
+                    hist.push(Some((mv / BOARD_SIZE, mv % BOARD_SIZE)));
+                }
+            }
+            // Take last-2 for the feature encoder.
+            let last2: Vec<Option<(usize, usize)>> =
+                hist.iter().rev().take(2).copied().collect::<Vec<_>>().into_iter().rev().collect();
+            encode_features_into(&board, &last2, &mut features[s * INPUT_ELEMENT_COUNT..]);
+            let (p, v) = forward_with_scratch(&weights, &features[s * INPUT_ELEMENT_COUNT..], &mut seq_scratch);
+            seq_policy[s] = p;
+            seq_value[s] = v;
+        }
+
+        let mut batch_policy = vec![0f32; k * POLICY_MOVES];
+        let mut batch_value = vec![0f32; k];
+        forward_batch_with_scratch(&weights, &features, k, &mut batch_scratch, &mut batch_policy, &mut batch_value);
+
+        // Compare. Allow generous epsilon — f32 reassociation in the batched
+        // dot loop can accumulate slightly differently than the sequential
+        // version (different summation order is legal per IEEE-754).
+        const EPS: f32 = 1e-3;
+        let mut max_policy_diff = 0f32;
+        let mut max_value_diff = 0f32;
+        for s in 0..k {
+            for i in 0..POLICY_MOVES {
+                let diff = (seq_policy[s][i] - batch_policy[s * POLICY_MOVES + i]).abs();
+                if diff > max_policy_diff {
+                    max_policy_diff = diff;
+                }
+            }
+            let diff = (seq_value[s] - batch_value[s]).abs();
+            if diff > max_value_diff {
+                max_value_diff = diff;
+            }
+        }
+        assert!(
+            max_policy_diff < EPS,
+            "batched vs sequential policy diff {max_policy_diff:e} exceeds {EPS:e}"
+        );
+        assert!(
+            max_value_diff < EPS,
+            "batched vs sequential value diff {max_value_diff:e} exceeds {EPS:e}"
+        );
+        eprintln!("g1 PASS: max policy diff {max_policy_diff:e}, max value diff {max_value_diff:e}");
     }
 }

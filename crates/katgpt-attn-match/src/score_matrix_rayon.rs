@@ -235,9 +235,7 @@ mod tests {
         for &r in &rms {
             assert!(
                 (r as f64 - expected_rms).abs() < 1e-5,
-                "rms {} should be {}",
-                r,
-                expected_rms
+                "rms {r} should be {expected_rms}"
             );
         }
     }
@@ -284,6 +282,6 @@ mod tests {
         for i in 0..n * t_len {
             max_diff = max_diff.max((scalar[i] - rayon_out[i]).abs());
         }
-        assert!(max_diff < 1e-4, "max rayon/scalar diff: {}", max_diff);
+        assert!(max_diff < 1e-4, "max rayon/scalar diff: {max_diff}");
     }
 }

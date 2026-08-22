@@ -28,6 +28,7 @@ mod mcts;
 
 pub use mcts::mcts_search;
 pub use mcts::mcts_search_informed;
+pub use mcts::{MctsSearchBudget, mcts_search_with};
 
 #[cfg(feature = "bandit")]
 pub use mcts::BanditRolloutPolicy;
@@ -49,10 +50,7 @@ mod tests {
         type Action = u8;
 
         fn available_actions(&self, _player_id: u8) -> Vec<Self::Action> {
-            match self.terminal {
-                true => vec![],
-                false => vec![0, 1, 2],
-            }
+            if self.terminal { vec![] } else { vec![0, 1, 2] }
         }
 
         fn advance(&self, _action: &Self::Action, _player_id: u8) -> Self {
@@ -69,9 +67,10 @@ mod tests {
         }
 
         fn reward(&self, player_id: u8) -> f32 {
-            match self.terminal {
-                true => 1.0,
-                false => player_id as f32 * 0.1,
+            if self.terminal {
+                1.0
+            } else {
+                player_id as f32 * 0.1
             }
         }
 

@@ -106,8 +106,8 @@ fn main() {
     .unwrap();
     println!("\n(b) Full correction (direction ∈ span(basis)):");
     println!("    γ = {gamma_b:.6} (expected ≈ 1.0)");
-    println!("    state:   {:?}", state_b);
-    println!("    out:     {:?}", out_b);
+    println!("    state:   {state_b:?}");
+    println!("    out:     {out_b:?}");
     println!("    shift:   {:?}", {
         let shift: Vec<f32> = out_b
             .iter()

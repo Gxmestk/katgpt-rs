@@ -178,13 +178,11 @@ fn main() {
 
     if min_content_rank > max_noise_rank {
         println!(
-            "✓ All content positions rank above noise (min_content_rank={}, max_noise_rank={})",
-            min_content_rank, max_noise_rank
+            "✓ All content positions rank above noise (min_content_rank={min_content_rank}, max_noise_rank={max_noise_rank})"
         );
     } else {
         println!(
-            "⚠ Content/noise overlap: min_content_rank={}, max_noise_rank={}",
-            min_content_rank, max_noise_rank
+            "⚠ Content/noise overlap: min_content_rank={min_content_rank}, max_noise_rank={max_noise_rank}"
         );
     }
 
@@ -232,8 +230,8 @@ fn main() {
             .filter(|p| !is_content(*p))
             .collect();
 
-        println!("  Evicted positions: {:?}", evict_set);
-        println!("  Kept positions:    {:?}", keep_set);
+        println!("  Evicted positions: {evict_set:?}");
+        println!("  Kept positions:    {keep_set:?}");
         println!(
             "  Content evicted: {} / {}",
             evicted_content.len(),

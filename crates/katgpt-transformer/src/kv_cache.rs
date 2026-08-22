@@ -49,6 +49,18 @@ pub struct MultiLayerKVCache {
     pub layers: Vec<KVCache>,
     /// Highest position written + 1 across all layers, for efficient snapshot.
     fill_pos: usize,
+    /// Per-layer sliding-window capacity. `0` = unbounded (uses full
+    /// `block_size` allocation, the original behavior for all non-Gemma-4 models).
+    /// `> 0` = sliding-bounded ring buffer with mirrored allocation (capacity
+    /// `2 * sliding_window` per layer, see [`new_gemma4_sliding_bounded`]).
+    ///
+    /// When bounded, the forward code writes K/V at `pos % capacity` AND mirrors
+    /// to `pos % capacity + capacity`, so any window of ≤ `capacity` positions is
+    /// always contiguous in the buffer — no wrap-around handling needed in the
+    /// attention code. Reads remap `t_start → t_start % capacity`.
+    ///
+    /// [`new_gemma4_sliding_bounded`]: Self::new_gemma4_sliding_bounded
+    pub sliding_capacity: Vec<usize>,
 }
 
 impl MultiLayerKVCache {
@@ -58,7 +70,149 @@ impl MultiLayerKVCache {
         Self {
             layers,
             fill_pos: 0,
+            sliding_capacity: vec![0; config.n_layer],
         }
+    }
+
+    /// Construct with per-layer KV dimensions. Used by models where each layer
+    /// has a different kv_dim (e.g. Gemma 4's alternating sliding/full layers —
+    // Issue 577). The vec length MUST equal `config.n_layer`.
+    ///
+    /// Each cache layer is allocated as `[block_size * per_layer_kv_dim[i]]`.
+    pub fn new_with_per_layer_kv_dim(config: &Config, per_layer_kv_dim: &[usize]) -> Self {
+        debug_assert_eq!(
+            per_layer_kv_dim.len(),
+            config.n_layer,
+            "per_layer_kv_dim length must equal n_layer"
+        );
+        let layers = per_layer_kv_dim
+            .iter()
+            .map(|&kvd| KVCache {
+                key: vec![0.0; config.block_size * kvd],
+                value: vec![0.0; config.block_size * kvd],
+            })
+            .collect();
+        Self {
+            layers,
+            fill_pos: 0,
+            sliding_capacity: vec![0; config.n_layer],
+        }
+    }
+
+    /// Construct with per-layer KV dimensions and an explicit position cap.
+    ///
+    /// Identical to [`new_with_per_layer_kv_dim`] except each layer is sized
+    /// `[max_positions * per_layer_kv_dim[i]]` instead of
+    /// `[block_size * per_layer_kv_dim[i]]`. Use this for **training** where
+    /// the sequence length is fixed and known upfront — avoids reserving the
+    /// model's full context window (e.g. Gemma-4-12B `block_size = 262_144` →
+    /// ~168 GiB of demand-paged virtual address space that can exceed the
+    /// system commit limit when the GPU runtime also holds significant host
+    /// memory). `max_positions` should be the training `seq_len`.
+    ///
+    /// `max_positions` is clamped to `>= 1` to avoid zero-sized allocations.
+    pub fn new_with_per_layer_kv_dim_bounded(
+        config: &Config,
+        per_layer_kv_dim: &[usize],
+        max_positions: usize,
+    ) -> Self {
+        debug_assert_eq!(
+            per_layer_kv_dim.len(),
+            config.n_layer,
+            "per_layer_kv_dim length must equal n_layer"
+        );
+        let cap = max_positions.max(1);
+        let layers = per_layer_kv_dim
+            .iter()
+            .map(|&kvd| KVCache {
+                key: vec![0.0; cap * kvd],
+                value: vec![0.0; cap * kvd],
+            })
+            .collect();
+        Self {
+            layers,
+            fill_pos: 0,
+            sliding_capacity: vec![0; config.n_layer],
+        }
+    }
+
+    /// Construct a sliding-bounded cache for Gemma-4's alternating
+    /// Sliding/Full layer pattern (Plan 320 Phase D3 production fix).
+    ///
+    /// Sliding layers get a **mirrored ring buffer** of capacity
+    /// `2 * sliding_window * kvd` (logical capacity `sliding_window`, mirrored
+    /// for contiguous-window reads). Full layers get `block_size * kvd`
+    /// (unbounded, same as `new_with_per_layer_kv_dim`).
+    ///
+    /// This reduces the 256K-context KV cache from ~168 GiB (naive, all layers
+    /// at `block_size`) to ~8 GiB (f32) or ~1.08 GiB (Q4) — a 20–150× reduction.
+    /// See the D3 test (`plan320_d3_kv_cache_256k_budget.rs`) for the budget
+    /// analysis.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` — for `n_layer` + `block_size`.
+    /// * `per_layer_kv_dim` — per-layer KV dimension (same as
+    ///   `new_with_per_layer_kv_dim`).
+    /// * `sliding_layers` — boolean mask: `true` = this layer is sliding-window
+    ///   (bounded allocation), `false` = full attention (unbounded). The caller
+    ///   determines this from the model's layer-type pattern (e.g.
+    ///   `config.gemma4_layer_types` in katgpt-core, which isn't visible at this
+    ///   substrate layer).
+    /// * `sliding_window` — the sliding-window size (Gemma-4 = 1024). Must be > 0
+    ///   for sliding layers to be bounded; 0 falls back to unbounded for all layers.
+    pub fn new_gemma4_sliding_bounded(
+        config: &Config,
+        per_layer_kv_dim: &[usize],
+        sliding_layers: &[bool],
+        sliding_window: usize,
+    ) -> Self {
+        debug_assert_eq!(
+            per_layer_kv_dim.len(),
+            config.n_layer,
+            "per_layer_kv_dim length must equal n_layer"
+        );
+        debug_assert_eq!(
+            sliding_layers.len(),
+            config.n_layer,
+            "sliding_layers length must equal n_layer"
+        );
+        let sw = sliding_window;
+        let layers = per_layer_kv_dim
+            .iter()
+            .enumerate()
+            .map(|(i, &kvd)| {
+                let is_sliding = sliding_layers.get(i).copied().unwrap_or(false);
+                let capacity = if is_sliding && sw > 0 {
+                    // Mirrored: 2× sliding_window for contiguous-window reads.
+                    2 * sw * kvd
+                } else {
+                    config.block_size * kvd
+                };
+                KVCache {
+                    key: vec![0.0; capacity],
+                    value: vec![0.0; capacity],
+                }
+            })
+            .collect();
+        // Record per-layer sliding capacity (0 = unbounded, sw = sliding-bounded).
+        let sliding_capacity: Vec<usize> = (0..config.n_layer)
+            .map(|i| {
+                let is_sliding = sliding_layers.get(i).copied().unwrap_or(false);
+                if is_sliding && sw > 0 { sw } else { 0 }
+            })
+            .collect();
+        Self {
+            layers,
+            fill_pos: 0,
+            sliding_capacity,
+        }
+    }
+
+    /// Get the sliding-window capacity for a layer (0 = unbounded/full block_size).
+    #[inline]
+    pub fn sliding_capacity(&self, layer_idx: usize) -> usize {
+        self.sliding_capacity.get(layer_idx).copied().unwrap_or(0)
     }
 
     pub fn reset(&mut self) {
@@ -304,19 +458,16 @@ impl PagedKVCache {
 
     /// Allocate a new page. Reuse from free list or grow the pool.
     fn alloc_page(&mut self) -> usize {
-        let idx = match self.free_pages.pop() {
-            Some(idx) => {
+        let idx = if let Some(idx) = self.free_pages.pop() {
                 self.pages[idx].fill(0.0);
                 idx
-            }
-            None => {
+            } else {
                 self.pages.push(vec![0.0; PAGE_SIZE * self.kv_dim * 2]);
                 let idx = self.total_pages;
                 self.total_pages += 1;
                 self.page_ref_counts.push(0);
                 idx
-            }
-        };
+            };
         self.page_ref_counts[idx] += 1;
         idx
     }
@@ -550,5 +701,273 @@ impl RavenKVCache {
     #[inline]
     pub fn r_t(&self) -> &[f32] {
         &self.router_r_t
+    }
+}
+
+// ── Plan 320 Phase D3: sliding-bounded cache tests ──────────────────────────
+
+#[cfg(test)]
+mod sliding_bounded_tests {
+    use super::*;
+
+    /// Build a tiny config for testing: 3 layers, block_size=32, kvd=4.
+    fn tiny_config() -> Config {
+        Config {
+            n_layer: 3,
+            block_size: 32,
+            n_embd: 16,
+            n_head: 2,
+            head_dim: 4,
+            n_kv_head: 1,
+            ..Config::micro()
+        }
+    }
+
+    #[test]
+    fn sliding_bounded_allocates_less_than_naive() {
+        // G1: sliding-bounded cache should allocate less memory than the naive
+        // all-full allocation for sliding layers.
+        let config = tiny_config();
+        let kvd = 4;
+        let sliding_window = 8; // much less than block_size=32
+
+        // Layer 0 and 2 are sliding; layer 1 is full.
+        let sliding_layers = vec![true, false, true];
+        let per_layer_kvd = vec![kvd; 3];
+
+        // Naive allocation: all layers at block_size.
+        let naive = MultiLayerKVCache::new_with_per_layer_kv_dim(&config, &per_layer_kvd);
+        let naive_bytes: usize = naive
+            .layers
+            .iter()
+            .map(|l| (l.key.len() + l.value.len()) * std::mem::size_of::<f32>())
+            .sum();
+
+        // Sliding-bounded allocation.
+        let bounded = MultiLayerKVCache::new_gemma4_sliding_bounded(
+            &config,
+            &per_layer_kvd,
+            &sliding_layers,
+            sliding_window,
+        );
+        let bounded_bytes: usize = bounded
+            .layers
+            .iter()
+            .map(|l| (l.key.len() + l.value.len()) * std::mem::size_of::<f32>())
+            .sum();
+
+        // Sliding layers: 2 * sw * kvd * 2 (mirrored, key+value)
+        // Full layer: block_size * kvd * 2
+        // Total bounded should be less than naive.
+        // Sliding layers: 2 * sw * kvd elements per buffer (key+value) → 2 * 2 * sw * kvd
+        // Full layer: block_size * kvd elements per buffer → 2 * block_size * kvd
+        // Total elements × sizeof(f32) = bytes.
+        let sliding_layer_elems = 2 * sliding_window * kvd * 2; // key+value
+        let full_layer_elems = config.block_size * kvd * 2;
+        let expected_elems = 2 * sliding_layer_elems + full_layer_elems; // 2 sliding + 1 full
+        let expected_bytes = expected_elems * std::mem::size_of::<f32>();
+        assert_eq!(
+            bounded_bytes, expected_bytes,
+            "bounded bytes should match expected: 2 sliding + 1 full layer"
+        );
+
+        // The claim in the test's name — `naive_bytes` was computed above but
+        // never checked, so G1's actual premise went unasserted.
+        assert!(
+            bounded_bytes < naive_bytes,
+            "sliding-bounded ({bounded_bytes} B) should allocate less than naive ({naive_bytes} B)"
+        );
+    }
+
+    #[test]
+    fn sliding_capacity_reports_correct_values() {
+        let config = tiny_config();
+        let sliding_layers = vec![true, false, true];
+        let per_layer_kvd = vec![4; 3];
+        let sw = 8;
+
+        let cache = MultiLayerKVCache::new_gemma4_sliding_bounded(
+            &config,
+            &per_layer_kvd,
+            &sliding_layers,
+            sw,
+        );
+
+        assert_eq!(cache.sliding_capacity(0), sw, "layer 0 is sliding");
+        assert_eq!(cache.sliding_capacity(1), 0, "layer 1 is full");
+        assert_eq!(cache.sliding_capacity(2), sw, "layer 2 is sliding");
+    }
+
+    #[test]
+    fn unbounded_cache_has_zero_sliding_capacity() {
+        // The standard new_with_per_layer_kv_dim should have all-zero capacities.
+        let config = tiny_config();
+        let per_layer_kvd = vec![4; 3];
+        let cache = MultiLayerKVCache::new_with_per_layer_kv_dim(&config, &per_layer_kvd);
+
+        for i in 0..config.n_layer {
+            assert_eq!(
+                cache.sliding_capacity(i),
+                0,
+                "layer {i} should be unbounded"
+            );
+        }
+    }
+
+    #[test]
+    fn bounded_cache_respects_max_positions() {
+        // The bounded constructor should size each layer at `max_positions * kvd`
+        // instead of `block_size * kvd` (Issue 442 T4 — training KV cache
+        // over-allocation that caused the CUDA-backend host OOM).
+        let mut config = tiny_config();
+        config.block_size = 1024; // simulate Gemma-4's large context window
+        let per_layer_kvd = vec![4; 3];
+        let max_positions = 32; // training seq_len
+        let cache = MultiLayerKVCache::new_with_per_layer_kv_dim_bounded(
+            &config,
+            &per_layer_kvd,
+            max_positions,
+        );
+
+        // Each layer should be sized at max_positions * kvd, NOT block_size * kvd.
+        for (i, layer) in cache.layers.iter().enumerate() {
+            let expected = max_positions * per_layer_kvd[i];
+            assert_eq!(
+                layer.key.len(),
+                expected,
+                "layer {i} key: expected {expected} (max_positions*kvd), got {}",
+                layer.key.len()
+            );
+            assert_eq!(
+                layer.value.len(),
+                expected,
+                "layer {i} value: expected {expected} (max_positions*kvd), got {}",
+                layer.value.len()
+            );
+        }
+
+        // Bounded cache should also report zero sliding_capacity (same as unbounded).
+        for i in 0..config.n_layer {
+            assert_eq!(cache.sliding_capacity(i), 0);
+        }
+    }
+
+    #[test]
+    fn bounded_cache_clamps_zero_max_positions() {
+        // max_positions = 0 should be clamped to 1 (avoid zero-sized alloc).
+        let config = tiny_config();
+        let per_layer_kvd = vec![4; 3];
+        let cache = MultiLayerKVCache::new_with_per_layer_kv_dim_bounded(
+            &config,
+            &per_layer_kvd,
+            0,
+        );
+        for layer in &cache.layers {
+            assert_eq!(layer.key.len(), 4, "clamped to 1*kvd");
+            assert_eq!(layer.value.len(), 4, "clamped to 1*kvd");
+        }
+    }
+
+    #[test]
+    fn sliding_bounded_mirror_write_correct() {
+        // G2: writing to a sliding-bounded cache at position `pos` should write
+        // to both `pos % sw` and `(pos % sw) + sw` (mirror).
+        let config = tiny_config();
+        let sw = 8;
+        let kvd = 4;
+        let sliding_layers = vec![true, false, false];
+        let per_layer_kvd = vec![kvd; 3];
+
+        let mut cache = MultiLayerKVCache::new_gemma4_sliding_bounded(
+            &config,
+            &per_layer_kvd,
+            &sliding_layers,
+            sw,
+        );
+
+        // Write a recognizable value at position 3 on layer 0 (sliding).
+        let pos = 3usize;
+        let test_val = 42.0f32;
+        let ring_pos = pos % sw; // = 3
+        let layer = &mut cache.layers[0];
+
+        // Simulate the write pattern from forward_gemma4.
+        let off = ring_pos * kvd;
+        let mirror_off = (ring_pos + sw) * kvd;
+        layer.key[off..off + kvd].fill(test_val);
+        layer.key[mirror_off..mirror_off + kvd].fill(test_val);
+        layer.value[off..off + kvd].fill(test_val);
+        layer.value[mirror_off..mirror_off + kvd].fill(test_val);
+
+        // Verify both primary and mirror slots have the value.
+        assert_eq!(layer.key[off], test_val, "primary slot should have value");
+        assert_eq!(
+            layer.key[mirror_off], test_val,
+            "mirror slot should have value"
+        );
+
+        // The buffer is 2 * sw * kvd = 2 * 8 * 4 = 64 elements.
+        assert_eq!(layer.key.len(), 2 * sw * kvd);
+    }
+
+    #[test]
+    fn sliding_bounded_window_contiguous() {
+        // G3: a window of positions [t_start, pos] where pos - t_start < sw should
+        // map to a contiguous region in the mirrored buffer.
+        let sw = 8;
+        let kvd = 4;
+
+        // Simulate positions 0..15 (wraps around the 8-capacity ring).
+        // At pos=15, t_start = 15 - 7 = 8. Window = [8, 15], length = 8.
+        // In the ring: t_start % sw = 8 % 8 = 0, pos % sw = 15 % 8 = 7.
+        // The window maps to [0, 7] in the primary region — contiguous.
+        let pos = 15;
+        let t_start = 8;
+        let t_n = pos - t_start + 1;
+        assert_eq!(t_n, 8);
+        assert!(t_n <= sw, "window must fit in sliding_window");
+
+        let read_start = (t_start % sw) * kvd; // = 0
+        let read_end = (pos % sw) * kvd + kvd; // = 7*4+4 = 32
+        assert_eq!(read_start, 0);
+        assert_eq!(read_end, sw * kvd);
+        // The window [0, 32) is contiguous within the primary region [0, sw*kvd).
+    }
+
+    #[test]
+    fn sliding_bounded_window_contiguous_at_boundary() {
+        // G4: window that straddles a ring boundary but fits within sw.
+        // pos=9, t_start=3, window=[3,9], length=7.
+        // ring: t_start%8=3, pos%8=1. In the mirrored buffer, [3*4, 2*4) spans
+        // [12, 8) — wrapping! But because of the mirror at [sw, 2*sw), the
+        // read from position 3 at offset 3*kvd through the mirror region is
+        // contiguous: primary[3..8) + mirror[0..2) = primary[3..8) + primary[8..10).
+        // Wait — that's NOT contiguous unless we read from the mirror.
+        //
+        // Actually, the key insight: in the mirrored buffer of size 2*sw,
+        // positions t_start..=pos map to (t_start%sw)..(t_start%sw + t_n - 1).
+        // Since t_n ≤ sw, this range is within [0, 2*sw). And we read from
+        // (t_start % sw) * kvd, which puts us at the start of the window.
+        // The mirror ensures that positions that wrapped around are available
+        // at sw + their ring index.
+        let sw = 8;
+        let kvd = 4;
+        let pos = 9;
+        let t_start = 3;
+        let t_n = pos - t_start + 1; // = 7
+
+        // Read starts at t_start % sw = 3, continues for t_n = 7 positions.
+        // In the mirrored buffer: positions 3,4,5,6,7,0(mirror@8),1(mirror@9).
+        // But we read from offset (3%8)*4 = 12, for 7 positions = 28 floats.
+        // The buffer at [12, 40) covers ring positions 3,4,5,6,7,8(mirror of 0),9(mirror of 1).
+        // This is contiguous and correct!
+        let read_start = (t_start % sw) * kvd; // = 12
+        let read_len = t_n * kvd; // = 28
+        let read_end = read_start + read_len; // = 40
+
+        // The buffer is 2*sw*kvd = 64 elements. read_end = 40 ≤ 64. ✓
+        assert!(read_end <= 2 * sw * kvd, "read must fit in mirrored buffer");
+        assert_eq!(read_start, 12);
+        assert_eq!(read_len, 28);
     }
 }

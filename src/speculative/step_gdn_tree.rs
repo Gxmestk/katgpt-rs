@@ -23,7 +23,7 @@ use katgpt_core::gdn_tree_verify::{GdnTreeVerifier, TreeTopology, build_topology
 use katgpt_core::speculative::sampling::{
     sample_from_distribution, sample_residual_distribution_into,
 };
-use katgpt_core::speculative::types::TreeNode;
+use katgpt_core::speculative::types::{TreeNode, TreePath};
 use katgpt_core::traits::NoPruner;
 use katgpt_forward::dflash::dflash_predict_with;
 #[cfg(feature = "weaver_runtime")]
@@ -112,39 +112,40 @@ pub fn gdn_tree_post_verify(
 
     // 2. Try each candidate path with p/q rejection.
     let mut residual_buf: Vec<f32> = Vec::new();
+    // Reused across paths and depths. Each node's logits row used to be copied
+    // out with `to_vec()`, i.e. one `vocab_size` heap allocation per
+    // (path × depth) — hundreds of KB of malloc/free per speculative step at
+    // real vocab sizes. Copying into one reused buffer leaves the softmax input
+    // (and therefore every sampled token) byte-identical.
+    let mut probs: Vec<f32> = Vec::new();
+    // Hoisted: one reciprocal instead of one per node.
+    let inv_temperature = 1.0 / target_config.temperature;
 
     for path in &paths {
         let mut accepted = Vec::with_capacity(path.len());
         let mut all_accepted = true;
 
-        let mut current_path_prefix: u128 = 0;
+        let mut current_path_prefix = TreePath::default();
 
         for (depth, &draft_tok) in path.iter().enumerate() {
-            current_path_prefix = if depth == 0 {
-                draft_tok as u128
-            } else {
-                (current_path_prefix << 16) | (draft_tok as u128)
-            };
+            current_path_prefix = current_path_prefix.push(draft_tok as u32, depth);
 
             // Find the topo node matching (depth, current_path_prefix).
-            let target_logits: Option<Vec<f32>> = (0..t).find_map(|k| {
-                let orig = topo.topo_order[k];
-                let node = &tree[orig];
-                if node.depth == depth && node.parent_path == current_path_prefix {
-                    let logits = &tree_logits[k * vocab_size..(k + 1) * vocab_size];
-                    Some(logits.to_vec())
-                } else {
-                    None
-                }
+            // Resolve the slot index only — the logits row is copied into the
+            // reused `probs` buffer instead of a fresh `Vec`.
+            let node_slot = (0..t).find(|&k| {
+                let node = &tree[topo.topo_order[k]];
+                node.depth == depth && node.parent_path == current_path_prefix
             });
 
-            let Some(node_logits) = target_logits else {
+            let Some(k) = node_slot else {
                 all_accepted = false;
                 break;
             };
 
-            let mut probs = node_logits;
-            softmax_scaled(&mut probs, 1.0 / target_config.temperature);
+            probs.clear();
+            probs.extend_from_slice(&tree_logits[k * vocab_size..(k + 1) * vocab_size]);
+            softmax_scaled(&mut probs, inv_temperature);
 
             let q_dist = marginals.get(depth).copied().unwrap_or(&[]);
             let q_i = q_dist.get(draft_tok).copied().unwrap_or(0.0);
@@ -168,31 +169,20 @@ pub fn gdn_tree_post_verify(
         // Bonus token if all accepted.
         if all_accepted && !accepted.is_empty() {
             let last_depth = path.len() - 1;
-            let last_prefix =
-                path.iter()
-                    .take(last_depth + 1)
-                    .enumerate()
-                    .fold(0u128, |acc, (d, &tok)| {
-                        if d == 0 {
-                            tok as u128
-                        } else {
-                            (acc << 16) | (tok as u128)
-                        }
-                    });
-            let bonus_logits: Option<Vec<f32>> = (0..t).find_map(|k| {
-                let orig = topo.topo_order[k];
-                let node = &tree[orig];
-                if node.depth == last_depth && node.parent_path == last_prefix {
-                    let logits = &tree_logits[k * vocab_size..(k + 1) * vocab_size];
-                    Some(logits.to_vec())
-                } else {
-                    None
-                }
+            let last_prefix = path.iter().enumerate().fold(TreePath::default(), |acc, (d, &tok)| {
+                acc.push(tok as u32, d)
+            });
+            let bonus_slot = (0..t).find(|&k| {
+                let node = &tree[topo.topo_order[k]];
+                node.depth == last_depth && node.parent_path == last_prefix
             });
 
-            if let Some(mut bl) = bonus_logits {
-                softmax_scaled(&mut bl, 1.0 / target_config.temperature);
-                let bonus = sample_from_distribution(&bl, rng);
+            if let Some(k) = bonus_slot {
+                // `probs` is dead at this point — reuse it instead of allocating.
+                probs.clear();
+                probs.extend_from_slice(&tree_logits[k * vocab_size..(k + 1) * vocab_size]);
+                softmax_scaled(&mut probs, inv_temperature);
+                let bonus = sample_from_distribution(&probs, rng);
                 accepted.push(bonus);
             }
         }

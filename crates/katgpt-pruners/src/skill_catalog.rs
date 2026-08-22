@@ -227,7 +227,14 @@ impl SkillCatalog {
 
     /// True if no skills registered.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        #[cfg(not(feature = "papaya"))]
+        {
+            self.descriptors.is_empty()
+        }
+        #[cfg(feature = "papaya")]
+        {
+            self.descriptors.pin().is_empty()
+        }
     }
 
     /// Iterate over all descriptors.

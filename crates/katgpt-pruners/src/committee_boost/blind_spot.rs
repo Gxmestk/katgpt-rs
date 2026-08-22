@@ -151,11 +151,10 @@ pub fn fit_convergence(oracle_rates: &[(usize, f64)]) -> ConvergenceFit {
     // Check convergence: need both (a) small gap between last two points AND
     // (b) at least 2 points observed (single point can't prove convergence).
     // The max rate being the last point doesn't prove convergence — need a plateau.
-    let last_rate = sorted.last().map(|&(_, r)| r).unwrap_or(0.0);
+    let last_rate = sorted.last().map_or(0.0, |&(_, r)| r);
     let second_last_rate = sorted
         .get(sorted.len().saturating_sub(2))
-        .map(|&(_, r)| r)
-        .unwrap_or(0.0);
+        .map_or(0.0, |&(_, r)| r);
     let residual_gap = (last_rate - second_last_rate).abs();
     let has_plateau = sorted.len() >= 2 && residual_gap < 0.02;
     let near_ceiling = (asymptote - last_rate).abs() < 0.02;

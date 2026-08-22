@@ -450,18 +450,15 @@ mod tests {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         hs.with_table(|t| t.lookup_into(&keys, &mut out))
                     }));
-                    match result {
-                        Ok(hits) => {
-                            // Sanity: hits ≤ K_MAX. If hits > K_MAX, we have
-                            // a torn read (corrupted vtable / data).
-                            if hits > K_MAX {
-                                panic_count.fetch_add(1, AOrd::Relaxed);
-                            }
-                            lookup_count.fetch_add(1, AOrd::Relaxed);
-                        }
-                        Err(_) => {
+                    if let Ok(hits) = result {
+                        // Sanity: hits ≤ K_MAX. If hits > K_MAX, we have
+                        // a torn read (corrupted vtable / data).
+                        if hits > K_MAX {
                             panic_count.fetch_add(1, AOrd::Relaxed);
                         }
+                        lookup_count.fetch_add(1, AOrd::Relaxed);
+                    } else {
+                        panic_count.fetch_add(1, AOrd::Relaxed);
                     }
                 }
             }));

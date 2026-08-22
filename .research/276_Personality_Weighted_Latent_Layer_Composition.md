@@ -16,6 +16,8 @@
 
 A generic modelless primitive: compose `N` latent direction vectors `dᵢ ∈ ℝ^D` into a single behavior vector via a personality weight vector `w ∈ ℝ^N` with sigmoid gating, and update `w` via an EMA on reward prediction error. **No game semantics, no game IP, no entity-kind assumptions.** Pure math — the kernel, the drift rule, and a trait surface that any host (game, robot, recommender) can implement for any kind of agent (NPC, player avatar, predator, prey, robot arm, etc.).
 
+**PASS-Redirects (synthesis 2):** Luo, Cai and Hu [arXiv:2607.27230 "Multi-Head Attention Residuals"] — the multi-head depth-routing generalization of Kimi Attention Residuals (2603.15031). Structural parallel to this note's single-w pattern: MHAR proves a single routing query shared across all d channels is a forced compromise whose cost grows with model width (single-head routing regresses from -0.039 at 100M to +0.105 at 1B). Splitting into H per-subspace heads removes the compromise BUT requires trained per-head queries (paper proves random queries give 0.03-0.10 KL vs 0.27-0.70 for trained). The modelless analog (splitting w into per-subspace groups derived from the same belief signal) would NOT capture the learned per-subspace specialization that drives the gain. Routes to riir-train. At our D=32 the forced compromise cost is negligible (single-head routing HELPS below d~512).
+
 **Distilled for katgpt-rs (modelless, inference-time):**
 - Composition: `behavior = Σᵢ sigmoid(wᵢ / τ) · dᵢ`
 - Drift: `Δwᵢ = α · (R_observed − R_expected) · dᵢ_recent`
@@ -227,8 +229,6 @@ katgpt-rs provides:
 ---
 
 ## 6. Verdict
-
-**Super-GOAT (open half).** Novel composition primitive (no prior art in katgpt-rs); new capability class when wired to game-specific layers (per riir-ai Research 146); product selling point ("emergent NPC moral character without per-NPC training"); force multiplier across 9 existing systems (R242, R123, R141, R142, R143, R145, `evolve_hla`, Fourier, `DualSignalGate`). Open primitive in katgpt-rs (generic math); Super-GOAT guide in riir-ai Research 146 (game-specific wiring + validation gates).
 
 ---
 

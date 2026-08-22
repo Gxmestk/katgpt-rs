@@ -219,7 +219,7 @@ fn t22_still_kv_compression_benchmarks() {
         println!("\n  ── Compression {cr}x (budget={budget} tokens) ──");
 
         for &strategy in &strategies {
-            let strat_name = format!("{:?}", strategy);
+            let strat_name = format!("{strategy:?}");
 
             // Warmup
             let _ = compact_single(&keys, &values, seq_len, strategy, budget, rope_theta);
@@ -297,7 +297,7 @@ fn t23_synthesis_vs_selection() {
     );
 
     for &strategy in &strategies {
-        let strat_name = format!("{:?}", strategy);
+        let strat_name = format!("{strategy:?}");
 
         let start = Instant::now();
         let (ck, _cv) = compact_single(&keys, &values, seq_len, strategy, budget, rope_theta);
@@ -466,7 +466,7 @@ fn g4_synthesis_quality_vs_selection() {
         let cos = avg_cosine_sim(&keys, &ck, KV_DIM);
         if cos > best_synthesis_cos {
             best_synthesis_cos = cos;
-            best_strat = format!("{:?}", strategy).as_str().to_string().leak();
+            best_strat = format!("{strategy:?}").as_str().to_string().leak();
         }
     }
 
@@ -504,29 +504,25 @@ fn g5_all_strategies_produce_valid_output() {
         assert_eq!(
             compact_keys.len(),
             budget * KV_DIM,
-            "G5 FAIL: {:?} produced wrong key size",
-            strategy
+            "G5 FAIL: {strategy:?} produced wrong key size"
         );
         assert_eq!(
             compact_values.len(),
             budget * KV_DIM,
-            "G5 FAIL: {:?} produced wrong value size",
-            strategy
+            "G5 FAIL: {strategy:?} produced wrong value size"
         );
 
         // All values must be finite
         for (i, &v) in compact_keys.iter().enumerate() {
             assert!(
                 v.is_finite(),
-                "G5 FAIL: {:?} key element {i} is not finite: {v}",
-                strategy
+                "G5 FAIL: {strategy:?} key element {i} is not finite: {v}"
             );
         }
         for (i, &v) in compact_values.iter().enumerate() {
             assert!(
                 v.is_finite(),
-                "G5 FAIL: {:?} value element {i} is not finite: {v}",
-                strategy
+                "G5 FAIL: {strategy:?} value element {i} is not finite: {v}"
             );
         }
     }
@@ -841,11 +837,8 @@ fn t26_stillcot_vs_thoughtfold() {
     let thoughtfold_reduction_pct = thoughtfold_tokens_saved as f32 / total_tokens as f32 * 100.0;
 
     println!("\n  📋 ThoughtFold (selection only):");
-    println!(
-        "    Tokens saved:  {} ({thoughtfold_reduction_pct:.1}%)",
-        thoughtfold_tokens_saved
-    );
-    println!("    Bytes saved:   {}", thoughtfold_bytes_saved);
+    println!("    Tokens saved:  {thoughtfold_tokens_saved} ({thoughtfold_reduction_pct:.1}%)");
+    println!("    Bytes saved:   {thoughtfold_bytes_saved}");
 
     // ── StillCoT: Selection + Synthesis (KV compaction) ────────────────
     let kv_dim = num_heads * head_dim;
@@ -883,39 +876,29 @@ fn t26_stillcot_vs_thoughtfold() {
     let stillcot_reduction_pct = stillcot_total_tokens_saved as f32 / total_tokens as f32 * 100.0;
 
     println!("\n  🧬 StillCoT (selection + synthesis):");
-    println!(
-        "    Fold tokens saved:   {} (from ThoughtFold selection)",
-        thoughtfold_tokens_saved
-    );
+    println!("    Fold tokens saved:   {thoughtfold_tokens_saved} (from ThoughtFold selection)");
     println!(
         "    Compact tokens saved: {} additional ({} → {} at 2x)",
         stillcot_additional_tokens, compact.original_tokens, compact.compact_tokens
     );
     println!(
-        "    Total tokens saved:   {} ({stillcot_reduction_pct:.1}%)",
-        stillcot_total_tokens_saved
+        "    Total tokens saved:   {stillcot_total_tokens_saved} ({stillcot_reduction_pct:.1}%)"
     );
-    println!(
-        "    KV compaction bytes:  {}",
-        stillcot_bytes_from_compaction
-    );
-    println!("    Total bytes saved:    {}", stillcot_total_bytes_saved);
+    println!("    KV compaction bytes:  {stillcot_bytes_from_compaction}");
+    println!("    Total bytes saved:    {stillcot_total_bytes_saved}");
     println!("    Compact timing: {:.0} µs", compact_elapsed.as_micros());
 
     // ── Comparison ────────────────────────────────────────────────────
     println!("\n  📊 Comparison:");
     println!("{}", "─".repeat(60));
     println!(
-        "    ThoughtFold:   {} tokens saved ({thoughtfold_reduction_pct:.1}%)  {} bytes",
-        thoughtfold_tokens_saved, thoughtfold_bytes_saved
+        "    ThoughtFold:   {thoughtfold_tokens_saved} tokens saved ({thoughtfold_reduction_pct:.1}%)  {thoughtfold_bytes_saved} bytes"
     );
     println!(
-        "    StillCoT:      {} tokens saved ({stillcot_reduction_pct:.1}%)  {} bytes",
-        stillcot_total_tokens_saved, stillcot_total_bytes_saved
+        "    StillCoT:      {stillcot_total_tokens_saved} tokens saved ({stillcot_reduction_pct:.1}%)  {stillcot_total_bytes_saved} bytes"
     );
     println!(
-        "    StillCoT gain: +{} tokens  +{} bytes",
-        stillcot_additional_tokens, stillcot_bytes_from_compaction
+        "    StillCoT gain: +{stillcot_additional_tokens} tokens  +{stillcot_bytes_from_compaction} bytes"
     );
     println!("{}", "─".repeat(60));
 
@@ -923,9 +906,7 @@ fn t26_stillcot_vs_thoughtfold() {
     // StillCoT total reduction must be ≥ ThoughtFold (compaction is additive)
     assert!(
         stillcot_total_bytes_saved >= thoughtfold_bytes_saved,
-        "StillCoT ({}) must save ≥ ThoughtFold ({}) bytes",
-        stillcot_total_bytes_saved,
-        thoughtfold_bytes_saved
+        "StillCoT ({stillcot_total_bytes_saved}) must save ≥ ThoughtFold ({thoughtfold_bytes_saved}) bytes"
     );
 
     // Sanity: at least 30% token reduction from folding alone
@@ -1013,10 +994,7 @@ fn t27_goat_stillcot_gate() {
             combined_pct * 100.0,
             fold_pct * 100.0
         );
-        println!(
-            "  Compact output: finite_keys={} finite_vals={} ✅",
-            finite_keys, finite_vals
-        );
+        println!("  Compact output: finite_keys={finite_keys} finite_vals={finite_vals} ✅");
     } else {
         panic!("GOAT FAIL: compact_trace returned None — StillCoT compaction failed");
     }

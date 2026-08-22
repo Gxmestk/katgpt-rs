@@ -339,7 +339,10 @@ pub fn stable_rank_update_into(
     //
     // ov_buf is now reused from scratch (Issue 001 T4). The first call for a
     // new `n` pays one resize; subsequent calls are allocation-free.
-    ov_buf.fill(0.0);
+    //
+    // No pre-zeroing: the `ov_buf[i] = dot(...)` loop below writes every slot
+    // that the `w` accumulation loop reads (both iterate `o`), so the memset
+    // was dead work — one wasted O(n) pass per call.
 
     let mut sigma1_sq = trace_f; // conservative upper bound
     let iters = n_iters.max(1) as usize;
@@ -373,8 +376,9 @@ pub fn stable_rank_update_into(
         // Normalize w into v for next iteration.
         let norm_w = (simd::simd_dot_f32(w, w, d)).max(1e-30).sqrt();
         let inv_norm = 1.0 / norm_w;
-        for j in 0..d {
-            v[j] = w[j] * inv_norm;
+        // zip instead of double indexing: two bounds checks per element → none.
+        for (vj, &wj) in v.iter_mut().zip(w.iter()) {
+            *vj = wj * inv_norm;
         }
     }
 
@@ -415,6 +419,44 @@ pub fn classify_sink_at(
     cfg: &SinkClassifierConfig,
     scratch: &mut StableRankScratch,
 ) -> SinkDiagnostic {
+    let stats = value_norm_stats(values);
+    classify_sink_at_with_stats(position, attn_column, values, update_O, cfg, scratch, stats)
+}
+
+/// `(Σ_i ‖v_i‖², count of non-empty rows)` over `values`.
+///
+/// This is the `mean_i ‖v_i‖` input to the classifier's `value_norm_ratio`, and
+/// it is **invariant across sink positions**. Hoisting it lets
+/// [`classify_all_sinks`] pay it once per head instead of once per candidate
+/// (up to `CANDIDATE_CAP = 32` candidates ⇒ O(k·n·d) → O(n·d)). The
+/// accumulation order over `values` is unchanged, so `sum_sq` is bit-identical
+/// to the previous inline loop.
+#[inline]
+fn value_norm_stats(values: &[Vec<f32>]) -> (f32, usize) {
+    let mut sum_sq = 0.0f32;
+    let mut counted = 0usize;
+    for row in values.iter() {
+        if row.is_empty() {
+            continue;
+        }
+        sum_sq += simd::simd_dot_f32(row, row, row.len());
+        counted += 1;
+    }
+    (sum_sq, counted)
+}
+
+/// [`classify_sink_at`] with the position-invariant `(sum_sq, counted)` value
+/// statistics supplied by the caller (see [`value_norm_stats`]).
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn classify_sink_at_with_stats(
+    position: usize,
+    attn_column: &[f32],
+    values: &[Vec<f32>],
+    update_O: Option<&[Vec<f32>]>,
+    cfg: &SinkClassifierConfig,
+    scratch: &mut StableRankScratch,
+    (sum_sq, counted): (f32, usize),
+) -> SinkDiagnostic {
     // ── Strength ───────────────────────────────────────────────
     let n_col = attn_column.len();
     let strength = if n_col == 0 {
@@ -435,16 +477,7 @@ pub fn classify_sink_at(
         } else {
             0.0
         };
-        // mean_i ‖v_i‖
-        let mut sum_sq = 0.0f32;
-        let mut counted = 0usize;
-        for row in values.iter() {
-            if row.is_empty() {
-                continue;
-            }
-            sum_sq += simd::simd_dot_f32(row, row, row.len());
-            counted += 1;
-        }
+        // mean_i ‖v_i‖ — precomputed by the caller (position-invariant).
         if counted == 0 || sum_sq == 0.0 {
             (1.0, true) // degenerate — set ratio to 1.0, kind = None
         } else {
@@ -540,7 +573,7 @@ pub fn classify_all_sinks(
     // Issue 001 T3: reuse `scratch.col_sums` instead of allocating per call.
     // The first call for a new `n` pays one resize; subsequent calls are
     // allocation-free.
-    scratch.ensure_capacity_dn(values.first().map(|r| r.len()).unwrap_or(0), n);
+    scratch.ensure_capacity_dn(values.first().map_or(0, |r| r.len()), n);
     let col_sums = &mut scratch.col_sums;
     col_sums[..n].fill(0.0);
     for row in attn.iter() {
@@ -587,9 +620,12 @@ pub fn classify_all_sinks(
     } else {
         &candidates_stack[..n_candidates]
     };
+    // Position-invariant value statistics: one O(n·d) pass for the whole head
+    // instead of one per candidate.
+    let stats = value_norm_stats(values);
     for &(j, strength_j) in process {
         let col = [strength_j];
-        let diag = classify_sink_at(j, &col, values, None, cfg, scratch);
+        let diag = classify_sink_at_with_stats(j, &col, values, None, cfg, scratch, stats);
         out.push(diag);
     }
 }
@@ -932,9 +968,7 @@ pub fn stable_rank_update_into_flat(
     debug_assert_eq!(
         o.len(),
         n * d,
-        "flat stable_rank: o must be (n={}, d={}) flat",
-        n,
-        d
+        "flat stable_rank: o must be (n={n}, d={d}) flat"
     );
     scratch.ensure_capacity_dn(d, n);
     let v = &mut scratch.v[..d];
@@ -1032,12 +1066,52 @@ pub fn classify_sink_at_flat(
     cfg: &SinkClassifierConfig,
     scratch: &mut StableRankScratch,
 ) -> SinkDiagnostic {
+    let sum_sq = value_norm_sum_sq_flat(values, n, d);
+    classify_sink_at_flat_with_sum_sq(
+        position,
+        attn_column,
+        values,
+        n,
+        d,
+        update_O,
+        cfg,
+        scratch,
+        sum_sq,
+    )
+}
+
+/// `Σ_i ‖v_i‖²` over the flat `(n, d)` value matrix — the position-invariant
+/// half of `value_norm_ratio`. Hoisted so [`classify_all_sinks_flat`] pays it
+/// once per head rather than once per candidate. Accumulation order is
+/// unchanged, so the sum is bit-identical to the previous inline loop.
+#[inline]
+fn value_norm_sum_sq_flat(values: &[f32], n: usize, d: usize) -> f32 {
+    let mut sum_sq = 0.0f32;
+    for i in 0..n {
+        let row = &values[i * d..(i + 1) * d];
+        sum_sq += simd::simd_dot_f32(row, row, d);
+    }
+    sum_sq
+}
+
+/// [`classify_sink_at_flat`] with the position-invariant `Σ_i ‖v_i‖²` supplied
+/// by the caller (see [`value_norm_sum_sq_flat`]).
+#[allow(non_snake_case, clippy::too_many_arguments)]
+fn classify_sink_at_flat_with_sum_sq(
+    position: usize,
+    attn_column: &[f32],
+    values: &[f32],
+    n: usize,
+    d: usize,
+    update_O: Option<(&[f32], usize, usize)>,
+    cfg: &SinkClassifierConfig,
+    scratch: &mut StableRankScratch,
+    sum_sq: f32,
+) -> SinkDiagnostic {
     debug_assert_eq!(
         values.len(),
         n * d,
-        "flat classify_sink_at: values must be (n={}, d={}) flat",
-        n,
-        d
+        "flat classify_sink_at: values must be (n={n}, d={d}) flat"
     );
 
     // ── Strength ───────────────────────────────────────────────
@@ -1059,12 +1133,7 @@ pub fn classify_sink_at_flat(
         } else {
             0.0
         };
-        // mean_i ‖v_i‖ = sqrt(Σ_i ‖v_i‖² / n). Single pass, contiguous.
-        let mut sum_sq = 0.0f32;
-        for i in 0..n {
-            let row = &values[i * d..(i + 1) * d];
-            sum_sq += simd::simd_dot_f32(row, row, d);
-        }
+        // mean_i ‖v_i‖ = sqrt(Σ_i ‖v_i‖² / n) — `sum_sq` precomputed by caller.
         if sum_sq == 0.0 {
             (1.0, true)
         } else {
@@ -1202,9 +1271,14 @@ pub fn classify_all_sinks_flat(
     } else {
         &candidates_stack[..n_candidates]
     };
+    // Position-invariant `Σ_i ‖v_i‖²`: one O(n·d) pass for the whole head
+    // instead of one per candidate.
+    let sum_sq = value_norm_sum_sq_flat(values, n, d);
     for &(j, strength_j) in process {
         let col = [strength_j];
-        let diag = classify_sink_at_flat(j, &col, values, n, d, None, cfg, scratch);
+        let diag = classify_sink_at_flat_with_sum_sq(
+            j, &col, values, n, d, None, cfg, scratch, sum_sq,
+        );
         out.push(diag);
     }
 }

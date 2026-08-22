@@ -212,7 +212,7 @@ fn main() {
     println!("│          │  H0       H3             │ heads×window   │ FLOPs      │          │");
     println!("├──────────┼──────────────────────────┼────────────────┼────────────┼──────────┤");
 
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(seq_lengths.len());
 
     for &seq_len in &seq_lengths {
         let result = run_decode_bench(seq_len, &mut rng);

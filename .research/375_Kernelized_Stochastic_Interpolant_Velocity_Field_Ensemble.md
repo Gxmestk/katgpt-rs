@@ -7,6 +7,7 @@
 > **Related Plans:** 376 (this primitive — open), riir-ai 385 (runtime wiring), 308 (KARC), 321 (CommittedFieldBlend), 310 (Cross-Resolution), 286 (FuncAttn)
 > **Cross-ref (riir-ai):** Research 170 (Per-NPC Velocity-Field Ensemble Composition Guide)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Tong et al. [arXiv:2608.05811 "Energy-Guided Flow Matching"](https://arxiv.org/abs/2608.05811) — PASS. Pixel-space image generation training recipe — replaces the fixed clean endpoint with a heat-kernel-filtered moving endpoint `y_t(x) = F⁻¹(exp(-a·h(x,t)·ρ²)·b_x)` releasing low→high image-frequency content via sample-adaptive spectral-energy scheduling. Mechanism is entirely training-time velocity-target construction (Eq. 16: `v_t = y_t - ε + t·∂_t y_t`); the paper explicitly states inference uses the same solver with no FFT/heat-kernel/bisection at runtime. Out of scope for our model-based track too (Plan 318/059/066 train LLM/game-AI/linear-attention, not image DiT). No modelless primitive to extract (there is nothing at inference). Closest cousins: this note (stochastic interpolant integrator), R150 (RecFM cross-scale flow matching), R369 (renoise-CE flow reasoning verifier) — all latent-reasoning, none pixel-space.
 
 ---
 
@@ -119,7 +120,7 @@ Operating on each Super-GOAT factory module:
 
 (e) **NeuronShard / freeze envelope** (`riir-neuron-db/src/`): `VelocityFieldEnsembleShard` subtype. Layout: `[zone_hash(32) | η_flat(P·4) | field_library_hash(32) | schedule_hash(16) | version(4) | blake3(32) | merkle_root(32)]` ≈ 116 + 4P bytes, P=8 → 148 bytes, padded to 192. `MerkleFrozenEnvelope` wraps it for atomic hot-swap. **The velocity-field library itself is a separate frozen artifact** (P NeuronShards), referenced by hash — not duplicated per ensemble.
 
-(f) **DEC Stokes-calculus** (`katgpt-core/src/dec/`): The combined drift `b̂_t` is a vector field on the latent manifold. `codifferential(b̂_t)` measures its divergence; `belief_mass_divergence(b̂_t) ≈ 0` is a modelless sanity check that the ensemble preserves belief mass. The Girsanov-derived `D*_t` is the *raw scalar* that crosses sync to keep the ensemble's stochastic transport mass-conserving. **Curse-of-dimensionality caveat (R296):** DEC ops win only for d ≤ 3; HLA (d=8) and shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *mass-conservation property*, not perf.
+(f) **DEC Stokes-calculus** (`katgpt-dec/src/`): The combined drift `b̂_t` is a vector field on the latent manifold. `codifferential(b̂_t)` measures its divergence; `belief_mass_divergence(b̂_t) ≈ 0` is a modelless sanity check that the ensemble preserves belief mass. The Girsanov-derived `D*_t` is the *raw scalar* that crosses sync to keep the ensemble's stochastic transport mass-conserving. **Curse-of-dimensionality caveat (R296):** DEC ops win only for d ≤ 3; HLA (d=8) and shards (d=64) do NOT benefit from boundary-only computation. The DEC mapping is for the *mass-conservation property*, not perf.
 
 ---
 

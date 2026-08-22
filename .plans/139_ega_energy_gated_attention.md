@@ -4,7 +4,7 @@
 > **Paper:** [arXiv:2605.21842](https://arxiv.org/abs/2605.21842) — Spectral salience as inductive bias for transformer attention
 > **Feature Gate:** `ega_attn` (opt-in, NOT default-on)
 > **Status:** ✅ Phase 3 complete (riir-ai integration)
-> **GOAT Pillar:** ❌ Not a pillar — secondary bet, model-based, depends on LoRA quality. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md).
+> **GOAT Pillar:** ❌ Not a pillar — secondary bet, model-based, depends on LoRA quality. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md).
 > **Domain:** `katgpt-rs` — generic energy-gated attention. Game-specific τ tuning and per-domain w_proj LoRA stay in `riir-ai`.
 
 ---

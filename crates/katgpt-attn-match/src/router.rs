@@ -242,8 +242,7 @@ mod tests {
             let b2 = pick_backend(t, 8192, gpu, &cfg);
             assert_eq!(
                 b1, b2,
-                "non-deterministic backend for t={} gpu={}: {:?} vs {:?}",
-                t, gpu, b1, b2
+                "non-deterministic backend for t={t} gpu={gpu}: {b1:?} vs {b2:?}"
             );
         }
     }

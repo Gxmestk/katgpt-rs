@@ -43,21 +43,17 @@ fn proof_1_oracle_gap_recovery() {
         let r = OracleGapRecovery::new(*p1, *p_oracle, *p_system);
         let rec = r.recovery();
 
-        match expected_rec {
-            Some(exp) => {
-                let actual = rec.expect("should compute recovery");
-                assert!(
-                    (actual - exp).abs() < EPS,
-                    "[G1 FAIL] Rec: expected ~{exp:.3}, got {actual:.3} (p1={p1}, p_oracle={p_oracle}, p_system={p_system})"
-                );
-            }
-            None => {
-                assert!(
-                    rec.is_none(),
-                    "[G1 FAIL] Expected None for zero gap, got {:?}",
-                    rec
-                );
-            }
+        if let Some(exp) = expected_rec {
+            let actual = rec.expect("should compute recovery");
+            assert!(
+                (actual - exp).abs() < EPS,
+                "[G1 FAIL] Rec: expected ~{exp:.3}, got {actual:.3} (p1={p1}, p_oracle={p_oracle}, p_system={p_system})"
+            );
+        } else {
+            assert!(
+                rec.is_none(),
+                "[G1 FAIL] Expected None for zero gap, got {rec:?}"
+            );
         }
 
         assert_eq!(
@@ -486,8 +482,7 @@ fn proof_5_committee_improves_over_single_shot() {
     let wins_for_0 = results.iter().filter(|c| c.winner == 0).count();
     assert!(
         wins_for_0 == 3,
-        "[G5j FAIL] Candidate 0 should win 3 comparisons, won {}",
-        wins_for_0
+        "[G5j FAIL] Candidate 0 should win 3 comparisons, won {wins_for_0}"
     );
 
     println!(

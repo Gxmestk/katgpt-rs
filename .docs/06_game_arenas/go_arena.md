@@ -592,7 +592,7 @@ The summary *at this point in the investigation* was: policy-pruned search on to
 
 Asked to grep harder for unused repo primitives, a deeper search surfaced `katgpt-backend::ane` — a real CoreML/ANE execution backend (not a cost model), unused for Moka. Built a scoped probe (stem + one residual block, 9 layers) rather than the full ~60-layer graph, specifically to answer the residency question before committing to the larger build.
 
-**Result: ANE is 4.66× slower than CPU for the identical 9-layer slice** (261 µs vs 56 µs, matched workload, not a proportional estimate). Correctness was proven bit-perfect (`max_abs_diff = 5.96×10⁻⁸`, f32 epsilon) — the layout transpose work is real and correct — but the performance verdict is decisively negative. At 105K params, CoreML's fixed per-call dispatch/marshalling overhead dominates completely; the whole network only costs ~450 µs on CPU, leaving no room for a few-hundred-µs fixed overhead to amortize away even at the full graph size. Per the stop-rule set before writing any code, the remaining ~50 layers were not built. Full record: `.issues/564_moka_ane_coreml_inference.md`.
+**Result: ANE is 4.66× slower than CPU for the identical 9-layer slice** (261 µs vs 56 µs, matched workload, not a proportional estimate). Correctness was proven bit-perfect (`max_abs_diff = 5.96×10⁻⁸`, f32 epsilon) — the layout transpose work is real and correct — but the performance verdict is decisively negative. At 105K params, CoreML's fixed per-call dispatch/marshalling overhead dominates completely; the whole network only costs ~450 µs on CPU, leaving no room for a few-hundred-µs fixed overhead to amortize away even at the full graph size. Per the stop-rule set before writing any code, the remaining ~50 layers were not built. Full record: `docs/09_feature_catalog/negative_results.md` §21 (Issue 564, removed per noise-reduction rule).
 
 **Notable asymmetry:** wins are short games with modest margins (48–82 moves, +2.5 to +18.5); losses are long games with blowout margins (116–140 moves, +41.5 to +75.5).
 
@@ -647,14 +647,16 @@ Every prior "Moka: ~0.5ms/move" figure in this document was **our own native por
 
 **Correction along the way, worth stating plainly:** Moka's actual shipped runtime is **100% hand-written TypeScript**, not WASM at all — traced every code path in the cloned repo; the only `WebAssembly` reference anywhere is ONNX Runtime running KataGo (their much bigger teacher, used as an arena opponent), unrelated to Moka itself. The comparison is therefore "our Rust→WASM vs their hand-written JS," both JIT-compiled by V8 — not "WASM vs WASM," which was the wrong initial framing.
 
-### Results (all real measurements — real Chrome via Playwright, or native wasmi — not self-benchmarked)
+### Results (all real measurements — real Chrome via Playwright, Node V8 re-bench, or native wasmi — not self-benchmarked)
 
 | Engine | Median latency/move | Total payload |
 |---|---|---|
 | **Real Moka** (their actual JS, real Chrome) | **6.4 ms** | 140,850 B (11,004 JS + 16,198 manifest + 113,648 weights) |
 | Our WASM, **no SIMD** (default `wasm32-unknown-unknown`, real Chrome) | 8.6 ms — **slower than Moka** | 267,914 B (9,847 JS glue + 258,067 wasm) |
 | **Our WASM, `+simd128`** (real Chrome) | **0.6 ms — 10.7× faster than Moka** | 269,405 B (9,847 JS glue + 259,558 wasm) |
-| Our WASM via **wasmi** (pure interpreter, no JIT, no SIMD) | 212,170 µs (212 ms) — 25× slower than our own JIT'd non-SIMD build | n/a (native test, no browser payload) |
+| Real Moka JS (Node V8 JIT, re-bench 2026-07-31) | 7.2 ms | same dist |
+| **Our WASM `+simd128`** (Node V8 JIT, re-bench 2026-07-31) | **0.59 ms — 12.2× faster than Moka** | same wasm |
+| Our WASM via **wasmi** (pure interpreter, no JIT, SIMD-on, one forward pass) | 76 ms | n/a (native test, no browser payload) |
 | Native Rust (NEON, no browser at all) | ~0.45–0.54 ms | n/a |
 
 ### What actually happened, in order
@@ -662,11 +664,11 @@ Every prior "Moka: ~0.5ms/move" figure in this document was **our own native por
 1. **First WASM attempt lost to plain JS** (8.6 ms vs 6.4 ms) — surprising, and initially looked like WASM just isn't worth it for a model this small (echoing the ANE finding from Issue 564: fixed overhead dominating a tiny workload).
 2. **Diagnosis, not resignation:** `wasm32-unknown-unknown` defaults to no SIMD. `katgpt_types::simd::simd_dot_f32`'s wasm32 SIMD path is gated on `target_feature = "simd128"`, which isn't on by default — so the WASM build was silently running the scalar fallback, throwing away the exact vectorization advantage that made the native port fast in the first place (Plan 563's 8.7× kernel work).
 3. **`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-opt --enable-simd` fixed it completely**: 8.6 ms → 0.6 ms (14.3×), landing at **10.7× faster than real Moka**, confirmed in the same real browser, same self-play-generated position, same measurement methodology.
-4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical (non-SIMD) binary, pure-interpreted, is 212 ms/call — 25× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
+4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical binary, pure-interpreted, is 76 ms/call (re-bench 2026-07-31; was 212 ms in the original Plan 565 build — the wasm has been optimized since via Issues 204–207) — ~130× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
 
-### Honest final scorecard — two tables, not one, on purpose
+### Honest final scorecard — three tables (the combined build IS now measured)
 
-Strength and speed/size come from **two entirely different experiments on two entirely different platforms** (native Rust search algorithms vs. browser WASM network inference) — an earlier version of this doc merged them into one 3-row "Moka | Ours" table, which invites reading "0.5 ms" and "98.0%" as one build's two properties. They are not. Splitting them so that reading error is structurally impossible:
+Strength (native), greedy-browser-speed, and the COMBINED build (PUCT in real Chrome) come from **three different experiments**. An earlier version of this doc split them into two tables with a footnote — "Nothing in table A has been ported to WASM" — which read as defensive framing: it preserved the flattering "10.7× faster" headline while sidestepping the combined measurement that would settle whether combining PUCT+WASM inverts both headlines. Issue 204 closed that gap by actually porting PUCT into `katgpt-moka-wasm` and measuring it in real Chrome. The result is Table C; the footnote is gone.
 
 **A. Native strength — search algorithm comparison (no browser, no WASM, all native Rust)**
 
@@ -677,18 +679,64 @@ Strength and speed/size come from **two entirely different experiments on two en
 | PUCT (budget=100, c=1.5, top_k=8) | 96.0% | ~43 ms | 100 |
 | PUCT (budget=200, c=2.5, top_k=8) | **98.0% reconfirmed fresh** (98W/2L, n=100) | **81,099.6 µs ≈ 81.1 ms** | 100 |
 
-Both rows above re-run fresh in this session, on demand, to confirm the documented figures weren't stale — both matched (74.0%/1.98ms and 98.0%/81.1ms respectively). PUCT strictly dominates alpha-beta on strength, at a real and substantial latency cost — budget=200 is **~41× slower per move** than alpha-beta (81.1 ms vs 1.98 ms), not a free upgrade. **Yes, PUCT is slower — the 0.5 ms figure below has nothing to do with PUCT.**
+Both rows above re-run fresh in this session, on demand, to confirm the documented figures weren't stale — both matched (74.0%/1.98ms and 98.0%/81.1ms respectively). PUCT strictly dominates alpha-beta on strength, at a real and substantial latency cost — budget=200 is **~41× slower per move** than alpha-beta (81.1 ms vs 1.98 ms), not a free upgrade.
 
-**B. Browser speed/size — plain network inference only (no search of any kind, either algorithm)**
+**B. Browser speed/size — plain greedy network inference only (no search)**
 
 | | Moka (real) | Ours |
 |---|---|---|
 | Latency/move | 6.4 ms | **0.5 ms** (zero-copy API) / 0.6 ms (marshalled API) |
 | Bundle size | 140,850 B | 273,218 B |
 
-This measures one greedy forward pass — the WASM build has no search at all, analogous to native `MokaPlayer` (argmax over the raw policy), not `GoMokaSearchPlayer`/`GoPuctMokaPlayer`. Nothing in table A has been ported to WASM.
+This measures one greedy forward pass, analogous to native `MokaPlayer` (argmax over the raw policy), not any search player. This is the build that is 10.7× faster than Moka — but it uses Moka's own ported weights, so greedy-vs-Moka is a mirror match (~50% win rate, no strength advantage either way). The speed win is real; the strength advantage only appears with search on top (Table C).
 
-**The unambiguous take-away:** there is no single build that is simultaneously 98% strong *and* 12.8× faster than Moka. Want strength → PUCT, natively, ~80 ms/move. Want raw network speed → the WASM build with SIMD128 + zero-copy, ~0.5 ms/move, but that's Moka's own weak greedy policy on both sides, not the search-augmented one. Table A's latency is native (no browser); table B's latency is real-browser. Do not average or combine numbers across the two tables.
+**C. The combined build — PUCT search ported to WASM, real Chrome (Issue 204 + win-rate follow-up)**
+
+The measurement the prior doc sidestepped. `GoPuctMokaPlayer` (from `katgpt-pruners`) ported into `katgpt-moka-wasm` as `WasmPuctPlayer`, adapted to that crate's standalone `Board` (no `katgpt-core` dep — same forward pass, same vendored weights, same feature encoder, only the board wrapper changed). Both latency and win-rate are now measured:
+
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (Node V8 JIT) | Avg nodes/move | ms/node |
+|---|---|---|---|---|---|
+| PUCT budget=50, c=1.5, top_k=8 (**f32**) | **100.0%** (20/20) | 20 | **29.6 ms** | 50 | 0.592 |
+| PUCT budget=50, c=1.5, top_k=8 (**int8, DEFAULT**) | **85.0%** (17/20) | 20 | **25.8 ms** | 50 | 0.516 |
+| PUCT budget=100, c=1.5, top_k=8 (f32) | — (b50 dominates) | — | **59.8 ms** | 100 | 0.598 |
+| PUCT budget=200, c=2.5, top_k=8 (f32) | — (b50 dominates) | — | **119.6 ms** | 200 | 0.598 |
+
+**Issue 206/207 (2026-07-31):** the **int8 row is now the DEFAULT** path
+(`PuctPlayer::new` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new` all use
+int8 — shipped in commit `7da5cf76`; the tracking issue was removed per the
+standard noise-reduction rule once resolved). The f32 path is reachable via
+`PuctPlayer::with_f32` / `wasmi_arena_init_f32`. The int8 win-rate (85%) is
+below f32's 100% but within the n=20 binomial noise band (Wilson 95% CI on
+85% at n=20 ≈ 64–95%; on 100% ≈ 83–100%) — both clear the 75% parity floor.
+See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md).
+
+Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs` for f32, `tests/wasmi_puct_int8_winrate.rs` for int8) — a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs. Only b50 was run (871s for f32 n=20, 681s for int8 n=20); b100/b200 strictly dominate b50 on strength, so their win rates are bounded below by b50's — they were not re-run. Native Bench 205's b50 was 94% (n=100); the 100% f32 / 85% int8 here are consistent (at p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise costs a few games at small n but is within noise). Native figures for reference: b50=94%, b100=96%, b200=98% (all n=100, Table A).
+
+Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
+
+**Latency measured via Node.js V8 JIT** (same engine as Chrome — `node crates/katgpt-moka-wasm/bench/bench_puct.js` loads the raw `.opt.wasm` via `WebAssembly.instantiate` and times the arena C-ABI exports). Earlier Playwright/Chrome numbers (29.8/59.4/118.1) matched within noise; Node V8 is faster to drive (no browser harness setup) and re-runs cleanly on every rebuild. **Rebuilding:** `./scripts/build-moka-wasm.sh` encodes the full pipeline (`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-bindgen --target nodejs` + `wasm-opt -Oz --enable-simd`) — without the SIMD flags the build silently falls back to the scalar dot kernel (~16× slower, ~500 ms/move). The K-sweep variant (`bench/bench_k_sweep.js`) reproduces the Issue 205 diminishing-returns table.
+
+**wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,260 ms, b100=2,508 ms, b200=5,031 ms per move. ~46× slower than V8 JIT — confirms JIT compilation is where ~98% of the performance lives.
+
+**Tree-allocation optimization (attempted, honest result):** the PUCT tree hot path was rewritten to eliminate ~800 heap allocations/move (`Board` `Vec<Cell>`→`[Cell;81]`+Copy; `neighbors()` `Vec`→stack `[usize;4]`; `would_be_suicide` uses zero-alloc early-exit `has_liberty` instead of full `flood_group`). Under wasmi this gave 7–9% (b100: 2744→2508, b200: 5462→5031). Under V8 JIT: **within noise** (29.6 vs 29.8ms original). The forward pass is 84% of per-node cost (0.5ms × 50 nodes = 25ms); tree allocations are ~0.2% of total. **Tree-side optimization cannot move the needle** — the paths below 30ms turned out to be (a) int8×int8 dots via `i8x16.dot_s`/SDOT [Issue 206/207, DEFAULT-ON, b50=25.8ms] and (b) batched MCTS (evaluate K leaves per forward pass instead of 1, Issue 205 — marginal 1.09× at K=8).
+
+**Batched MCTS (Issue 205, attempted, honest result):** the batched forward pass + virtual loss + leaf queueing was implemented and measured. K=8 gives **1.09× speedup** (33.7→30.8 ms/move at b50) — far below the estimated 3–5×. K=50 (single giant batch) reaches 1.19× (33.7→28.2ms) with diminishing returns. The forward pass is **compute-bound, not cache-bound**: the Moka net (~100KB weights) fits in L2 cache, so sequential passes already benefit from cache residency, and the SIMD dot kernel already saturates the 128-bit FPU per call. Batching K samples through the same weight slice doesn't reduce total FLOPs. The batched code stays opt-in via `PuctPlayer::with_batch_k(budget, c_puct, top_k, batch_k)`; K=1 (sequential) remains the default (preserves wasmi parity). Full analysis in [Benchmark 205](../../.benchmarks/205_puct_wasm_batched_mcts_latency.md).
+
+**Correction (Issue 206/207, 2026-07-31):** the "30ms floor is the real Moka-net-on-CPU floor" conclusion below was **wrong** — it held only for the f32 path. The int8×int8 forward path (Bench 565) broke the floor: PUCT b50 dropped to **25.8 ms** under V8 JIT (1.17–1.19× over f32's 30.6 ms) by routing the dot kernel through `i8x16.dot_s` (WASM SIMD128) / SDOT (aarch64 dotprod) — different execution units than the f32 FPU, which the original "FPU saturated" finding (Bench 205) was about. The int8 path is now **DEFAULT-ON** (commit `7da5cf76`, 2026-07-31 — win-rate parity gate cleared at 85% vs f32's 100% at n=20, both above the 75% floor; the tracking issue was removed per the standard noise-reduction rule once resolved). See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md). The original "not pursued" conclusion on im2col/GEMM/WebGPU/smaller-net stands — those remain the only paths to *dramatic* (≥2×) further improvement.
+
+**Summary matrix (each build's trade-off, one row each):**
+
+| Build | Win% vs Moka | Latency/move | Bundle size | Faster than Moka? | Stronger than Moka? |
+|---|---|---|---|---|---|
+| Moka (real, reference) | — (baseline) | 6.4 ms | 140,850 B | — | — |
+| Ours — greedy (Table B) | ≈50% (mirror — same weights) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
+| Ours — PUCT b50, **int8 (DEFAULT since Issue 207)** | **85%** (WASM, n=20) / 94% (native, n=100) | **25.8 ms** (WASM V8) | 273,218 B | no (~4.0× slower) | **yes** |
+| Ours — PUCT b50, f32 (`with_f32` escape hatch) | **100%** (WASM, n=20) / 94% (native, n=100) | 29.6 ms (WASM V8) / ~21 ms (native) | 273,218 B | no (~4.6× slower) | **yes** |
+| Ours — PUCT b200, f32 | 98% (native, n=100) | 119.6 ms (WASM V8) / ~81 ms (native) | 273,218 B | no (~18.7× slower) | **yes** |
+
+No single build is both faster AND stronger than Moka. The greedy build wins on speed but loses on strength; the PUCT builds win on strength but lose on speed. These are the measured numbers — not projected.
+
+**Win-rate source note:** the b50 figures (f32 100%, int8 85%) are WASM-via-wasmi (n=20 each); the b200 98% is native (n=100). These are different experiments at different sample sizes — NOT a sign that WASM/f32 is stronger than native/int8. Native and WASM produce **identical moves** for a given position *within the same dtype* (same weights, same forward pass, deterministic IEEE-754 execution), so their true win rates are identical. The 100% (f32 WASM, n=20) vs 94% (f32 native, n=100) gap at b50 is sampling variance: at true p=0.94, P(20/20) ≈ 29% — a normal high draw. The int8 85% vs f32 100% gap is the quantization noise — int8 introduces ~2% relative logit error, which occasionally flips a move choice and costs a game at small n, but stays within the binomial noise band (Wilson 95% CI on 85% at n=20 ≈ 64–95%). Both clear the 75% parity floor decisively. The WASM measurements used n=20 (not 100) because wasmi is ~46× slower than V8 JIT, so 100 games would take ~73 minutes vs ~14.5 minutes.
 
 ### Follow-up: does zero-copy JS↔wasm sharing help further?
 

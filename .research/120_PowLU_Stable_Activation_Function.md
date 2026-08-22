@@ -90,3 +90,5 @@ m=3 is optimal. Sensitivity is low (±0.002 across m=2-4).
 - **katgpt-rs:** No plan needed. Research stored for reference.
 - **riir-ai:** No plan needed. If game LoRA training is added, consider PowLU as default activation.
 - **GOAT status:** Not applicable — training-only, no inference gain.
+
+> **PASS-Redirects (synthesis):** Glorot, Bordes & Bengio [ICML 2011, PMLR v15 "glorot11a" — "Deep Sparse Rectifier Neural Networks"] — origin of the claims this note leans on: ReLU's clean zeros (which power our default-on `sparse_mlp` path, R008) vs squashing activations' non-sparse outputs, and the ReLU-vs-sigmoid training-stability motivation. All training-dynamics content routes to riir-train per this note's existing precedent; inference-side ReLU + sparsity exploitation already ship.

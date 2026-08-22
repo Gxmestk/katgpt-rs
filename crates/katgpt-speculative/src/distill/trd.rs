@@ -325,9 +325,10 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
         let mut refined_tokens = Vec::with_capacity(raw_branch.len());
         // Copy the accepted prefix (before failure point), optionally pre-folded
         let cutoff = failure.token_idx.min(raw_branch.len());
-        let prefix = match self.config.enable_prefold {
-            true => prefold_prefix(&raw_branch[..cutoff]),
-            false => raw_branch[..cutoff].to_vec(),
+        let prefix = if self.config.enable_prefold {
+            prefold_prefix(&raw_branch[..cutoff])
+        } else {
+            raw_branch[..cutoff].to_vec()
         };
         refined_tokens.extend(prefix);
 
@@ -375,14 +376,11 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
             } else {
                 // Pruner rejects — try top-k from marginal
                 let fallback = find_valid_token(depth, marginal, &refined_tokens, self.pruner);
-                match fallback {
-                    Some(tok) => refined_tokens.push(tok),
-                    None => {
+                if let Some(tok) = fallback { refined_tokens.push(tok) } else {
                         // No valid continuation — refinement failed
                         success = false;
                         break;
                     }
-                }
             }
         }
 
@@ -946,9 +944,7 @@ mod tests {
 
         assert!(
             score_good > score_bad,
-            "Good branch should score higher: {} vs {}",
-            score_good,
-            score_bad
+            "Good branch should score higher: {score_good} vs {score_bad}"
         );
     }
 
@@ -1026,8 +1022,7 @@ mod tests {
         assert_eq!(pulls_1step, 1, "1-step arm should have been pulled once");
         assert!(
             (mean_1step - (-0.5f32)).abs() < 1e-6,
-            "Reward should be exactly -0.5, got {}",
-            mean_1step
+            "Reward should be exactly -0.5, got {mean_1step}"
         );
     }
 
@@ -1059,8 +1054,7 @@ mod tests {
         for &tok in &compacted {
             assert!(
                 prefix.contains(&tok),
-                "Compacted token {} must exist in original prefix",
-                tok
+                "Compacted token {tok} must exist in original prefix"
             );
         }
 
@@ -1077,8 +1071,7 @@ mod tests {
             let count_5 = compacted.iter().filter(|&&t| t == 5).count();
             assert!(
                 count_5 < 7,
-                "Redundant token 5 should be partially folded: {} remaining of 7",
-                count_5
+                "Redundant token 5 should be partially folded: {count_5} remaining of 7"
             );
         }
 

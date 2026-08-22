@@ -75,8 +75,8 @@ fn main() {
     // Segment 2 tokens = [8,9,10,11], segment 5 tokens = [20,21,22,23] for X4
     let query: Vec<u32> = vec![9, 10, 20, 21];
     let selected = select_segments_to_expand(&ctx, &query, 3);
-    println!("  Query tokens: {:?}", query);
-    println!("  Selected segment IDs: {:?}", selected);
+    println!("  Query tokens: {query:?}");
+    println!("  Selected segment IDs: {selected:?}");
     let hits_seg2 = selected.contains(&2);
     let hits_seg5 = selected.contains(&5);
     println!(
@@ -101,10 +101,7 @@ fn main() {
 
     // query_expand returns segment IDs relevant to the query
     let buf_selected = buf.query_expand(&query, 3);
-    println!(
-        "  query_expand({:?}, top_k=3) → segments {:?}",
-        query, buf_selected
-    );
+    println!("  query_expand({query:?}, top_k=3) → segments {buf_selected:?}");
     let buf_query_ok = buf_selected.contains(&2) && buf_selected.contains(&5);
     println!(
         "  Query hit segments 2 & 5: {}",

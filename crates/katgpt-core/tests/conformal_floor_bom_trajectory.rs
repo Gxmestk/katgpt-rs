@@ -240,11 +240,7 @@ fn small_amplitude_seasonal(n: usize, seed: u64) -> TrajectoryCorpus {
         let noise = rng.gaussian() * 0.05;
         values.push(0.8 * phase.sin() + noise);
     }
-    TrajectoryCorpus::from_slice(
-        format!("small_amp_seasonal_0p8sigma0p05_n{}", n),
-        &values,
-        48,
-    )
+    TrajectoryCorpus::from_slice(format!("small_amp_seasonal_0p8sigma0p05_n{n}"), &values, 48)
 }
 
 /// Small-σ white noise: `N(0, 0.3)`. Values roughly in [-0.9, 0.9] (3σ).
@@ -254,7 +250,7 @@ fn small_sigma_white_noise(n: usize, seed: u64) -> TrajectoryCorpus {
     for _ in 0..n {
         values.push(rng.gaussian() * 0.3);
     }
-    TrajectoryCorpus::from_slice(format!("white_noise_sigma0p3_n{}", n), &values, 64)
+    TrajectoryCorpus::from_slice(format!("white_noise_sigma0p3_n{n}"), &values, 64)
 }
 
 // ===== Tests =====
@@ -389,9 +385,8 @@ fn bom_trajectory_interval_width_is_constant_across_volatility_regimes() {
     let width_ratio = mean_high / mean_low.max(1e-9);
     assert!(
         (0.5..=2.0).contains(&width_ratio),
-        "BoM trajectory width ratio {:.3} should be ~1.0 (σ-controlled); \
-         if data-driven like the floor, it would be ~15×",
-        width_ratio
+        "BoM trajectory width ratio {width_ratio:.3} should be ~1.0 (σ-controlled); \
+         if data-driven like the floor, it would be ~15×"
     );
 }
 
@@ -414,7 +409,7 @@ fn bom_trajectory_sigma_sweep_changes_width_but_not_quality() {
             &corpus.values,
             0.05,
             corpus.recommended_warmup,
-            &format!("seasonal_sigma_{}", sigma),
+            &format!("seasonal_sigma_{sigma}"),
         );
         eprintln!(
             "σ={:.2}: crps_ratio={:.4}, coverage={:.4}, verdict={:?}",
@@ -427,8 +422,7 @@ fn bom_trajectory_sigma_sweep_changes_width_but_not_quality() {
     for (sigma, report) in &reports {
         assert!(
             !report.primitive_wins(),
-            "σ={}: BoM trajectory must not be declared a UQ win",
-            sigma
+            "σ={sigma}: BoM trajectory must not be declared a UQ win"
         );
     }
 }

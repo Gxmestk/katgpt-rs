@@ -1025,9 +1025,7 @@ mod tests {
         let dim_count_after = builder.dim_count();
         assert!(
             dim_count_after > dim_count_before + 100,
-            "expected significant dimension growth, got {} -> {}",
-            dim_count_before,
-            dim_count_after
+            "expected significant dimension growth, got {dim_count_before} -> {dim_count_after}"
         );
     }
 

@@ -468,8 +468,7 @@ impl OpusRedundantEnv {
             .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i);
         let optimal_reward = means[optimal_arm];
 
         Self {

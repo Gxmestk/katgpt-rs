@@ -127,13 +127,11 @@ fn g2_synthetic_broadcast_dual_preserves_more_than_uniform() {
     // scale O by σ(gate_scale) ≈ 0.88, destroying the rank-1 broadcast.
     assert!(
         (cos_dual - 1.0).abs() < 1e-5,
-        "DualPolicy should preserve Broadcast output unchanged, cosine={}",
-        cos_dual
+        "DualPolicy should preserve Broadcast output unchanged, cosine={cos_dual}"
     );
     assert!(
         (cos_uniform - 1.0).abs() < 1e-5,
-        "Uniform should also preserve output unchanged (copy semantics), cosine={}",
-        cos_uniform
+        "Uniform should also preserve output unchanged (copy semantics), cosine={cos_uniform}"
     );
 
     // Magnitude check: both should equal O.
@@ -142,15 +140,11 @@ fn g2_synthetic_broadcast_dual_preserves_more_than_uniform() {
     let mag_dual: f32 = out_dual.iter().flatten().map(|x| x.abs()).sum();
     assert!(
         (mag_uniform - mag_o).abs() / mag_o < 1e-5,
-        "Uniform should copy O unchanged for Broadcast head: uniform={} vs o={}",
-        mag_uniform,
-        mag_o
+        "Uniform should copy O unchanged for Broadcast head: uniform={mag_uniform} vs o={mag_o}"
     );
     assert!(
         (mag_dual - mag_o).abs() / mag_o < 1e-5,
-        "DualPolicy should preserve Broadcast output magnitude: dual={} vs o={}",
-        mag_dual,
-        mag_o
+        "DualPolicy should preserve Broadcast output magnitude: dual={mag_dual} vs o={mag_o}"
     );
 
     // Counterfactual sanity: an AlwaysGate policy (what the paper warns about)
@@ -159,8 +153,7 @@ fn g2_synthetic_broadcast_dual_preserves_more_than_uniform() {
     let would_be_gate = 1.0 / (1.0 + (-gate_scale).exp());
     assert!(
         would_be_gate < 0.89 && would_be_gate > 0.87,
-        "σ(2.0) should be ≈0.881, got {}",
-        would_be_gate
+        "σ(2.0) should be ≈0.881, got {would_be_gate}"
     );
     // That gate × mag_o is what an AlwaysGate policy would produce.
     // DualPolicy's mag_dual is strictly larger than AlwaysGate's would-be mag.
@@ -237,15 +230,11 @@ fn g2_synthetic_nop_dual_gates_uniform_does_not() {
     // Uniform: copies O unchanged.
     assert!(
         (mag_uniform - mag_o).abs() / mag_o < 1e-5,
-        "Uniform should copy O unchanged for NOP head: uniform={} vs o={}",
-        mag_uniform,
-        mag_o
+        "Uniform should copy O unchanged for NOP head: uniform={mag_uniform} vs o={mag_o}"
     );
     // Dual: gates → smaller magnitude.
     assert!(
         mag_dual < mag_o * 0.99,
-        "DualPolicy should suppress NOP head output magnitude: dual={} vs o={}",
-        mag_dual,
-        mag_o
+        "DualPolicy should suppress NOP head output magnitude: dual={mag_dual} vs o={mag_o}"
     );
 }

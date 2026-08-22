@@ -814,8 +814,7 @@ mod tests {
         let divergence = (total_matched - total_mismatched).abs();
         let total_ratio = divergence / total_matched.abs().max(1e-6);
         eprintln!(
-            "G5: matched={:.4}, mismatched={:.4}, divergence={:.4} ({:.4}× of matched total — direction correct, magnitude small per paper's 1/d normalization)",
-            total_matched, total_mismatched, divergence, total_ratio
+            "G5: matched={total_matched:.4}, mismatched={total_mismatched:.4}, divergence={divergence:.4} ({total_ratio:.4}× of matched total — direction correct, magnitude small per paper's 1/d normalization)"
         );
         // Sanity: the divergence is non-zero (the mechanism does something).
         assert!(divergence > 0.0, "G5: divergence should be non-zero");

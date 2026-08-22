@@ -296,10 +296,7 @@ fn main() {
         let p50 = percentile(&samples, 0.50);
         let p99 = percentile(&samples, 0.99);
         let mx = *samples.last().unwrap_or(&0);
-        println!(
-            "dual-pool {label:<24} {:>8.1} {:>8} {:>8} {:>8}",
-            mean, p50, p99, mx
-        );
+        println!("dual-pool {label:<24} {mean:>8.1} {p50:>8} {p99:>8} {mx:>8}");
     }
 
     // Single-pool + detector (reactive).
@@ -327,8 +324,7 @@ fn main() {
         "single-pool, no detector", "∞", "∞", "∞", "∞"
     );
     println!(
-        "  └─ {} of {} trials never escaped (permanent trap — the failure mode)",
-        never_escaped, n_trials
+        "  └─ {never_escaped} of {n_trials} trials never escaped (permanent trap — the failure mode)"
     );
 
     // ── Part 2: per-cycle routing overhead ─────────────────────────────

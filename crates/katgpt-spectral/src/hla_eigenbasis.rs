@@ -107,6 +107,27 @@ impl EigenbasisScratch {
             self.cached_d = d;
         }
     }
+
+    /// Lend out the internal `(gram, v, w)` scratch buffers for the whitening
+    /// Gram-build + power-iteration step. Used by `ica_lens::whiten_into`
+    /// (Plan 475) to reuse the same workspace without re-allocating.
+    ///
+    /// The callback receives `(gram: &mut [f32], v: &mut [f32], w: &mut [f32])`
+    /// already sized to `d * d`, `d`, `d` respectively. The buffers are
+    /// mutated in place; callers should zero `gram` before accumulating
+    /// (see `recover_eigenbasis_inner` for the same pattern).
+    pub fn with_gram_buffers<R>(
+        &mut self,
+        d: usize,
+        f: impl FnOnce(&mut [f32], &mut [f32], &mut [f32]) -> R,
+    ) -> R {
+        self.ensure_capacity_d(d);
+        f(
+            &mut self.gram[..d * d],
+            &mut self.v[..d],
+            &mut self.w[..d],
+        )
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -209,8 +230,7 @@ impl EigenbasisTracker {
         let d = self.d;
         assert!(
             d <= 16,
-            "push_tick: D={} > 16 stack buffer; widen new_buf/old_buf",
-            d
+            "push_tick: D={d} > 16 stack buffer; widen new_buf/old_buf"
         );
 
         if self.is_full() {
@@ -262,9 +282,7 @@ impl EigenbasisTracker {
         let d = self.d;
         assert!(
             k >= 1 && k <= d,
-            "recover: k must be in [1, D]=[1, {}], got {}",
-            d,
-            k
+            "recover: k must be in [1, D]=[1, {d}], got {k}"
         );
         assert_eq!(
             out_eigvecs.len(),
@@ -480,9 +498,7 @@ fn recover_eigenbasis_inner(
 ) -> EigenbasisProvenance {
     assert!(
         t_dim > 0 && d_dim > 0,
-        "recover_eigenbasis_from_window: t_dim and d_dim must be positive, got T={}, D={}",
-        t_dim,
-        d_dim
+        "recover_eigenbasis_from_window: t_dim and d_dim must be positive, got T={t_dim}, D={d_dim}"
     );
     assert_eq!(
         window.len(),
@@ -495,9 +511,7 @@ fn recover_eigenbasis_inner(
     );
     assert!(
         k >= 1 && k <= d_dim,
-        "recover_eigenbasis_from_window: k must be in [1, D]=[1, {}], got {}",
-        d_dim,
-        k
+        "recover_eigenbasis_from_window: k must be in [1, D]=[1, {d_dim}], got {k}"
     );
     assert_eq!(
         out_eigvecs.len(),
@@ -726,14 +740,13 @@ mod tests {
         for i in 1..k {
             assert!(
                 eigvals[i - 1] >= eigvals[i],
-                "eigvals not descending: {:?}",
-                eigvals
+                "eigvals not descending: {eigvals:?}"
             );
         }
         // Top-3 eigenvalues should carry ~all the energy (noise floor is ~1%).
         let total = window_total_energy(&window, t, d);
         let ratio = energy_ratio(&eigvals, total);
-        assert!(ratio > 0.9, "G3 energy ratio {} too low", ratio);
+        assert!(ratio > 0.9, "G3 energy ratio {ratio} too low");
 
         // Eigenvectors unit-norm.
         for col in 0..k {
@@ -744,9 +757,7 @@ mod tests {
             }
             assert!(
                 (nrm_sq - 1.0).abs() < 1e-3,
-                "col {} not unit norm: {}",
-                col,
-                nrm_sq
+                "col {col} not unit norm: {nrm_sq}"
             );
         }
 
@@ -764,8 +775,7 @@ mod tests {
             }
             assert_eq!(
                 best, col,
-                "col {} peak at row {} (expected {})",
-                col, best, col
+                "col {col} peak at row {best} (expected {col})"
             );
         }
     }
@@ -809,7 +819,7 @@ mod tests {
         }
         let cos = dot / (na.sqrt() * nb.sqrt());
         // Should be well below 0.7 (the G4 budget) — directions are orthogonal.
-        assert!(cos.abs() < 0.5, "G4 cos too high: {} (expected <0.5)", cos);
+        assert!(cos.abs() < 0.5, "G4 cos too high: {cos} (expected <0.5)");
     }
 
     #[test]
@@ -833,10 +843,10 @@ mod tests {
 
         // Deterministic: same input → same output bit-for-bit.
         for i in 0..e1.len() {
-            assert_eq!(e1[i], e2[i], "non-deterministic eigvec at {}", i);
+            assert_eq!(e1[i], e2[i], "non-deterministic eigvec at {i}");
         }
         for i in 0..l1.len() {
-            assert_eq!(l1[i], l2[i], "non-deterministic eigval at {}", i);
+            assert_eq!(l1[i], l2[i], "non-deterministic eigval at {i}");
         }
     }
 
@@ -862,16 +872,14 @@ mod tests {
             assert_eq!(
                 a[i].to_bits(),
                 b[i].to_bits(),
-                "eigvec bit mismatch at {}",
-                i
+                "eigvec bit mismatch at {i}"
             );
         }
         for i in 0..la.len() {
             assert_eq!(
                 la[i].to_bits(),
                 lb[i].to_bits(),
-                "eigval bit mismatch at {}",
-                i
+                "eigval bit mismatch at {i}"
             );
         }
     }
@@ -903,8 +911,7 @@ mod tests {
         for i in 1..d {
             assert!(
                 l[i - 1] >= l[i] - tie_band,
-                "k=D eigvals not descending (outside tie band): {:?}",
-                l
+                "k=D eigvals not descending (outside tie band): {l:?}"
             );
         }
     }
@@ -1011,7 +1018,7 @@ mod tests {
             nt += ev_t[row * k] * ev_t[row * k];
         }
         let cos = (dot / (ns.sqrt() * nt.sqrt())).abs();
-        assert!(cos > 0.95, "tracker top-1 direction cos {} < 0.95", cos);
+        assert!(cos > 0.95, "tracker top-1 direction cos {cos} < 0.95");
     }
 
     #[test]

@@ -257,7 +257,7 @@ fn compute_covariance_eigenvalues(data: &[Vec<f32>], dim: usize) -> Vec<f32> {
     }
 
     // Power iteration for top eigenvalues (extract up to dim eigenvalues)
-    let mut eigenvalues = Vec::new();
+    let mut eigenvalues = Vec::with_capacity(dim);
     let mut remaining_cov = cov.clone();
 
     for _ in 0..dim {
@@ -1062,18 +1062,9 @@ fn test_final_verdict_summary() {
 
     println!("║                                                            ║");
     println!("║  Config: avg_bits_k=4, avg_bits_v=2, head_dim={head_dim}          ║");
-    println!(
-        "║  K cosine similarity:    {:.4}  (target ≥ 0.995)           ║",
-        cos_k
-    );
-    println!(
-        "║  V cosine similarity:    {:.4}  (target ≥ 0.980)           ║",
-        cos_v
-    );
-    println!(
-        "║  Compression ratio:      {:.1}×  (target ≥ 8×)            ║",
-        compression
-    );
+    println!("║  K cosine similarity:    {cos_k:.4}  (target ≥ 0.995)           ║");
+    println!("║  V cosine similarity:    {cos_v:.4}  (target ≥ 0.980)           ║");
+    println!("║  Compression ratio:      {compression:.1}×  (target ≥ 8×)            ║");
     println!("║                                                            ║");
 
     let k_pass = cos_k >= 0.995;

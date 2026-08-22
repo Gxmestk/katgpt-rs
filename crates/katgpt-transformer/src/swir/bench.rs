@@ -382,7 +382,7 @@ pub fn run_benchmark(
             }
 
             // Accumulate answer tokens (simplified — real host would detokenize).
-            answer_tokens.push_str(&format!(" {}", argmax));
+            answer_tokens.push_str(&format!(" {argmax}"));
         }
 
         let elapsed = start.elapsed();

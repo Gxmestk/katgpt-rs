@@ -424,9 +424,7 @@ mod tests {
                 assert_eq!(
                     out_batched[i * D + d].to_bits(),
                     out_seq[d].to_bits(),
-                    "batched output bit-mismatch at NPC {} dim {}",
-                    i,
-                    d,
+                    "batched output bit-mismatch at NPC {i} dim {d}",
                 );
             }
         }
@@ -453,7 +451,7 @@ mod tests {
         let mut out_seq = vec![0.0f32; N * D];
         for (i, f) in singles.iter_mut().enumerate() {
             let ok = f.forecast_into(&seeds[i], &mut out_seq[i * D..(i + 1) * D]);
-            assert!(ok, "single forecast_into returned false for NPC {}", i);
+            assert!(ok, "single forecast_into returned false for NPC {i}");
         }
 
         // Build the batched forecaster: clone each Wout + share the basis.
@@ -479,9 +477,7 @@ mod tests {
                 assert_eq!(
                     out_batched[i * D + d].to_bits(),
                     out_seq[i * D + d].to_bits(),
-                    "batched vs single bit-mismatch at NPC {} dim {}",
-                    i,
-                    d,
+                    "batched vs single bit-mismatch at NPC {i} dim {d}",
                 );
             }
         }
@@ -512,9 +508,7 @@ mod tests {
                 assert_eq!(
                     out[unfitted_idx * D + d],
                     0.0,
-                    "unfitted NPC {} dim {} should be zero",
-                    unfitted_idx,
-                    d,
+                    "unfitted NPC {unfitted_idx} dim {d} should be zero",
                 );
             }
         }
@@ -547,8 +541,7 @@ mod tests {
             assert_eq!(
                 out_batched[d].to_bits(),
                 out_single[d].to_bits(),
-                "N=1 case bit-mismatch at dim {}",
-                d,
+                "N=1 case bit-mismatch at dim {d}",
             );
         }
     }

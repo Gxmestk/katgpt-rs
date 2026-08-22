@@ -597,7 +597,7 @@ mod tests {
         mask.set(1, 20);
         mask.set_recovery_score(0.75);
 
-        let s = format!("{}", mask);
+        let s = format!("{mask}");
         assert!(s.contains("python"));
         assert!(s.contains("0.75"));
     }
