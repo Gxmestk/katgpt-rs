@@ -1,7 +1,7 @@
 # Issue 683 — `MultiLayerKVCache` has no model-agnostic all-sliding constructor
 
 **Filed:** 2026-08-23
-**Status:** OPEN
+**Status:** OPEN — ⚠ reframed 2026-08-24: the cache is UNWIRED (doc-only write contract) and has a working plain-modulo twin in riir-ai; adjudicate the convention (T0) before adding the constructor (T1)
 **Owner repo:** katgpt-rs (modelless inference primitive — correct home)
 **Consumer blocked:** riir-train [Plan 343](https://github.com/gist-rs/riir-train) T1.6 (Maglev drafter G4 cache invariant)
 
@@ -44,6 +44,64 @@ gate is precisely "drafter KV cache == W per layer, zero growth across a run
 ≫ W tokens", i.e. an assertion over `sliding_capacity(layer_idx)`. Without this
 constructor the likely outcome is a **parallel ring-buffer implementation in
 riir-train**, which is the exact drift the substrate-first rule exists to stop.
+
+## ⚠ CORRECTION (2026-08-24, same session) — the cache is UNWIRED, and it has a twin
+
+Deeper grep after filing. Two findings that change this issue's framing, and the
+first one invalidates part of my own reasoning above:
+
+**1. `MultiLayerKVCache`'s sliding path has no implementation and no consumer.**
+`sliding_capacity` has **zero** references outside `kv_cache.rs` anywhere in the
+workspace, and `new_gemma4_sliding_bounded` is called **only by `kv_cache.rs`'s
+own unit tests** (lines 747 / 789 / 881). The mirrored-write contract —
+*"the forward code writes K/V at `pos % capacity` AND mirrors to
+`pos % capacity + capacity`"* — exists **only as a doc comment**. No forward path
+in any of the 15 repos does that write. So the design's sole advantage (windows
+always contiguous ⇒ zero wrap-around handling in attention) is **unrealized**,
+and the 2× memory is currently paid for nothing.
+
+This is a doc-lie of the same class the substrate-first rule warns about, and it
+is worse than a missing feature: a doc comment asserting what "the forward code"
+does invites a consumer to trust an unimplemented contract. It is exactly what I
+did one message earlier in riir-train Plan 343 T1.6 ("CONSUME, do NOT build") —
+recorded there as a correction.
+
+**2. A working twin ships in riir-ai.**
+`riir-ai/crates/riir-gpu/src/gemma4_cubecl/kv_cache.rs::Gemma4CpuKVCache` has its
+own `sliding_capacity: Vec<usize>` and a **real** `store()` that ring-writes at
+`pos % sliding_capacity` with capacity `sw * stride` — **plain modulo, not
+mirrored, 1× memory** — and it is exported (`pub use kv_cache::Gemma4CpuKVCache`)
+and consumed.
+
+| | katgpt-rs `MultiLayerKVCache` | riir-ai `Gemma4CpuKVCache` |
+|---|---|---|
+| allocation | mirrored `2·W·kvd` | plain `W·stride` |
+| write | doc'd only, **unimplemented** | real `store()`, `pos % W` |
+| consumers | its own unit tests | exported + used |
+
+So the two repos disagree on the ring convention, and the *working* one is the
+plain-modulo one in the downstream repo — while the upstream primitive repo holds
+the unwired 2× design. That is the parallel-system drift this repo's rules exist
+to catch, and it should be resolved before a new constructor is bolted onto
+either side.
+
+## Revised task ordering
+
+T1 (the constructor) is no longer the first thing to do — adding an API to an
+unwired cache is low value and would deepen the duplication. Decide the
+convention first:
+
+- [ ] **T0 (NEW, blocking) — adjudicate the duplication.** Either (a) implement
+      the mirrored write in a katgpt-rs forward path and make riir-ai's Gemma-4
+      GPU cache consume the upstream primitive, or (b) accept plain-modulo as the
+      house convention, delete the unrealized 2× mirroring from
+      `MultiLayerKVCache`, and fix the doc. **(b) is cheaper and matches the only
+      code that actually runs**; (a) is only worth it if the contiguous-read
+      saving in attention is measured, which it never has been.
+- [ ] **T0b (NEW, cheap, do regardless) — fix the doc-lie now.** Reword the
+      `sliding_capacity` comment from "the forward code writes…" to an explicit
+      *"contract not yet implemented by any forward path; see Issue 683"*, so no
+      future consumer trusts it. This is the highest value-per-byte item here.
 
 ## Proposed shape
 
