@@ -85,6 +85,46 @@ the unwired 2× design. That is the parallel-system drift this repo's rules exis
 to catch, and it should be resolved before a new constructor is bolted onto
 either side.
 
+## Second consumer found, and it sharpens T0 (2026-08-24)
+
+riir-train Plan 343 **T1.6** needs exactly this: "drafter KV cache == W per layer,
+asserted across a run ≫ W tokens (zero cache growth)", for an **SSSS** drafter
+(every layer sliding, `W = 512` — the uniform case). Walking it produced the
+concrete comparison this issue was missing:
+
+| | katgpt-rs `MultiLayerKVCache` | riir-ai `Gemma4CpuKVCache` |
+|---|---|---|
+| ring write | **doc comment only, unimplemented** | real `store()`, `pos % sw` |
+| read side | none | `get_combined_kv_window()` |
+| allocation | mirrored `2·W·kvd` | plain `W·stride` |
+| constructor | `new_gemma4_sliding_bounded` (pattern mask) | `new(n_layer, kv_stride, sliding_capacity)` — **fully generic** |
+| gating | none | **`#[cfg(feature = "gemma4_gpu")]`** |
+| home | upstream primitive crate | a **GPU** module |
+
+**The irony is the point:** the downstream, Gemma-4-*named* type is the generic
+one — `new(n_layer, kv_stride, sliding_capacity)` takes per-layer vectors, so
+uniform arguments give precisely the windowed ring an SSSS drafter wants, and it
+already has both a write and a read path. The upstream, generically-*named* type
+is the one that is model-shaped (a pattern mask) **and** unimplemented.
+
+**Why a consumer still cannot just use it:** `gemma4_cubecl` is behind
+`gemma4_gpu`, so consuming a **pure-CPU** ring cache would mean a CPU-only
+training crate enabling an unrelated **GPU** feature tree. That is a
+worse-than-cosmetic coupling, and it is what currently blocks Plan 343 T1.6 from
+simply consuming the working code.
+
+**So T0's answer is now evidenced rather than a preference:** adopt **plain
+modulo** as the house convention (it is what the only working implementation
+does), and give it a home that a CPU consumer can reach — either
+(a) implement the write/read here in `katgpt-transformer` and delete the
+unrealized 2× mirroring, or (b) relocate the riir-ai ring to an ungated,
+non-GPU-named module (riir-gpu's `speculative_decode` is a plausible home, since
+a bounded-window KV cache is speculative-decode substrate).
+
+**What must NOT happen:** a third implementation inside riir-train. Plan 343 T1.6
+is explicitly held rather than unblocked that way — two ring caches with
+different conventions are already one too many, and the drafter would make three.
+
 ## Revised task ordering
 
 T1 (the constructor) is no longer the first thing to do — adding an API to an
