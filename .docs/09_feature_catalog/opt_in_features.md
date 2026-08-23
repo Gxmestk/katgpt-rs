@@ -2862,3 +2862,56 @@ prediction-quality claim owes the conformal floor per Issue 010), and no
 framing novelty — Research 497 §3 scored Q1 NO (De Marzo arXiv:2605.10721 /
 De Nobili arXiv:2608.02178 published the "stat-mech predicts LLM crowds"
 headline first). Gain, not Super-GOAT.
+
+**`verdict_margin` (Plan 545 T1, 2026-08-23).** The one-snapshot
+crowd-manipulability forecast derived from this substrate: the
+CLR-reliability-weighted verdict margin over binary verdictification — how
+close the crowd's weighted verdict sits to its decision boundary. Measured on
+N=200 signed ring crowds: ρ(margin₀, verdict-flip-frac) = **−0.65** (paper
+LLM −0.59; riir-ai Issue 745 / Research 499) — firm crowds flip less under
+equal pressure, *but only through the gate's budget allocation* (ungated
+uniform pressure flips firm crowds MORE — they have more majority agents to
+lose; the negative forecast correlation exists only through conviction-gated
+spending). Ships in the same module (`signed_coupling::verdict_margin`);
+consumed by riir-games `social_pressure` (riir-ai Plan 545 — the
+conviction-gated broadcast runner, G8 gated-spares-firm-crowds).
+
+## 86. gaussianity_probe — sketched projection-normality for embedding populations (Issue 681)
+
+Cramér–Wold sketch for d-dimensional embedding populations (Research 498 —
+LeVLJEPA arXiv:2607.00784 SIGReg, distilled from training loss to an
+inference-time diagnostic). Second-moment metrics (erank, spectral_flatness)
+cannot see distribution *shape*; this probe can.
+
+- **16 fixed directions** — 4 coordinate-axis anchors (`e_0..e_3`, the honest
+  fix for axis-aligned bimodality: a purely random sketch dilutes it by
+  |cos| ≈ 1/√d) + 12 BLAKE3-derived Rademacher ±1 rows (seedable, exact in f32)
+- **Per direction** — KS-vs-fitted-Gaussian D statistic, a verbatim port of
+  `katgpt_spectral::ks_d_statistic` (the leaf constraint forbids the dep; the
+  port is pinned bit-identical by `katgpt-spectral/tests/gaussianity_agreement.rs`)
+- **Aggregate** — `score = sigmoid(ln(p_min / 0.01))` over the n-aware
+  Kolmogorov min-p (KS critical ∝ 1/√n); per-direction statistic public as
+  `ks_d_vs_fitted_gaussian`
+- **Zero-alloc** after `GaussianityScratch::new` (G4: 0 allocs / 100 calls)
+
+### GOAT (Bench 673)
+
+G1–G5 + cross-crate agreement **ALL PASS**, stays **opt-in** per the issue's
+own T5 (promotion is a consumer decision). The load-bearing row is the
+non-redundancy pin: on a bimodal e_0 μ=3σ fixture the probe scores **2.4e-23**
+while `effective_rank` reads **53.3/64 = 83.3% "healthy"** — the blind spot
+pinned. G2: probe **4.20× faster** than `effective_rank` (697.7 µs vs
+2928.0 µs at n=1024 d=64 — erank pays the O(d³) Jacobi sweep). G5: 3 runs
+bit-identical.
+
+**Honest scope (module docs):** a non-axis-aligned moderate (μ ≲ 3σ) bimodal
+departure in high d is missed by all 16 directions — the sketch is the cheap
+always-on audit; `ica_lens` (katgpt-spectral, FastICA) is the optimizing
+locator a consumer runs when it trips. CLT smoothing hides per-coordinate
+idiosyncrasy for d ≳ 32; margin-wide departures (mixtures across samples,
+radial heavy tails) are caught at any d.
+
+**Waiting consumers:** band_conditioner Fisher-z precondition guard, riir-ai
+#743 edge_lora hidden-space monitor, riir-neuron-db freeze-gate advisory
+(`FreezeGateReport` additive field — the bimodal-two-styles-before-freeze
+case).

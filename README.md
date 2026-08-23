@@ -3167,6 +3167,35 @@ Opt-in — promotion waits on a production consumer (the CLR precedent).
 `σ(h_i)` is a dynamics rule, not a calibrated forecaster: no prediction-quality
 claim is made, and any future one owes the conformal floor.
 
+**`verdict_margin` (Plan 545 T1, 2026-08-23)** — the one-snapshot
+crowd-manipulability forecast on this substrate: the CLR-reliability-weighted
+verdict margin over binary verdictification (how close the crowd's weighted
+verdict sits to its decision boundary). Measured on N=200 signed ring crowds:
+ρ(margin₀, verdict-flip-frac) = **−0.65** (paper LLM −0.59; riir-ai Issue 745 /
+[Research 499](.research/499_Jagged_Judges_Epistemic_Stability.md)) — firm
+crowds flip less under equal pressure, *but only through the gate's budget
+allocation* (ungated uniform pressure flips firm crowds MORE — they have more
+majority agents to lose). Reachable as `signed_coupling::verdict_margin`;
+consumed by riir-games `social_pressure` (riir-ai Plan 545).
+
+### 🔍 gaussianity_probe — Projection-Normality for Embedding Populations (Issue 681, arXiv:2607.00784)
+
+Second-moment metrics (erank, spectral_flatness) cannot see distribution
+*shape*. The Cramér–Wold sketch projects an n×d embedding population onto
+**16 fixed directions** (4 coordinate-axis anchors + 12 BLAKE3-derived
+Rademacher rows), runs KS-vs-fitted-Gaussian per direction, and aggregates
+with a sigmoid over the n-aware Kolmogorov min-p. On a bimodal μ=3σ fixture
+the probe scores **2.4e-23** while `effective_rank` reads **83% "healthy"** —
+the blind spot pinned. **4.2× faster than erank** (697.7 µs vs 2928.0 µs at
+n=1024 d=64); zero-alloc after `GaussianityScratch::new`; 3 runs
+bit-identical.
+
+**GOAT G1–G5 + cross-crate agreement ALL PASS**
+([Bench 673](.benchmarks/673_sketched_gaussianity_goat.md)) — stays opt-in
+(promotion is a consumer decision); waiting consumers: band_conditioner
+Fisher-z guard, riir-ai #743 edge_lora monitor, riir-neuron-db freeze-gate
+advisory.
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional
