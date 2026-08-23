@@ -103,7 +103,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 postcard = { version = "1", features = ["alloc"] }
 bevy_ecs = { version = "0.15", optional = true }  # Standalone ECS (Plan 033)
-wasmi = { version = "1.0", optional = true }       # WASM bomber validator (Plan 034, wasmi migration Plan 167)
+wasmi = { version = "1.0", optional = true, features = ["simd"] }  # WASM bomber validator (Plan 034, wasmi migration Plan 167). `simd`: hosts load +simd128-built modules
 papaya = { version = "0.2", optional = true }      # Lock-free concurrent HashMap (Plan 037)
 # katgpt-tokenizer (Issue 014): extracted to standalone crate. Non-optional — the
 # BPE substrate is always compiled, matching pre-extraction `pub mod tokenizer`

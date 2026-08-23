@@ -42,3 +42,21 @@ Everything downstream is a consumer, never a dependency:
 ## Drift ledger (target vs actual)
 
 None. (Clean at last guard run.)
+
+## WASM / wasmi compatibility contract (audited 2026-08-23)
+
+- Targets: `wasm32-unknown-unknown` (browser + CF Worker via wasm-bindgen) and
+  `wasm32-wasip2` (wasmtime-run benches). Both verified clean via
+  `cargo check -p katgpt-core --target <t>` with `+simd128` (2026-08-23).
+- **simd128 rule (the Issue 205 lesson)**: every wasm build that runs perf
+  kernels MUST pass `-C target-feature=+simd128` — without it the SIMD paths
+  silently compile the scalar fallback (~16× slower; encoded in
+  `scripts/build-moka-wasm.sh`) — and `wasm-opt --enable-simd` at the
+  optimize step (without it SIMD ops are stripped).
+- `getrandom` wasm backends (0.2 `js` + 0.3 `wasm_js`) stay pinned at
+  workspace level — transitive bevy/uuid consumers break without them.
+- **wasmi hosts carry `features = ["simd"]`** so they load modules built
+  under any sibling workspace's `+simd128` rustflag. One version-aligned
+  wasmi 1.x in every tree ("one wasmi" rule).
+- Footgun: env `RUSTFLAGS` REPLACES `.cargo/config.toml` rustflags (they do
+  not merge) — include every needed flag when overriding.
