@@ -914,11 +914,12 @@ mod go_analytics_tests {
 
     // ════════════════════════════════════════════════════════════════
     // 17. T14 Natsukaze-style validation (simulated)
-    // ════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════
     //
-    // Full Natsukaze validation requires riir-gpu's load_flat_zip() which
-    // lives in riir-ai. This test simulates the Natsukaze data shape
-    // (strong AI play with realistic move patterns) to validate the pipeline.
+    // Full Natsukaze validation requires load_flat_zip() which lives in
+    // riir-train-engine (moved from riir-gpu by Issue 741 TAIL P4). This
+    // test simulates the Natsukaze data shape (strong AI play with
+    // realistic move patterns) to validate the pipeline.
 
     #[test]
     fn test_natsukaze_style_pipeline() {
