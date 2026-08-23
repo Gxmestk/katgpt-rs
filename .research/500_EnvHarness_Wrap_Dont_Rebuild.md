@@ -4,7 +4,7 @@
 > **Code:** https://github.com/google-research/envharness (Apache-2.0, Python; Setup/Rule/Link + designer loop + GRPO via verl-agent)
 > **Date:** 2026-08-22
 > **Verdict:** Gain — the architectural COMPLEMENT to Research 496 (SPADE). Not Super-GOAT: Q1 fails (the wrapper-over-frozen-env axis is established prior art — Gymnasium JMLR 2024, ACCEL ICML 2022, ALP-GMM JMLR 2020).
-> **Status:** DISTILLED — pending owner decision
+> **Status:** RECORD — P1 fold DECIDED (YES — owner-delegated perf+sec call, 2026-08-23) + executed: Guide 340 §"Wrapper composition" (c11875ded) + Plan 576 folded (this commit). P0 → riir-train Plan 348 Item A; P2 rides PoC 677.
 > **Label-anchoring hazard (avoided, same class as 496):** "Agent Learning" + GRPO vocabulary routes wholesale to riir-train. The adversarial panel (both advocates, this session) shows the load-bearing deltas are interface algebra + closed-form statistics + one sampling policy. Only the recipe shell is frontier-scale.
 
 ## TL;DR
