@@ -4,7 +4,7 @@
 > **Code/weights:** deltatok.github.io
 > **Date:** 2026-06-16
 > **Status:** Done
-> **Related Research:** 192 (NextLat belief residual = delta encoding), 215 (ECHO env prediction), 242 (MicroRecurrentBeliefState — `evolve_hla` prior-art lesson), 245 (Mirage latent spatial memory — PASS), 018 (Free Transformer Z-sampling — closest BoM cousin), 058 (GRAM SDE noise), 079 (EqR noise injection)
+> **Related Research:** 192 (NextLat belief residual = delta encoding), 215 (ECHO env prediction), 242 (MicroRecurrentBeliefState — `evolve_hla` prior-art lesson), 245 (Mirage latent spatial memory — PASS), 018 (Free Transformer Z-sampling — closest BoM cousin), 058 (GRAM SDE noise), 079 (EqR noise injection), 505 (Mean-Field Distributional Steering — FK weights give BoM's K hypotheses their theoretical foundation)
 > **Related Plans:** 276 (MicroRecurrentBeliefState — ships the delta-encoding kernel), 277 (Temporal Derivative Kernel — temporal delta cousin), 247 (EnvPredictorPruner — inference-time ECHO), 281 (this paper's plan — BoM single-pass sampling)
 > **Cross-ref (riir-train):** `riir-train/.plans/272_echo_env_prediction_lora_training.md`, `riir-train/.benchmarks/288_echo_bomber_arena_v4_2layer.md` — **the ECHO failure analysis explicitly identifies "delta-token encoding" as the fix; this paper is the literature backup for that fix**
 > **Classification:** Public

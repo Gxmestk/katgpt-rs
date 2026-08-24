@@ -3,7 +3,7 @@
 > **Source:** Synthesized from CAA literature (Panickssery et al. 2023), Anthropic Transformer Circuits (Research 144, functional emotions), and the Gemini "wave interference" reframing (2026-06-23)
 > **Date:** 2026-06-23
 > **Status:** Active
-> **Related Research:** 144 (Functional Emotions), 257 (FUNCATTN), 267 (FPCG — explicit non-mutation baseline), 219 (TNO/DEC)
+> **Related Research:** 144 (Functional Emotions), 257 (FUNCATTN), 267 (FPCG — explicit non-mutation baseline), 219 (TNO/DEC), 505 (Mean-Field Distributional Steering — the distributional generalization: targets a specified crowd measure with FK-weight convergence, this note's mechanism as the pointwise special case)
 > **Related Plans:** 162 (Emotion Vector — read-only), 087 (CNA — neuron-level mutation), 292 (FPCG — sample-level, no mutation), 309 (this primitive)
 > **Cross-ref (riir-ai):** Research 153 (Latent Field Steering Game Runtime Guide)
 > **Classification:** Public
