@@ -3,8 +3,8 @@
 > **Paper:** [SPADE: Self-Play in Adaptive Synthetic Executable Environments](https://arxiv.org/abs/2608.19197) — Liu, Yu, Jiang et al. (UW/Stanford/NEU/CMU/MIT/NUS/SNU), 2026-08-19
 > **Code:** https://github.com/spade-rl/spade
 > **Date:** 2026-08-21
-> **Verdict:** Super-GOAT (4/4 novelty gate; quality-parity UNPROVEN → PoC Issue 677)
-> **Status:** DISTILLED — pending owner decision
+> **Verdict:** Super-GOAT (4/4 novelty gate; quality-parity PROVEN at PoC scale — §PoC Addendum, Issue 677 DEFEND)
+> **Status:** RECORD — PoC 677 defended the quality-parity claim (2026-08-24, riir-mmorpg-examples `c56f072`); Plan 576 remains the open primitive, now unblocked for Guide 340 P2 wiring
 > **Mandatory outputs:** Guide [riir-ai `.research/340`](../../riir-ai/.research/340_hint_regret_frontier_curriculum_guide.md) · Plan 576 (katgpt-rs open primitive) · Issue 677 (defend-wrong PoC) · riir-train Plan 346 (training-recipe backlog)
 > **Label-anchoring hazard (avoided):** the abstract's "self-play RL framework / GRPO / 30B" vocabulary routes wholesale to riir-train. Path 0 decomposition shows EVERY load-bearing signal is a Monte-Carlo average, band gate, posterior quantile, or limit detector — all modelless-extractable. What needs GD is only *training a neural designer to maximize* the signal; nothing needs GD to *compute, use, or act on* it.
 
@@ -125,3 +125,138 @@ What none of the cousins alone can do: CGSP has the loop but not the discriminat
 None (Gain verdict). Closest shipped cousins updated by this note's signal-diff table instead: Research 038 (SDAR — designer-side gap noted), Research 240 (SGS/CGSP — conflation documented), riir-ai `.research/126` (CGSP guide — three-regime extension pointer in Guide 340).
 
 > **Follow-up (2026-08-22):** [EnvHarness arXiv:2608.19880] — the architectural COMPLEMENT to this note: transform a FROZEN env via composable Setup/Rule/Link wrapper layers (verifier inherited untouched) instead of generating new MDPs; diagnosis-first targeting (name the weakness, then rig) vs this note's score-first loop. Distilled as Research 500 (katgpt-rs) with the wrap-axis signal-diff + the delta Path 0 table; refines Plan 576/Guide 340 before implementation.
+
+## PoC Addendum (Issue 677 — defend-wrong verdict, 2026-08-24)
+
+**VERDICT: DEFEND.** All pre-registered gates pass; the quality-parity
+caveat (§Honest caveats #1) is discharged at PoC scale. Harness:
+riir-mmorpg-examples `c56f072` (`src/pet_teaching_677.rs`, extending the
+Bench-013 rig). 32 seeds, release, bit-identical double-run; every arm ran
+the REAL systems (`CombatSystem` + `PetAiSystem` + the pets teaching
+substrate), identical boot (2× rank-1 warmup) + CRN sites per seed, and the
+validated `TargetedExemplarSeeking` attention policy — the CONTENT-SELECTION
+policy was the only variable.
+
+### The rig (what "content selection" means here)
+
+The Bench-013 rig had a fixed encounter script; here each training slot
+(4-encounter block, Bench-013 density) has its monster rank chosen by the
+arm's policy, decided at slot end on the live pet state. Content pool =
+ranks 1..=6: 1..=4 the pet's world (rank-2 pet: natural {0,1}, learnable
+{2,3,4}); **5..=6 model boss content beyond the species ceiling — a
+demonstration there can never translate into pet performance** (the
+eligibility gate never opens past `MAX_SKILL_LEVEL`=4): intractable by
+domain construction, discoverable only empirically.
+
+- **Arm 1 RegretGated** — the inline Plan-576-style estimator (~60 LOC;
+  Plan 576 is NOT landed — the PoC did not block on the primitive): paired
+  probe of every candidate over shadow skill states,
+  `r̂ = mean(with-demo) − mean(without-demo)`, K=4 pairs per arm per
+  candidate; two-threshold triage (τ_r = τ_R = 0.5) keeps frontier, freezes
+  mastered, evicts intractable; offers the top frontier item; STOPS
+  (budget unspent) when no frontier remains.
+- **Arm 2 Uniform** — rank uniform over the full pool 1..=6.
+- **Arm 3 AggregateDifficulty** — CGSP-shaped `(1−solve_rate)·guide`,
+  guide = 1 (uniform guide quality — nothing rigged), solve rate = Laplace
+  posterior over the pet's REAL per-rank swing record (new `rank_stats` on
+  `PetTeachingState`); argmax, least-recently-offered tie-break; no hint arm.
+
+### Measured (raw, 32 seeds)
+
+| Metric (mean) | 1 regret | 2 uniform | 3 aggregate |
+|---|---|---|---|
+| closure @ 3 slots | **1.000** | 0.313 | 0.667 |
+| closure @ 6 slots | **1.000** | 0.635 | 1.000 |
+| closure @ 12 slots | **1.000** | 0.875 | 1.000 |
+| time-to-frontier ticks (first cover) | **252** (32/32) | 555 (32/32) | 252 (32/32) |
+| ticks-to-full-closure | **632** (32/32) | 1621 (**20/32**) | 1087 (32/32) |
+| wasted intractable encounters | **0.0** | 15.1 | **24.0** |
+| slots spent (of 12) | **3** | 12 | 12 |
+| regret probe overhead | 88 intractable samples/seed (192 total, 4 rounds) | — | — |
+
+**Gates (pre-registered, not tuned):** wins_primary (arm 1 strictly beats
+arm 2 to full closure) = **32/32** (gate ≥ 28/32) ✓; wins_ttf = 32/32 ✓;
+waste gate arm1 0.0 < arm3 24.0/2 = 12.0 ✓. Regret's ticks-to-full range
+604–661 across seeds; uniform never closes on 12/32 seeds (coupon-collector
+misses: 12 uniform draws over a 6-rank pool miss one of {2,3,4} with the
+expected ~31% probability — the measured 12/32 matches).
+
+The 12 uniform non-closures are the closure-per-budget story in one number:
+at ANY budget ≥ 3 slots the regret arm holds closure 1.000 while uniform's
+mean is 0.313/0.635/0.875 at 3/6/12. The paired-rollout 2× overhead
+(the REFUTE axis) is measured at 192 probe samples/seed of scheduler-side
+compute — the whole 96-run sweep executes in 0.07 s release; there is no
+regime in this domain where it could buy nothing.
+
+### Honest findings (the parts that were not designed)
+
+1. **The estimator rediscovers the hand-tuned curriculum.** Arm 1 offers
+   exactly `[2, 3, 4]` on every seed — the Bench-013 script minus warmups,
+   which was hand-derived from the cluster-density finding. The modelless
+   selection loop produces the expert-authored sequence deterministically,
+   then stops (3 of 12 slots spent).
+2. **Prefix-blocked ≈ intractable to the probe.** At boot, ranks 3/4
+   (learnable, but the pet cannot attempt them until 2 is covered) carry
+   the same (r̂=0, R⁻=0) signature as ranks 5/6 (never learnable). The
+   estimator cannot distinguish them — it does not need to: per-round
+   re-probing reclassifies 3/4 as frontier the moment the prefix completes,
+   and no non-frontier item is ever OFFERED. 88 of the 192 probe samples
+   land on intractable-classified candidates (including those early 3/4
+   probes). This is the domain forcing the loop to be stateful, exactly as
+   SPADE's frontier moves with the learner.
+3. **The conflation costs closure SPEED and WASTE, not frontier-hitting.**
+   Arm 3 reaches the frontier as fast as arm 1 (ttf 252 = 252) — the
+   aggregate signal is not blind to difficulty, only to the
+   intractable/frontier DISTINCTION. Its losses: (a) full-closure speed —
+   the Laplace solve-rate rises slowly, so it re-drills each rank twice
+   ([2,2,3,3,4,4], 1087 vs 632 ticks); (b) the permanent tail — after the
+   band completes it farms 5/6 for 6 of 12 slots (24 encounters, and 3
+   wasted exemplar writes polluting the taught-mask with bits that can
+   never matter). The issue's prediction ("this arm should farm intractable
+   content") holds; the refinement is that it also gets there slower.
+4. **Uniform wastes on TWO axes**: intractable slots (15.1 encounters) AND
+   mastered re-offers (mean ~21 encounters at already-covered ranks) — the
+   freeze-mastered half of the triage is worth as much as the evict half.
+
+### Harness adaptations (recorded per the issue's instruction)
+
+- **Learnable share := closure over the learnable band.** SPADE's metric
+  (fraction of pool with win rate ∈ [0.2, 0.8]) is not expressible in this
+  domain: `combat_tick` hits are CERTAIN (no miss chance), so per-item
+  solve is bimodal {0, 1} and nothing ever SITS in the band. Closure is
+  the domain-faithful analog — content moved from unsolvable to solvable,
+  rising 0 → 1.0 under arm 1 exactly as the 0.16→0.31 signature demands
+  directionally; the difference (SPADE counts content AT the frontier, we
+  count content CROSSED) is inherent to binary lookup-binding skills.
+- **Budget = training slots** (encounter blocks). Probe samples are
+  scheduler-side arithmetic (the modelless loop's actual overhead —
+  measured above), not training engagements; both are reported so the
+  waste gate can be recomputed under stricter accountings. Under the
+  strictest reading (probe samples counted as attempts at ~10 pet swings
+  per encounter-equivalent), arm 1's intractable-attempt total would be
+  88/10 ≈ 9 encounter-equivalents vs arm 3's 24 — the gate (0 < 12)
+  passes on the slot accounting, and would FAIL on that strictest one;
+  the honest claim is the slot-level one, since probes move no game
+  entity. Recorded so a skeptic can re-derive either way.
+- **Determinism of the sweep**: the 192 per-seed report lines are
+  bit-identical across independent release runs (verified by output diff
+  across three runs, one spanning the print-only fix); the debug
+  determinism gate additionally asserts full `ArmReport` equality on
+  5 seeds × 3 arms double-run.
+
+### Disposition
+
+- **Guide 340 P2 (riir-ai quest-center consumer): UNBLOCKED** — the loop
+  ships as the validated selection policy (the issue's DEFEND branch).
+- **Plan 576 (the primitive): still worth landing** — the PoC ran the
+  estimator INLINE (~60 LOC) because the primitive was not landed; the
+  primitive adds the CRN/Hoeffding K schedule + Wilson CI + Beta-LCB
+  ordering that this domain's deterministic swings made vacuous here but
+  any stochastic-solve consumer needs. The "Report the Floor" gate
+  (triage accuracy vs single-arm banding at matched budget) remains the
+  primitive's own obligation (Plan 576 Phase 4 G-Floor).
+- **The REFUTE branch (primitive demotes to the triage gate alone) did
+  NOT fire** — the full loop beat uniform 32/32 with measured-negligible
+  overhead.
+- Issue 677 closed + removed (noise-reduction rule); this addendum is the
+  record.
