@@ -32,3 +32,6 @@ scripts/kimi_ref/ref_output/
 
 # Symlink to AGENTS.md so Claude Code reads the same instructions as Zed's agent
 CLAUDE.md
+# cargo heal runtime state — self-evolve trajectory store + miss queue
+# (machine-local WAL + key seed, never committed; riir-clippy Issue 037)
+.heal/
