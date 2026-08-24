@@ -525,21 +525,38 @@ pub struct ForwardContext {
 - `lora_buf` avoids per-projection LoRA allocation; fused into `lora_apply()` in-place
 - Sparse MLP buffers pack alive ReLU neurons for `sparse_matmul()` — only used when `alive_ratio ≤ sparse_threshold`
 
-## MultiLayerKVCache (`transformer.rs`)
+## MultiLayerKVCache (`crates/katgpt-transformer/src/kv_cache.rs`)
 ```rust
 pub struct MultiLayerKVCache {
     pub layers: Vec<KVCache>,
+    fill_pos: usize,                 // highest position written + 1
+    pub sliding_capacity: Vec<usize>, // per-layer window (0 = unbounded)
 }
 pub struct KVCache {
-    pub key: Vec<f32>,    // [block_size, kv_dim]
-    pub value: Vec<f32>,  // [block_size, kv_dim]
+    pub key: Vec<f32>,    // [capacity, kv_dim]
+    pub value: Vec<f32>,  // [capacity, kv_dim]
 }
 ```
 - One KVCache per layer
-- `kv_dim = n_kv_head * head_dim` (may be < n_embd with GQA)
-- `reset()` clears all layers
-- `snapshot(pos, config)` → `KVSnapshot` (copies only filled slots `[0..pos*kv_dim]`)
-- `restore(snapshot, config)` — rollback to earlier state
+- `kv_dim = n_kv_head * head_dim` (may be < n_embd with GQA); per-layer KV
+  widths via `new_with_per_layer_kv_dim`
+- `reset()` clears all layers; `invalidate_position(pos, kv_dim)` is the O(kv_dim)
+  single-position variant
+- `snapshot(pos, config)` → `KVSnapshot` (copies only filled slots, clamped to
+  each layer's physical buffer); `snapshot_into` is the zero-alloc hot-path
+  variant; `restore(snapshot, config)` — rollback to earlier state
+- **Sliding-window ring caches** (a.k.a. `RingKvCache` / `SlidingWindowCache` /
+  `WindowedKvCache` / `kv_ring`): a layer with `sliding_capacity(l) = W`
+  allocates exactly `W × kv_dim` floats and holds the most recent `W` positions
+  as a **plain-modulo ring** — the consumer writes at `pos % W` and reads `t` at
+  `t % W`; a wrap-straddling window must be gathered as two slices (contiguity
+  across a wrap is NOT provided). House convention adjudicated in Issue 683
+  (2026-08-24): the former unexercised 2× mirrored layout was removed in favor
+  of this 1× plain-modulo ring, matching the only ring implementation that
+  actually runs (riir-ai `Gemma4CpuKVCache`). Constructors:
+  `new_gemma4_sliding_bounded` (Gemma-4 alternating pattern) and
+  `new_all_sliding_bounded(config, window)` (every layer sliding at `window`,
+  Issue 683 T1 — the uniform/SSSS shape).
 
 ## Forward Pass (`transformer.rs`)
 

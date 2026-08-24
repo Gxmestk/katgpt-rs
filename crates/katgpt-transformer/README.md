@@ -6,6 +6,13 @@ Transformer substrate types shared between `katgpt-rs` and `riir-engine`:
 buffers (`PrefillContext`, `WallPrefixState`, `GateStatistics`), MTP projection
 loader (`MtpProjection`), and contiguous weight packing (`ContiguousWeights`).
 
+`MultiLayerKVCache` supports per-layer sliding-window bounding — a plain-modulo
+ring holding the most recent `window` positions at `window × kv_dim` floats per
+layer (a.k.a. `RingKvCache` / `SlidingWindowCache` / `WindowedKvCache`; house
+convention adjudicated in Issue 683). Constructors:
+`new_gemma4_sliding_bounded` (Gemma-4 alternating pattern) and the
+model-agnostic `new_all_sliding_bounded(config, window)` (every layer sliding).
+
 ## Why a separate crate?
 
 `katgpt-core` ships pure substrate primitives (types, SIMD kernels, leaf

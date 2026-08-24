@@ -1,6 +1,25 @@
 //! KV cache types for autoregressive generation, paged branching, and Raven routing.
 //!
 //! All types here are pure data + allocator helpers — no forward logic.
+//!
+//! # Sliding-window ring caches (aliases: `RingKvCache`, `SlidingWindowCache`,
+//! `WindowedKvCache`, `kv_ring`, circular cache, windowed KV cache)
+//!
+//! [`MultiLayerKVCache`] supports per-layer sliding-window bounding: a layer
+//! with `sliding_capacity(l) = W` allocates exactly `W × kv_dim` floats and holds
+//! the most recent `W` positions as a **plain-modulo ring buffer**. The aliases
+//! above exist so a consumer grepping English names finds this substrate instead
+//! of re-implementing a ring (Issue 683 T4).
+//!
+//! **House convention (Issue 683, adjudicated 2026-08-24): plain modulo.** The
+//! consumer's forward code writes K/V at `pos % W` (one slot, no mirror copy) and
+//! reads logical position `t` at `t % W`. An earlier design allocated `2·W·kvd`
+//! per sliding layer and mirrored every write so any window was always
+//! contiguous in the buffer; that mirrored write was never exercised by any
+//! live construction path, and the contiguous-read saving was never measured, so
+//! the 2× memory bought nothing and the mirroring was removed. Contiguity across
+//! a ring wrap is **not** provided — a window straddling the ring boundary must
+//! be gathered as two slices (exact contract on the `sliding_capacity` field).
 
 use katgpt_core::types::{self, Config};
 
@@ -51,15 +70,32 @@ pub struct MultiLayerKVCache {
     fill_pos: usize,
     /// Per-layer sliding-window capacity. `0` = unbounded (uses full
     /// `block_size` allocation, the original behavior for all non-Gemma-4 models).
-    /// `> 0` = sliding-bounded ring buffer with mirrored allocation (capacity
-    /// `2 * sliding_window` per layer, see [`new_gemma4_sliding_bounded`]).
+    /// `> 0` = sliding-bounded plain-modulo ring buffer: the layer's physical
+    /// buffer is exactly `sliding_capacity × kv_dim` floats and holds the most
+    /// recent `sliding_capacity` positions (Issue 683).
     ///
-    /// When bounded, the forward code writes K/V at `pos % capacity` AND mirrors
-    /// to `pos % capacity + capacity`, so any window of ≤ `capacity` positions is
-    /// always contiguous in the buffer — no wrap-around handling needed in the
-    /// attention code. Reads remap `t_start → t_start % capacity`.
+    /// This cache is data + capacity bookkeeping only — it performs no writes
+    /// and no reads of its own. The ring convention is the **consumer's**
+    /// responsibility:
     ///
-    /// [`new_gemma4_sliding_bounded`]: Self::new_gemma4_sliding_bounded
+    /// * **Write** (consumer forward code): store K/V for logical position
+    ///   `pos` at `layers[l].key[(pos % W) * kv_dim ..][..kv_dim]` and the same
+    ///   offset in `value` — plain modulo, a single slot.
+    /// * **Read** (consumer attention): logical position `t` lives at `t % W`.
+    ///   A window `[t_start, pos]` is contiguous in the buffer only while it
+    ///   does not straddle the ring boundary (`t_start % W <= pos % W`); a
+    ///   straddling window must be gathered as two slices, `[t_start % W .. W)`
+    ///   and `[0 .. pos % W + 1)`. Contiguity across a wrap is NOT provided —
+    ///   the former 2× mirrored layout that guaranteed it was removed in
+    ///   Issue 683 (never exercised, saving never measured).
+    ///
+    /// ⚠ Downstream note (2026-08-24): `riir_engine::transformer::gemma4`'s
+    /// `forward_gemma4_impl` still carries a mirrored-write +
+    /// mirrored-contiguous-read branch keyed on `sliding_capacity(l) > 0` that
+    /// assumes `2·W·kvd` buffers. No live construction sets a non-zero capacity
+    /// so it never runs, but do NOT pass a cache built by the sliding-bounded
+    /// constructors into that forward until the branch migrates to plain
+    /// modulo (Issue 683 follow-up, riir-ai).
     pub sliding_capacity: Vec<usize>,
 }
 
@@ -137,17 +173,23 @@ impl MultiLayerKVCache {
     }
 
     /// Construct a sliding-bounded cache for Gemma-4's alternating
-    /// Sliding/Full layer pattern (Plan 320 Phase D3 production fix).
+    /// Sliding/Full layer pattern (Plan 320 Phase D3 production fix; re-based
+    /// onto the plain-modulo 1× ring convention by Issue 683).
     ///
-    /// Sliding layers get a **mirrored ring buffer** of capacity
-    /// `2 * sliding_window * kvd` (logical capacity `sliding_window`, mirrored
-    /// for contiguous-window reads). Full layers get `block_size * kvd`
-    /// (unbounded, same as `new_with_per_layer_kv_dim`).
+    /// Sliding layers get a **plain-modulo ring buffer** of exactly
+    /// `sliding_window * kvd` floats (logical capacity `sliding_window` — one
+    /// slot per window position, no mirror region). Full layers get
+    /// `block_size * kvd` (unbounded, same as [`new_with_per_layer_kv_dim`]).
+    /// The consumer's forward code owns the ring semantics: write at
+    /// `pos % sliding_window`, read `t` at `t % sliding_window`, gathering a
+    /// wrap-straddling window as two slices (see the `sliding_capacity` field
+    /// doc for the full contract).
     ///
-    /// This reduces the 256K-context KV cache from ~168 GiB (naive, all layers
-    /// at `block_size`) to ~8 GiB (f32) or ~1.08 GiB (Q4) — a 20–150× reduction.
-    /// See the D3 test (`plan320_d3_kv_cache_256k_budget.rs`) for the budget
-    /// analysis.
+    /// Versus the naive all-`block_size` allocation this reduces the 256K-context
+    /// KV cache from ~168 GiB to the single-digit GiB range, and the 1×
+    /// plain-modulo convention halves the sliding layers' share again versus the
+    /// former mirrored layout. See the D3 test (`plan320_d3_kv_cache_256k_budget.rs`)
+    /// for the original budget analysis.
     ///
     /// # Arguments
     ///
@@ -184,8 +226,8 @@ impl MultiLayerKVCache {
             .map(|(i, &kvd)| {
                 let is_sliding = sliding_layers.get(i).copied().unwrap_or(false);
                 let capacity = if is_sliding && sw > 0 {
-                    // Mirrored: 2× sliding_window for contiguous-window reads.
-                    2 * sw * kvd
+                    // Plain-modulo ring: window × kvd, 1× (Issue 683).
+                    sw * kvd
                 } else {
                     config.block_size * kvd
                 };
@@ -207,6 +249,32 @@ impl MultiLayerKVCache {
             fill_pos: 0,
             sliding_capacity,
         }
+    }
+
+    /// Construct a cache where **every** layer is sliding-bounded at `window`
+    /// (Issue 683 T1) — the uniform all-sliding pattern (SSSS-style drafters,
+    /// windowed-everywhere architectures; see the module doc's ring-cache
+    /// vocabulary).
+    ///
+    /// Model-agnostic counterpart to [`new_gemma4_sliding_bounded`]: no
+    /// layer-type pattern, one window for every layer, per-layer KV width
+    /// `types::kv_dim(config)`. Allocation is exactly `window × kv_dim` floats
+    /// per layer (plain-modulo ring, 1×) — same convention and the same
+    /// allocation path, so "capacity implies allocation" holds by construction.
+    /// This is a constructor rather than a post-hoc setter for exactly that
+    /// reason: a setter that does not resize the buffers would silently produce
+    /// out-of-range reads.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `window == 0` (use [`new`](Self::new) for an unbounded cache).
+    pub fn new_all_sliding_bounded(config: &Config, window: usize) -> Self {
+        assert!(window > 0, "new_all_sliding_bounded: window must be > 0");
+        let kvd = types::kv_dim(config);
+        let per_layer_kv_dim = vec![kvd; config.n_layer];
+        let all_sliding = vec![true; config.n_layer];
+        // Reuse the existing allocation path — no duplicated ring allocation.
+        Self::new_gemma4_sliding_bounded(config, &per_layer_kv_dim, &all_sliding, window)
     }
 
     /// Get the sliding-window capacity for a layer (0 = unbounded/full block_size).
@@ -266,10 +334,14 @@ impl MultiLayerKVCache {
     /// reusable buffer.
     pub fn snapshot(&self, pos: usize, config: &Config) -> KVSnapshot {
         let kd = types::kv_dim(config);
-        let end = pos * kd;
         // Pre-allocate outer Vec to avoid collect() reallocation jitter.
         let mut layers = Vec::with_capacity(self.layers.len());
         for layer in &self.layers {
+            // Clamp to the physical buffer: a sliding-bounded layer holds a
+            // `window × kv_dim` ring, so only the physical contents can be
+            // captured — logical positions beyond the window are not
+            // reconstructible from a ring (Issue 683).
+            let end = (pos * kd).min(layer.key.len());
             layers.push(KVLayerSnapshot {
                 key: layer.key[..end].to_vec(),
                 value: layer.value[..end].to_vec(),
@@ -296,7 +368,6 @@ impl MultiLayerKVCache {
     /// In steady state (same model), this branch is never taken.
     pub fn snapshot_into(&self, pos: usize, config: &Config, out: &mut KVSnapshot) {
         let kd = types::kv_dim(config);
-        let end = pos * kd;
         out.pos = pos;
         if out.layers.len() != self.layers.len() {
             out.layers
@@ -306,6 +377,9 @@ impl MultiLayerKVCache {
                 });
         }
         for (src, dst) in self.layers.iter().zip(out.layers.iter_mut()) {
+            // Clamp to the physical buffer (sliding rings hold only the last
+            // `window` positions — Issue 683).
+            let end = (pos * kd).min(src.key.len());
             dst.key.resize(end, 0.0);
             dst.value.resize(end, 0.0);
             dst.key[..end].copy_from_slice(&src.key[..end]);
@@ -317,15 +391,24 @@ impl MultiLayerKVCache {
     /// Writes snapshot data back and zeros out positions [snapshot.pos..block_size)
     /// to prevent stale data leaking into the next sequence. The tail zeroing is
     /// the conservative default for a shared substrate crate.
+    ///
+    /// For sliding-bounded layers the restore is a **physical** ring restore:
+    /// `end` is clamped to the layer's buffer (and to the captured snapshot
+    /// length), so a full-buffer snapshot round-trips the ring contents exactly
+    /// and the tail zeroing covers whatever the snapshot did not capture
+    /// (Issue 683).
     pub fn restore(&mut self, snapshot: &KVSnapshot, config: &Config) {
         let kd = types::kv_dim(config);
-        // Hoist loop-invariant `end` out of the per-layer loop.
-        let end = snapshot.pos * kd;
         for (layer, snap_layer) in self.layers.iter_mut().zip(snapshot.layers.iter()) {
-            layer.key[..end].copy_from_slice(&snap_layer.key);
-            layer.value[..end].copy_from_slice(&snap_layer.value);
-            // Zero out positions [snapshot.pos..block_size) to prevent stale data
-            // from a previous sequence leaking into the restored state.
+            // Clamp to the physical buffer and to what the snapshot actually
+            // captured (sliding rings are window-sized — Issue 683).
+            let end = (snapshot.pos * kd)
+                .min(layer.key.len())
+                .min(snap_layer.key.len());
+            layer.key[..end].copy_from_slice(&snap_layer.key[..end]);
+            layer.value[..end].copy_from_slice(&snap_layer.value[..end]);
+            // Zero out the uncaptured tail to prevent stale data from a
+            // previous sequence leaking into the restored state.
             layer.key[end..].fill(0.0);
             layer.value[end..].fill(0.0);
         }
@@ -381,14 +464,22 @@ pub fn preload_kv_cache(
     // Layer guard: can only share layers that exist in both caches
     let min_layers = draft_cache.layers.len().min(target_cache.layers.len());
 
-    // Copy KV for positions [0..pos) for each shared layer
-    let copy_len = pos * target_kv_dim;
-    if copy_len > 0 {
+    // Copy KV for positions [0..pos) for each shared layer. Sliding-bounded
+    // layers hold `window × kv_dim` rings, so the copy is clamped to both
+    // physical buffers — a physical ring transfer, not a logical [0..pos)
+    // transfer (Issue 683).
+    if pos > 0 {
         for layer_idx in 0..min_layers {
             let draft_layer = &mut draft_cache.layers[layer_idx];
             let target_layer = &target_cache.layers[layer_idx];
-            draft_layer.key[..copy_len].copy_from_slice(&target_layer.key[..copy_len]);
-            draft_layer.value[..copy_len].copy_from_slice(&target_layer.value[..copy_len]);
+            let copy_len = (pos * target_kv_dim)
+                .min(draft_layer.key.len())
+                .min(target_layer.key.len());
+            if copy_len > 0 {
+                draft_layer.key[..copy_len].copy_from_slice(&target_layer.key[..copy_len]);
+                draft_layer.value[..copy_len]
+                    .copy_from_slice(&target_layer.value[..copy_len]);
+            }
         }
     }
 }
@@ -756,13 +847,10 @@ mod sliding_bounded_tests {
             .map(|l| (l.key.len() + l.value.len()) * std::mem::size_of::<f32>())
             .sum();
 
-        // Sliding layers: 2 * sw * kvd * 2 (mirrored, key+value)
-        // Full layer: block_size * kvd * 2
-        // Total bounded should be less than naive.
-        // Sliding layers: 2 * sw * kvd elements per buffer (key+value) → 2 * 2 * sw * kvd
+        // Sliding layers: sw * kvd elements per buffer (key+value) → 2 * sw * kvd
         // Full layer: block_size * kvd elements per buffer → 2 * block_size * kvd
-        // Total elements × sizeof(f32) = bytes.
-        let sliding_layer_elems = 2 * sliding_window * kvd * 2; // key+value
+        // Plain-modulo 1× ring (Issue 683) — no mirror region.
+        let sliding_layer_elems = sliding_window * kvd * 2; // key+value
         let full_layer_elems = config.block_size * kvd * 2;
         let expected_elems = 2 * sliding_layer_elems + full_layer_elems; // 2 sliding + 1 full
         let expected_bytes = expected_elems * std::mem::size_of::<f32>();
@@ -869,9 +957,11 @@ mod sliding_bounded_tests {
     }
 
     #[test]
-    fn sliding_bounded_mirror_write_correct() {
-        // G2: writing to a sliding-bounded cache at position `pos` should write
-        // to both `pos % sw` and `(pos % sw) + sw` (mirror).
+    fn sliding_bounded_plain_modulo_write() {
+        // Issue 683 T0(b): the ring convention is plain modulo — a write for
+        // logical position `pos` lands at `pos % sw`, a single slot, no mirror.
+        // The substrate performs no writes itself; this simulates the
+        // consumer-side write the field doc contract describes.
         let config = tiny_config();
         let sw = 8;
         let kvd = 4;
@@ -885,89 +975,228 @@ mod sliding_bounded_tests {
             sw,
         );
 
-        // Write a recognizable value at position 3 on layer 0 (sliding).
-        let pos = 3usize;
-        let test_val = 42.0f32;
-        let ring_pos = pos % sw; // = 3
+        // 1× allocation: exactly sw * kvd floats — no mirror region exists.
+        assert_eq!(cache.layers[0].key.len(), sw * kvd);
+        assert_eq!(cache.layers[0].value.len(), sw * kvd);
+        // Non-sliding layers keep the full block_size allocation.
+        assert_eq!(cache.layers[1].key.len(), config.block_size * kvd);
+
+        // Write position 3, then position 3 + sw (one full ring turn later):
+        // both map to the SAME physical slot — the defining plain-modulo
+        // property (the newest write wins).
         let layer = &mut cache.layers[0];
+        for (pos, val) in [(3usize, 42.0f32), (3 + sw, 99.0f32)] {
+            let off = (pos % sw) * kvd;
+            layer.key[off..off + kvd].fill(val);
+            layer.value[off..off + kvd].fill(val);
+        }
+        let off = (3 % sw) * kvd;
+        assert_eq!(layer.key[off], 99.0, "pos and pos+sw share one slot");
+        assert_eq!(layer.value[off], 99.0);
+    }
 
-        // Simulate the write pattern from forward_gemma4.
-        let off = ring_pos * kvd;
-        let mirror_off = (ring_pos + sw) * kvd;
-        layer.key[off..off + kvd].fill(test_val);
-        layer.key[mirror_off..mirror_off + kvd].fill(test_val);
-        layer.value[off..off + kvd].fill(test_val);
-        layer.value[mirror_off..mirror_off + kvd].fill(test_val);
+    #[test]
+    fn sliding_bounded_window_contiguous_when_aligned() {
+        // Plain-modulo truth (Issue 683 T3): a window that does NOT straddle
+        // the ring boundary (`t_start % sw <= pos % sw`) IS contiguous in the
+        // buffer and maps linearly. After exactly 3 full ring turns (positions
+        // 0..=3*sw-1), the current window [2*sw, 3*sw-1] is aligned
+        // (t_start % sw == 0) and maps to the whole buffer [0, sw*kvd).
+        let config = tiny_config();
+        let sw = 8;
+        let kvd = 4;
+        let mut cache = MultiLayerKVCache::new_all_sliding_bounded(&config, sw);
 
-        // Verify both primary and mirror slots have the value.
-        assert_eq!(layer.key[off], test_val, "primary slot should have value");
-        assert_eq!(
-            layer.key[mirror_off], test_val,
-            "mirror slot should have value"
+        // Simulate the consumer write path; encode position identity into K.
+        for pos in 0..3 * sw {
+            for layer in &mut cache.layers {
+                let off = (pos % sw) * kvd;
+                layer.key[off..off + kvd].fill(pos as f32);
+                layer.value[off..off + kvd].fill(pos as f32);
+            }
+        }
+
+        let pos = 3 * sw - 1;
+        let t_start = pos + 1 - sw; // = 2*sw, aligned: t_start % sw == 0
+        assert_eq!(t_start % sw, 0);
+        assert_eq!(pos % sw, sw - 1);
+        assert!(t_start % sw <= pos % sw, "window must not straddle");
+
+        // Contiguous read: ring slot i holds logical position t_start + i.
+        let layer = &cache.layers[0];
+        for i in 0..sw {
+            let got = layer.key[i * kvd];
+            let expected = (t_start + i) as f32;
+            assert_eq!(got, expected, "ring slot {i} should hold position {}", t_start + i);
+        }
+    }
+
+    #[test]
+    fn sliding_bounded_straddling_window_needs_two_slice_gather() {
+        // Plain-modulo truth (Issue 683 T3): a window that straddles the ring
+        // boundary (`t_start % sw > pos % sw`) is NOT contiguous in the buffer.
+        // The consumer must gather two slices. This test pins exactly that —
+        // including that a naive contiguous read would run off the end of the
+        // 1× buffer. (The old mirrored layout guaranteed contiguity here; that
+        // guarantee is deliberately gone — the mirror was never exercised and
+        // its saving was never measured.)
+        let config = tiny_config();
+        let sw = 8;
+        let kvd = 4;
+        let mut cache = MultiLayerKVCache::new_all_sliding_bounded(&config, sw);
+
+        // Run past 3 full ring turns + 5, ending at pos = 3*sw+4 = 28.
+        let n = 3 * sw + 5;
+        for pos in 0..n {
+            for layer in &mut cache.layers {
+                let off = (pos % sw) * kvd;
+                layer.key[off..off + kvd].fill(pos as f32);
+                layer.value[off..off + kvd].fill(pos as f32);
+            }
+        }
+
+        let pos = n - 1; // 28
+        let t_start = pos + 1 - sw; // 21
+        let t_n = pos - t_start + 1;
+        assert_eq!(t_n, sw);
+        assert!(
+            t_start % sw > pos % sw,
+            "chosen window must straddle ({} % {} = {} > {} % {} = {})",
+            t_start,
+            sw,
+            t_start % sw,
+            pos,
+            sw,
+            pos % sw
         );
 
-        // The buffer is 2 * sw * kvd = 2 * 8 * 4 = 64 elements.
-        assert_eq!(layer.key.len(), 2 * sw * kvd);
+        let layer = &cache.layers[0];
+        // Honest pin: a contiguous read at (t_start % sw) would overflow the
+        // window-sized buffer — contiguity is NOT provided.
+        let naive_read_end = (t_start % sw) * kvd + t_n * kvd;
+        assert!(
+            naive_read_end > layer.key.len(),
+            "naive contiguous read ({naive_read_end} floats) must exceed the 1x buffer ({})",
+            layer.key.len()
+        );
+
+        // The consumer-side two-slice gather returns exactly the logically-
+        // expected sequence [t_start..=pos].
+        let head = &layer.key[(t_start % sw) * kvd..sw * kvd];
+        let tail = &layer.key[..(pos % sw + 1) * kvd];
+        let mut gathered: Vec<f32> = Vec::with_capacity(t_n);
+        gathered.extend_from_slice(head);
+        gathered.extend_from_slice(tail);
+        let expected: Vec<f32> = (t_start..=pos).map(|t| t as f32).collect();
+        for (i, chunk) in gathered.chunks(kvd).enumerate() {
+            assert_eq!(chunk[0], expected[i], "gathered position {i} of the window");
+        }
+        assert_eq!(gathered.len(), t_n * kvd);
     }
 
     #[test]
-    fn sliding_bounded_window_contiguous() {
-        // G3: a window of positions [t_start, pos] where pos - t_start < sw should
-        // map to a contiguous region in the mirrored buffer.
-        let sw = 8;
-        let kvd = 4;
+    fn all_sliding_bounded_shape_and_zero_growth() {
+        // Issue 683 T1 + T2 — the consumer's gate: run ≫ window positions
+        // through the plain-modulo write path and assert every layer's buffer
+        // is exactly window × kvd with sliding_capacity(l) == window — zero
+        // growth across the run. (T2's assertion is `window * kvd`, not the
+        // issue's original `2 * window * kvd`: that text predates the T0(b)
+        // reframe to the plain-modulo 1× convention.)
+        let config = tiny_config(); // 3 layers, kvd = 4
+        let window = 8;
+        let kvd = types::kv_dim(&config);
+        assert_eq!(kvd, 4);
 
-        // Simulate positions 0..15 (wraps around the 8-capacity ring).
-        // At pos=15, t_start = 15 - 7 = 8. Window = [8, 15], length = 8.
-        // In the ring: t_start % sw = 8 % 8 = 0, pos % sw = 15 % 8 = 7.
-        // The window maps to [0, 7] in the primary region — contiguous.
-        let pos = 15;
-        let t_start = 8;
-        let t_n = pos - t_start + 1;
-        assert_eq!(t_n, 8);
-        assert!(t_n <= sw, "window must fit in sliding_window");
+        let mut cache = MultiLayerKVCache::new_all_sliding_bounded(&config, window);
 
-        let read_start = (t_start % sw) * kvd; // = 0
-        let read_end = (pos % sw) * kvd + kvd; // = 7*4+4 = 32
-        assert_eq!(read_start, 0);
-        assert_eq!(read_end, sw * kvd);
-        // The window [0, 32) is contiguous within the primary region [0, sw*kvd).
+        // Shape: every layer sliding at `window`, buffer exactly window * kvd.
+        for l in 0..config.n_layer {
+            assert_eq!(cache.sliding_capacity(l), window, "layer {l} all-sliding");
+            assert_eq!(cache.layers[l].key.len(), window * kvd);
+            assert_eq!(cache.layers[l].value.len(), window * kvd);
+        }
+
+        // Zero growth: run 100 positions (12+ wraps) through the write path.
+        let lens_before: Vec<(usize, usize)> = cache
+            .layers
+            .iter()
+            .map(|l| (l.key.len(), l.value.len()))
+            .collect();
+        for pos in 0..100 {
+            for layer in &mut cache.layers {
+                let off = (pos % window) * kvd;
+                layer.key[off..off + kvd].fill(pos as f32);
+                layer.value[off..off + kvd].fill(pos as f32);
+            }
+            cache.advance_pos(pos);
+        }
+        let lens_after: Vec<(usize, usize)> = cache
+            .layers
+            .iter()
+            .map(|l| (l.key.len(), l.value.len()))
+            .collect();
+        assert_eq!(lens_before, lens_after, "buffers must not grow across the run");
+        for l in 0..config.n_layer {
+            assert_eq!(cache.layers[l].key.len(), window * kvd);
+            assert_eq!(cache.sliding_capacity(l), window);
+        }
+        assert_eq!(cache.fill_pos(), 100);
     }
 
     #[test]
-    fn sliding_bounded_window_contiguous_at_boundary() {
-        // G4: window that straddles a ring boundary but fits within sw.
-        // pos=9, t_start=3, window=[3,9], length=7.
-        // ring: t_start%8=3, pos%8=1. In the mirrored buffer, [3*4, 2*4) spans
-        // [12, 8) — wrapping! But because of the mirror at [sw, 2*sw), the
-        // read from position 3 at offset 3*kvd through the mirror region is
-        // contiguous: primary[3..8) + mirror[0..2) = primary[3..8) + primary[8..10).
-        // Wait — that's NOT contiguous unless we read from the mirror.
-        //
-        // Actually, the key insight: in the mirrored buffer of size 2*sw,
-        // positions t_start..=pos map to (t_start%sw)..(t_start%sw + t_n - 1).
-        // Since t_n ≤ sw, this range is within [0, 2*sw). And we read from
-        // (t_start % sw) * kvd, which puts us at the start of the window.
-        // The mirror ensures that positions that wrapped around are available
-        // at sw + their ring index.
-        let sw = 8;
+    fn all_sliding_bounded_panics_on_zero_window() {
+        let config = tiny_config();
+        let result = std::panic::catch_unwind(|| {
+            MultiLayerKVCache::new_all_sliding_bounded(&config, 0);
+        });
+        assert!(result.is_err(), "window == 0 must panic (use `new` for unbounded)");
+    }
+
+    #[test]
+    fn all_sliding_bounded_snapshot_restore_roundtrip() {
+        // Sliding consistency of the snapshot/restore path (Issue 683): the
+        // snapshot captures the physical ring contents (clamped to the
+        // window-sized buffer) and restore round-trips them exactly, so a
+        // speculative rollback recovers the ring state.
+        let config = tiny_config();
+        let window = 8;
         let kvd = 4;
-        let pos = 9;
-        let t_start = 3;
-        let t_n = pos - t_start + 1; // = 7
+        let mut cache = MultiLayerKVCache::new_all_sliding_bounded(&config, window);
 
-        // Read starts at t_start % sw = 3, continues for t_n = 7 positions.
-        // In the mirrored buffer: positions 3,4,5,6,7,0(mirror@8),1(mirror@9).
-        // But we read from offset (3%8)*4 = 12, for 7 positions = 28 floats.
-        // The buffer at [12, 40) covers ring positions 3,4,5,6,7,8(mirror of 0),9(mirror of 1).
-        // This is contiguous and correct!
-        let read_start = (t_start % sw) * kvd; // = 12
-        let read_len = t_n * kvd; // = 28
-        let read_end = read_start + read_len; // = 40
+        // Write 20 positions (2.5 wraps), then snapshot at pos = 20 > window —
+        // must not panic despite pos * kvd exceeding the buffer.
+        for pos in 0..20 {
+            for layer in &mut cache.layers {
+                let off = (pos % window) * kvd;
+                layer.key[off..off + kvd].fill(pos as f32);
+                layer.value[off..off + kvd].fill(pos as f32);
+            }
+            cache.advance_pos(pos);
+        }
+        let snapshot = cache.snapshot(20, &config);
+        // Full physical ring captured (pos * kvd clamped to window * kvd).
+        for layer in &snapshot.layers {
+            assert_eq!(layer.key.len(), window * kvd);
+            assert_eq!(layer.value.len(), window * kvd);
+        }
 
-        // The buffer is 2*sw*kvd = 64 elements. read_end = 40 ≤ 64. ✓
-        assert!(read_end <= 2 * sw * kvd, "read must fit in mirrored buffer");
-        assert_eq!(read_start, 12);
-        assert_eq!(read_len, 28);
+        // Corrupt, then restore — ring contents come back exactly.
+        for layer in &mut cache.layers {
+            layer.key.fill(-1.0);
+            layer.value.fill(-1.0);
+        }
+        cache.restore(&snapshot, &config);
+        for l in 0..config.n_layer {
+            for i in 0..window {
+                // Ring slot i holds the most recent position ≡ i (mod window),
+                // i.e. the unique p in [pos-window, pos) with p % window == i.
+                let expected_pos = 20 - window + ((i + window - ((20 - window) % window)) % window);
+                assert_eq!(
+                    cache.layers[l].key[i * kvd],
+                    expected_pos as f32,
+                    "layer {l} ring slot {i} after restore"
+                );
+            }
+        }
     }
 }
