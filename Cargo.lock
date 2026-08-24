@@ -1850,6 +1850,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "katgpt-device-verify"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+]
+
+[[package]]
 name = "katgpt-forward"
 version = "0.1.0"
 dependencies = [

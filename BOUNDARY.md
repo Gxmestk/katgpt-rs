@@ -15,6 +15,18 @@
   the public funnel per Research 003. No training, no backprop, no gradient
   descent; runtime weight mutations limited to freeze/thaw, deterministic
   raw/lora hot-swap, latent-space updates.
+- **`no_std` device-side verification primitives** (`katgpt-device-verify`) —
+  fair-roll die verification and binary-Merkle inclusion verification for the
+  `Satellite` tier (`riir-chain` Issues 108/109, this repo's Issue 685).
+  Admitted 2026-08-24 on the domain test read as written: *modelless*, *no riir
+  dep*, and this repo is upstream of everything. It is a **verification**
+  rather than an *inference* primitive, which is a widening of the Owns line
+  above and is recorded as such rather than waved through — the load-bearing
+  half of the test is the dependency direction, and the alternatives
+  (`riir-chain`, `riir-neuron-db`) are both downstream, both std-only, and
+  both drag a 100 K-LOC manifest into every MCU build's resolution (the Plan
+  040 recursive-path-dep lesson). One dep: `blake3`, `default-features =
+  false`. No `getrandom` — verification consumes entropy, never produces it.
 - Workspace-level agent skills in `.agents/skills/` (boundary-guard,
   substrate-first, feature-gate-audit, goat-audit, proposal, research) — these
   are workspace *tooling*, not crate surface.
@@ -33,6 +45,22 @@ Everything downstream is a consumer, never a dependency:
 | Crate | Location | Condition |
 |---|---|---|
 | — | — | **Nothing workspace-internal.** katgpt-rs is UPSTREAM of riir-ai; any riir dep here is a dependency cycle. |
+| `blake3` | crates.io | `katgpt-device-verify` pins `default-features = false` (pure-Rust core-only). The `std` feature is host/CI only; a device build must not enable it. |
+
+### Consumers of `katgpt-device-verify` (outbound, informational)
+
+Not a dependency of this repo — recorded so the drift invariant has a home.
+`riir-chain` (fair roll) and `riir-neuron-db` (Merkle) each own an
+implementation this crate mirrors, and each asserts the **same pinned vector
+fixture** by value. Copying the code across the seam is what creates drift;
+copying the fixture is what detects it.
+
+The consume-and-re-export step (each sibling's function becoming a thin
+re-export so exactly one implementation exists) is **not yet done**: both
+siblings take `katgpt-core` as a *git dep on branch `main`*, and this crate
+lives on `develop`. It unblocks on a `develop` → `main` promotion, which is a
+release decision, not a refactor. Until then the shared fixture — asserted on
+all three sides — is the drift gate.
 
 ## Inherited boundaries (links)
 

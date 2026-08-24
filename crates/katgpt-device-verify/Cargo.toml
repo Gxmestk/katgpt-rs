@@ -1,0 +1,52 @@
+[package]
+name = "katgpt-device-verify"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "no_std device-side verification primitives for the Satellite tier (riir-chain Issues 108/109, katgpt-rs Issue 685). Fair-roll die verification (BLAKE3 + integer rejection sampling) and binary-Merkle inclusion verification, with pinned cross-target vectors. Alloc-free, panic-free on the verify path, no getrandom."
+repository = "https://github.com/katopz/katgpt-rs"
+keywords = ["no-std", "verification", "merkle", "blake3", "modelless"]
+categories = ["algorithms", "no-std", "cryptography"]
+publish = false  # only katgpt-core ships to crates.io
+
+[dependencies]
+# blake3 with `default-features = false` is pure-Rust core-only — this is the
+# ONLY dependency, and it is the same declaration `riir-wallet-signer` uses
+# (that crate is PROVEN to compile+link for xtensa-esp32s3-none-elf and
+# riscv32imc-unknown-none-elf; see riir-chain Proposal 006 §10 Q1/Q3).
+# Non-optional: every module in this crate hashes.
+blake3 = { version = "1", default-features = false }
+
+[features]
+# Both verify surfaces on by default. Deliberately NOT `default = []`: a
+# leaf crate whose every module is gated off compiles to nothing and its
+# green `cargo check` proves nothing (the documented "disbelieve a cfg-gated
+# pass" trap). Consumers gate at THEIR level, not here.
+default = ["fair_roll", "merkle_verify"]
+
+# Fair-roll verification — `FairRollVerifier::roll_die`. Alloc-free.
+fair_roll = []
+
+# Binary-Merkle inclusion + root compare. Alloc-free (proof siblings are a
+# borrowed slice).
+merkle_verify = []
+
+# `alloc` — adds `roll_dice` (plural, returns `Vec`) and `MerkleProofBuf`.
+# A daily single-item claim needs NEITHER; a device build leaves this off.
+alloc = []
+
+# `std` — implies `alloc`, turns on blake3's std paths (rayon-free; just
+# `std::io` + runtime SIMD dispatch). Host/CI only.
+std = ["alloc", "blake3/std"]
+
+[dev-dependencies]
+# The vector generator hashes labels directly (`blake3::hash`) to derive
+# seeds; the library's own blake3 is core-only, so the example needs the
+# std build. Dev-only — no device build sees this.
+blake3 = "1"
+
+# ─── The fixture generator. Provenance for `src/vectors_data.rs`; a fixture
+# whose derivation is not reproducible is a blob of magic bytes.
+[[example]]
+name = "gen_vectors"
+required-features = ["std"]
