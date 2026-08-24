@@ -74,6 +74,37 @@ cargo check --all-features
 cargo test -p katgpt-core --features <feature_name> --lib
 ```
 
+## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
+
+Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,
+capacity, `needless_return`, …) are fixed by the riir-clippy healer FIRST,
+manual second:
+
+```bash
+cargo heal --fix <paths>                                  # dry run (review only)
+cargo heal --fix --write --verify <paths>                 # compile-gated apply
+cargo heal --fix --write --verify --verify-args "--features <set>" <paths>  # gated code
+```
+
+- Global binary `cargo heal` = `~/.cargo/bin/cargo-heal` → the sibling
+  `riir-clippy/target/release/cargo-heal` (built `--features
+  fix_verify,clippy_verify`; rebuild after healer source changes). Missing
+  sibling → fall back to manual fixes + `cargo clippy --fix`.
+- `--verify` compiles baseline → applies → re-checks → auto-REVERTS breaking
+  edits. Feature-gated code needs `--verify-args "--features <set>"` (a
+  default-features check compiles gated files empty — a green check proves
+  nothing about them).
+- The healer is deliberately SILENT on documented divergence classes
+  (comment-guarded matches, array-literal defaults, named-arg renames,
+  nested macro args) — those stay manual; see the `cargo-heal` skill
+  (`~/.agents/skills/cargo-heal/`) for the full table + discipline.
+- `cargo clippy --fix` remains fine for one-off trivial fixes; the healer
+  wins on batches (span-preserving, comment guards, compile gate,
+  self-evolve memory) and was validated across the full katgpt-rs sweep
+  (every surface, count-identical test validation, 2026-08-19).
+- Observed misses / wrong suggestions → note in the session record; they feed
+  riir-clippy's post-mining queue (usage-artifact improvement intake).
+
 ## Feature Flag Discipline
 
 Every new primitive ships behind a feature flag (opt-in). Promotion to
