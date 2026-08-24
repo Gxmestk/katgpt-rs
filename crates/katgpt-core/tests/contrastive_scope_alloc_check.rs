@@ -30,8 +30,8 @@ fn g4_zero_alloc_steady_state() {
     // Build the table OUTSIDE the measured section (cold path).
     let mut b = ContrastiveScoreBuilder::new(4096, 0.5);
     for i in 0..200u32 {
-        b.observe_in(&[(i % 2048) as u32, (i % 977) as u32, (i % 613) as u32]);
-        b.observe_out(&[(2048 + i % 2048) as u32, (2048 + i % 1301) as u32]);
+        b.observe_in(&[i % 2048, i % 977, i % 613]);
+        b.observe_out(&[2048 + i % 2048, 2048 + i % 1301]);
     }
     let table = b.finish();
     let gate = ScopeGate { kappa: 0.05, theta: 8.0 };

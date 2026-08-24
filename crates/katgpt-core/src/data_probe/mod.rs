@@ -16,6 +16,7 @@
 //! - `sink_classify`    — Per-head NOP/Broadcast sink classifier (Plan 287) — gated `sink_aware_attn`
 //! - `gold_share`       — Content-specific output-fraction diagnostic (Plan 411) — gated `gold_share_probe`
 //! - `gaussianity`      — Sketched projection-normality probe (Issue 681) — gated `gaussianity_probe`
+//! - [`cca`]              — SVCCA SVD-denoised CCA subspace similarity (Issue 684) — gated `svd_cca`
 //!
 //! # Always-on vs feature-gated split
 //!
@@ -94,6 +95,15 @@ pub mod gold_share;
 #[cfg(feature = "gaussianity_probe")]
 pub mod gaussianity;
 
+/// SVCCA — SVD-denoised CCA subspace similarity between two representation
+/// snapshots (Issue 684, Research 501 — arXiv:1706.05806).
+/// Affine-invariant ρ spectrum + mean over the η=0.99-energy subspaces;
+/// answers "same function, up to invertible linear re-mixing?" where BLAKE3
+/// only answers "same bytes". Composes `symmetric_eig` + `ns_inv_sqrt_psd_into`
+/// + `numerical_rank`; gated `svd_cca` (opt-in until a consumer promotes).
+#[cfg(feature = "svd_cca")]
+pub mod cca;
+
 // ── Re-exports (always-on items) ────────────────────────────────────────
 
 pub use claim::{ClaimCard, Intervention, ValidityVerdict};
@@ -133,10 +143,15 @@ pub use sink_classify::{
 #[cfg(feature = "gold_share_probe")]
 pub use gold_share::{GoldShareReport, GoldShareScratch, gold_share, gold_share_flat};
 
-// ── Re-exports (gaussianity items, gated) ──────────────────────────────
+// ── Re-exports (gaussianity items, gated) ──────────────────────────
 
 #[cfg(feature = "gaussianity_probe")]
 pub use gaussianity::{
     GaussianityReport, GaussianityScratch, N_AXIS_ANCHORS, N_DIRECTIONS, ks_d_vs_fitted_gaussian,
     sketched_gaussianity,
 };
+
+// ── Re-exports (svd_cca items, gated) ─────────────────────────────
+
+#[cfg(feature = "svd_cca")]
+pub use cca::{CcaReport, CcaScratch, MAX_K, svcca_into};

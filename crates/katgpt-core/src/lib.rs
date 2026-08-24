@@ -1881,11 +1881,13 @@ pub use katgpt_types::depth_invariance::{
 // PEIRA's f64 path is left untouched. Plan 319 (Clifford geometric product)
 // and Plan 326 (Tucker/HOSVD tensor factorization) ship peers under `linalg::`
 // — each must also gate this `pub mod` so the crate compiles when only that
-// feature is on.
+// feature is on. Issue 684 (`svd_cca`) joins the same rule for its
+// `symmetric_eig` consumption.
 #[cfg(any(
     feature = "karc_forecaster",
     feature = "geometric_product",
-    feature = "tucker_factorization"
+    feature = "tucker_factorization",
+    feature = "svd_cca"
 ))]
 pub mod linalg;
 
