@@ -1,6 +1,6 @@
 # Issue 685 — Host the two `no_std` device-verify primitives (`Satellite` receiving side)
 
-> **Opened:** 2026-08-24 · **Status:** LANDED 2026-08-24 — one step left (see §Remaining)
+> **Opened:** 2026-08-24 · **Status:** ✅ **CLOSED 2026-08-24** — landed, released, and consumed
 > **Requesting side:** `riir-chain` Issue 108 (fair-roll verify) + Issue 109 (Merkle verify)
 > **Design:** `riir-chain/.proposals/006_esp32_device_tier_ws_fallback.md` §10 Q6/Q7
 
@@ -116,17 +116,54 @@ change to every historical roll and belongs in a versioned `_v2` seam agreed on
 both sides. Documented on `FairRollVerifier::roll_die`; tracked in
 `riir-chain` Issue 108.
 
-## Remaining
+## Consumed — released the same day
 
-**The consume-and-re-export step.** Both siblings take `katgpt-core` as a *git
-dep on branch `main`*, and this crate is on `develop`. Making
-`FairRng::roll_die` a thin re-export therefore unblocks on a `develop` → `main`
-promotion, which is a **release decision, not a refactor** — deliberately not
-taken here.
+`develop` → `main` promoted as a fast-forward (`51be354a` → `4d6749fa`),
+verified first: `main` was 0 commits ahead, and `katgpt-core` was
+check-built under the sibling-consumed feature set
+(`engram, subspace_phase_gate, dec_operators, mag_mining, tropical_algebra,
+chunked_content_store, rtdc_subtree_inclusion`) before the push.
 
-Until then the invariant is held by the shared fixture asserted on all three
-sides: `katgpt-device-verify` (17 tests), `riir-chain`
-`tests/fair_roll_device_vectors.rs` (3, pinned in `test_gate.sh`), and
-`riir-neuron-db` `tests/merkle_device_vectors.rs` (5). All green as of
-2026-08-24 — the node-side implementations agree with the device fixture
-bit-for-bit today.
+Both siblings now **consume** rather than duplicate:
+
+| Repo | Was | Now |
+|---|---|---|
+| `riir-chain` | own `FairRng::roll_die` etc. | delegates to `FairRollVerifier` (`optional`, pulled in by `chain`) |
+| `riir-neuron-db` | own `hash_pair` / `compute_root_from_proof` / `verify_proof` / `EMPTY_HASH` | `pub use` from `merkle_verify` (non-optional) |
+
+**There is now exactly one implementation of each, and it is the one the
+device links.** The invariant this issue opened with — *one implementation,
+consumed, never copied* — holds structurally, not by convention.
+
+### The proof the move was behaviour-preserving
+
+The vector fixtures were written against the **old, in-repo** implementations
+and still pass against the delegated ones:
+
+| Gate | Result |
+|---|---|
+| `katgpt-device-verify` (host + wasip2) | 17/17 each |
+| `riir-chain --test fair_roll_device_vectors` | 3/3 |
+| `riir-neuron-db --test merkle_device_vectors` | 5/5 |
+| `riir-neuron-db --test merkle_soundness_spec_match` | 7/7 — the **Lean** corpus survived the move |
+| `riir-chain --lib` | 343, unchanged |
+| `riir-neuron-db --lib` | 412 passed, 4 ignored |
+| workspace boundary contract | clean, 15 repos, 181 edges |
+
+That is what makes this a refactor rather than a rewrite: the measurement
+predates the change.
+
+### One thing the release forced, and how it was handled
+
+Adding a second package from the same git source moves the **whole**
+`katgpt-rs` rev, so both siblings jumped 30 upstream commits. Every
+`katgpt-core`-consuming `riir-chain` feature was re-checked
+(`chain_engram_commit`, `chain_rtdc`, `chain_rtdc_subtree`,
+`chain_vessel_delivery`, `chain_wasm`, `chain_guard`) — all clean. Worth
+knowing for next time: a git-dep addition is never *only* an addition.
+
+## Still open elsewhere (not this issue)
+
+`roll_die`'s residual bias — reproduced here bit-for-bit on purpose, and now
+the single definition, so a `_v2` fix would be a one-place change agreed on
+both sides. Tracked in `riir-chain` Issue 108.

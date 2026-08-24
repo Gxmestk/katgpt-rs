@@ -55,12 +55,13 @@ implementation this crate mirrors, and each asserts the **same pinned vector
 fixture** by value. Copying the code across the seam is what creates drift;
 copying the fixture is what detects it.
 
-The consume-and-re-export step (each sibling's function becoming a thin
-re-export so exactly one implementation exists) is **not yet done**: both
-siblings take `katgpt-core` as a *git dep on branch `main`*, and this crate
-lives on `develop`. It unblocks on a `develop` → `main` promotion, which is a
-release decision, not a refactor. Until then the shared fixture — asserted on
-all three sides — is the drift gate.
+The consume step **landed 2026-08-24** (`develop` → `main` fast-forward,
+`51be354a` → `4d6749fa`). `riir-chain`'s `FairRng` delegates to
+`FairRollVerifier`; `riir-neuron-db/src/merkle.rs` `pub use`s the verify half.
+Exactly one implementation of each now exists, and it is the one a device
+links. The shared fixture remains the gate that would catch a re-divergence —
+it was written against the pre-move implementations and still passes against
+the delegated ones, which is what proved the move behaviour-preserving.
 
 ## Inherited boundaries (links)
 
