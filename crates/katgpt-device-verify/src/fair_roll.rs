@@ -6,8 +6,11 @@
 //! was handed does not match, the node rigged the outcome.
 //!
 //! Bit-identical to `riir-chain::split_key::{BetaResolver::combine,
-//! FairRng::roll_die}`. **Do not "improve" the arithmetic here** — see the
-//! residual-bias note on [`FairRollVerifier::roll_die`].
+//! FairRng::roll_die}` — the node delegates here, so this file **is** the
+//! seam. The rejection rule is **v2**: every draw is threshold-tested (see
+//! [`FairRollVerifier::roll_die`]). Do not "simplify" it back to an
+//! unconditional fallback byte — that reintroduces the v1 bias and forks
+//! the seam.
 //!
 //! Alloc-free and panic-free except for the documented `sides == 0` case,
 //! which has a [`FairRollVerifier::checked_roll_die`] escape hatch.
@@ -71,23 +74,33 @@ impl FairRollVerifier {
 
     /// Roll a single die with `sides` faces. Returns `1..=sides`.
     ///
-    /// One `blake3::hash` of 32 bytes plus integer arithmetic. No allocation,
-    /// no entropy source, no float.
+    /// One `blake3::hash` of 32 bytes plus integer arithmetic in the
+    /// overwhelmingly common case. No allocation, no entropy source, no
+    /// float.
     ///
-    /// # Residual bias — deliberately preserved, not fixed here
+    /// # Exact uniformity (v2) — every draw is rejection-tested
     ///
-    /// The first byte is rejection-tested against
-    /// `threshold = 256 - (256 % sides)`, but the **fallback byte is used
-    /// unconditionally**, without its own rejection test. So for a `sides`
-    /// that does not divide 256 the distribution is not exactly uniform: the
-    /// low `256 % sides` faces are over-represented by the fallback's share.
+    /// Each hash byte is tested against `threshold = 256 - (256 % sides)` —
+    /// that is `sides * (256 / sides)`, the largest multiple of `sides` that
+    /// fits in a byte. The **first byte below the threshold** decides the
+    /// roll: `byte % sides + 1`. A byte at or above the threshold is
+    /// rejected and the next byte is drawn; if all 32 hash bytes reject
+    /// (probability ≤ `(127/256)^32 ≈ 2e-10` for any `sides`), the
+    /// keystream extends deterministically by hashing the hash. An accepted
+    /// byte is uniform over exactly `threshold` values — a whole number of
+    /// `sides`-blocks — so `byte % sides` is exactly uniform and every face
+    /// in `1..=sides` is reachable. No modulo is ever applied to a
+    /// rejected value.
     ///
-    /// This is **reproduced on purpose**. The node computes the same skew, and
-    /// bit-identity with the node is the property that keeps an honest claim
-    /// from looking like fraud. Correcting the distribution is a
-    /// consensus-visible change to the settled outcome of every historical
-    /// roll, so it belongs in a versioned `_v2` seam agreed on both sides —
-    /// not in a device-side "cleanup". Tracked in `riir-chain` Issue 108.
+    /// # v1 → v2 (2026-08-24, owner call — `riir-chain` Issue 108)
+    ///
+    /// v1 tested only the first byte and used the second **unconditionally**
+    /// when the first rejected, so a `sides` not dividing 256 was slightly
+    /// non-uniform (the low `256 % sides` faces over-represented). v2
+    /// rejection-tests every draw. Outcomes change **only** for seeds whose
+    /// first *two* hash bytes both meet the threshold (e.g. ~0.02% of seeds
+    /// at `sides = 6`); every other seed rolls the same face as v1. The
+    /// fixture labels carry `v2` so the two seams cannot be confused.
     ///
     /// # Panics
     ///
@@ -96,14 +109,19 @@ impl FairRollVerifier {
     #[inline]
     #[must_use]
     pub fn roll_die(&self, sides: u8) -> u8 {
-        let hash = blake3::hash(&self.combined_seed);
         let threshold = 256u16 - (256 % u16::from(sides));
-        let val = u16::from(hash.as_bytes()[0]);
-        let used = match val < threshold {
-            true => val as u8,
-            false => hash.as_bytes()[1],
-        };
-        used % sides + 1
+        let mut hash = blake3::hash(&self.combined_seed);
+        loop {
+            for &byte in hash.as_bytes() {
+                if u16::from(byte) < threshold {
+                    return byte % sides + 1;
+                }
+            }
+            // All 32 bytes rejected (≤ ~2e-10 for any sides): extend the
+            // keystream deterministically. Never taken in practice; exists
+            // so the function is total without an allocation or a panic.
+            hash = blake3::hash(hash.as_bytes());
+        }
     }
 
     /// [`Self::roll_die`], returning `None` instead of panicking on `sides == 0`.
@@ -133,11 +151,13 @@ impl FairRollVerifier {
 
     /// Roll `count` dice via the BLAKE3 XOF keystream.
     ///
-    /// Bit-identical to `riir-chain`'s `FairRng::roll_dice`, **including** its
-    /// different (and here fully-correct) rejection rule: the XOF path rejects
-    /// every out-of-range byte rather than falling back to a second one, so it
-    /// does *not* share [`Self::roll_die`]'s residual bias. The two functions
-    /// are different distributions by construction, on both sides.
+    /// Bit-identical to `riir-chain`'s `FairRng::roll_dice`. Like
+    /// [`Self::roll_die`] (v2), this path rejection-tests **every** byte, so
+    /// both functions are exactly uniform. They remain *different*
+    /// distributions because they draw from different byte streams — this
+    /// one a keyed XOF keystream, `roll_die` the plain hash bytes chained on
+    /// exhaustion — so the same seed rolls different sequences under the
+    /// two, on both sides of the seam.
     ///
     /// Behind `alloc` because it returns a `Vec`. A daily single-item claim
     /// needs only [`Self::roll_die`]; a device build leaves this off.

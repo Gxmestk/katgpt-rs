@@ -25,17 +25,28 @@
 //! `sides` values are split deliberately:
 //!
 //! - **Divides 256** (`1, 2, 4, 8, 16, 32, 64, 128`) — `256 % sides == 0`, so
-//!   `threshold == 256`, the first byte is *always* accepted and the fallback
-//!   branch is dead. These pin the common path.
+//!   `threshold == 256`, the first byte is *always* accepted and the
+//!   rejection branch is dead. These pin the common path.
 //! - **Does not divide 256** (`3, 5, 6, 7, 10, 12, 20, 100, 255`) — the
 //!   rejection branch is live. **This is where drift hides**, because it is
 //!   the only place where two well-meaning implementations can reasonably
 //!   differ (reject-and-retry vs. reject-and-fall-back, and *which* byte the
-//!   fallback reads).
+//!   retry reads).
 //! - [`FAIR_ROLL_FALLBACK_VECTORS`] holds seeds *searched for* so that
-//!   `hash[0] >= threshold` — the fallback branch is exercised by
-//!   construction, not by luck. Without these the branch is hit ~0.4% of the
-//!   time for `sides = 3` and a drifting implementation ships green.
+//!   `hash[0] >= threshold` — the rejection branch is exercised by
+//!   construction, not by luck. Without these the branch is hit ~0.4% of
+//!   the time for `sides = 3` and a drifting implementation ships green.
+//! - [`FAIR_ROLL_DOUBLE_REJECT_VECTORS`] (v2) holds seeds searched so that
+//!   `hash[0]` AND `hash[1]` both reject **and** v1's unconditional-fallback
+//!   outcome differs from v2's — the retry path is covered by construction,
+//!   and every row is a genuine v1/v2 discriminator: a silent regression to
+//!   the biased v1 rule flips the whole set.
+//!
+//! Labels carry `v2` — the rejection rule that tests **every** draw (v1
+//! tested only the first byte and used the second unconditionally; see the
+//! v2 note on [`crate::fair_roll::FairRollVerifier::roll_die`]). Seeds are
+//! `BLAKE3(label)`, so a version bump re-derives the whole table and the
+//! two seams cannot be confused.
 
 use crate::Hash;
 

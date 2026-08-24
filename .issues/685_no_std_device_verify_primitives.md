@@ -105,16 +105,17 @@ with the node on every odd-sized tree. Filed + fixed as `riir-neuron-db`
 Issue 606. This is the entire argument for shipping vectors before code,
 demonstrated rather than asserted.
 
-### Second finding, deliberately NOT fixed
+### Second finding — fixed same day as v2 (see the bottom section)
 
-`roll_die`'s rejection sampling is incomplete: the first byte is threshold-tested,
-but the **fallback byte is used unconditionally**, so for a `sides` that does
-not divide 256 the low faces are over-represented. Reproduced bit-for-bit here
-on purpose — the node computes the same skew, and bit-identity is what keeps an
-honest claim from looking like fraud. Correcting it is a consensus-visible
-change to every historical roll and belongs in a versioned `_v2` seam agreed on
-both sides. Documented on `FairRollVerifier::roll_die`; tracked in
-`riir-chain` Issue 108.
+`roll_die`'s rejection sampling was incomplete: the first byte was
+threshold-tested, but the **fallback byte was used unconditionally**, so for
+a `sides` that did not divide 256 the low faces were over-represented. It
+was reproduced bit-for-bit here on purpose at landing time — the node
+computed the same skew, and bit-identity was what kept an honest claim from
+looking like fraud. Correcting it was deferred to a versioned `_v2` seam
+agreed on both sides. **That decision landed the same day** (owner call,
+`riir-chain` Issue 108) — see [v2](#v2--the-residual-bias-is-fixed-2026-08-24-same-day)
+below.
 
 ## Consumed — released the same day
 
@@ -166,4 +167,46 @@ knowing for next time: a git-dep addition is never *only* an addition.
 
 `roll_die`'s residual bias — reproduced here bit-for-bit on purpose, and now
 the single definition, so a `_v2` fix would be a one-place change agreed on
-both sides. Tracked in `riir-chain` Issue 108.
+both sides. Tracked in `riir-chain` Issue 108. **→ RESOLVED same day as v2
+(owner call); see the section below.**
+
+## v2 — the residual bias is fixed (2026-08-24, same day)
+
+The owner made the `_v2` call the same day the issue closed, before the
+daily-claim loop shipped against real value — so no historical roll was
+settled on v1 arithmetic.
+
+**The fix:** `roll_die` now rejection-tests **every** draw. The first hash
+byte below `threshold = sides * (256 / sides)` decides the roll
+(`byte % sides + 1`); bytes at/above the threshold reject and the next byte
+is drawn; if all 32 hash bytes reject (≤ ~2e-10 for any `sides`) the
+keystream extends deterministically by hashing the hash. An accepted byte
+is uniform over a whole number of `sides`-blocks, so the modulo on it is
+exact — allocation-free, `no_std`, simpler than Lemire's multiply-shift,
+which is why the owner picked rejection sampling over it.
+
+**Outcomes vs v1** change only for seeds whose first *two* hash bytes both
+reject (~0.02% of seeds at `sides = 6`, ~4.8% at `sides = 100`); every other
+seed rolls the same face as before. `roll_dice` (already per-byte rejected)
+is unchanged.
+
+**The fixture moved to `v2` labels** (seeds derive from labels, so the whole
+table re-derives and the seams cannot be confused):
+
+- 26 v1 vectors → 26 v2 vectors (div / nondiv / fallback sets, re-searched)
+- **new** `FAIR_ROLL_DOUBLE_REJECT_VECTORS` (9): seeds searched so `hash[0]`
+  AND `hash[1]` both reject AND v1's unconditional-fallback face differs
+  from v2's — every row is a genuine v1/v2 discriminator; a silent
+  regression to the biased rule flips the whole set.
+- **new** `tests/rejection_uniformity.rs`: for each `sides`, a seed is
+  searched for **every** possible first hash byte `0..=255`, mapping the
+  complete raw-value space through the real BLAKE3 path — accepted bytes
+  must reduce by modulo (pinned per value), each face has exactly
+  `floor(256/sides)` accepted preimages (exact conditional uniformity),
+  every face reachable; dividing sides get the fully exhaustive proof
+  (each face exactly `256/sides` times).
+
+Verified: host 18+2 green, `wasm32-wasip2` **executed** under wasmtime 18+2
+green, `wasm32-unknown-unknown` + `riscv32imc-unknown-none-elf` build clean,
+clippy 0. `riir-chain` re-synced its mirror (35 vectors) in lockstep — see
+Issue 108 for the node-side record and commit hashes.

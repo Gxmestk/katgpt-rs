@@ -13,7 +13,9 @@
 //! The fallback-branch vectors are **searched for**, not sampled: for a
 //! `sides` value with a small residue the rejection branch is taken ~0.4% of
 //! the time, so a random table exercises it never and a drifting fallback
-//! ships green.
+//! ships green. The double-rejection set is searched harder still — both
+//! leading bytes rejected **and** the v1 outcome different from v2 — so a
+//! silent regression to v1's unconditional fallback flips every one of them.
 
 use katgpt_device_verify::fair_roll::FairRollVerifier;
 use katgpt_device_verify::merkle_verify::{EMPTY_HASH, compute_root_from_proof, hash_pair};
@@ -57,7 +59,7 @@ fn main() {
     let dividing: Vec<_> = [1u8, 2, 4, 8, 16, 32, 64, 128]
         .iter()
         .map(|&sides| {
-            let label = format!("katgpt-device-verify/fair_roll/v1/div/{sides}");
+            let label = format!("katgpt-device-verify/fair_roll/v2/div/{sides}");
             let seed = seed_of(&label);
             let die = FairRollVerifier::from_combined_seed(seed).roll_die(sides);
             (label, seed, sides, die)
@@ -67,7 +69,7 @@ fn main() {
         "FAIR_ROLL_DIVIDING_VECTORS",
         "Fair-roll vectors on `sides` values that divide 256 — \
          `threshold == 256`, so the first byte is always accepted and the \
-         fallback branch is unreachable. These pin the common path.",
+         rejection branch is unreachable. These pin the common path.",
         &dividing,
     );
     println!();
@@ -76,7 +78,7 @@ fn main() {
     let nondividing: Vec<_> = [3u8, 5, 6, 7, 10, 12, 20, 100, 255]
         .iter()
         .map(|&sides| {
-            let label = format!("katgpt-device-verify/fair_roll/v1/nondiv/{sides}");
+            let label = format!("katgpt-device-verify/fair_roll/v2/nondiv/{sides}");
             let seed = seed_of(&label);
             let die = FairRollVerifier::from_combined_seed(seed).roll_die(sides);
             (label, seed, sides, die)
@@ -92,14 +94,14 @@ fn main() {
     println!();
 
     // ── Fair roll: seeds SEARCHED so that hash[0] >= threshold ──
-    // Guarantees the fallback byte is the one that decides the outcome.
+    // Guarantees the first byte rejects, so a later byte decides the outcome.
     let fallback: Vec<_> = [3u8, 5, 6, 7, 10, 12, 20, 100, 255]
         .iter()
         .map(|&sides| {
             let t = threshold(sides);
             let (label, seed) = (0u32..)
                 .map(|i| {
-                    let l = format!("katgpt-device-verify/fair_roll/v1/fallback/{sides}/{i}");
+                    let l = format!("katgpt-device-verify/fair_roll/v2/fallback/{sides}/{i}");
                     let s = seed_of(&l);
                     (l, s)
                 })
@@ -112,11 +114,54 @@ fn main() {
     emit(
         "FAIR_ROLL_FALLBACK_VECTORS",
         "Fair-roll vectors whose seed was **searched** so that \
-         `hash[0] >= threshold` — the rejection fallback branch decides the \
-         outcome by construction, not by luck. Without these the branch is \
-         taken ~0.4% of the time for `sides = 3` and a drifting fallback \
-         ships green.",
+         `hash[0] >= threshold` — the first byte rejects, so the byte that \
+         decides the outcome is a later one, by construction rather than \
+         luck. Without these the branch is taken ~0.4% of the time for \
+         `sides = 3` and a drifting rejection rule ships green.",
         &fallback,
+    );
+    println!();
+
+    // ── Fair roll: seeds SEARCHED so hash[0] AND hash[1] both reject, with
+    // v1 ≠ v2 outcomes — the v2 retry path, and a genuine v1/v2
+    // discriminator per vector. This is the branch where v2 diverged from
+    // v1's unconditional fallback byte, and where a silent regression back
+    // to v1 changes the settled outcome.
+    let dbltrej: Vec<_> = [3u8, 5, 6, 7, 10, 12, 20, 100, 255]
+        .iter()
+        .map(|&sides| {
+            let t = threshold(sides);
+            let (label, seed) = (0u32..)
+                .map(|i| {
+                    let l = format!("katgpt-device-verify/fair_roll/v2/dblrej/{sides}/{i}");
+                    let s = seed_of(&l);
+                    (l, s)
+                })
+                .find(|(_, s)| {
+                    let h = blake3::hash(s);
+                    let b = h.as_bytes();
+                    u16::from(b[0]) >= t
+                        && u16::from(b[1]) >= t
+                        // v1 would deal b[1] % sides + 1 unconditionally;
+                        // require it to DIFFER from the v2 outcome so every
+                        // vector in this set discriminates the two seams.
+                        && b[1] % sides + 1
+                            != FairRollVerifier::from_combined_seed(*s).roll_die(sides)
+                })
+                .expect("a discriminating double-rejection seed exists for every sides > 0");
+            let die = FairRollVerifier::from_combined_seed(seed).roll_die(sides);
+            (label, seed, sides, die)
+        })
+        .collect();
+    emit(
+        "FAIR_ROLL_DOUBLE_REJECT_VECTORS",
+        "Fair-roll vectors whose seed was **searched** so that `hash[0]` AND \
+         `hash[1]` both meet the threshold AND the v1 outcome (unconditional \
+         `hash[1] % sides + 1`) differs from the v2 one — the retry path \
+         (deciding byte at index >= 2) is exercised by construction, and \
+         every vector here flips if the implementation regresses to v1's \
+         unconditional fallback.",
+        &dbltrej,
     );
     println!();
 

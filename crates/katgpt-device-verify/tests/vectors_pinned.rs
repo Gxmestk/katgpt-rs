@@ -18,8 +18,8 @@ use katgpt_device_verify::merkle_verify::{
     verify_proof_bounded,
 };
 use katgpt_device_verify::vectors::{
-    FAIR_ROLL_DIVIDING_VECTORS, FAIR_ROLL_FALLBACK_VECTORS, FAIR_ROLL_NONDIVIDING_VECTORS,
-    FairRollVector, MERKLE_VECTORS,
+    FAIR_ROLL_DIVIDING_VECTORS, FAIR_ROLL_DOUBLE_REJECT_VECTORS,
+    FAIR_ROLL_FALLBACK_VECTORS, FAIR_ROLL_NONDIVIDING_VECTORS, FairRollVector, MERKLE_VECTORS,
 };
 
 /// The rejection threshold, spelled the way the implementation spells it.
@@ -32,6 +32,23 @@ fn all_fair_roll() -> impl Iterator<Item = &'static FairRollVector> {
         .iter()
         .chain(FAIR_ROLL_NONDIVIDING_VECTORS)
         .chain(FAIR_ROLL_FALLBACK_VECTORS)
+        .chain(FAIR_ROLL_DOUBLE_REJECT_VECTORS)
+}
+
+/// The face `roll_die` (v2) must deal: walk the hash bytes, take the first
+/// one below the threshold, reduce it. Spelled locally — mirrors of the
+/// rule are what turn a table+seed mismatch into a red test.
+fn first_accepted_face(seed: &[u8; 32], sides: u8) -> u8 {
+    let t = threshold(sides);
+    let mut hash = blake3::hash(seed);
+    loop {
+        for &b in hash.as_bytes() {
+            if u16::from(b) < t {
+                return b % sides + 1;
+            }
+        }
+        hash = blake3::hash(hash.as_bytes());
+    }
 }
 
 // ── The gate itself ────────────────────────────────────────────────────
@@ -48,7 +65,7 @@ fn fair_roll_vectors_match() {
         );
         n += 1;
     }
-    assert_eq!(n, 26, "vector count changed — was the fixture regenerated?");
+    assert_eq!(n, 35, "vector count changed — was the fixture regenerated?");
 }
 
 #[test]
@@ -111,18 +128,54 @@ fn fallback_vectors_actually_take_the_fallback_branch() {
         assert!(
             first >= threshold(v.sides),
             "{}: first byte {} < threshold {} — this vector no longer \
-             exercises the fallback, so the branch is UNCOVERED",
+             exercises the rejection branch, so the branch is UNCOVERED",
             v.label,
             first,
             threshold(v.sides)
         );
-        // And prove the fallback is what decided the outcome: the value the
-        // rejected first byte would have produced must differ from the pinned
-        // die, otherwise the two paths coincide and the test is vacuous.
-        let rejected = blake3::hash(&v.seed).as_bytes()[0] % v.sides + 1;
-        let fallback = blake3::hash(&v.seed).as_bytes()[1] % v.sides + 1;
-        assert_eq!(v.die, fallback, "{}: pinned die is not the fallback", v.label);
-        let _ = rejected; // may legitimately coincide; recorded, not asserted
+        // v2: the first byte rejects by construction, so the decider is a
+        // later byte — and it must produce the pinned face.
+        assert_eq!(
+            v.die,
+            first_accepted_face(&v.seed, v.sides),
+            "{}: pinned die is not the first accepted byte's face",
+            v.label
+        );
+    }
+}
+
+#[test]
+fn double_reject_vectors_take_the_v2_retry_path() {
+    for v in FAIR_ROLL_DOUBLE_REJECT_VECTORS {
+        let hash = blake3::hash(&v.seed);
+        let t = threshold(v.sides);
+        assert!(
+            u16::from(hash.as_bytes()[0]) >= t,
+            "{}: hash[0] accepted — not a double-rejection seed",
+            v.label
+        );
+        assert!(
+            u16::from(hash.as_bytes()[1]) >= t,
+            "{}: hash[1] accepted — the retry path is not exercised",
+            v.label
+        );
+        // The decider is at index >= 2 (or the chained hash) and must match
+        // the pinned face.
+        assert_eq!(
+            v.die,
+            first_accepted_face(&v.seed, v.sides),
+            "{}: pinned die is not the first accepted byte's face",
+            v.label
+        );
+        // And it must DISAGREE with v1's unconditional fallback byte — these
+        // vectors were searched for that property, so a regression to v1
+        // flips every row here rather than passing silently.
+        let v1_face = hash.as_bytes()[1] % v.sides + 1;
+        assert_ne!(
+            v.die, v1_face,
+            "{}: v1 and v2 agree — this vector no longer discriminates the seams",
+            v.label
+        );
     }
 }
 
