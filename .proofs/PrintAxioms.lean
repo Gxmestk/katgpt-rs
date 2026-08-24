@@ -39,11 +39,13 @@ import KatgptProof.Pencil.RayleighCF
 import KatgptProof.Pencil.Weyl
 import KatgptProof.Pencil.Loewner
 import KatgptProof.Pencil.Eigengap
+import KatgptProof.HintRegret.Basic
 
 open KatgptProof.Bridge
 open KatgptProof.Hope
 open KatgptProof.Ssmax
 open KatgptProof.Pencil
+open KatgptProof.HintRegret
 
 -- Action-bridge ranking preservation (the sigmoid strict-monotonicity chain).
 #print axioms action_bridge_ranking_preserved
@@ -103,3 +105,8 @@ open KatgptProof.Pencil
 #print axioms eigval_diagonal_antitone
 #print axioms ladder_unit_gap
 #print axioms eigengap_ladder_ge_half
+
+-- HintRegret (Plan 576): band-gate openness over ℝ — the ideal (0, 1)
+-- contract the f32 gate approximates (its ±40 early-exit / rounding
+-- saturation points are the documented Rust-vs-ℝ divergence).
+#print axioms bandGate_mem_Ioo

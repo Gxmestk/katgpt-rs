@@ -107,6 +107,20 @@ perturb "Eigengap.lean" \
     's/    eigval (diagonal_isHermitian d) j = d j := by/    eigval (diagonal_isHermitian d) j = -d j := by/' \
     "antitone-diagonal theorem pins the NEGATED diagonal — false (d = const 5)"
 
+echo ""
+echo "── HintRegret negative tests (Plan 576) ──"
+SRC="$PROOFS/KatgptProof/HintRegret"
+
+echo "P7: band-gate factor drop (product → single rising factor)"
+perturb "Basic.lean" \
+    's/sigmoid (κ \* (w - wLo)) \* sigmoid (κ \* (wHi - w))/sigmoid (κ * (w - wLo))/' \
+    "gate drops the falling wall — the theorem survives (single sigmoid ∈ (0,1)) but the κ=0 flat instance (1/4) and the wall instances (<1/2) must fail"
+
+echo "P8: spec-test flat constant typo (1/4 → 1/2)"
+perturb "SpecTests.lean" \
+    's/bandGate w wLo wHi 0 = (1:ℝ) \/ 4 := by/bandGate w wLo wHi 0 = (1:ℝ) \/ 2 := by/' \
+    "κ=0 instance expects σ(0)·σ(0)=1/2 instead of 1/4"
+
 if [ "$fail" -gt 0 ]; then
     echo "✗ $fail perturbation(s) built green — spec-test holes"
     exit 1

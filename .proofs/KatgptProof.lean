@@ -29,3 +29,5 @@ import KatgptProof.Pencil.Loewner
 import KatgptProof.Pencil.Eigengap
 import KatgptProof.Pencil.SpecTests
 import KatgptProof.Ssmax.SpecTests
+import KatgptProof.HintRegret.Basic
+import KatgptProof.HintRegret.SpecTests

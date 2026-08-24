@@ -112,6 +112,18 @@ pub mod linking_fold;
 pub mod best_belief;
 #[cfg(feature = "best_belief")]
 pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief};
+// hint_regret — paired-rollout value-of-information estimation (Plan 576,
+// Research 496 SPADE arXiv:2608.19197 / Research 500 EnvHarness, game-side
+// guide riir-ai .research/340). The frontier-curriculum discriminator: how
+// much would ONE hint (demo / revealed arm) improve the return on this
+// content? Paired CRN estimator (Welford, zero-alloc) + Hoeffding /
+// empirical-Bernstein machinery + sigmoid band gate + three-regime triage
+// + Beta-LCB frontier ordering (DRY over best_belief) + regret-scored
+// memory with absorbing-intractable eviction. Opt-in pending the GOAT
+// verdict; consumers: riir-ai Guide 340 P0 (supersedes the mmorpg inline
+// collapse), riir-train Plan 346 arena opponent selection.
+#[cfg(feature = "hint_regret")]
+pub mod hint_regret;
 // entropic_tilt — KL-budgeted max-seeking advantage tilt (TTT-Discover
 // arXiv:2601.16175; prior art RS-GRPO / RSPO). The max-seeking counterpart to
 // `best_belief` above: that scores a candidate from its OWN history counts,

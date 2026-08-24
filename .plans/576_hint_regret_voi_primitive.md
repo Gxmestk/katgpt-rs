@@ -19,34 +19,34 @@ Ship the modelless hint-regret primitive SPADE (arXiv:2608.19197) distills to: a
 
 ## Phase 1 — Estimator core (`crates/katgpt-core/src/hint_regret.rs`)
 
-- [ ] `HintRegretEstimator` struct: paired arms, CRN shared seeds, rolling K with Hoeffding `K(ε,δ) = ⌈(b−a)²/(2ε²)·ln(2/δ)⌉`, sequential stopping on CI half-width.
-- [ ] `estimate() -> RegretEstimate { r_hat, ci_half_width, n_pairs, arm_means }` — pure arithmetic over recorded pairs, alloc-free.
-- [ ] Analytic oracles as test fixtures: reveal-the-arm bandit (hint exposes μ*; `r = μ* − max_j μ̂_j`), hinted shortest path (β→∞ returns demo return bit-exactly).
-- [ ] G1 gate: estimator within 2× Hoeffding bound at prescribed K across 10³ seeds; coverage of the δ-guarantee ≥ nominal.
+- [x] `HintRegretEstimator` struct: paired arms, CRN shared seeds, rolling K with Hoeffding `K(ε,δ) = ⌈(b−a)²/(2ε²)·ln(2/δ)⌉`, sequential stopping on CI half-width. *(Landed as `src/hint_regret/mod.rs` — the plan's single file became a module dir at Phase 2.)*
+- [x] `estimate() -> RegretEstimate { r_hat, ci_half_width, n_pairs, arm_means }` — pure arithmetic over recorded pairs, alloc-free.
+- [x] Analytic oracles as test fixtures: reveal-the-arm bandit (hint exposes μ*; `r = μ* − max_j μ̂_j`), hinted shortest path (β→∞ returns demo return bit-exactly).
+- [x] G1 gate: estimator within 2× Hoeffding bound at prescribed K across 10³ seeds; coverage of the δ-guarantee ≥ nominal. *(Bench 576: max_err 0.0347 < 2×h(K)=0.10, coverage 1.000.)*
 
 ## Phase 2 — Band gate + triage (`hint_regret/gate.rs`)
 
-- [ ] `learnable_band_gate(w, w_lo, w_hi, kappa) -> f32` — `σ(κ(w−w_lo))·σ(κ(w_hi−w))`; monotone ↑↓, strict (0,1), peaks at band center. Property tests + one-line Lean extension of the shipped `sigmoid_bounded` family (`.proofs/KatgptProof`). **`w` = per-composition Beta posterior mean** (Research 500 row 11) — the gate ranks modifier compositions, and when `w` leaves the band the consumer swaps composition, not a scalar.
-- [ ] `Regime` enum { Frontier, Mastered, Intractable } + `triage(r_hat, r_floor, unhinted_return, tau_r, tau_R) -> Regime` — 2-threshold 2D partition; property test: exactly one cell per input, boundaries pinned.
-- [ ] Wilson CI on the learnable-share statistic (UQ honesty on the signature metric).
+- [x] `learnable_band_gate(w, w_lo, w_hi, kappa) -> f32` — `σ(κ(w−w_lo))·σ(κ(w_hi−w))`; monotone ↑↓, strict (0,1), peaks at band center. Property tests + one-line Lean extension of the shipped `sigmoid_bounded` family (`.proofs/KatgptProof`). **`w` = per-composition Beta posterior mean** (Research 500 row 11) — the gate ranks modifier compositions, and when `w` leaves the band the consumer swaps composition, not a scalar. *(Lean: `KatgptProof.HintRegret.bandGate_mem_Ioo` + SpecTests + 2 negative perturbations, 39-theorem audit green. The strict-(0,1) claim is the ideal ℝ contract; the f32 gate's two saturation surfaces — ±40 early-exit → 0, rounding → 1 at args ≳17 — are documented in the Rust doc + pinned by the property test.)*
+- [x] `Regime` enum { Frontier, Mastered, Intractable } + `triage(r_hat, r_floor, unhinted_return, tau_r, tau_R) -> Regime` — 2-threshold 2D partition; property test: exactly one cell per input, boundaries pinned. *(Deviation, documented in gate.rs: the plan draft carried a fifth `r_floor` arg the guide's partition (and the landed consumer) does not use — shipped the 4-arg canonical Guide 340 form `triage(r_hat, unhinted_return, tau_r, tau_ret)`; noise-floor handling lives in the estimator's sequential stopping.)*
+- [x] Wilson CI on the learnable-share statistic (UQ honesty on the signature metric). *(Byte-identical to the qmc twin; free fn `wilson_score_ci`.)*
 
 ## Phase 3 — Frontier ordering + memory seam
 
-- [ ] `beta_lcb_order(scores: &[(successes, fails)]) -> Vec<usize>` — ε-quantile of Beta(1+S, 1+F) descending (mirror of shipped `SelectionMode::BetaPosterior`; extract or re-implement leaf-clean — check katgpt-core first, DRY). **Expose the per-entry quantile (`beta_lcb`) so consumers can order BOTH directions** — descending for frontier ordering, ascending for weakness-slice diagnosis (Research 500 row 4: weakest slice = lowest LCB; Guide 340 diagnosis-first loop). One primitive, two consumers.
-- [ ] `RegretMemoryEntry { content_hash, r_hat, ci, skill_tag_bits, last_seen_tick }` + salience `r_hat · σ(−λ·Δt)` (staleness decay — same family as `decay_confidence`).
-- [ ] Oldest-first eviction at capacity; absorbing-eviction for Intractable-classified entries.
+- [x] `beta_lcb_order(scores: &[(successes, fails)]) -> Vec<usize>` — ε-quantile of Beta(1+S, 1+F) descending (mirror of shipped `SelectionMode::BetaPosterior`; extract or re-implement leaf-clean — check katgpt-core first, DRY). **Expose the per-entry quantile (`beta_lcb`) so consumers can order BOTH directions** — descending for frontier ordering, ascending for weakness-slice diagnosis (Research 500 row 4: weakest slice = lowest LCB; Guide 340 diagnosis-first loop). One primitive, two consumers. *(Landed as `beta_lcb_order_into` — DRY over `best_belief_score`'s Beta-quantile, zero-alloc scratch form; per-entry `beta_lcb` exposed.)*
+- [x] `RegretMemoryEntry { content_hash, r_hat, ci, skill_tag_bits, last_seen_tick }` + salience `r_hat · σ(−λ·Δt)` (staleness decay — same family as `decay_confidence`).
+- [x] Oldest-first eviction at capacity; absorbing-eviction for Intractable-classified entries. *(Bounded tombstone ring.)*
 
 ## Phase 4 — GOAT gate + bench
 
-- [ ] `benches/bench_576_hint_regret_goat.rs`:
+- [x] `benches/bench_576_hint_regret_goat.rs`:
   - G1: oracle calibration (Phase 1) + triage partition properties.
-  - G2: CRN variance ratio ≥ 2× vs independent-seed estimation (1000 reps); per-pair cost sub-µs alloc-free.
-  - G3: default feature set untouched (gate compiles out); cgsp suite count-identical with `hint_regret` off.
+  - G2: CRN variance ratio ≥ 2× vs independent-seed estimation (1000 reps); per-pair cost sub-µs alloc-free. *(2.76× / 24.7 ns — fixture calibration + noise-stream fix documented in Bench 576 §Honest findings.)*
+  - G3: default feature set untouched (gate compiles out); cgsp suite count-identical with `hint_regret` off. *(Default lib 1904 = clean-HEAD 1904, worktree-verified.)*
   - G4: counting-allocator zero steady-state allocs over 10⁴ pairs.
-  - G-Floor (Report the Floor): triage accuracy vs single-arm banding floor at matched budget — paired arm must win or FAIL.
-  - G8 (simulated): learnable-share rises under regret-gated selection vs uniform on a synthetic curriculum (the 0.16→0.31 signature, modelless).
-- [ ] `.benchmarks/576_hint_regret_goat.md` record.
-- [ ] Promotion decision: default-on only if G-Floor and G8 pass modellessly; else stays opt-in with the verdict recorded.
+  - G-Floor (Report the Floor): triage accuracy vs single-arm banding floor at matched budget — paired arm must win or FAIL. *(0.997 vs 0.693.)*
+  - G8 (simulated): learnable-share rises under regret-gated selection vs uniform on a synthetic curriculum (the 0.16→0.31 signature, modelless). *(1.000 vs 0.273, 8 seeds.)*
+- [x] `.benchmarks/576_hint_regret_goat.md` record. *(Landed as `tests/` integration binaries, not `benches/` — gate tests, not criterion benches; same convention as the sibling GOAT gates.)*
+- [x] Promotion decision: default-on only if G-Floor and G8 pass modellessly; else stays opt-in with the verdict recorded. *(**Stays opt-in** — G-Floor + G8 pass modellessly (criterion met, necessary-not-sufficient); promotion deferred per the no-default-consumer rule until the Phase 5 consumer migrates onto `katgpt_core::hint_regret` — the landed mmorpg core `2c17f08` predates this module and carries a local triage. Verdict in Bench 576 §Promotion verdict.)*
 
 ## Phase 5 — Consumer wiring (defer-marked, owner-gated)
 

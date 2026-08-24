@@ -271,6 +271,20 @@ substrate_gate = []  # SubstrateGate passthrough — inference-time capability s
 belief_drafter = ["katgpt-types/belief_drafter"]  # NextLat Belief-State Speculative Drafter — entropy threshold config (Plan 217)
 best_belief = []  # ε-quantile Beta lower bound for conservative selection (Plan 336, Research 320, RQGM arXiv:2606.26294 Prop. 4). Complements sample_beta (Thompson exploration) with a conservative-exploitation counterpart. DEFAULT-ON (Phase 2 G2-unblock, 2026-06-28): LUT hot path 3.38ns<<100ns (32x32x5 table bit-identical to closed-form), G1 3.099e-5<1e-4, G4 0 allocs.
 entropic_tilt = []  # KL-budgeted entropic (max-seeking) advantage tilt — TTT-Discover arXiv:2601.16175, prior art RS-GRPO arXiv:2509.24261 / RSPO arXiv:2508.01174. Max-seeking sibling of best_belief (mean-seeking): scores from the SHAPE of the current group, not per-candidate history. Hoisted 2026-08-18 from riir-clippy selection_entropic (Issue 026) when riir-train Plan 341 became the second consumer — one implementation, two imports. Batch form (zero-sum) for ranking consumers, leave-one-out form (debiased, paper A.1) for gradient-scaling consumers. Opt-in pending Plan 341 Phase 2/3 GOAT.
+# hint_regret (Plan 576 / Research 496 SPADE arXiv:2608.19197 + Research 500
+# EnvHarness, 2026-08-24): paired-rollout value-of-information estimator —
+# the frontier-curriculum discriminator. Common-random-number pairing
+# (caller owns rollouts+seeds; Welford accumulators, zero-alloc steady
+# state), Hoeffding K(eps,delta) schedule + sequential stopping, empirical-
+# Bernstein variance-adaptive bound (the one that SEES the CRN win), sigmoid
+# band-pass difficulty gate, three-regime triage (frontier / mastered /
+# intractable — the CGSP-conflation fix), Wilson CI on the learnable-share
+# statistic, regret-scored memory with absorbing-intractable eviction, and
+# Beta-LCB frontier ordering over best_belief (DRY consume, both-direction
+# exposure). Game-side guide: riir-ai .research/340; the landed mmorpg P2
+# core (2c17f08) is the deterministic collapse this primitive supersedes
+# generically. Opt-in pending the GOAT verdict (Bench 576).
+hint_regret = ["best_belief"]
 # tether (Issue 675 / Research 426, 2026-08-21): closed-form outcome-fit
 # estimator blend — ρ* per window by OLS against realized outcomes
 # (b(ρ)=(1−ρ)p1+ρp2; exact in-sample never-worse), lag law as API shape,
@@ -1040,6 +1054,21 @@ required-features = ["conformal_predictive_intervals", "sleep_time_anticipation"
 [[test]]
 name = "conformal_floor_best_belief"
 required-features = ["conformal_predictive_intervals", "best_belief"]
+
+# Plan 576 Phase 4 — hint_regret GOAT gate: G1 oracle calibration + triage
+# partition, G2 CRN variance ratio (>=2x, 1000 reps) + per-pair cost, G3
+# default-untouched sanity, G4 zero-alloc, G-Floor (single-arm banding
+# floor at matched budget), G8 learnable-share curriculum signature.
+[[test]]
+name = "bench_576_hint_regret_goat"
+required-features = ["hint_regret"]
+
+# Plan 576 Phase 4 G4 — zero-alloc steady state (estimator + memory seam).
+# Separate single-fn binary: parallel tests share the global counting
+# allocator (the bench_655 convention).
+[[test]]
+name = "bench_576_hint_regret_alloc_check"
+required-features = ["hint_regret"]
 
 # Plan 359 Phase 4 T4.3 — BoM Trajectory floor comparison. The BoM Trajectory
 # adapter (`heat_kernel_trajectory_bom`) wraps the near-harmonic perturbation
