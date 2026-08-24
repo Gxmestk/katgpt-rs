@@ -93,7 +93,8 @@ Two advocates ran in parallel (No-GD 41-item extraction; Model-based 14-item ext
 
 - **P2 (owner-ruling / later):**
 - Sturm integer predicates at the chain seam ("≥ j modes below θ" — exact, platform-stable, tamper-evident; consumed via riir-dapps at Glacial rates only; most outcomes settle nothing — `Settlement::None` stays the default) — **deliberately unfiled** (no Glacial consumer exists; reopen from this note if one materializes).
-- LP anchor interpolation on the commuting subclass (order-statistic-of-affines fitting is quantile-curve LP — deterministic construction, not GD; flagged for owner ruling on legality class — **Issue 679**) + seeded property-test search.
+- LP anchor interpolation on the commuting subclass (order-statistic-of-affines fitting is quantile-curve LP) — **RULED NOT LEGAL for the modelless track** (owner ruling, 2026-08-24, Issue 679): an LP fit is still a fitting procedure producing embedded data, and pinned-solver bit-determinism is fragile across platforms; the conservative route is doc-only — any real fitting demand routes to riir-train [472](../../riir-train/.issues/472_spectral_neuron_training_recipes.md) (trained heads). Non-commuting pencils by any solver remain riir-train territory under all rulings. No code on this route.
+- Seeded property-test search (sample 676 constructions until one passes a property test; deterministic given seed + test) — unambiguous (same seed → same bytes), unaffected by the ruling.
 - Lean 4 package: sym-isometry, Weyl 1-Lipschitz, Loewner monotonicity, **the constructive eigengap bound** — static matrix algebra, fits the FV doctrine (public items → `KatgptProof`; bump `EXPECTED_THEOREMS`; paired SpecTests + Rust spec_match + negative perturbations) — **Issue 678**.
 
 ### 3.2 Admitted — model-based track (riir-train 472; frozen-Pod shipping complies with the mandate's sanctioned weight states)
@@ -149,7 +150,7 @@ A per-NPC gate genome (seeded construction, γk ≥ ½ certificate, canonical-ga
 | P0 | `spectral_pencil` open primitive (packing, dense+tridiag+Sturm kernel, seeded init, bounds, attribution, shape DSL, rank-one path, pinned evaluation) | katgpt-rs (katgpt-core, opt-in flag) | Issue 676 |
 | P1 | Consumer PoC: personality genomes + certificate Lipschitz + ledger integration + curiosity/temperament A/Bs + Super-GOAT re-gate | riir-ai (riir-poc → consumer) | Issue 736 |
 | P1 | Training recipes: sym packing, squareplus, eigengap init, hero 4th fusion arm, auction CDF probe | riir-train | Issue 472 |
-| P2 | Sturm chain predicates (via riir-dapps, Glacial-only, `Settlement::None` default — unfiled by design), LP-anchor compile (Issue 679), Lean package (Issue 678) | katgpt-rs / riir-chain / .proofs | 679 / 678 |
+| P2 | Sturm chain predicates (via riir-dapps, Glacial-only, `Settlement::None` default — unfiled by design), seeded property-test search, Lean package (Issue 678). LP-anchor compile **ruled out of the modelless track** (Issue 679, 2026-08-24 — fitting demand → riir-train 472) | katgpt-rs / riir-chain / .proofs | 678 |
 
 ## 8. Validation protocol (GOAT sketch — full gates live in the issues)
 
