@@ -50,8 +50,8 @@ Ship the modelless hint-regret primitive SPADE (arXiv:2608.19197) distills to: a
 
 ## Phase 5 — Consumer wiring (defer-marked, owner-gated)
 
-- [ ] [-] riir-ai quest-center frontier weighting **via Setup/Rule/Link modifier composition over the frozen `QuestTemplateRow` table** (Guide 340 §"Wrapper composition" — folded BEFORE implementation per Research 500 P1; verifier BLAKE3-pinned invariant across wraps is a P2 gate condition; after PoC Issue 677 verdict which now includes the wrap arm + transfer-back evaluation).
-- [ ] [-] CGSP conflation fix evaluation: whether `(1−solve_rate)·guide_score` gains an intractable-separation term behind the feature (behavior change to shipped substrate — needs its own gate run).
+- [ ] [-] riir-ai quest-center frontier weighting — **CORE LANDED 2026-08-24** (riir-mmorpg-examples `2c17f08`, behind the existing opt-in `demo_coverage_curiosity`: the regime triage is the hunt scorer's PRIMARY term, lexicographic over counter quality — Issue 677's DEFEND policy shipped; 8 new tests, all suites green). **The Setup/Rule/Link modifier-composition variant over the frozen `QuestTemplateRow` table remains deferred** — it was never PoC-validated (Issue 677's arms were regret/uniform/aggregate; the Research 500 wrap arm + transfer-back evaluation did NOT run); the verifier BLAKE3-pinned invariant across wraps stays its gate condition. The landed core needs no verifier concern: pure ordering, content never transformed.
+- [ ] [-] CGSP conflation fix evaluation: whether `(1−solve_rate)·guide_score` gains an intractable-separation term behind the feature (behavior change to shipped substrate — needs its own gate run). *(Partially answered by the P2 landing: the quest-center seam now preferentially offers frontier + sinks intractable content at the CONSUMER level — the aggregate arm's measured 24 wasted intractable encounters/seed is the behavior the core wiring removes — but the shipped CGSP reward itself is unchanged; the substrate-side term still needs its own gate run.)*
 - [ ] [-] edge_lora arena opponent selection (riir-train Plan 346 dependency).
 
 ## Non-goals
