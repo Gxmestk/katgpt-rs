@@ -349,7 +349,14 @@ impl PlackettLuceRater {
         let mut elos = HashMap::with_capacity(n);
         for s in 0..n {
             let mean_lambda = lambda_sum[s] / effective_samples;
-            let elo = lambda_to_elo(mean_lambda, self.config.elo_offset, self.config.elo_scale);
+            // Issue 686: the λ→Elo curve lives in `katgpt_core::rating`
+            // (`elo_from_lambda`) — bit-identical to the former local
+            // `lambda_to_elo` (clamp 1e-10 + log10, verbatim).
+            let elo = katgpt_core::rating::elo_from_lambda(
+                mean_lambda,
+                self.config.elo_offset,
+                self.config.elo_scale,
+            );
             elos.insert(sketches[s].id, elo);
         }
 
@@ -398,18 +405,10 @@ impl fmt::Display for PlackettLuceRater {
 }
 
 // ── Elo Conversion ─────────────────────────────────────────────
+// (Issue 686: `lambda_to_elo` moved to `katgpt_core::rating::elo_from_lambda`
+// — the rating math is shared substrate now; the call site above delegates.)
 
-/// Convert mean λ to Elo rating.
-///
-/// `Elo = offset + scale × log10(λ_mean)`
-///
-/// Clamps λ_mean to 1e-10 minimum to avoid -inf from log10.
-fn lambda_to_elo(lambda_mean: f64, offset: f64, scale: f64) -> f64 {
-    let clamped = lambda_mean.max(1e-10);
-    offset + scale * clamped.log10()
-}
-
-// ── Gamma Sampler ──────────────────────────────────────────────
+// ── Gamma Sampler ──────────────────────────────────────────────────
 
 /// Sample from Gamma(shape, rate) distribution.
 ///
@@ -657,27 +656,27 @@ mod tests {
     #[test]
     fn elo_conversion_lambda_one() {
         // λ=1 → Elo = 1200 + 400*log10(1) = 1200
-        let elo = lambda_to_elo(1.0, 1200.0, 400.0);
+        let elo = katgpt_core::rating::elo_from_lambda(1.0, 1200.0, 400.0);
         assert!((elo - 1200.0).abs() < 1e-9);
     }
 
     #[test]
     fn elo_conversion_lambda_ten() {
         // λ=10 → Elo = 1200 + 400*log10(10) = 1600
-        let elo = lambda_to_elo(10.0, 1200.0, 400.0);
+        let elo = katgpt_core::rating::elo_from_lambda(10.0, 1200.0, 400.0);
         assert!((elo - 1600.0).abs() < 1e-9);
     }
 
     #[test]
     fn elo_conversion_lambda_tenth() {
         // λ=0.1 → Elo = 1200 + 400*log10(0.1) = 800
-        let elo = lambda_to_elo(0.1, 1200.0, 400.0);
+        let elo = katgpt_core::rating::elo_from_lambda(0.1, 1200.0, 400.0);
         assert!((elo - 800.0).abs() < 1e-9);
     }
 
     #[test]
     fn elo_conversion_clamps_near_zero() {
-        let elo = lambda_to_elo(0.0, 1200.0, 400.0);
+        let elo = katgpt_core::rating::elo_from_lambda(0.0, 1200.0, 400.0);
         assert!(elo.is_finite(), "should not be -inf");
     }
 

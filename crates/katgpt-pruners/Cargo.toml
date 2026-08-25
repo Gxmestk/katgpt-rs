@@ -11,7 +11,7 @@ publish = false  # dev/examples aggregator; only katgpt-core ships to crates.io
 
 [dependencies]
 # ScreeningPruner / NoScreeningPruner / ConstraintPruner traits (Plan 107 Phase 0).
-katgpt-core = { path = "../katgpt-core" }
+katgpt-core = { path = "../katgpt-core", features = ["rating"] }
 # Config, Rng, LoraAdapter, matmul, rmsnorm, kv_dim, etc.
 katgpt-types = { path = "../katgpt-types" }
 # TransformerWeights, DecodeStage, ForwardContext (for non-bomber pruners that

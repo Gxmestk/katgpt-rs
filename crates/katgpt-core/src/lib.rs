@@ -90,6 +90,15 @@ pub mod attention;
 #[cfg(feature = "newton_schulz")]
 pub mod newton_schulz;
 
+// rating — Elo + Plackett-Luce rating primitives (Issue 686, promoted from
+// four in-stack copies: katgpt-pruners arena EloCalculator + proof
+// lambda_to_elo, riir-ai riir-games ruliology ParadigmRanking, riir-clippy
+// src/elo.rs). Pure modelless arithmetic; bit-identical expression trees;
+// f64 canonical + f32 twins (riir-clippy's persisted ratings keep their
+// exact numerics). Zero-cost-unless-invoked.
+#[cfg(feature = "rating")]
+pub mod rating;
+
 // linking_fold — Linking-Number Detector + Fold Correction (Plan 410,
 // Research 391, arXiv:2606.31856 Ren & Lim ICML 2026). SPLIT (Plan 410 T4.4
 // Option C, 2026-07-07) into two independently-gated sub-features:

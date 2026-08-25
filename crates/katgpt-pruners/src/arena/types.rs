@@ -152,19 +152,19 @@ impl Default for EloCalculator {
 
 impl EloCalculator {
     /// Expected score for player A vs player B.
+    ///
+    /// Issue 686: the math lives in `katgpt_core::rating` (bit-identical
+    /// expression tree — the former inline form is preserved exactly).
+    /// Scale 400 stays hardcoded here as it always was (the struct's public
+    /// surface is `k` + `base`; `base` seeds initial ratings in consumers,
+    /// it does not enter the math).
     pub fn expected(&self, rating_a: f64, rating_b: f64) -> f64 {
-        1.0 / (1.0 + 10.0_f64.powf((rating_b - rating_a) / 400.0))
+        katgpt_core::rating::expected(rating_a, rating_b, 400.0)
     }
 
     /// Update ratings after a game. Returns (new_a, new_b).
     pub fn update(&self, rating_a: f64, rating_b: f64, a_won: bool) -> (f64, f64) {
-        let expected_a = self.expected(rating_a, rating_b);
-        let actual_a = if a_won { 1.0 } else { 0.0 };
-        let actual_b = 1.0 - actual_a;
-
-        let new_a = rating_a + self.k * (actual_a - expected_a);
-        let new_b = rating_b + self.k * (actual_b - (1.0 - expected_a));
-        (new_a, new_b)
+        katgpt_core::rating::update(rating_a, rating_b, a_won, self.k, 400.0)
     }
 }
 
