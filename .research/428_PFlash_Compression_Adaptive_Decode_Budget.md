@@ -2,6 +2,7 @@
 
 > **Source:** [Luce PFlash](https://github.com/Luce-Org/lucebox-hub) — speculative prefill compression (128K→2.6K, 10.4× TTFT reduction)
 > **Date:** 2026-06-01
+> **PASS-Redirects (synthesis):** Li, Huang, Venkitesh, Locatelli et al. [arXiv:2404.14469 "SnapKV: LLM Knows What You are Looking for Before Generation"] — the origin paper for the observation-window idea our substrate already ships: `FlashPrefillConfig.tail_window` + `BlockAttentionScorer`'s tail-position attention voting → `block_select` (sink+window+alpha) is SnapKV's design at block granularity, where 32-64-token blocks get cluster contiguity by construction (SnapKV's 1D max-pool is the token-level approximation of block selection); per-head selection ships in `block_select_grid`. PASS — same mechanism, and the eviction class is quality-dominated by AM (R233) past ~10×.
 > **Related Research:** R002 (Speculative Decoding), R016 (AutoTTS), R037 (REAP Model-Based/Modelless Duality)
 > **Related Plans:** Domain Inference Budget (Plan 026), MTP Budget Propagation (Plan 057), Bandit infrastructure
 > **Domain:** katgpt-rs (modelless — inference orchestration, budget allocation)

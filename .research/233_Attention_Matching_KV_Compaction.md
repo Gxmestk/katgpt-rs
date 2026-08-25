@@ -6,6 +6,8 @@
 **Target:** `katgpt-rs` modelless inference engine — new `src/attn_match/` module
 **Status:** Verdict = **GAIN** — direct port + novel CPU/SIMD/GPU/ANE adaptive solver routing. Plan 271.
 
+> **PASS-Redirects (synthesis):** Li et al. [arXiv:2404.14469 "SnapKV: LLM Knows What You are Looking for Before Generation"] — the token-eviction baseline class this note's AM compaction beats (SnapKV in the "degrade rapidly past ~10×" family above; arxiv ID pinned so `grep 2404.14469` hits). Re-distilled 2026-08-25: PASS — the observation-window mechanism already ships via the PFlash substrate (`FlashPrefillConfig.tail_window`, R428), and AM is the quality winner for compaction.
+
 > **See also (added Plan 469 T5.3, 2026-07-25):** [HOPE — Hilbert-Schmidt Capacity Kernel](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md) (Research 454 / Plan 469) — the closest shipped **compaction cousin** in our stack. AM compacts the **KV cache** (token dimension); HOPE compacts **rank-1 operators** (feature dimension via optimal rank-1 parent). Both are modelless + closed-form; complementary scopes.
 
 ---
