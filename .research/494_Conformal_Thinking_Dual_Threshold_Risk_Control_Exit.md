@@ -7,6 +7,7 @@
 > **Related Plans:** 340 (ConformalIntervalCalibrator — the calibration substrate), 304 (GainCostLoopHalter — the exit consumer), 575 (this paper's plan)
 > **Cross-ref (riir-ai):** Research 339 (per-NPC risk-controlled think-budget guide)
 > **Classification:** Public (open primitive note; game wiring lives in riir-ai Research 339)
+> **PASS-Redirects (synthesis):** Valluri, Nguyen & Grover [arXiv:2608.20359 "Self-Speculation for Faster Reasoning Models"] — the complementary half of this note's partial-CoT convergence premise: where Conformal Thinking/Plan 575 EXITS on budget-controlled confidence trajectories (halt early, save tokens), SSR DRAFTS from them (reuse the partial-CoT answer distribution as a speculation source, verified against the full-budget distribution, same model, training-free). PASS for us: the exit half is what ships (`RiskControlledExit` plan + SWIR `</think>`/ForceAnswerPrefix budget control on qwen38 — we pre-fill the empty think block, non-thinking branch, so no live CoT phase has ever been decoded); the draft half additionally needs concurrent request streams to hide the model-drafter behind ongoing CoT (our engine is single-stream batch-1 CUDA-graph decode by design) and loses economically to the shipped ~free lookup drafter (15.15/16 acceptance, riir-ai Issue 742). Their suffix-only-beats-prefix ablation (1.318× vs 1.086×) is the interesting datapoint for any future span-recovery work. Reopen trigger: a live-thinking-mode chat consumer.
 
 ---
 

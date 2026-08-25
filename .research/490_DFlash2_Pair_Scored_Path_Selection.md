@@ -9,6 +9,7 @@
 > **Related Plans:** Plan 339 (HardwareAwarePrefixScheduler — DSpark distillate)
 > **Cross-ref (riir-ai):** Bench 693/694 (Issue 717 consumer gates — the measured selection headroom this note targets), katgpt-rs Issues 659 (bigram head), 670 (TreePath fix, RESOLVED), 671 (this note's POC)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Valluri, Nguyen & Grover [arXiv:2608.20359 "Self-Speculation for Faster Reasoning Models"] — adds a drafter-SOURCE class orthogonal to this note's selection problem (same model at partial CoT budget as its own drafter — intersection-novel vs LayerSkip/QuantSpec/SpecReason per prior-art search) and reports suffix-only verification BEATS prefix-only (1.318× vs 1.086× on ClassEval): span recovery beyond the first rejected token carries more reuse than prefix acceptance in their regime. PASS for us: our closest analog, `fill_lookup_draft` (Issue 742 T2, 15.15/16 acceptance), already saturates the high-overlap regime where suffix decoding pays, and their suffix cache composes with lookup — a bounded ≤5% ceiling here. Vocabulary hazard: this note's "suffix decay" (end-of-block recall collapse in parallel drafters, DFlash 2's two-tap conv fix) is UNRELATED to SSR's "suffix decoding" (suffix-cache span recovery during continuation) — different mechanisms sharing a word.
 
 ---
 

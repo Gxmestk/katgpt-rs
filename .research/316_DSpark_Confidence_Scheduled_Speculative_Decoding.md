@@ -7,6 +7,7 @@
 > **Related Plans:** 004 (Leviathan distill), 166 (FlashAR anchor), 243 (Bebop Issue 023), 294 (ICT G10 — Bebop H_1→H_2 upgrade)
 > **Related Issues:** 003 (this note's optimization — hardware-aware prefix scheduler)
 > **Classification:** Public — generic speculative-decode primitives, no game/chain/shard semantics
+> **PASS-Redirects (synthesis):** Valluri, Nguyen & Grover [arXiv:2608.20359 "Self-Speculation for Faster Reasoning Models"] — a new drafter axis (CoT budget on the SAME model: partial-CoT answer distribution drafts, full-CoT verifies — training-free, no aux params, vs DSpark's trained semi-AR head) plus suffix decoding (rejected draft remainder seeds a suffix cache to recover spans beyond the first mismatch during continuation; compositional over SuffixDecoding arXiv:2411.04975 / SAM-decoding / Token Recycling). PASS for us: our verify surfaces (`forward_speculative_verify`, tree-masked, p=16 chunk) are all prefix-accept + rollback-discard and suffix recovery is genuinely absent — but the recoverable headroom is bounded (doc-repro lookup acceptance 15.15/16 leaves ≤0.85 tok/verify ≈ 5%; chat is low-overlap, the paper's own worst regime) and "the acceptance axis is CLOSED" (riir-ai Bench 754 — remaining levers are GEMM/attention-side). The hide-the-drafter-behind-CoT trick needs vLLM-style multi-request serving; we are single-stream batch-1 CUDA graphs by design.
 
 ---
 
