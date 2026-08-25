@@ -7,6 +7,7 @@
 > **Related Plans:** 250 (Breakeven Bandit), 251 (DEC operators), 275 (SwiR), 276 (MicroRecurrentBeliefState), 308 (KARC), 318 (rank-k functor)
 > **Classification:** Public
 > **Verdict: Gain** — theoretical/expressivity paper; value is the formal separation theorems (TC^k for latent thought, FPRAS for CoT) that provide a complexity-class foundation for our existing mode-switching and routing primitives. No new mechanism ships; the FPRAS separation is a genuinely novel insight for our corpus (zero prior grep hits for `TC^k|FPRAS|FPTAS|approximate counting|self-reducib`). A complexity-class-gated routing fusion (SwiR × Breakeven × k_selector × DEC × BoM) is flagged as a future GOAT candidate, (captured in §2.6 below; requires a complexity-class classifier not provided by the paper).
+> **PASS-Redirects (synthesis, 2026-08-25):** Hao et al. [arXiv:2412.06769 "Training Large Language Models to Reason in a Continuous Latent Space"] (Coconut) — **PASS**: v4 (Aug 2026) adds no formal content relevant to the TC^k/FPRAS frame (cosmetic over v3). Its theory follow-up Zhu et al. [arXiv:2505.12514 "Reasoning by superposition: A theoretical perspective on chain of continuous thought"] (NeurIPS 2025) proves the two-layer/D-step continuous-CoT reachability separation (vs O(n²) discrete decoding steps) — the formal version of the superposition-BFS mechanism already shipped as `mux_bfs`; recorded here for the corpus (zero prior 2505.12514 grep hits). The training-dynamics companion Zhu et al. [arXiv:2509.23365] stays GD-side (→ riir-train Plan 352 family rows).
 
 ---
 
