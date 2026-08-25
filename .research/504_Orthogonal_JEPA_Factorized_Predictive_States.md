@@ -3,6 +3,7 @@
 > **Source:** [Orthogonal JEPA: Factorized Predictive States for Latent World Models](https://arxiv.org/abs/2608.20065) — Taoyong Cui, Pheng-Ann Heng, Wanli Ouyang (CUHK), arXiv:2608.20065v1, 2026-08-20
 > **Date:** 2026-08-24
 > **Status:** DISTILLED — pending owner decision (katgpt-rs #687 primitives + riir-train Plan 351)
+> **P3 cross-track note (2026-08-26, riir-train Bench 532):** the EMA m-sweep's 0.996-wins condition is NOT met — m=0.99 ties online on healthy data, higher m taxes quality monotonically, EMA alone cannot prevent planted collapse, and the only regime where EMA helps (damping the hinge's quality-tax oscillation) prefers m=0.999. No calibration evidence for `LatentSkillEvolution`'s EMA decay constant from this study.
 > **Related Research:** 138 (LeJEPA — linear-identifiability precedent), 360 (AdaJEPA — runtime analog = `ReestimationScheduler`, PASS), 498 (LeVLJEPA/SIGReg — gaussianity probe #681 + dist-guard lineage), 288 (KARC delay basis — closest fixed-basis forecaster), 475 (ICA lens — orthogonality ≠ independence), 291 (cross-resolution Parseval precedent), 214 (spectral irrep channels)
 > **Related Plans:** riir-train 351 (orthogonal factorized NextLat — the trained half)
 > **Related Issues:** katgpt-rs #687 (orthogonal factorization primitives — the modelless half); riir-train Issue 743 (dist_guard — the hinge A/B closes its deferred Phase 2 gate)
