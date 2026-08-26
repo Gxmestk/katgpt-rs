@@ -64,6 +64,8 @@ With a shared state baseline V and per-action Q, the BoK advantage is A_a(K) = (
 
 Verified numerically: Q=.5, V=.3 → K\*≈1.98 (A(1)=.20, A(2)=.24, A(3)=.22 — peak at 2 ✓); Q=.2, V=.1 → K\*≈3.4. Limits behave: Q→V ⇒ degenerate (advantage vanishes, no interior peak); Q→1 ⇒ K\*→1. The paper's empirical "Bo4 dominates" is the population-aggregate of this per-context law. Use: pick best-of-K budgets (drafter retries, anytime-inference K, sampling best-of-K) from measured (Q,V) instead of sweeping.
 
+> **T3 status (2026-08-27, Issue 692 T3, katgpt-rs `983c6fb8`):** the law is now gate-pinned in `katgpt_core::prover_selection` (`k_star` + `bok_advantage`; exhaustive both-halves (Q,V) grids assert argmax|A| ∈ {floor K\*, ceil K\*}). **Erratum to the anchors above**: anchor 1 confirmed exactly (K\*≈1.9747, peak 2), but anchor 2's "Q=.2, V=.1 → K\*≈3.4" is arithmetically off — the true value is **K\*≈6.371** with the empirical peak at K=6 (A(6)=.2693 > A(7)=.2686). The law itself holds everywhere on the grid; only this anchor line was wrong.
+
 ### 2.2 Honest negatives (consumers examined and rejected)
 
 - **QGF / DualLeoOracle (civ):** the paper's centering fix does NOT apply — `tilt_logits` selects an action *within* a state, and subtracting the action-mean V(s) preserves argmax (the shipped T9/T10 correctness checks pin exactly this invariance for same-signal tilts). The fix only bites in *cross-state* selection, which QGF is not. And the civ critic axis is closed by riir-ai Research 322; the PAV prover theory does not resolve the Q-vs-forecast trap named there. Do not reopen.
