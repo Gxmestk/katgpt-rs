@@ -107,6 +107,15 @@ pub mod rating;
 #[cfg(feature = "laprop")]
 pub mod laprop;
 
+// prover_selection — prover-selection statistics kernels (Issue 692 T2,
+// from Research 509 — arXiv:2410.08146): first_pit, the changepoint kernel
+// (first index where Q̂ < ε) consumed by riir-clippy's PAV data curation
+// (riir-train Plan 356 A1) via a same-signature twin. T1 (D/Al) + T3 (the
+// K* law gate) land beside it. Pure modelless arithmetic, no deps, no
+// allocs, zero-cost-unless-invoked.
+#[cfg(feature = "prover_selection")]
+pub mod prover_selection;
+
 // linking_fold — Linking-Number Detector + Fold Correction (Plan 410,
 // Research 391, arXiv:2606.31856 Ren & Lim ICML 2026). SPLIT (Plan 410 T4.4
 // Option C, 2026-07-07) into two independently-gated sub-features:
