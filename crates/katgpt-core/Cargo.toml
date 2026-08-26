@@ -277,6 +277,7 @@ mux_pruner = []  # MuxSpanPruner — vocabulary simplex pruning (Research 158, M
 mux_ddtree = ["mux_pruner"]  # MuxDdTree — superposition branch DDTree nodes (Research 158, MUX)
 mux_bandit_width = []  # MuxBanditWidth — adaptive superposition width (Research 158, MUX)
 mux_bfs = ["mux_ddtree"]  # MUX BFS — superposition-guided parallel tree search (Research 158)
+mux_height_gate = ["mux_bfs"]  # MUX height-gated commit + gap-trend narrowing (Issue 688, Coconut arXiv:2412.06769 §4.4/Fig. 6 — classic-heuristic port, no novelty claim). HeightGate consumes distance-to-TERMINAL (defer deterministic commitment until near-terminal; the previously-discarded `depth` signal) + GapTrendNarrower narrows width on the inter-step derivative of the cumulative top-k mass gap (explore→focus). Negative control pinned: flat gaps structurally never narrow (Bench 017 T9 wide-dominance is the control case).
 mux_freeze_thaw = ["mux_pruner"]  # MUX Freeze/Thaw — persistent superposition patterns (Research 158)
 comp_width = []  # Compositional DDTree partner-entropy width — continuous replacement for PEAK_DOMINANCE_RATIO (Plan 205, Research 181)
 mux_demux = []  # MuxDemux Verifier — deterministic superposition recovery (Research 158, MUX)

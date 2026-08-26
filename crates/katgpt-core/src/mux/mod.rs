@@ -7,6 +7,8 @@
 //! - `mux_demux`    — `mux_demux` verifier
 //! - `mux_bandit_width` — `MuxBanditWidth` arm selector
 //! - `mux_freeze_thaw`  — `MuxTarget` / `MuxPatternStore`
+//! - `mux_height_gate`  — `HeightGate` commit-timing + `GapTrendNarrower`
+//!   (Issue 688, Coconut §4.4/Fig. 6; implies `mux_bfs`)
 
 #[cfg(feature = "mux_pruner")]
 pub mod span_pruner;
@@ -18,6 +20,9 @@ pub mod dd_tree;
 
 #[cfg(feature = "mux_bfs")]
 pub mod bfs;
+
+#[cfg(feature = "mux_height_gate")]
+pub mod height_gate;
 
 #[cfg(feature = "mux_demux")]
 pub mod demux;

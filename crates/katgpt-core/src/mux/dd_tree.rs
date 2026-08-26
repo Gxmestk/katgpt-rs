@@ -377,6 +377,15 @@ impl MuxDdTree {
     ///
     /// Clears `paths` and refills it. Retains heap capacity from prior calls,
     /// eliminating per-step allocation in the BFS hot loop.
+    ///
+    /// Correctness note (fixed with Issue 688's composed multi-step tests):
+    /// the DFS appends intermediate child-path copies to `buf` as stack
+    /// entries are pushed — garbage between the FINAL leaf-path copies. The
+    /// offset scheme must therefore be built by an explicit compaction pass,
+    /// not by assuming leaf copies are contiguous (the original single-offset
+    /// scheme returned garbage prefixes — e.g. `path(0) == [3,2,1,0,0]` —
+    /// for any tree with depth ≥ 1; every prior caller only collected from
+    /// a root-only tree, so the bug was latent).
     pub fn collect_leaf_paths_flat_into(&self, paths: &mut LeafPaths) {
         paths.clear();
         // Pre-size stack: worst case is root with all children (branching factor ≤ K).
@@ -385,15 +394,18 @@ impl MuxDdTree {
         let mut stack: Vec<(*const MuxNode, usize, usize)> =
             Vec::with_capacity((self.depth + 1) * self.k.max(1));
         stack.push((&self.root as *const _, 0, 0));
-        paths.offsets.push(0);
 
+        // Phase 1 — DFS. `offsets` temporarily holds (start, end) PAIRS for
+        // each emitted leaf copy (2 entries per leaf).
         while let Some((node_ptr, path_start, path_len)) = stack.pop() {
             // SAFETY: node_ptr comes from valid tree references that outlive this fn.
             let node = unsafe { &*node_ptr };
             if node.is_leaf() {
+                let start = paths.buf.len();
                 paths
                     .buf
                     .extend_from_within(path_start..path_start + path_len);
+                paths.offsets.push(start);
                 paths.offsets.push(paths.buf.len());
             } else {
                 for (i, child) in node.children.iter().enumerate().rev() {
@@ -407,6 +419,26 @@ impl MuxDdTree {
                 }
             }
         }
+
+        // Phase 2 — compaction: memmove each leaf block to the front in
+        // emission order (moving LEFT is overlap-safe via `copy_within`),
+        // rewriting `offsets` as the contiguous `leaf_count + 1` start table.
+        // Write index `p` is always ≤ the read indices `2p`/`2p+1`, so the
+        // in-place rewrite is safe.
+        let pair_count = paths.offsets.len() / 2;
+        let mut write = 0usize;
+        for p in 0..pair_count {
+            let s = paths.offsets[2 * p];
+            let e = paths.offsets[2 * p + 1];
+            if write != s {
+                paths.buf.copy_within(s..e, write);
+            }
+            paths.offsets[p] = write;
+            write += e - s;
+        }
+        paths.buf.truncate(write);
+        paths.offsets.truncate(pair_count);
+        paths.offsets.push(write);
     }
 
     /// Collect paths to all leaf nodes (BFS order).
