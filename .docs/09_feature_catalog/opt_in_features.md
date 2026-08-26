@@ -2975,3 +2975,40 @@ MMD² 0.331 → 0.011, shares 0.24/0.76 → 0.67/0.33. **Reopen paths:** a
 diffusion-sampler-shaped harness (the prerequisite for the riir-ai
 crowd-targeting plan, Guide 344); approximate kernel features for G2;
 N≲300 populations are already sub-µs per particle.
+
+## 88. risk_control_exit — dual-threshold risk-controlled compute exit (Plan 575)
+
+Modelless compute-exit gating distilled from "Conformal Thinking"
+(Xi Wang et al., JHU + Apple, ICML 2026,
+[arXiv:2602.03814](https://arxiv.org/abs/2602.03814);
+Plan 575 / [Research 494](../../.research/494_Conformal_Thinking_Dual_Threshold_Risk_Control_Exit.md)):
+how much compute a query needs is a **risk-controlled** decision, and one
+threshold is not enough.
+
+- **`DualExitPolicy`** — upper stop-when-confident threshold `λ+` + squeezed-
+  sigmoid lower stop-when-not-progressing schedule
+  `λ−(t) = σ(c(ωt − sB), l, u)` (Phase 1 T1.1–T1.2): exit early when the
+  answer is provably not improving, not merely when it looks confident
+- **Four bounded losses** (paper Eq. 8–11, T1.3) — the UQ-bearing surface;
+  the Report-the-Floor rule is instantiated as the naive-calibration contrast
+  (G1) + the exit-floor family (G2) since CRPS/Winkler are undefined for a
+  decision rule
+- **UCB/Hoeffding calibrator** (T1.4–T1.5) — offline, per-candidate
+  `Risk̂ + sqrt(ln(1/δ)/2n) ≤ ε`, two-step decoupled selection with
+  efficiency-loss argmin + monotonicity refusal
+- **App. C disarm tripwire** (T1.6) — `p_i ≥ p_c` candidates are disarmed,
+  the paper's safety condition against a degenerate lower schedule
+
+### GOAT (Bench 681) — ALL PASS ⇒ stays opt-in (no-default-consumer rule)
+
+| Gate | Result |
+|---|---|
+| G1 risk hold | UCB holds realized exit-FP-risk ≤ ε on **40/40** resplits at both validation sizes (n=40 max risk 0.0100; n=400 0.0200); naive no-correction violates **7/40 at n=40** (realized 0.18–0.35 ≫ ε) and is safe at n=400 — the paper's Fig. 4 small-n shape |
+| G2 exit floor | At matched realized risk: dual compute **0.417** vs single-threshold **0.609** vs fixed-budget **1.000** (means over 3:1/1:1/1:3 trivial:stuck; wins-or-ties per composition; the gap grows 0.075→0.310 with stuck share — Fig. 6 shape) |
+| G3 no-regression | Default lib 1951 unchanged; feature-on compiles green |
+| G4 alloc/perf | 0 allocs steady state; **~4–5 ns/exit** (3.90/5.18, two release runs); calibration 0 allocs after init |
+
+**Stays opt-in** — all gates pass modellessly but no in-tree consumer compiles
+this module yet. Phase 3 is what flips it (each with its own consumer gate):
+MCTS termination, Plan 304 fusion `GainCostLoopHalter`, Bebop Issue 023
+re-gate, riir-ai Research 339 wiring.

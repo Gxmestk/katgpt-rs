@@ -3196,6 +3196,53 @@ bit-identical.
 Fisher-z guard, riir-ai #743 edge_lora monitor, riir-neuron-db freeze-gate
 advisory.
 
+### 🎯 risk_control_exit — Dual-Threshold Risk-Controlled Compute Exit (Plan 575, arXiv:2602.03814)
+
+How much compute does a query actually need? "Conformal Thinking" answers
+with **two thresholds instead of one**: an upper stop-when-confident gate plus
+a parametric lower stop-when-not-progressing schedule
+`λ−(t) = σ(c(ωt − sB), l, u)` — exit early when the answer is *provably*
+not improving, not just when it looks confident. Calibration is offline
+UCB/Hoeffding (`Risk̂ + sqrt(ln(1/δ)/2n) ≤ ε`) with two-step decoupled
+selection + an App. C `p_i ≥ p_c` disarm tripwire. Fully modelless —
+bounded losses + concentration inequalities, no training anywhere.
+
+**GOAT G1/G2/G4 ALL PASS** ([Bench 681](.benchmarks/681_risk_control_exit_goat.md)):
+G1 realized exit-FP-risk ≤ ε on **40/40** validation/test resplits while
+naive no-correction calibration violates on **7/40** at n=40 (the paper's
+Fig. 4 small-n shape); G2 at matched realized risk the dual policy spends
+**0.417** of fixed-budget compute vs **0.609** single-threshold vs **1.000**
+fixed — and the gap grows with stuck-query share (Fig. 6 shape); G4 0 allocs,
+**~4–5 ns/exit** (3.90/5.18, two release runs). Stays opt-in per the no-default-consumer rule — Phase 3
+consumers (MCTS termination, Plan 304 fusion `GainCostLoopHalter`, Bebop
+Issue 023 re-gate) are what would flip it.
+
+### 🧭 distributional_steering — Mean-Field Population Steering via Feynman-Kac Weights (Plan 577, arXiv:2608.08770)
+
+Steer a *population* toward a measure-defined target `μ* ∝ e^{λΨ} p` without
+touching individuals: a closed-form first-variation reward table
+(`Linear`/`Moment`/`Mmd`), Feynman-Kac log-weight accumulation with the
+mean-field `Ψ̇` correction solved by damped Picard, and the weighted empirical
+measure `μ̂ = Σ wᵢ δ_{Xᵢ}` as the converging object. Ships the BoM static-tilt
+adapter (`bom_sampling` + `distributional_steering`) as a principled
+alternative to `select_best` argmax, plus a 2-D GMM demo
+(`--example distributional_steering_demo`, MMD² 0.331 → 0.011).
+
+**GOAT G1 FAIL-partial, honestly recorded**
+([Bench 682](.benchmarks/682_distributional_steering_goat.md)) — stays
+opt-in. The paper's 1-D falsifiable harness reproduced the targeting minimum
+at **λ\*=5 on both noise schedules** (clean V-curves) and the exact-J
+trade-off structure, but λ\*=10 held only one of two schedules and the
+FK-vs-gradient **separation claim did not reproduce** in the 1-D broad-kernel
+Langevin regime (position steering dominates; FK weights are a third-decimal
+correction). G2: 9045 ns/particle/step @ N=1000 — the sub-µs gate is
+structurally infeasible for exact O(N²) MMD. En-route finds: Research 505's
+own Table-2 MMD **sign slip** corrected + finite-difference-pinned, and the
+critical tuning law **Picard damping `α = min(1, 2/λ)`** (diverges otherwise
+for λ≳5). Reopen paths: a diffusion-sampler-shaped harness + approximate
+kernel features; the riir-ai crowd-targeting plan (Guide 344) waits on that
+reopen.
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional

@@ -871,3 +871,45 @@ decomposition does not transfer to a drafter this weak.
 drafter's context-conditioned `U` — riir-train lineage / the Issue 717
 tree-verify path. Reopen only with an information source orthogonal to the
 pair table.
+
+## 41. Distributional Steering — FK-vs-gradient separation claim NOT reproduced (Plan 577, G1 FAIL-partial)
+
+**Feature flag:** `distributional_steering` (opt-in, stays opt-in). Plan 577
+COMPLETE 2026-08-26; gate [Bench 682](../../.benchmarks/682_distributional_steering_goat.md),
+research [Research 505](../../.research/505_Mean_Field_Distributional_Steering.md)
+(Howard & Nüsken, arXiv:2608.08770).
+
+**What the paper claims:** on their 1-D toy, Feynman-Kac (FK) steering
+achieves a markedly better optimality-gap/λ trade-off than gradient-only
+steering — the FK correction is the differentiating mechanism.
+
+**What reproduced:** the targeting minimum at **λ\*=5 on both noise
+schedules** (clean V-curves over the λ grid) and the exact-J trade-off
+structure; λ\*=10 held on one of two schedules (the other's curve is flat
+at the 8-seed noise floor ≈±0.013).
+
+**What failed:** the **separation claim**. In the 1-D broad-kernel Langevin
+regime, gradient-only ≈ FK — the optimality gaps differ in the **third
+decimal**. Mechanism: with a broad kernel the position steering dominates
+and the FK log-weight correction is a small additive term, not a different
+driver. The paper's separation regime is the diffusion-sampler setting
+(where FK tilts the *sampling* measure); a modelless weights-only Langevin
+harness cannot exhibit it.
+
+**Secondary negatives:** G2's sub-µs/particle gate is **structurally
+infeasible** for exact O(N²) MMD (measured 9045 ns/particle/step @ N=1000;
+the kernel build alone is 10⁶ `fast_exp` — the paper's "Picard = 0.04% of
+runtime" is relative to network evals a modelless stack doesn't have);
+weights-only degenerates to ESS→1 by λ≈7.5 over 30 steps without resampling
+(a real property, clip-bounded — decisive for sampling consumers, harmless
+for crowd-salience).
+
+**Load-bearing positives kept:** the Research 505 **Table-2 MMD sign slip**
+corrected in-module (`Ψ = 2[emb_ν − emb_μ]`, finite-difference-pinned) and
+the **Picard damping law `α = min(1, 2/λ)`** (iteration Jacobian ≈ 0.2λ —
+damping 1.0 diverges for λ≳5 regardless of iteration count).
+
+**Reopen paths:** a diffusion-sampler-shaped harness (the prerequisite for
+the riir-ai crowd-targeting plan, Guide 344 — deliberately NOT filed while
+this stays closed); approximate kernel features for the G2 threshold;
+N≲300 populations are already sub-µs per particle.
