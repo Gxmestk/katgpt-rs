@@ -552,9 +552,12 @@ impl<S: GameState> RolloutPolicy<S> for RandomRolloutPolicy {
 /// Per-player aggregate tracked during insert for O(1) reads.
 #[derive(Clone, Copy, Debug, Default)]
 struct PlayerAgg {
-    // OPT: usize first avoids 4 bytes of padding between f32 and usize
+    // OPT: usize first avoids 4 bytes of padding between f64 and usize
     count: usize,
-    sum: f32,
+    // f64 (Issue 690): f32 running sums drift low once the total passes ~2^24
+    // (one ULP exceeds 1) — measured −2.81% on a 2.26M-record go-arena arm.
+    // f64 holds exact integer sums to 2^53, unreachable at any arena scale.
+    sum: f64,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -562,7 +565,9 @@ pub struct ActionSpaceLog {
     /// Running peak across all entries, tracked during record() for O(1) peak_action_space().
     peak: usize,
     /// Running total sum of action counts for O(1) avg_action_space().
-    total_sum: f32,
+    /// f64 for exact integer accumulation past 2^24 (Issue 690: the f32 form
+    /// under-reported the mean by −2.81% at 2.26M records × 50 actions).
+    total_sum: f64,
     /// (tick, player_id, action_count) entries.
     /// Field order: usize (8B) → u32 (4B) → u8 (1B) = 16B vs 24B with (u32, u8, usize).
     entries: Vec<(usize, u32, u8)>,
@@ -599,9 +604,9 @@ impl ActionSpaceLog {
             self.player_aggs
                 .resize(pid + 1, PlayerAgg { sum: 0.0, count: 0 });
         }
-        self.player_aggs[pid].sum += n as f32;
+        self.player_aggs[pid].sum += n as f64;
         self.player_aggs[pid].count += 1;
-        self.total_sum += n as f32;
+        self.total_sum += n as f64;
         if n > self.peak {
             self.peak = n;
         }
@@ -619,9 +624,14 @@ impl ActionSpaceLog {
     }
 
     /// Average action space size across all entries.
-    /// O(1) via running total_sum tracked during record().
+    /// O(1) via running total_sum tracked during record(). Exact: the f64
+    /// accumulator holds integer sums exactly to 2^53 (Issue 690).
     pub fn avg_action_space(&self) -> f32 {
-        if self.entries.is_empty() { 0.0 } else { self.total_sum / self.entries.len() as f32 }
+        if self.entries.is_empty() {
+            0.0
+        } else {
+            (self.total_sum / self.entries.len() as f64) as f32
+        }
     }
 
     /// Average action space size for a specific player.
@@ -632,7 +642,7 @@ impl ActionSpaceLog {
             Some(a) if a.count > 0 => a,
             _ => return 0.0,
         };
-        agg.sum / agg.count as f32
+        (agg.sum / agg.count as f64) as f32
     }
 
     /// Peak (maximum) action space size recorded.
@@ -1499,6 +1509,9 @@ mod tests_leo;
 
 #[cfg(test)]
 mod tests_spec_gen;
+
+#[cfg(test)]
+mod tests_action_space_log; // Issue 690: f64 accumulator regression gates
 
 #[cfg(test)]
 mod tests_best_buddies;
