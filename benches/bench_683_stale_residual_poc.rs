@@ -405,7 +405,7 @@ fn run() {
         );
 
         let gate = AcceptGate::default();
-        let mut run_hazard = |theta: f32, tag: &str| {
+        let run_hazard = |theta: f32, tag: &str| {
             let gate = AcceptGate { threshold: theta };
             let mut agree_total = 0usize;
             let mut compared_total = 0usize;
