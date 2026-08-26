@@ -107,12 +107,15 @@ pub mod rating;
 #[cfg(feature = "laprop")]
 pub mod laprop;
 
-// prover_selection — prover-selection statistics kernels (Issue 692 T2,
-// from Research 509 — arXiv:2410.08146): first_pit, the changepoint kernel
-// (first index where Q̂ < ε) consumed by riir-clippy's PAV data curation
+// prover_selection — prover-selection statistics kernels (Issue 692,
+// from Research 509 — arXiv:2410.08146): T1 ships the D/Al complementarity
+// selector (distinguishability + alignment + Theorem 3.1's γ·(D+Al)
+// predicted-gain bound + its sigmoid-gated exposure), T2 the first_pit
+// changepoint kernel (first index where Q̂ < ε) consumed by riir-clippy's
+// PAV data curation.
 // (riir-train Plan 356 A1) via a same-signature twin. T1 (D/Al) + T3 (the
-// K* law gate) land beside it. Pure modelless arithmetic, no deps, no
-// allocs, zero-cost-unless-invoked.
+// The K* law gate (T3) lands beside them. Pure modelless arithmetic, no
+// deps, no allocs, zero-cost-unless-invoked.
 #[cfg(feature = "prover_selection")]
 pub mod prover_selection;
 
