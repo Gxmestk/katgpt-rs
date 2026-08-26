@@ -136,6 +136,14 @@ statrs = "0.17"
 # consumer PoC is riir-ai Issue 757, gated on this landing).
 kinematic_rollout = []
 
+# Stale-residual speculative layer pipelining analysis (Issue 691 /
+# Research 508, arXiv:2608.23841 §6.3): residual-dominance ratios + paper
+# viability bar, accept/rollback threshold gate, KL/top-1 speculative
+# outcome metrics + θ-sweep reduction, and the (C+IO)/max(C,IO) overlap
+# latency model parameterized by bits/weight. Pure modelless analysis over
+# captured activations. OPT-IN pending the Issue 691 POC verdict.
+stale_residual = []
+
 # rating (Issue 686, 2026-08-25): Elo + Plackett-Luce rating primitives —
 # standard expected-score/K-update (win/loss + draw-scored), the λ→Elo
 # conversion curve (base + scale·log10 λ, the fixed point pairwise Elo and
@@ -321,6 +329,23 @@ entropic_tilt = []  # KL-budgeted entropic (max-seeking) advantage tilt — TTT-
 # core (2c17f08) is the deterministic collapse this primitive supersedes
 # generically. Opt-in pending the GOAT verdict (Bench 576).
 hint_regret = ["best_belief"]
+# risk_control_exit (Plan 575 / Research 494 "Conformal Thinking"
+# arXiv:2602.03814, 2026-08-20): modelless dual-threshold compute-exit —
+# upper stop-when-confident + parametric lower stop-when-not-progressing
+# (squeezed-sigmoid schedule), offline UCB/Hoeffding calibration
+# (Risk̂ + sqrt(ln(1/δ)/2n) ≤ ε), two-step decoupled selection with
+# efficiency-loss argmin, App. C p_i ≥ p_c disarm tripwire. UQ-bearing
+# (exit-risk guarantee) → the Report-the-Floor rule applies at its GOAT.
+# Opt-in pending the Bench 681 verdict.
+risk_control_exit = []
+# distributional_steering (Plan 577 / Research 505 "Mean-Field
+# Distributional Steering" arXiv:2608.08770, 2026-08-24): population
+# steering toward a measure-defined target — MeasureReward first-variation
+# table (Linear / Moment / Mmd rows), Feynman-Kac log-weight accumulation
+# with the mean-field Ψ̇ correction solved by damped Picard, weighted
+# empirical measure μ̂ exposure. Weights-only (no persistent-agent
+# resampling). Opt-in pending the Bench 682 targeting gate (G1).
+distributional_steering = []
 # tether (Issue 675 / Research 426, 2026-08-21): closed-form outcome-fit
 # estimator blend — ρ* per window by OLS against realized outcomes
 # (b(ρ)=(1−ρ)p1+ρp2; exact in-sample never-worse), lag law as API shape,
@@ -1127,6 +1152,43 @@ required-features = ["hint_regret"]
 [[test]]
 name = "bench_576_hint_regret_alloc_check"
 required-features = ["hint_regret"]
+
+# Plan 575 Phase 2 — risk_control_exit GOAT gate: G1 risk-hold across 40
+# validation/test resplits (+ naive no-correction violation contrast),
+# G2 exit-floor (dual vs fixed-budget vs single-threshold at matched
+# realized risk, 3 crowd compositions). NOTE: bench number 681, not 575 —
+# 575 was already allocated (sigmoid_argmaxability_audit; monotonic rule).
+[[test]]
+name = "bench_681_risk_control_exit_goat"
+required-features = ["risk_control_exit"]
+
+# Plan 575 Phase 2 T2.4 — zero-alloc per-call exit + calibration steady
+# state. Separate single-fn binary (the bench_655 / bench_576 convention:
+# parallel tests share the global counting allocator).
+[[test]]
+name = "bench_681_risk_control_exit_alloc_check"
+required-features = ["risk_control_exit"]
+
+# Plan 577 Phase 3 — distributional_steering GOAT gate: G1 targeting
+# (optimality gap minimized at λ*, FK vs gradient-only vs no-steer, the
+# paper's 1D GMM experiment), G2 perf, G3 no-regression, G6 determinism.
+# NOTE: bench number 682, not 577 — 577 was already allocated
+# (emotion_direction_rank; monotonic numbering rule).
+[[test]]
+name = "bench_682_distributional_steering_goat"
+required-features = ["distributional_steering"]
+
+# Plan 577 Phase 3 T3.5 — zero-alloc steady state over 1000 steps at
+# N=1000. Separate single-fn binary (global counting allocator convention).
+[[test]]
+name = "bench_682_distributional_steering_alloc_check"
+required-features = ["distributional_steering"]
+
+# Plan 577 Phase 4 T4.2 — 2-D GMM population steered to a target histogram:
+# before/after divergence + per-particle weight distribution read-out.
+[[example]]
+name = "distributional_steering_demo"
+required-features = ["distributional_steering"]
 
 # Plan 359 Phase 4 T4.3 — BoM Trajectory floor comparison. The BoM Trajectory
 # adapter (`heat_kernel_trajectory_bom`) wraps the near-harmonic perturbation

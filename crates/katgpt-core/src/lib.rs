@@ -141,6 +141,21 @@ pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief}
 // collapse), riir-train Plan 346 arena opponent selection.
 #[cfg(feature = "hint_regret")]
 pub mod hint_regret;
+// risk_control_exit — modelless dual-threshold compute-exit (Plan 575,
+// Research 494, "Conformal Thinking" arXiv:2602.03814): stop-when-confident
+// upper threshold + parametric stop-when-not-progressing lower schedule,
+// offline UCB/Hoeffding calibration with guaranteed realized exit-risk,
+// efficiency-loss selection among feasible pairs, App. C disarm tripwire.
+// Opt-in pending the Bench 681 GOAT.
+#[cfg(feature = "risk_control_exit")]
+pub mod risk_control_exit;
+// distributional_steering — population steering toward a measure-defined
+// target (Plan 577, Research 505, arXiv:2608.08770): MeasureReward
+// first-variation table + Feynman-Kac log-weights with the mean-field Ψ̇
+// Picard correction + weighted empirical measure exposure. Opt-in pending
+// the Bench 682 targeting gate.
+#[cfg(feature = "distributional_steering")]
+pub mod distributional_steering;
 // entropic_tilt — KL-budgeted max-seeking advantage tilt (TTT-Discover
 // arXiv:2601.16175; prior art RS-GRPO / RSPO). The max-seeking counterpart to
 // `best_belief` above: that scores a candidate from its OWN history counts,
@@ -2612,6 +2627,21 @@ pub mod contrastive_scope;
 // KARC precedent); consumer PoC: riir-ai Issue 757.
 #[cfg(feature = "kinematic_rollout")]
 pub mod kinematics;
+
+// Stale-residual speculative layer pipelining — the modelless analysis half
+// (Issue 691 / Research 508, arXiv:2608.23841 §6.3 Approach A+B — the
+// paper's own UNTESTED hypothesis): residual-dominance ratios ‖δℓ‖/‖x_in‖
+// + the paper's viability bar (>50% of layers, median ratio < 0.05), the
+// accept/rollback threshold gate, the KL/top-1 SpecOutcome metrics + θ-sweep
+// reduction, and the stream-ratio-aware (C+IO)/max(C,IO) overlap latency
+// model (bits/weight-parameterized so ternary 1.58 b/w and Q4 4.6 b/w
+// project from one code). Pure analysis over captured activations — the
+// K3-0.40B simulator (which actually executes layers on stale residuals)
+// lives in the root crate's `kimi_k3` module; Bonsai/Gemma trace producers
+// in riir-ai feed `residual_dominance_from_trace`. Opt-in pending the Issue
+// 691 verdict.
+#[cfg(feature = "stale_residual")]
+pub mod stale_residual;
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
