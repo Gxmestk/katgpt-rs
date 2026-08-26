@@ -99,6 +99,14 @@ pub mod newton_schulz;
 #[cfg(feature = "rating")]
 pub mod rating;
 
+// laprop — LaProp normalize-before-accumulate momentum (Issue 689, from
+// riir-train Research 428 C2/C3): EMA over RMS-normalized intake with the
+// closed-form accumulator bound |m| ≤ 1/√(1−ν) — downstream accumulators
+// delete their clamps and get a theorem instead. Vector + scalar twins;
+// opt-in until a consumer adopts.
+#[cfg(feature = "laprop")]
+pub mod laprop;
+
 // linking_fold — Linking-Number Detector + Fold Correction (Plan 410,
 // Research 391, arXiv:2606.31856 Ren & Lim ICML 2026). SPLIT (Plan 410 T4.4
 // Option C, 2026-07-07) into two independently-gated sub-features:

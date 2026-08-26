@@ -132,6 +132,15 @@ statrs = "0.17"
 # zero-cost-unless-invoked.
 rating = []
 
+# laprop (Issue 689, 2026-08-25): LaProp normalize-before-accumulate
+# momentum — EMA over RMS-normalized intake with the closed-form
+# accumulator bound |m| ≤ 1/√(1−ν) (L∞; L2 form √D/√(1−ν)). Deletes
+# downstream clamps at heavy-tailed-intake sites (riir-clippy ema_step is
+# the documented consumer; migration is its own A/B in that repo). Vector
+# + scalar twins, zero deps, zero allocs. OPT-IN until a consumer adopts
+# (T3 promote/demote decision: G1–G4 pass but no default consumer yet).
+laprop = []
+
 # sterling_primitives (Issue 672 / Research 491, 2026-08-19): Steerling-8B
 # (arXiv:2608.07594) inference-time distillate — relu_gated_suppression_into
 # (one-sided logit mask; naive subtraction promotes anti-aligned tokens),
