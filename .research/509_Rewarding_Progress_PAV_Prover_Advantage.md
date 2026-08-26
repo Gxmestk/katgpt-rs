@@ -2,7 +2,7 @@
 
 > **Source:** [Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning](https://arxiv.org/abs/2410.08146) — Setlur, Nagpal, Fisch, Geng, Eisenstein, R. Agarwal, A. Agarwal, Berant, Kumar (Google DeepMind/Research), ICML 2025. 339 citations — the canonical PRM paper.
 > **Date:** 2026-08-27
-> **Status:** DISTILLED — pending owner decision (open-primitive issue 692 + riir-train Plan 355 filed)
+> **Status:** DISTILLED — pending owner decision (open-primitive issue 692 + riir-train Plan 356 filed)
 > **Classification:** Public (generic math) + private consumers + riir-train training arm
 > **Related:** 250 (self-advantage — single-policy cousin), 160/180 (SDPG centered_log_ratio — oracle/student cousin), 373 (ReMax expected-max — same Bernoulli-K form), 494 (conformal dual-threshold), 322-riir-ai (civ critic stop rule — adjacent, closed), 426-riir-train (TETHER blend — level-signal blend family)
 
@@ -19,7 +19,7 @@ The paper's thesis: **process rewards should be advantages measured under a *dif
 4. **Potential-difference immunity** — difference-based signals resist level-inflation farming (the paper's "REPHRASE THE PROBLEM" degenerate optimum); level-based signals do not. Our semantic domain already bets this way (emotion *kicks* on change) — the paper supplies the theorem-grade rule for every *new* scoring surface: **score the Δ, gate on the level**.
 5. **First-pit attribution** — fault = first step where Q̂ drops ≈0 on an incorrect rollout from a high-value state; a thresholded changepoint detector on logged Bernoulli means, no learned parameters.
 
-**Redirect → riir-train (Plan 355):** the trained PAV itself — a gemma-2-2b QLoRA edit-scorer attacking the clippy L4 fixer's measured 0/60 G1 (~30 GPU-h), plus the dense per-edit reward arm.
+**Redirect → riir-train (Plan 356):** the trained PAV itself — a gemma-2-2b QLoRA edit-scorer attacking the clippy L4 fixer's measured 0/60 G1 (~30 GPU-h), plus the dense per-edit reward arm.
 
 ---
 
@@ -53,7 +53,7 @@ Search: beam with r_eff = Q^π + αA^μ (α∈[0.2,0.6]) is >8% more accurate an
 | 4 | BoK transform Q^{BoK}=1−(1−Q)^K | **covered** — `iid_at_least_one` (qmc_halter), `expected_max_over_m` (remax), `tamper_detection_probability` (rtdc): same closed form at 3 sites | direct Bernoulli-K success everywhere; **nobody differences it into an advantage or optimizes K** | K\* law derived here (§2.1) — removes the sweep |
 | 5 | Effective-reward/blend coefficient α | **partial** — TETHER (riir-clippy 033, `selection_tether.rs`) fits a blend ρ from realized outcomes; QGF `DualLeoMixer` α-blends two heads | TETHER blends two *level* signals; PAV blends level + *difference* signal | **yes** — TETHER's least-squares fit is the natural α-estimator for r_eff too |
 | 6 | First-pit attribution | **partial** — riir-ai 313 (step-level fault attribution guide, SkillAdaptor delta qualification) documents the concept; no generic runtime kernel ships | guide-level; game_sync kill-credit is claim-based, not temporal-changepoint | **yes** — thresholded first-crossing on logged Q̂ sequence |
-| 7 | Dense per-step rewards for online RL | **n/a (track c)** — loss_grpo group-baseline notes "no external value model needed"; the paper's claim is a learned per-step baseline beats it 5–6× | — | **no** — needs the trained verifier → Plan 355 |
+| 7 | Dense per-step rewards for online RL | **n/a (track c)** — loss_grpo group-baseline notes "no external value model needed"; the paper's claim is a learned per-step baseline beats it 5–6× | — | **no** — needs the trained verifier → Plan 356 |
 | 8 | Trained PAV (amortized MC) | **none** | — | **no** — but paper-conceded circumventable by direct rollouts (the modelless path we'd take first) |
 
 ### 2.1 Derived law: the interior K\* (novel, beyond the paper)
@@ -104,7 +104,7 @@ Not all 4 YES → not Super-GOAT. Gain with issue + plan.
 
 - Issue 039 measured 98.5%-unseen candidates and *deferred selection work* on store densification — the lift/advantage axis is the documented follow-up shape once density lands.
 - dd_tree ships `BestQ` — the paper's exact diagnosed exploit-only selector, one enum arm from the fix.
-- riir-clippy L4 fixer G1 is a measured 0/60 (Bench 465/467) with 9/29 reachable misses (Bench 037) — the PAV edit-scorer (Plan 355) attacks a live documented gap.
+- riir-clippy L4 fixer G1 is a measured 0/60 (Bench 465/467) with 9/29 reachable misses (Bench 037) — the PAV edit-scorer (Plan 356) attacks a live documented gap.
 - No-GD advocate's items 1/3/6 have zero shipped analogs (grep-verified).
 
 ### Routing
@@ -113,7 +113,7 @@ Not all 4 YES → not Super-GOAT. Gain with issue + plan.
 |----------|------------|--------|
 | Research note (this file) | `katgpt-rs/.research/509_*.md` | ✅ |
 | Open primitive issue (D+Al stats, K\* law, first-pit kernel, potential-difference law, BestAdvantage mode) | `katgpt-rs/.issues/692_*.md` | ✅ |
-| Training plan (PAV edit-scorer → clippy L4; dense per-edit rewards; BoK relabel; token-value baseline in loss_grpo) | `riir-train/.plans/355_*.md` | ✅ |
+| Training plan (PAV edit-scorer → clippy L4; dense per-edit rewards; BoK relabel; token-value baseline in loss_grpo) | `riir-train/.plans/356_*.md` | ✅ |
 | PASS-Redirects to cousins | n/a (Gain, not PASS) | — |
 
 ---

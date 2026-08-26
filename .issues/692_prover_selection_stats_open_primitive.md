@@ -27,7 +27,7 @@ Our stack selects inference components by strength everywhere: drafters by mean 
 ## Honest negatives (do not re-litigate without new evidence)
 
 - QGF/`DualLeoOracle` is NOT a consumer: per-state tilt is argmax-invariant under centering (T9/T10 correctness checks pin it), and the civ critic axis is closed (riir-ai Research 322).
-- The trained PAV (amortized MC) is riir-train territory — riir-train Plan 355.
+- The trained PAV (amortized MC) is riir-train territory — riir-train Plan 356.
 
 ## Acceptance
 
