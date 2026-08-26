@@ -55,6 +55,14 @@ pub use model::{
     kimi_k3_forward_token_traced, kimi_k3_inject_pause, kimi_k3_pause_step,
 };
 
+/// Stale-residual speculative layer-execution simulator (Issue 691 /
+/// Research 508, arXiv:2608.23841 §6.3): runtime snapshot/restore, true-run
+/// per-layer capture, replay-from-layer-ℓ+1 on stale/corrected residuals,
+/// KL/top-1 outcome metrics, and the Approach-B closed-form δ-predictors
+/// (router-logit + x_in-linear, fit via the katgpt-attn-match OLS substrate).
+#[cfg(feature = "kimi_k3_loader")]
+pub mod stale_residual;
+
 // Safetensors loader + tiktoken tokenizer (gated by `kimi_k3_loader`).
 #[cfg(feature = "kimi_k3_loader")]
 pub mod loader;

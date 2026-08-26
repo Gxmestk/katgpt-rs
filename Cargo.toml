@@ -626,6 +626,11 @@ transformer_attn_res = ["katgpt-transformer/transformer_attn_res"]  # Attention 
 # capability addition, not a modelless runtime primitive that belongs in the
 # default build surface.
 kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_res"]
+# Stale-residual speculative layer pipelining POC (Issue 691 / Research 508,
+# arXiv:2608.23841 §6.3): forwards katgpt-core's analysis primitives
+# (residual-dominance ratios + accept gate + KL metrics + overlap latency
+# model) to the K3 simulator in src/kimi_k3/stale_residual.rs. OPT-IN.
+stale_residual = ["katgpt-core/stale_residual"]
 # Safetensors loader + tiktoken tokenizer for real-model loading.
 # Stays OPT-IN — pulls heavy deps (safetensors, base64) only needed when
 # actually loading model.safetensors.
@@ -1001,6 +1006,18 @@ harness = false
 name = "bench_013_swe_trajectory_freezer_goat"
 path = "benches/bench_013_swe_trajectory_freezer_goat.rs"
 required-features = ["swe_trajectory_freeze"]
+harness = false
+
+# Issue 691 — Stale-residual speculative layer pipelining POC (arXiv:2608.23841
+# §6.3 Approach A+B, the paper's own untested hypotheses). Real Kimi-K3-0.40B
+# weights + real tiktoken prompts, pure CPU: T1 residual-dominance table +
+# paper viability bar, T2 theta-sweep x delay-layer grid with persistent-hazard
+# arm, T3 closed-form delta-predictors (router-logit + x_in-linear), latency
+# model at our stream ratios. Reads Bonsai/Gemma SRTR traces when present.
+[[bench]]
+name = "bench_683_stale_residual_poc"
+path = "benches/bench_683_stale_residual_poc.rs"
+required-features = ["kimi_k3_loader", "stale_residual"]
 harness = false
 
 # Proposal 011 T5.6 — SweTrajectoryFreezer G5 gate (cross-model discrimination).
