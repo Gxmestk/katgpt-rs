@@ -1,26 +1,29 @@
 # Issue 001 — Deferred crate-promotion candidates
 
-Status: **PARTIALLY SUPERSEDED** by Proposal 003 (`003_src_consolidation_master.md`).
-Verified accurate 2026-07-04 by grep against Proposal 003's destination map +
-phase list:
-  - **Candidate C — `dash_attn/`**: ✅ genuinely tracked → Proposal 002 (done)
-    and Proposal 003 Phase 2 (`katgpt-attn` crate).
-  - **Candidate A — `mux_latent/`**: ❌ NOT in Proposal 003. Phase 6
-    (`katgpt-speculative` absorption) lists `distill/{ilc,trd}`, `spechop`,
-    `rt_turbo`, `precision_aware_draft`, `sparse_compose`,
-    `spec_reconciliation` — **mux_latent is absent**. The only `mux*` entry
-    anywhere in Proposal 003 is `mux_demux.rs` (Phase 10, `katgpt-core`),
-    which is the MUX *primitive*, not the mux_latent *application*.
-    The 3 unblock-criteria checkboxes below remain genuinely OPEN.
-  - **Candidate B — `proof_cert/`**: ❌ NOT in Proposal 003. Zero mentions
-    of `proof_cert` or `proof/` anywhere in the proposal (verified by grep).
-    Phase 12 ("final sweep") does not reference it. The 4 unblock-criteria
-    checkboxes below remain genuinely OPEN.
+Status: **RESOLVED** (2026-08-26). All candidates landed. Both "genuinely
+OPEN" T2 decisions were executed by Proposal 003 Phase 12 commits shortly
+after the 2026-07-04 audit — the header below was stale from then until
+this resolution note:
+  - **Candidate C — `dash_attn/`**: ✅ landed via Proposal 002 + Proposal 003
+    Phase 2 (`katgpt-attn` crate).
+  - **Candidate A — `mux_latent/`**: ✅ **RESOLVED** — moved to
+    `crates/katgpt-core/src/mux_latent/` as its **own module** in commit
+    `348347bd` (Phase 12 T4.3, "move 4 folders to katgpt-core"). NOT merged
+    into `katgpt-core/src/mux/` — the audit's "they are unrelated
+    subsystems" separation holds (verified 2026-08-26: the two modules are
+    siblings with zero cross-imports). Verified healthy: 35/35 lib tests +
+    7/7 `bench_238_mux_latent_goat` under `mux_latent_context`.
+  - **Candidate B — `proof_cert/`**: ✅ **RESOLVED** — extracted to
+    `crates/katgpt-proof-cert/` in commit `cf23050a` (Proposal 003 Phase 12
+    T1+T4.1), exactly the audit's T2 recommendation (katgpt-rs-local crate;
+    NOT riir-chain). Root re-exports preserved (`katgpt_rs::proof_cert::*`).
+    Verified healthy: compiles default, 8/8 tests with `wasm_proof_witness`.
 The earlier "all candidates scheduled in Proposal 003" claim was aspirational
-and inaccurate. This issue remains the live tracker for Candidates A and B.
+and inaccurate at the time; Phase 12's final sweep subsequently covered both.
 Created: 2026-07-01
 Status corrected: 2026-07-04
-Related proposal: `.proposals/003_src_consolidation_master.md` (covers Candidate C only)
+Resolved: 2026-08-26 (verification pass: compile + tests, evidence above)
+Related proposal: `.proposals/003_src_consolidation_master.md` (Phase 12 executed A + B)
 
 ## Context
 
@@ -97,7 +100,7 @@ of `src/mux_latent/` shows:
       performed 2026-07-04: grep `use katgpt_core` in `src/mux_latent/`
       returns zero hits; grep `katgpt_core::mux` returns zero hits; only
       consumer is `src/lib.rs:320`.)
-- [ ] **T2 — Decide promotion target. Original options reframed by T1
+- [x] **T2 — Decide promotion target. Original options reframed by T1
       finding:**
       - ~~(a) promote mux primitive + mux_latent together into `katgpt-mux`~~ —
         **INVALID**: they are unrelated; bundling them would create a false
@@ -105,22 +108,25 @@ of `src/mux_latent/` shows:
       - ~~(b) fold mux_latent into `katgpt-core::mux`~~ — **INVALID**:
         they are different concerns; `katgpt-core::mux` is spec-decode
         multi-token drafting, mux_latent is LCLM context compression.
-      - **(c) keep as-is in root `src/mux_latent/`** — viable but leaves
+      - **(c) keep as-is in root `src/mux_latent/`** — rejected: leaves
         ~104 KB of LCLM code in the root crate.
-      - **(d) NEW — promote mux_latent to its own `katgpt-mux-latent`
-        crate** (or fold into an existing attention/context crate if one
-        emerges from Proposal 003 Phase 2 `katgpt-attn`). Cleanest option
-        given T1: zero cross-crate deps to resolve.
-      - **(e) NEW — fold into `katgpt-sleep` or a future `katgpt-context`
-        crate** if the LCLM context-compression concern groups better with
-        sleep-time anticipation than with attention. Decision needs a
-        semantic call, not a dep-graph call (deps are trivial either way).
+      - **(d) promote to its own crate** — superseded by the landed decision.
+      - **(e) fold into katgpt-sleep / katgpt-context** — not taken.
+      **DECISION (executed, commit `348347bd`, Phase 12 T4.3): fold into
+      `katgpt-core` as its own top-level module**
+      `katgpt-core/src/mux_latent/` — a hybrid none of the original options
+      named exactly: consolidated into core (removing it from the root
+      crate, option (c)'s complaint) while preserving the module boundary
+      the audit demanded (NOT inside `katgpt-core::mux`, option (b)'s
+      invalid grouping). Feature `mux_latent_context` ("DEFAULT-ON in root"
+      per katgpt-core Cargo.toml L578). Verified 2026-08-26: zero
+      cross-imports between `mux/` and `mux_latent/`; 35/35 lib tests +
+      7/7 bench_238 GOAT pass.
 - [-] **T3 — If (a): write Proposal 003 with the full MUX closure.**
       **DEFERRED — moot.** T1 disproved the premise that made (a) an
-      option. Whatever T2 decides, it won't be "write Proposal 003 with
-      MUX closure" — Proposal 003 doesn't currently cover mux_latent
-      (grep-verified, see status header) and shouldn't be retrofitted to.
-      Replaced by: "if T2 picks (d) or (e), write the matching proposal."
+      option. T2's landed decision (fold into katgpt-core) was executed
+      directly as Phase 12 T4.3 — no separate proposal was needed.
+      CLOSED as moot with the T2 resolution.
 
 ---
 
@@ -207,16 +213,18 @@ Grep of `src/proof_cert/` shows:
       (Audit 2026-07-04: grep `use katgpt_core` and `use crate::` in
       `src/proof_cert/` returns zero; grep `wasmi|wasmtime|wasm_bindgen`
       returns zero; quintet proof-surface map above.)
-- [ ] **T2 — Decide: is this a katgpt-rs-local crate, or does it belong
+- [x] **T2 — Decide: is this a katgpt-rs-local crate, or does it belong
       in a different repo (riir-chain)?**
-      Reframed by T1: dep-graph says lift is trivial in either repo.
-      Semantic call: GOAT proof certificates are *engine-side* (the GOAT
-      gate runs in katgpt-rs/riir-ai runtime), so proof_cert belongs with
-      the engine, NOT with the chain. The chain commits *results*; it
-      doesn't *produce* GOAT gate evidence. **Recommendation: katgpt-rs-local
-      `katgpt-proof-cert` crate** (or fold into katgpt-core alongside
-      merkle.rs). riir-chain would *consume* proof certificates if a
-      future bridge commits them on-chain, but it doesn't own the algorithm.
+      **DECISION: katgpt-rs-local `katgpt-proof-cert` crate — the audit's
+      recommendation, taken verbatim.** Executed in commit `cf23050a`
+      (Proposal 003 Phase 12 T1+T4.1, 2026-07-04): extracted to
+      `crates/katgpt-proof-cert/` (serde + postcard + blake3 always-on;
+      `wasm_proof_witness` feature gates the witness subset), root
+      re-exports preserved (`katgpt_rs::proof_cert::*` + the
+      `conditional_proof!` macro). riir-chain consumes nothing here —
+      it doesn't own the algorithm. Verified 2026-08-26: compiles
+      default-clean; 8/8 tests under `wasm_proof_witness` (0/0 default,
+      matching the original module's gated-test coverage).
 - [x] **T3 — If katgpt-rs-local: confirm the WASM coupling can be
       feature-gated so the crate compiles without a WASM runtime.**
       **ANSWER: yes — it already is.** `wasm_proof_witness` is gated by
@@ -226,12 +234,13 @@ Grep of `src/proof_cert/` shows:
       with zero wasm deps under the default feature set; only the
       opt-in `wasm_proof_witness` feature adds the witness generator.
 - [-] **T4 — Write Proposal 004 with the cross-repo boundary decision.**
-      **DEFERRED — pending T2 decision.** T1 + T3 unblock the dep-graph
-      side; T2 is a semantic call that the user should make (the audit's
-      recommendation is katgpt-rs-local, but the call is not the agent's
-      to make unilaterally — it affects the public crate surface). Note:
-      Proposal 004 number is already taken (`004_adaptive_causal_calibration.md`);
-      the actual number for this proposal would be 005+.
+      **DEFERRED — CLOSED as moot with T2.** T2 was decided + executed
+      inside Proposal 003 Phase 12 (`cf23050a`); a separate cross-repo
+      boundary proposal became unnecessary — the T1 audit had already
+      established the surfaces are disjoint at the algorithm level, and
+      the extraction landed katgpt-rs-local with no riir-chain involvement.
+      (Note: Proposal 004 number was already taken; a new proposal was
+      never filed because none was needed.)
 
 ---
 
@@ -276,13 +285,21 @@ They share the word "sleep" but are unrelated substrates. `src/sleep/` is
 
 ## Priority order when revisiting
 
-1. **Proposal 002 — `dash_attn`** (strongest standalone lift, clean boundary).
-2. **Candidate A — `mux_latent`** (needs MUX substrate split decision first).
-3. **Candidate B — `proof_cert`** (needs cross-repo quintet boundary design).
+All three landed — nothing left to revisit.
+
+1. ~~**Proposal 002 — `dash_attn`**~~ — DONE (`katgpt-attn` crate, Proposals
+   002 + 003 Phase 2).
+2. ~~**Candidate A — `mux_latent`**~~ — DONE (`katgpt-core/src/mux_latent/`,
+   commit `348347bd`).
+3. ~~**Candidate B — `proof_cert`**~~ — DONE (`katgpt-proof-cert` crate,
+   commit `cf23050a`).
 
 ## TL;DR
 
-`mux_latent` and `proof_cert` are real promotion candidates but each has a
-coupling issue that makes the lift not worth it right now. `dash_attn` is
-the next clean win (Proposal 002). `src/sleep/` is NOT a duplicate of the
-`katgpt-sleep` crate — different papers, leave alone.
+`mux_latent` and `proof_cert` were real promotion candidates whose deferral
+premises the 2026-07-04 audit disproved; both landed in Proposal 003 Phase
+12 (2026-07-04): mux_latent as its own `katgpt-core` module (NOT inside
+`mux/`), proof_cert as the `katgpt-proof-cert` crate. `dash_attn` landed via
+Proposal 002. `src/sleep/` was never a duplicate of the `katgpt-sleep` crate
+— different papers, left alone (still true: `src/sleep/` remains the
+`sleep_consolidation` GDN2 substrate). Issue fully RESOLVED 2026-08-26.
