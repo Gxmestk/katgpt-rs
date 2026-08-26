@@ -6,8 +6,9 @@
 //! prover/critic/verifier is not strength but distinguishability +
 //! alignment (Theorem 3.1: improvement ≳ γ·(D + Al)). This module hosts the
 //! modelless kernels; T1 ships the D/Al selection statistics + the theorem
-//! bound + its sigmoid-gated exposure, T2 the changepoint kernel. The K\*
-//! law gate (T3) lands beside them.
+//! bound + its sigmoid-gated exposure, T2 the changepoint kernel, T3 the
+//! K\* interior-optimum law ([`k_star`] + [`bok_advantage`]) — the closed
+//! form that replaces the empirical best-of-K sweep.
 //!
 //! T1 — [`distinguishability`] / [`alignment`] / [`theorem_bound`] /
 //! [`selection_gate`]: offline-computable from logged Bernoulli outcomes,
@@ -192,9 +193,61 @@ pub fn first_pit(q_seq: &[f32], eps: f32) -> Option<usize> {
     q_seq.iter().position(|&q| q < eps)
 }
 
+// ── T3: the K* interior-optimum law (Research 509 §2.1, beyond the paper) ─
+
+/// A(K) = (1−V)^K − (1−Q)^K — the best-of-K advantage gap at rollout count
+/// K (Issue 692 T3; Research 509 §2.1's pairwise form).
+///
+/// With a shared state baseline V and per-candidate success Q, both terms
+/// are BoK *failure* probabilities — P(all K iid attempts fail) — so the
+/// gap is the K-rollout advantage one success rate holds over the other:
+/// the pairwise distinguishability signal (Var over actions inherits the
+/// same interior peak when V is shared, per the note). Positive for V < Q,
+/// antisymmetric under the swap (bit-exact in IEEE), identically 0 on the
+/// diagonal, and **unimodal in K**: 0 at K = 0, one interior peak, then
+/// monotone decay to 0 as both failure tails die (K → ∞ kills the signal —
+/// the paper's own limit). The peak's location is [`k_star`].
+///
+/// Integer exponent via `powi` (no `powf` rounding); K = 0 → 0 exactly.
+/// Deterministic, allocation-free.
+#[must_use]
+pub fn bok_advantage(k: u32, q: f32, v: f32) -> f32 {
+    (1.0 - v).powi(k as i32) - (1.0 - q).powi(k as i32)
+}
+
+/// K\* = ln(ln(1−Q)/ln(1−V)) / ln((1−V)/(1−Q)) — the interior-optimum law
+/// (Issue 692 T3; Research 509 §2.1, derived beyond the paper): the rollout
+/// count maximizing |[`bok_advantage`]|, in closed form.
+///
+/// Setting dA/dK = 0 for A(K) = (1−V)^K − (1−Q)^K leaves
+/// ((1−V)/(1−Q))^K = ln(1−Q)/ln(1−V); the left side is strictly monotone
+/// in K, so the root is unique — A is unimodal and the integer argmax is
+/// always floor(K\*) or ceil(K\*) (pinned against the empirical sweep on
+/// an exhaustive (Q,V) grid by the gate test). The paper sweeps K
+/// empirically ("Bo4 dominates" — the population aggregate of this
+/// per-context law); this closed form removes the sweep: pick best-of-K
+/// budgets (drafter retries, anytime-inference K, sampling best-of-K) from
+/// measured (Q,V) instead.
+///
+/// Limits: Q → V ⇒ 0/0 = NaN — the advantage vanishes, there is no interior
+/// peak (caller screens, the same totality stance as the T1/T2 kernels);
+/// Q → 1 ⇒ K\* → 0 (integer optimum 1 = ceil); Q → V at fixed V ⇒ K\* →
+/// 1/|ln(1−V)|, which diverges as V → 0 — weak-baseline near-ties want many
+/// rollouts. Symmetric under Q ↔ V (the gap is antisymmetric; the law
+/// maximizes |A|, so both halves of the square agree).
+#[must_use]
+pub fn k_star(q: f32, v: f32) -> f32 {
+    let ln_fail_q = (1.0 - q).ln();
+    let ln_fail_v = (1.0 - v).ln();
+    (ln_fail_q / ln_fail_v).ln() / ((1.0 - v) / (1.0 - q)).ln()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{alignment, distinguishability, first_pit, selection_gate, theorem_bound};
+    use super::{
+        alignment, bok_advantage, distinguishability, first_pit, k_star, selection_gate,
+        theorem_bound,
+    };
 
     #[test]
     fn empty_sequence_never_pits() {
@@ -425,5 +478,188 @@ mod tests {
         assert!(distinguishability(&clean, &nan_prover).is_nan());
         assert!(alignment(&nan_base, &clean).is_nan());
         assert!(alignment(&clean, &nan_prover).is_nan());
+    }
+
+    // ── T3: the K* law ──────────────────────────────────────────────────
+
+    /// Empirical argmax of |A(K)| over K ∈ [1, k_sweep] (first index wins
+    /// ties) — the sweep the closed form replaces. |A| per Research 509
+    /// §2.1 ("maximizes |A|"): both halves of the (Q,V) square share the
+    /// same interior peak because the gap is antisymmetric while the law
+    /// is symmetric under the swap.
+    fn empirical_argmax_abs_k(q: f32, v: f32, k_sweep: u32) -> u32 {
+        let mut best_k = 1_u32;
+        let mut best_a = bok_advantage(1, q, v).abs();
+        for k in 2..=k_sweep {
+            let a = bok_advantage(k, q, v).abs();
+            if a > best_a {
+                best_a = a;
+                best_k = k;
+            }
+        }
+        best_k
+    }
+
+    /// The gate: on every off-diagonal-band (Q,V), the empirical argmax of
+    /// |A(K)| is floor(K*) or ceil(K*) (exact — unimodality is structural:
+    /// ((1−V)/(1−Q))^K is strictly monotone in K, so dA/dK has one root).
+    /// floor is clamped to the sweep's 1.. domain (K* < 1 ⇒ argmax = ceil).
+    #[test]
+    fn k_star_law_matches_empirical_argmax_over_the_grid() {
+        let mut checked = 0_usize;
+        // main grid: the full (0.02, 0.98)² square at 0.02 resolution,
+        // skipping the degenerate near-diagonal band (|Q−V| < 0.03: A is
+        // flat ⇒ f32 cannot resolve the peak, and K* → 1/|ln(1−V)| there).
+        // K* ≤ ~27 on this grid (V=.02, Q=.06) — the 1024 sweep is ≥ 38×
+        // beyond every peak.
+        for i in 1..=49_u32 {
+            for j in 1..=49_u32 {
+                let (q, v) = ((i as f32) * 0.02, (j as f32) * 0.02);
+                if (q - v).abs() < 0.03 {
+                    continue;
+                }
+                let ks = k_star(q, v);
+                assert!(
+                    ks.is_finite() && ks > 0.0,
+                    "K* degenerate at Q={q} V={v}: {ks}"
+                );
+                let lo = (ks.floor() as u32).max(1);
+                let hi = ks.ceil() as u32;
+                let argmax = empirical_argmax_abs_k(q, v, 1024);
+                assert!(
+                    argmax == lo || argmax == hi,
+                    "K* law violated at Q={q} V={v}: K*={ks}, argmax={argmax}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 2_000, "main grid vacuous: {checked} pairs");
+
+        // refinement: the flattest-peak zone (mid-range V, minimal legal
+        // separation) at 0.005 resolution — K* ≤ ~2.9 here, sweep 256 is
+        // ≥ 88× beyond every peak.
+        let mut refined = 0_usize;
+        for i in 60..=120_u32 {
+            for j in 60..=120_u32 {
+                let (q, v) = ((i as f32) * 0.005, (j as f32) * 0.005);
+                if (q - v).abs() < 0.01 {
+                    continue;
+                }
+                let ks = k_star(q, v);
+                assert!(
+                    ks.is_finite() && ks > 0.0,
+                    "K* degenerate at Q={q} V={v}: {ks}"
+                );
+                let lo = (ks.floor() as u32).max(1);
+                let hi = ks.ceil() as u32;
+                let argmax = empirical_argmax_abs_k(q, v, 256);
+                assert!(
+                    argmax == lo || argmax == hi,
+                    "K* law violated at Q={q} V={v}: K*={ks}, argmax={argmax}"
+                );
+                refined += 1;
+            }
+        }
+        assert!(refined > 3_000, "refinement grid vacuous: {refined} pairs");
+    }
+
+    /// Far-K guard: a handful of extreme pairs at a much longer sweep —
+    /// nothing past the peak ever comes back (underflow → 0, never above
+    /// the positive peak).
+    #[test]
+    fn far_tail_never_beats_the_peak() {
+        for &(q, v) in &[
+            (0.99_f32, 0.5_f32),
+            (0.55, 0.5),
+            (0.98, 0.02),
+            (0.7, 0.3),
+            (0.06, 0.02), // K*≈26.9 — the largest-K* corner (weak baseline, near-tie)
+        ] {
+            let ks = k_star(q, v);
+            let lo = (ks.floor() as u32).max(1);
+            let hi = ks.ceil() as u32;
+            let argmax = empirical_argmax_abs_k(q, v, 8192);
+            assert!(
+                argmax == lo || argmax == hi,
+                "far-tail violation at Q={q} V={v}: K*={ks}, argmax={argmax}"
+            );
+        }
+    }
+
+    /// Research 509 §2.1's hand-verified anchors, recomputed. The first
+    /// confirms the note exactly. The second is the note's ERRATUM: its
+    /// "K*≈3.4" is arithmetically off — the true closed form gives ≈6.371
+    /// and the empirical peak sits at K=6 (A(6)=.2693 > A(7)=.2686), which
+    /// floor/ceil of 6.371 predicts. The law holds; the anchor prose was
+    /// wrong (corrected in the note's status line).
+    #[test]
+    fn k_star_note_anchors() {
+        // anchor 1 (confirmed): Q=.5, V=.3 → K*≈1.975, peak at K=2
+        // (A(1)=.20, A(2)=.24, A(3)=.218 — non-dyadic, tolerance-pinned)
+        assert!((k_star(0.5, 0.3) - 1.9747).abs() < 1e-3);
+        assert!((bok_advantage(1, 0.5, 0.3) - 0.20).abs() < 1e-6);
+        assert!((bok_advantage(2, 0.5, 0.3) - 0.24).abs() < 1e-6);
+        assert!((bok_advantage(3, 0.5, 0.3) - 0.218).abs() < 1e-6);
+        assert_eq!(empirical_argmax_abs_k(0.5, 0.3, 256), 2);
+
+        // anchor 2 (ERRATUM): Q=.2, V=.1 → true K*≈6.371, peak at K=6 —
+        // NOT the note's "≈3.4"
+        assert!((k_star(0.2, 0.1) - 6.371_3).abs() < 1e-3);
+        assert!((bok_advantage(6, 0.2, 0.1) - 0.269_297).abs() < 1e-5);
+        assert!((bok_advantage(7, 0.2, 0.1) - 0.268_582).abs() < 1e-5);
+        assert!(bok_advantage(6, 0.2, 0.1) > bok_advantage(7, 0.2, 0.1));
+        assert_eq!(empirical_argmax_abs_k(0.2, 0.1, 256), 6);
+    }
+
+    /// Dyadic exactness + the m-power identity: (1−Q) = (1−V)^m ⇒
+    /// K* = ln m/((1−m)·ln(1−V)). At m = 2 both logs land on ln(2.0) so
+    /// K* = 1 BIT-EXACT in f32; at m = 3/2 (b = 1/4) the denominator is
+    /// ln 2 again and K* = log₂(3/2).
+    #[test]
+    fn dyadic_pairs_and_power_identities() {
+        // Q = 0.75, V = 0.5: fail bases 0.25 and 0.5 — every power here is
+        // an exact dyadic f32, so the gap is bit-exact.
+        assert_eq!(bok_advantage(0, 0.75, 0.5), 0.0); // 1 − 1
+        assert_eq!(bok_advantage(1, 0.75, 0.5), 0.25);
+        assert_eq!(bok_advantage(2, 0.75, 0.5), 0.1875); // .25 − .0625
+        assert_eq!(bok_advantage(3, 0.75, 0.5), 0.109_375); // .125 − .015625
+        assert_eq!(bok_advantage(4, 0.75, 0.5), 0.058_593_75); // .0625 − .00390625
+        // m = 2: K* = 1 exactly
+        assert_eq!(k_star(0.75, 0.5), 1.0);
+        // m = 3/2 (1−Q = 1/8, 1−V = 1/4): K* = log2(3/2), one f32 ln off
+        assert!((k_star(0.875, 0.75) - 0.584_962_5).abs() < 1e-6);
+    }
+
+    /// Structure pins: antisymmetry is bit-exact (IEEE subtraction is
+    /// negation-symmetric), the diagonal is exactly flat, K* is symmetric
+    /// under the swap (to ln(1/x) rounding), and the near-diagonal limit
+    /// Q→V tends to 1/|ln(1−V)| (here 1/ln 2 = 1.442695).
+    #[test]
+    fn gap_antisymmetric_k_star_symmetric_diagonal_degenerate() {
+        for &(q, v) in &[(0.9_f32, 0.5_f32), (0.75, 0.6), (0.95, 0.05), (0.5, 0.3)] {
+            for k in [1_u32, 2, 5, 13] {
+                assert_eq!(bok_advantage(k, q, v), -bok_advantage(k, v, q));
+            }
+            assert!((k_star(q, v) - k_star(v, q)).abs() < 1e-5);
+        }
+        // Q = V: the gap is identically 0 and the closed form is 0/0 = NaN
+        for q in [0.3_f32, 0.5, 0.75] {
+            assert!(k_star(q, q).is_nan());
+            assert_eq!(bok_advantage(7, q, q), 0.0);
+        }
+        // Q→V limit: K* → 1/|ln(1−V)| = 1/ln 2 at V = 0.5 (δ = 0.001)
+        assert!((k_star(0.501, 0.5) - 1.442_695).abs() < 0.005);
+    }
+
+    /// Totality: out-of-domain and NaN inputs surface as NaN (never a
+    /// plausible silent number) — same stance as the T1/T2 kernels.
+    #[test]
+    fn k_star_out_of_domain_propagates_nan() {
+        assert!(k_star(1.0, 0.5).is_nan()); // ln(0) = −inf ⇒ inf/inf
+        assert!(k_star(1.5, 0.5).is_nan()); // ln(−0.5) = NaN
+        assert!(k_star(f32::NAN, 0.5).is_nan());
+        assert!(k_star(0.9, f32::NAN).is_nan());
+        assert!(bok_advantage(3, f32::NAN, 0.5).is_nan());
+        assert!(bok_advantage(3, 0.9, f32::NAN).is_nan());
     }
 }

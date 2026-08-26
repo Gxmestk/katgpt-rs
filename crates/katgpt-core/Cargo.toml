@@ -155,7 +155,7 @@ stale_residual = []
 # zero-cost-unless-invoked.
 rating = []
 
-# prover_selection (Issue 692 T1+T2, 2026-08-27, from Research 509 —
+# prover_selection (Issue 692 T1–T3, 2026-08-27, from Research 509 —
 # arXiv:2410.08146): prover-selection statistics kernels. T1 ships the
 # D/Al complementarity selector — distinguishability + alignment +
 # Theorem 3.1's γ·(D+Al) predicted-gain bound + its sigmoid-gated
@@ -163,9 +163,11 @@ rating = []
 # complementarity, not mean acceptance). T2 ships the first_pit
 # changepoint kernel (first index where Q̂ < ε) — consumed by riir-clippy's
 # PAV data curation (riir-train Plan 356 A1) via a same-signature twin
-# that swaps to this import on the next dep bump. T3 (the K* law
-# validation gate) lands beside them. Pure modelless arithmetic, no deps,
-# no allocs, zero-cost-unless-invoked.
+# that swaps to this import on the next dep bump. T3 ships the K* law —
+# k_star (the closed-form interior-optimum rollout count) + bok_advantage
+# (the BoK gap A(K)), gate-pinned against the empirical argmax on an
+# exhaustive (Q,V) grid. Pure modelless arithmetic, no deps, no allocs,
+# zero-cost-unless-invoked.
 prover_selection = []
 
 # laprop (Issue 689, 2026-08-25): LaProp normalize-before-accumulate

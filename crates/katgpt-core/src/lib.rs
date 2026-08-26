@@ -112,10 +112,12 @@ pub mod laprop;
 // selector (distinguishability + alignment + Theorem 3.1's γ·(D+Al)
 // predicted-gain bound + its sigmoid-gated exposure), T2 the first_pit
 // changepoint kernel (first index where Q̂ < ε) consumed by riir-clippy's
-// PAV data curation.
-// (riir-train Plan 356 A1) via a same-signature twin. T1 (D/Al) + T3 (the
-// The K* law gate (T3) lands beside them. Pure modelless arithmetic, no
-// deps, no allocs, zero-cost-unless-invoked.
+// PAV data curation (riir-train Plan 356 A1) via a same-signature twin.
+// T3 ships the K* interior-optimum law — k_star (the closed-form rollout
+// count maximizing the gap) + bok_advantage (the BoK gap
+// A(K) = (1−V)^K − (1−Q)^K), gate-pinned against the empirical argmax on
+// an exhaustive (Q,V) grid. Pure modelless arithmetic, no deps, no
+// allocs, zero-cost-unless-invoked.
 #[cfg(feature = "prover_selection")]
 pub mod prover_selection;
 
