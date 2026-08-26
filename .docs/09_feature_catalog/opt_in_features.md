@@ -2915,3 +2915,63 @@ radial heavy tails) are caught at any d.
 #743 edge_lora hidden-space monitor, riir-neuron-db freeze-gate advisory
 (`FreezeGateReport` additive field — the bimodal-two-styles-before-freeze
 case).
+
+## 87. distributional_steering — mean-field population steering via Feynman-Kac weights (Plan 577)
+
+Population-level steering toward a **measure-defined target** `μ* ∝ e^{λΨ} p`
+(Howard & Nüsken, [arXiv:2608.08770](https://arxiv.org/abs/2608.08770);
+Research 505): a closed-form first-variation reward table, FK log-weight
+accumulation with the mean-field `Ψ̇` correction solved by damped Picard,
+and the weighted empirical measure `μ̂ = Σ wᵢ δ_{Xᵢ}` as the converging
+object (paper Thm 3.4).
+
+- **Reward table** — `LinearReward` (Ψ = a·x), `MomentReward`
+  (Ψ = F'(m)·(p·x)), `MmdReward` (Ψ = 2[emb_ν − emb_μ], second variation
+  −2k). All rows finite-difference-verified; the MMD gradient is
+  `λ·4γ·[S_pop − S_ν]` (target attraction)
+- **FK stepper** — `begin_step` (∇Ψ steering increment) → consumer
+  integrates → `finish_step` (damped-Picard Ψ̇ + `Aᵢ += (b·∇Ψ + Ψ̇)δt` with
+  the paper's clip); kernel matrix built **once per step** (symmetric fill +
+  one `simd_exp_inplace` pass) and reused across every Picard iteration
+- **Resampling** — `residual_resample_into` / `systematic_resample_into` for
+  sampling consumers ONLY (documented NOT for persistent agents — the
+  theorem tracks the weighted measure; weights-only is the agent mode)
+- **BoM adapter** (`bom_sampling` + `distributional_steering`): static tilt
+  fixed point over K hypotheses as a principled alternative to
+  `select_best` argmax — no UQ claim
+- **Zero-alloc** steady state (G4: 0 allocs / 1000 steps @ N=1000);
+  bit-identical determinism; `tilt_residual` convergence certificate
+
+### GOAT (Bench 682) — FAIL (partial) ⇒ stays opt-in
+
+The paper's 1-D falsifiable harness reproduced the targeting minimum at
+**λ\*=5 in both noise schedules** (clean V-curves) and the exact J
+trade-off structure, but λ\*=10 held only one of two schedules (flat curve
+at the seed-noise floor) and the gradient-only **separation claim did not
+reproduce** (in the 1-D broad-kernel Langevin regime the position steering
+dominates; the FK weights are a third-decimal correction). G2: 9045
+ns/particle/step @ N=1000 — the sub-µs gate is structurally infeasible for
+exact O(N²) MMD (the kernel build alone is 10⁶ `fast_exp`; the paper's
+"Picard = 0.04% of runtime" is relative to network evals a modelless stack
+doesn't have).
+
+**Consumer-critical findings** (all in the module docs + Bench 682):
+
+1. **Picard damping must scale O(1/λ)** for broad kernels — the iteration
+   Jacobian ≈ 0.2λ; damping 1.0 diverges for λ≳5 regardless of K_FP
+   (weights collapse to ESS 1). Use `α = min(1, 2/λ)`.
+2. **`b` = the FULL simulated drift** (base + steering) — the `b·∇Ψ` term
+   carries the Girsanov overshoot correction; Ψ̇ must be pure measure drift
+   (both Ψ terms at the advanced positions).
+3. **Research 505's Table-2 MMD row has a sign slip** (`Ψ = 2∫k(μ−ν)` for
+   `R = −MMD²`); the module ships the corrected `Ψ = 2[emb_ν − emb_μ]`,
+   pinned by finite-difference tests.
+4. **Weights-only degenerates** to ESS→1 by λ≈7.5 over 30 steps without
+   resampling (a real property, clip-bounded — harmless for crowd-salience
+   consumers, decisive for sampling consumers).
+
+**Demo** (`--example distributional_steering_demo`): 2-D GMM 1:3 → 3:1 dial,
+MMD² 0.331 → 0.011, shares 0.24/0.76 → 0.67/0.33. **Reopen paths:** a
+diffusion-sampler-shaped harness (the prerequisite for the riir-ai
+crowd-targeting plan, Guide 344); approximate kernel features for G2;
+N≲300 populations are already sub-µs per particle.

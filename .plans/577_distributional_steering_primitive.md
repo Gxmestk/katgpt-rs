@@ -1,10 +1,16 @@
 # Plan 577: Distributional Steering Primitive — FK Weights + First-Variation Table + Picard Ψ̇ Solver
 
-**Date:** 2026-08-24
+**Date:** 2026-08-24 (landed 2026-08-26)
 **Research:** [katgpt-rs/.research/505_Mean_Field_Distributional_Steering.md](../.research/505_Mean_Field_Distributional_Steering.md)
 **Source paper:** [arXiv:2608.08770](https://arxiv.org/abs/2608.08770) — Howard & Nüsken, "A Mean-Field Framework for Inference-Time Distributional Control of Diffusion Models" (SPIGM @ ICML 2026)
 **Target:** `crates/katgpt-core/src/distributional_steering.rs` (new module) + Cargo feature `distributional_steering` (opt-in)
-**Status:** Active — Phase 1 not started
+**Status:** COMPLETE — G1 FAIL (partial) ⇒ stays opt-in; record [Bench 682](../.benchmarks/682_distributional_steering_goat.md)
+
+> **Renumber note (binding):** the bench/test targets hardcode
+> `.benchmarks/577_*` / `tests/bench_577_*` in this plan — renumbered to
+> **682** (577 was already allocated to `577_emotion_direction_rank`; the
+> monotonic never-reuse rule, highwater 680). All Phase-3 file references
+> below read as 682.
 
 ---
 
@@ -20,43 +26,43 @@ Ship the generic, modelless population-steering primitive: given a weighted part
 
 ### Tasks
 
-- [ ] **T1.1** `MeasureReward` trait in `distributional_steering.rs`: `first_variation_into(&self, x: &[f32], pop: &WeightedPopulation, out: &mut [f32])` + `second_variation(&self, x, y, pop) -> f32` (second needed only for the linear solver; Picard needs finite diffs of the first). Zero game semantics; `#[repr(u8)]` enum dispatch closed over a small table.
-- [ ] **T1.2** Closed-form rows: `Linear(f)` (Ψ = f(x) — degenerates to pointwise; unit-test equivalence against plain steering), `Moment(F, φ)` (Ψ = F'(∫φ dμ)·φ(x)), `Mmd(kernel, target_particles)` (Ψ(x,μ) = 2∫k(x,y)(μ−ν)(dy); second variation = 2·mean-centered kernel). Reuse `rbf_mmd_sq` conventions (`mag/transfer.rs`) for the kernel; targets are weighted particle sets (no density objects).
-- [ ] **T1.3** `WeightedPopulation` POD: `[f32]` states (flat N×d), `log_weights: &mut [f32]`, `weights_into(&mut [f32])` via **log-sum-exp** normalization. Fixed-capacity scratch struct; zero alloc.
-- [ ] **T1.4** `gradient_steering_into`: `∇_x Ψ` per particle — for the closed-form rows this is analytic (MMD: `2∫∇_x k(x,y)(μ−ν)(dy)`); RBF kernels make this the same kernel matrix evaluated once. Compose with `LatentField`-style application (consumer passes the increment to its own integrator).
-- [ ] **T1.5** Unit tests: variation rows verified against numerical functional differentiation (`(R((1−ε)μ+εδ_x) − R(μ))/ε`); MMD first variation matches finite difference at ε→0.
-- [ ] **T1.6** Feature flag `distributional_steering = []` wired in katgpt-core `Cargo.toml` (opt-in, no default change) + module gated in lib.rs + `cargo check --features distributional_steering` green.
+- [x] **T1.1** `MeasureReward` trait: `first_variation_into(&self, x, pop, out)` + `second_variation` + `reward()` + `as_any()` (closed-table downcast for the hot loops). `RewardKind` is `#[repr(u8)]`. — *Single-position form writes Ψ to `out[0]` (the slice signature kept for batch headroom); `second_variation` non-zero only for MMD (`−2k`).*
+- [x] **T1.2** Closed-form rows: `LinearReward{dir}` (Ψ = a·x), `MomentReward{gain, phi}` (Ψ = F'(m)·(p·x), `MomentGain` `#[repr(u8)]` NegSq/Sq/Identity), `MmdReward{gamma, target, dim}`. — *Kernel is a local twin of `mag/transfer.rs::rbf_kernel` (same `fast_exp(−γ‖a−b‖²)` formula — that helper is private to mag; no cross-feature dep). **Sign correction:** Research 505's Table-2 transcription (`Ψ = 2∫k(μ−ν)`) has a sign slip against its own `R = −MMD²`; the module ships `Ψ = 2[emb_ν − emb_μ]` (δR/δμ's x-dependent kernel — pinned by the finite-difference tests + the BoM adapter test which caught the wrong sign empirically: the target hypothesis was down-weighted to 6.7e-5 before the flip).*
+- [x] **T1.3** `WeightedPopulation` borrowed view (states + unnormalized log weights), `weights_into` via log-sum-exp (f64 accumulators; degenerate → uniform, never NaN). Zero alloc.
+- [x] **T1.4** `gradient_steering_into` (cold path, per-row analytic ∇Ψ) + the stepper's cached-kernel hot path; `clamp_steering_norm` helper for the ≤10%-of-|b| config. — *Hot ≡ cold pinned by test (the MMD gradient is `λ·4γ·[S_pop − S_ν]`, attraction toward the target).*
+- [x] **T1.5** Unit tests: MMD + Moment first variations vs numerical functional differentiation via probe differences (the mass-preserving finite difference is δR/δμ + an x-independent const; probe differences cancel the constant — that constant is invisible to the tilt anyway). Linear exactness. All pass.
+- [x] **T1.6** Feature wired (pre-wired by the coordinator scaffold; `cargo check --features distributional_steering` verified green).
 
 ## Phase 2 — FK Log-Weights + Picard Ψ̇ Solver
 
 ### Tasks
 
-- [ ] **T2.1** `FkStepper::step`: `A_i += (b_i·∇Ψ_i + Ψ̇_i)·δt` — `b_i` supplied by the consumer (their own per-tick drift), `Ψ̇` from T2.2. Clamp per-step log-weight delta (paper clips at 1.0) + steering-norm clamp (≤10% of |b|) as config.
-- [ ] **T2.2** `psi_dot_picard`: damped fixed point per paper Alg 4 — candidate next-weights → candidate next-measure → `Ψ̇ ≈ [Ψ(x, μ̃_{t+δt}) − Ψ(x, μ_t)]/δt` → weight update; `k_fp: u8` (default 3), `damping: f32` (default 1.0; 0.5 for strong tilts). Kernel/reward evaluations computed once per step and reused across iterations (paper: Picard = 0.036–0.24% runtime). Fixed scratch; zero alloc steady-state.
-- [ ] **T2.3** `residual_resample_into` (optional, sampling consumers only — `#[cfg]`-documented as NOT for persistent-agent use; Research 505 caveat 2). Systematic variant as the deterministic alternative.
-- [ ] **T2.4** Self-consistency residual gate `tilt_residual(pop, reward)`: fixed-point check `μ̂ ≈ (1/Z)e^{Ψ(·,μ̂)}p`-formulated as the Picard fixed-point gap at convergence — cheap convergence certificate for consumers.
-- [ ] **T2.5** Unit tests: Ψ̇ Picard matches the implicit linear-system solution (Alg 3 form, small N) to tolerance; weights sum to 1 across K_FP settings; K_FP=1 vs 3 bias visible on a strong-tilt fixture (documents the paper's own observation); damping rescues the diverging strong-λ case.
+- [x] **T2.1** `FkStepper::begin_step`/`finish_step` two-phase API: `A_i += (b_i·∇Ψ_i + Ψ̇_i)·δt` with `clip_log_delta` (paper clips at 1.0); the ≤10%-of-|b| clamp ships as `clamp_steering_norm` (config on the consumer side — it needs |b| which only the consumer holds at begin time). — *Key contract discovery (Bench 682): `b` = the FULL simulated drift (base + steering) — the `b·∇Ψ` term carries the position transport / Girsanov overshoot correction; and Ψ̇ must be pure MEASURE drift (both Ψ terms at the advanced positions — evaluating the second at the old positions imports a `λ²|∇Ψ|²δt` transport term that explodes; max|Ψ̇| measured up to 230 before the fix).*
+- [x] **T2.2** Picard Ψ̇ inside `finish_step`: warm-started, damped, K_FP config; kernel matrix built ONCE per step (symmetric fill + one `simd_exp_inplace` pass) and reused across all iterations + the gradient + the Ψ evaluations. Zero-alloc steady state (G4-pinned). — *Stability finding (Bench 682): the iteration Jacobian norm ≈ `2λ·E_w|k−emb|` ≈ 0.2λ for bandwidth-5 kernels — **divergent for λ≳5 at damping 1.0 regardless of K_FP**; consumers need damping O(1/λ) (the G1 harness uses α=min(1, 2/λ), K_FP=8). Encoded in the stepper docs.*
+- [x] **T2.3** `residual_resample_into` (systematic-within-residuals) + `systematic_resample_into` (deterministic), both documented NOT for persistent-agent use per Research 505 caveat 2. — *Weights-only is the persistent-agent mode; the G1 harness uses the resampling protocol (the paper's own sampling-consumer mode) because weights-only degenerates to ESS→1 by λ≈7.5 over 30 steps (a real property, documented — bounded by the clip, harmless for crowd salience consumers).*
+- [x] **T2.4** `tilt_residual`: one more Picard update from the current state, L1 weight gap — the cheap convergence certificate. Weak-tilt settled residual < 0.05 (pinned).
+- [x] **T2.5** Unit tests: Picard Ψ̇ vs the Alg-3 dense linear system `(I−MW+(Mw)wᵀ)Ψ̇=(MW−(Mw)wᵀ)c` with `M = −2λk` (max_diff/scale < 5e-2 @ δt=1e-3, K_FP=200); weights sum to 1 across K_FP ∈ {1,3,5,10}; K_FP=1-vs-3 bias pinned in BOTH start regimes — *honest caveat: a zero-drift consumer makes Ψ̇ ≡ 0 identically (candidate weights = old weights → no measure drift — correct math) and every K_FP vacuous*; damping-0.5 residual ≤ damping-1.0 on the λ=40 strong-tilt fixture.
 
 ## Phase 3 — GOAT Gate (falsifiable targeting harness)
 
 ### Tasks
 
-- [ ] **T3.1** `tests/bench_577_distributional_steering_goat.rs` (feature-gated): the paper's 1D experiment — base = bimodal GMM (means −1/+1, unit var, weights 1:3); reward = MMD² toward reweighted GMM (3:1), RBF kernel bandwidth 5.0; analytic `μ*` via GMM tilt; objective `J(μ) = λ*·MMD²(μ,ν) + KL(μ‖p₁)` (leave-one-out KL estimator, RBF 0.2). Three arms: no-steer / gradient-only / FK+Picard, λ swept around λ* ∈ {5, 10}.
-- [ ] **T3.2** **G1 (targeting)**: optimality gap minimized at λ = λ* for the FK arm across ≥2 noise schedules; gradient-only arm's minimum elsewhere (the paper's headline separation, reproduced in Rust). FAIL ⇒ primitive does NOT promote; note records the refutation.
-- [ ] **T3.3** **G2 (perf)**: per-particle per-step cost of the full FK+Picard path sub-µs at N=1000 (release, M3) — kernel matrix + Picard arithmetic only; document the fixed per-step setup. Bench vs gradient-only arm.
-- [ ] **T3.4** **G3 (no-regression)**: default features untouched (opt-in only) — `cargo check` + `cargo test -p katgpt-core --lib` green without the feature; with the feature, full lib suite green.
-- [ ] **T3.5** **G4 (alloc-free)**: tracking-allocator harness over 1000 steps at N=1000 — zero steady-state allocs (scratch pre-sized).
-- [ ] **T3.6** Determinism: seeded runs bit-identical (fixed iteration order, no HashMap in the path); two-run equality test.
-- [ ] **T3.7** Benchmark doc `.benchmarks/577_distributional_steering_goat.md` with the verdict table + GOAT outcome. Promotion decision recorded here; if G1 PASS → promote to default in the same commit series; if FAIL → stays opt-in with the negative result documented.
+- [x] **T3.1** `tests/bench_682_distributional_steering_goat.rs` — the paper's 1-D experiment as specified (base GMM −1/+1 unit-var 1:3; target 3:1; MMD² reward RBF bandwidth 5.0; `J = λ*·MMD² + KL` with leave-one-out KL at RBF 0.2; λ grid {0,1.25,2.5,5,7.5,10,12.5,15}) plus: analytic-μ\* grid fixed point (damped), 4096-particle stratified reference evaluated through the SAME estimators (same-footing — estimator bias cancels in the λ-argmin), CRN across arms and λ, 8 seeds, 2 σ schedules, ESS-guard systematic resampling (the paper's sampling protocol), and adaptive Picard damping α=min(1, 2/λ).
+- [x] **T3.2** **G1 (targeting): FAIL (partial)** — λ\*=5: **2/2 schedules FK min at λ=5** ✓✓ (the headline signature reproduces — clean V-shaped gap curves); λ\*=10: 1/2 (σ=1.0 ✓ at 10; σ=0.5 lands at 5, curve flat to within the 8-seed noise floor, Δgap ≈ 0.003–0.013); **separation claim NOT reproduced** (gradient-only ≈ FK, gaps agree to the 3rd decimal — in the 1-D broad-kernel Langevin regime the position steering does the work and the FK weights are a small correction). ⇒ primitive does NOT promote; the refutation + four harness-bug findings are recorded in [Bench 682](../.benchmarks/682_distributional_steering_goat.md).
+- [x] **T3.3** **G2 (perf): FAIL at the literal gate** — 9045 ns/particle/step @ N=1000 d=1 (15420 @ d=8); FK/gradient-only ratio 3.91× (the marginal FK machinery cost bounded < 10× — the only perf assertion that binds). The sub-µs threshold is structurally infeasible for exact O(N²) MMD at N=1000 (the kernel build alone is 10⁶ fast_exp ≈ 1 µs/particle); the paper's 0.036–0.24% figure is relative to network evals a modelless stack doesn't have. Breakdown + the N≲300 sub-µs crossover + the approximate-kernel reopen path in Bench 682 §G2.
+- [x] **T3.4** **G3 PASS** — default lib **1951/0/7i** (module compiles out — opt-in); feature-on **1969/0** (+18 module tests).
+- [x] **T3.5** **G4 PASS** — **0 allocs** over 1000 steps @ N=1000 (release; debug-ignored with reason: the debug run exceeds 60 s at which point libtest's slow-warning itself allocates +2 on the shared global counter — measured at step 481, harness noise, not module allocation).
+- [x] **T3.6** Determinism PASS — two-run bit-identity of states + weights (pinned in-test); index loops only, no HashMap in the path.
+- [x] **T3.7** Bench doc [`.benchmarks/682_distributional_steering_goat.md`](../.benchmarks/682_distributional_steering_goat.md) — verdict table, honest findings (incl. the Research 505 sign-slip correction), stays-opt-in disposition + three reopen paths.
 
 ## Phase 4 — Consumers + Docs
 
 ### Tasks
 
-- [ ] **T4.1** BoM adapter (opt-in composition, feature `bom_sampling` + `distributional_steering`): FK weights over K hypotheses against an `Mmd`/moment reward as an alternative to `select_best` argmax. NOTE: makes no UQ claim — if any future gate claims calibrated uncertainty from this, the "Report the Floor" rule attaches there (Research 505 caveat 5).
-- [ ] **T4.2** Example `examples/distributional_steering_demo.rs`: 2-D GMM population steered to a target histogram — print before/after Sinkhorn-divergence + per-particle weight distribution (the "who carries it" read-out).
-- [ ] **T4.3** `.docs/` entry + README feature-gate row (opt-in until promotion).
-- [ ] **T4.4** Signal to riir-ai: on G1–G2 PASS, file the crowd-targeting plan there (Guide 344's P0) referencing this primitive's commit.
+- [x] **T4.1** BoM adapter — `distributional_steering::bom` behind `#[cfg(all(feature = "bom_sampling", feature = "distributional_steering"))]`: `hypothesis_weights_into` (static tilt fixed point over the K hypotheses — the Picard loop without the time dimension) + `select_best_fk` (argmax-weight alternative to the trait's argmax `select_best`). — *Composes cleanly with **NO Cargo.toml change**: `bom_sampling` is default-on and implies `micro_belief`, so the cfg resolves `crate::micro_belief`; the composition test drives a real `LeakyIntegrator::sample_k_states`. No UQ claim made (Research 505 caveat 5 in the module docs).*
+- [x] **T4.2** `examples/distributional_steering_demo.rs` — 2-D GMM 1:3 → 3:1 dial: **MMD² 0.331 → 0.011 (3.4% of before)**, weighted cluster shares 0.24/0.76 → **0.67/0.33** toward the 0.75/0.25 target, ESS 522/600, 1 resample, top-10 weights 2.3× uniform (the "who carries it" read-out). — *Deviation: the plan's Sinkhorn-divergence print was replaced by the reward's own MMD² metric (no new dependency for a demo; noted in Bench 682).*
+- [x] **T4.3** Docs: `.docs/09_feature_catalog/opt_in_features.md` entry added. — *`crates/katgpt-core/README.md` carries no per-feature opt-in table (module tables only — inspected); skipped per the plan's conditional and noted here.*
+- [x] **T4.4** riir-ai signal: **REPORT-ONLY — DO NOT FILE YET.** G1 is FAIL-partial and G2 is over-budget at crowd scale; the crowd-affect-targeting plan (riir-ai Guide 344 P0) should wait for the diffusion-sampler-shaped harness reopen path (Bench 682 §Disposition). Handoff note recorded in the bench doc.
 
 ## Non-goals
 
@@ -64,3 +70,29 @@ Ship the generic, modelless population-steering primitive: given a weighted part
 - No training, no amortized steering networks (that is the fine-tuning quadrant — Santi 2511.22640 / Smith 2510.10020 — riir-train cross-ref only).
 - No persistent-NPC resampling mode (weights-only is the correct consumer shape).
 - No game semantics in katgpt-rs (crowd targeting lives in riir-ai per Guide 344).
+
+## Landing record (2026-08-26)
+
+**Files:** `src/distributional_steering.rs` (~1.6k lines incl. 18 unit tests),
+`tests/bench_682_distributional_steering_goat.rs`,
+`tests/bench_682_distributional_steering_alloc_check.rs`,
+`examples/distributional_steering_demo.rs`,
+`.benchmarks/682_distributional_steering_goat.md`, this plan, and the
+`.docs/09_feature_catalog/opt_in_features.md` entry. No Cargo.toml / lib.rs
+changes (the coordinator scaffold pre-wired them).
+
+**Verdict:** GOAT G1 **FAIL (partial)** + G2 **FAIL at the literal gate** ⇒
+`distributional_steering` **stays opt-in**. What genuinely reproduced: the
+λ\*=5 targeting minimum in both noise schedules (the theory's V-curve), the
+J trade-off structure (MMD² ↓ / KL ↑ in exactly the predicted balance), and
+the 2-D dial demo (29× MMD² reduction, shares 0.24/0.76 → 0.67/0.33 toward
+0.75/0.25). What didn't: λ\*=10 at one of two schedules (flat curve at the
+noise floor), the gradient-only separation claim (regime-dependent), and
+the sub-µs perf gate (structurally infeasible for exact O(N²) MMD at
+N=1000).
+
+**Reopen paths** (Bench 682 §Disposition): (a) a diffusion-sampler-shaped
+harness to reproduce the separation claim — the prerequisite for the
+riir-ai crowd plan; (b) approximate kernel features (random features /
+Nyström) for the G2 threshold; (c) N≲300 populations are already sub-µs
+per particle.
