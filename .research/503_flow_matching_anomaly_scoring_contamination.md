@@ -1,5 +1,7 @@
 # Research 503: Flow-Matching Anomaly Detection — Scoring Function Choice Beats the Model
 
+> **STATUS 2026-08-26 — riir-train Plan 350 CLOSED as a NEGATIVE RESULT.** Both arms built (TCCM 3x256 contraction field; Forest-Flow in-tree GBM) and measured on riir-chain Issue 112 T1 fixtures against its registered classical floor: best arm AUROC 0.9365 / AUPRC 0.2953 vs floor 0.9333 / 0.3564, gate 0.9633 / 0.3864, 0/3 seeds clearing. The learned fields reach PARITY on ranking and LOSE on AUPRC by 0.061 — the classical floor stays the detector. The paper's central claim (trajectory scores beat single-point Decision under contamination) did NOT reproduce on 8-lane sparse integer deltas: all three scores within ~0.01 AUROC, Decision the single best cell. See riir-train `.benchmarks/529_plan350_flow_anomaly_arms.md`.
+
 > **Source:** "Unsupervised Anomaly Detection Using Flow Matching on Tabular Data" — [arXiv:2608.19801](https://arxiv.org/abs/2608.19801), Philip Konz, Tejaswini Medi, Margret Keuper (Univ. Mannheim / MPI-INF), 2026-08-20
 > **Date:** 2026-08-24
 > **Status:** DISTILLED — actionable deltas filed (riir-chain Issue 112, riir-train Plan 350)
