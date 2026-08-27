@@ -2632,6 +2632,24 @@ pub mod recirculation;
 #[cfg(feature = "contrastive_scope")]
 pub mod contrastive_scope;
 
+// Bounded-target correction + realization-gap triage primitives (Issue 695
+// / Research 432, arXiv:2608.24646 DiffusionOPSD, Zhou et al.): the OPSD
+// recipe's modelless half — one-measurement SPSA direction (unit by
+// construction: with Rademacher Δ the normalized estimate collapses to
+// sign(dq)·Δ/√D), bounded ±pairs/corrections with a type-level ‖Δ‖≤ε
+// contract, the 5-eval ε-ladder with an honest monotone flag, the
+// scorer-vitality canary, the multiplicative-step fixpoint + budget law
+// (k > 3/η ⇒ re-anchor), and the ρ̂(k,η,ε) = (1−(1−η)^k)(1−cε²) realization
+// model with FittingStarved/TargetStarved/OnModel triage. Consumers
+// (riir-train Plan 360 T3.1, riir-clippy score-bench promised-vs-realized
+// axis, riir-ai self-adaptive loops) file consumer-side at adoption.
+// Zero-alloc (fixed [f32; 64] cap); c in ρ̂ is landscape-dependent —
+// calibrate on frozen fixtures, DEFAULT_C is a prior. Opt-in POC.
+#[cfg(feature = "bounded_target")]
+pub mod bounded_target;
+#[cfg(feature = "bounded_target")]
+pub mod realization_gap;
+
 // Kinematic rollout primitive (Plan 578 / Research 506, arXiv:2608.09926 —
 // LDR, Li et al.): the modelless core of latent dynamics reasoning —
 // finite-difference state (order ladder 0→3), O(1) Newton-backward closed-

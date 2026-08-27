@@ -240,6 +240,18 @@ recirculation = []
 # cost unless a table is constructed.
 contrastive_scope = []
 
+# bounded_target (Issue 695 / Research 432, arXiv:2608.24646 DiffusionOPSD):
+# the modelless half of the OPSD recipe — SPSA bounded-target direction
+# (unit by construction), bounded pairs/corrections (type-level ‖Δ‖≤ε),
+# the ε-ladder, the scorer-vitality canary, and the realization-gap triage
+# (fixpoint + budget law + ρ̂ model). Gates BOTH bounded_target and
+# realization_gap modules (the issue's "same feature or rider" clause).
+# Zero-alloc by construction (fixed [f32; 64] cap); pure f32 math + one
+# BLAKE3 XOF per direction. Opt-in — consumers (riir-train Plan 360,
+# riir-clippy score-bench axis, riir-ai self-adaptive loops) adopt
+# consumer-side; DEFAULT_C is a prior, calibrate per use-site.
+bounded_target = []
+
 # ignition_schedule (Issue 459 T5, 2026-08-19): closed-form logistic
 # ignition curves z(t) = K·σ(ζt−c), the patience law t* = ln(1/ε)/ζ, and a
 # ζ-descending ordering helper — the modelless half of NQF staged learning
