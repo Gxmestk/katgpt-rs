@@ -88,5 +88,17 @@
 pub mod gate;
 pub mod iou;
 
+// Support-instability regime detection (Issue 693 / Research 513 /
+// arXiv:2608.22764 LpWM) — the consecutive-tick TEMPORAL consumer of `iou`,
+// + mode-factored state accessors (SupportMask / magnitudes). Opt-in behind
+// `support_regime` (which implies this crate's own feature gate — the
+// module lives beside `iou`).
+#[cfg(feature = "support_regime")]
+pub mod support_instability;
+#[cfg(feature = "support_regime")]
+pub use support_instability::{
+    SupportInstabilityDetector, SupportMask, magnitudes, support_instability,
+};
+
 pub use gate::{HeadSubstitutionGate, worst_case_behavior_delta};
 pub use iou::iou;

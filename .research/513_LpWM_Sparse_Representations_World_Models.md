@@ -2,7 +2,7 @@
 
 > **Source:** [LpWM: A Case for Sparse Representations in World Models](https://arxiv.org/abs/2608.22764) — Kuang, Dagade, Le Lidec, Maes, Balestriero, LeCun (NYU AMI Labs / Duke / Mila / Brown), arXiv:2608.22764v1, 2026-08-24. Code: [github.com/YilunKuang/lpworldmodel](https://github.com/YilunKuang/lpworldmodel) (MIT).
 > **Date:** 2026-08-27
-> **Status:** DISTILLED — pending owner decision (katgpt-rs #693 primitive + riir-ai R352 guide)
+> **Status:** RECORD — #693 primitive landed (Bench 685: T3 pre-registered gate FAIL-honest — raw signal 100%/0% false, the debounce config is mismatched to 1-tick swaps; G1/G2 29.29 ns/G4 all PASS; opt-in `support_regime`); riir-ai R352 consumer guide remains open
 > **Related Research:** 504 (Orthogonal JEPA — the sibling geometry claim: orthogonal vs sparse codes; same Gain shape), 498 (LeVLJEPA/SIGReg — LeWM's regularizer lineage), 426 (Temporal Straightening — slowness-family prior, cited by LpWM), 360 (AdaJEPA), 138 (LeJEPA), 270 (ICT distributional branching — the OTHER regime/decision detector; complementary signal, see §Signal-diff), 192 (NextLat belief states), 245 (latent spatial memory video WM)
 > **Related Research (riir-ai):** 352 (support-regime events guide — the private half), 142 (ICT branching guide), 151 (latent magnitude hygiene)
 > **Related Issues:** katgpt-rs #693 (support-instability + mode-factored accessors primitive)
