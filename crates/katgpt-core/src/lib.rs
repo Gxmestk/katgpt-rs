@@ -118,7 +118,12 @@ pub mod laprop;
 // A(K) = (1−V)^K − (1−Q)^K), gate-pinned against the empirical argmax on
 // an exhaustive (Q,V) grid. Pure modelless arithmetic, no deps, no
 // allocs, zero-cost-unless-invoked.
-#[cfg(feature = "prover_selection")]
+//
+// DEFAULT-ON since 2026-08-27 (Bench 684 GOAT G1–G5 PASS — the T5
+// head-to-head: D+Al-ranked prover selection beats strength-ranked on a
+// controlled PAV harness, 16 seeds; the `rating` precedent — pure math,
+// no dep surface, zero-cost-unless-invoked). The Cargo feature remains as
+// an inert alias.
 pub mod prover_selection;
 
 // linking_fold — Linking-Number Detector + Fold Correction (Plan 410,

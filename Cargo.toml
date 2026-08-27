@@ -631,6 +631,11 @@ kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_r
 # (residual-dominance ratios + accept gate + KL metrics + overlap latency
 # model) to the K3 simulator in src/kimi_k3/stale_residual.rs. OPT-IN.
 stale_residual = ["katgpt-core/stale_residual"]
+# Prover-selection statistics kernels (Issue 692 T1–T3, from Research 509 —
+# arXiv:2410.08146): D/Al complementarity selector + Theorem 3.1 bound +
+# first_pit changepoint + the K* law. Forwards katgpt-core's opt-in feature
+# for the T5 GOAT bench (bench_684). OPT-IN.
+prover_selection = ["katgpt-core/prover_selection"]
 # Safetensors loader + tiktoken tokenizer for real-model loading.
 # Stays OPT-IN — pulls heavy deps (safetensors, base64) only needed when
 # actually loading model.safetensors.
@@ -1018,6 +1023,18 @@ harness = false
 name = "bench_683_stale_residual_poc"
 path = "benches/bench_683_stale_residual_poc.rs"
 required-features = ["kimi_k3_loader", "stale_residual"]
+harness = false
+
+# Issue 692 T5 GOAT — head-to-head prover selection (strength-ranked vs
+# D+Al-ranked) on a controlled PAV harness: three arms (shipped strength-only
+# baseline / strength-picked prover / bound-picked prover wired as
+# r_eff = Q^π + α·A^μ cross-state beam retention), seeded + deterministic,
+# consuming T1's estimators on logged Bernoulli means. Gates G1–G5 at
+# 3 seeds × α ∈ {0.2, 0.4, 0.6}.
+[[bench]]
+name = "bench_684_prover_selection_goat"
+path = "benches/bench_684_prover_selection_goat.rs"
+required-features = ["prover_selection"]
 harness = false
 
 # Proposal 011 T5.6 — SweTrajectoryFreezer G5 gate (cross-model discrimination).

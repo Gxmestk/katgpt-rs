@@ -168,6 +168,10 @@ rating = []
 # (the BoK gap A(K)), gate-pinned against the empirical argmax on an
 # exhaustive (Q,V) grid. Pure modelless arithmetic, no deps, no allocs,
 # zero-cost-unless-invoked.
+# DEFAULT-ON since 2026-08-27 (Bench 684 GOAT G1–G5 PASS — T5 head-to-head:
+# D+Al-ranked selection beats strength-ranked, 16 seeds; module ungated in
+# lib.rs per the `rating` precedent). This feature remains as an inert
+# alias for existing consumers.
 prover_selection = []
 
 # laprop (Issue 689, 2026-08-25): LaProp normalize-before-accumulate
