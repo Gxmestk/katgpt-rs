@@ -1,0 +1,313 @@
+---
+name: doc-sync
+description: Synchronize each repo's `.docs/` and `README.md` with recently succeeded plans/issues/benchmarks by diffing git history against the last documented entry. Use after landing a GOAT-passing plan, closing a batch of issues, or quarterly as a doc-hygiene gate. Covers every workspace repo and knows each repo's doc layout + where to record what, including each repo's root BOUNDARY.md contract (drift rows vs issue state).
+---
+
+# doc-sync — Keep `.docs/` + `README.md` in sync with landed work
+
+This skill brings a repo's documentation up to date with the work that has
+**landed in git but not yet been written up**. It is the doc equivalent of a
+`cargo doc` rebuild: the code shipped, now make the narrative match.
+
+## When to use
+
+- After a plan closes with a GOAT/gain verdict (promote, keep-opt-in, or honest fail).
+- After a batch of issues resolves (especially negative-result issues that move a
+  primitive's status line).
+- After a feature is promoted to default-on OR demoted to opt-in.
+- Quarterly as a doc-hygiene gate.
+- **NOT** for speculative work — only landed, committed work counts.
+
+## `BOUNDARY.md` — the 4th doc surface (added 2026-08-21)
+
+Every repo ships a root `BOUNDARY.md`: Owns / Does not own / May depend on
+(crate-granular allowlist) / Inherited (links) / **Drift ledger**. It is a
+doc-sync surface because its drift ledger is a *claim about issue state*, and
+claims rot:
+
+- **Row ⟺ open issue.** A `fixable` / `owner-call` row REQUIRES an existing
+  issue file; a `by-design` row cites a decision record instead. When an issue
+  closes, its row must be removed **in the same commit** — the noise-reduction
+  rule extended to BOUNDARY.md. A row whose issue is gone is the boundary
+  equivalent of a stale README claim.
+- **Flag row-without-issue** and **issue-without-row** (a boundary issue that
+  landed with no ledger row is invisible to the guard).
+- **Don't hand-verify the dep tables** — run
+  `riir-ai/scripts/ci_boundary_contract.sh`. It fails on an undeclared
+  cross-repo dep, a stale allowlist row, an unparseable ledger, and on the 4
+  split-prep invariants. `--list-deps` prints the measured graph.
+- **Numbers in a contract are measurements**, so they carry a date. If a row
+  cites "N symbols" or "N packages", re-measure before trusting it in a new
+  decision (`riir-ai/BOUNDARY.md` D2/D3 are the pattern).
+- The contract is per-repo; cross-repo rules live in ONE canonical home
+  (chain admission → `riir-chain`, dep matrix + split-prep → `riir-ai`) and
+  every other repo LINKS. Never copy a cross-repo rule into a second file —
+  that is the duplication doc-sync exists to catch.
+
+## The workspace repos and their doc shapes (12 as of 2026-08-21)
+
+Each repo has a different doc layout. **Read the repo's `AGENTS.md` first** —
+it documents the canonical layout and the numbering discipline.
+
+| Repo | `.docs/` shape | `README.md` | Numbering highwater | Working branch |
+|---|---|---|---|---|
+| `katgpt-rs` | 10 numbered folders (`01_orientation/` … `10_audits/`), unnumbered files inside. The **public** selling-point book. | Large showcase + feature tables + getting-started. | `.plans/.highwater`, `.issues/.highwater`, `.benchmarks/.highwater`, `.research/.highwater` | `develop` |
+| `riir-ai` | **12 numbered folders** (`01_orientation/` … `12_inference/`; `02_inference/` was renumbered to `12_inference/` on 2026-08-08 to resolve a `02_` prefix collision with `02_crates/`). The **private** consolidated selling-point book. | Large showcase + crate table. | same `.highwater` files | `develop` |
+| `riir-chain` | **7 numbered folders** (`01_orientation/` … `07_formal_verification/`, reindexed from flat on 2026-08-08), unnumbered files inside. Canonical self-description — the chain owns the truth about the chain; `riir-ai/.docs/07_neuro_symbolic_chain/` is the consumer/fusion view and links here. Two workspace members (`riir-chain` lib + `riir-chaind` daemon). Build surface still lives in `README.md`; FV invariants in `AGENTS.md` + `.proofs/README.md`. | Build commands + feature flags + the wallet/RPC trust surface + the `merkle_root` lesson. | same | `develop` |
+| `riir-neuron-db` | **10 numbered folders** (`01_orientation/` … `10_local_kv/`; the 10th was added 2026-07-30 for the Warm tier substrate, Issue 043), unnumbered files inside. Covers all `src/` modules + `examples/`. Matches the `riir-ai/.docs/` format. | What the crate owns + feature gates (default-on / opt-in) + feature→chain mapping + `merkle_root`/`can_freeze` lessons. | same | `develop` |
+| `riir-train` | **6 numbered folders** (`01_orientation/` … `06_cross_cutting/`, reindexed from flat on 2026-07-15), unnumbered files inside. Training-method research vault. | Role + sibling layout. | same | `main` (no `develop`) |
+| `riir-game-sdk` | **10 numbered folders** (`01_orientation/` … `10_multiplayer_topology/`; the 10th was added for the two-binary production topology + avatar/game sync facade), unnumbered files inside. Covers all `src/` modules + `examples/`. Matches the `riir-ai/.docs/` / `riir-neuron-db/.docs/` format. | Boundary rule + leaf constraint + spatial canonical + Phase 2/3 status + feature gates. | same | `develop` |
+| `riir-mmorpg-examples` | **No `.docs/` folder** — docs live in `AGENTS.md` (extensive: role, topology, plans/issues/benchmarks index, canonical-failure lessons) + `README.md` (status + build commands + env vars) + `.plans/` / `.issues/` / `.benchmarks/` files. POC consumer of `riir-game-sdk`. | Status + build commands + Plan/Issue index. | same | `develop` |
+| `riir-clippy` | **11 numbered folders** (`01_orientation/` … `11_domains/`), unnumbered files inside. The code-healer vault — corpus/drafter/pruner/verify/self-evolve/domains narrative. `AGENTS.md` carries the batch-mining progress notes (the sweep record home for cross-repo clippy heals). | Status + Quick Start + Usage + feature gates. | same | `develop` |
+| `riir-unity` | **No `.docs/` folder** — AGENTS.md-centric (domain boundary, Unity MCP rules, issue log) + `.benchmarks/`. The Unity host; Rust work belongs in riir-viewbridge, so doc-sync here = AGENTS.md issue-log sections + module-map freshness. | Role + boundary + sibling layout. | same | `develop` |
+| `riir-viewbridge` | **No `.docs/` folder** — AGENTS.md-centric (workspace layout, boundary rules, latent/raw wall, issue log) + `.benchmarks/` (Bench 002 node GOAT). The Rust FFI side of the Unity bridge. | Role + boundary + build commands. | same | `develop` |
+
+## The sync workflow (per repo)
+
+### Step 1 — Find the last documented commit
+
+```sh
+git --no-pager log --oneline <branch> -- ".docs/**" "README.md" | head -20
+```
+
+The most recent `docs:` commit is your baseline. Everything after it is **undocumented work**.
+
+### Step 2 — List landed-but-undocumented work
+
+```sh
+git --no-pager log --oneline <baseline>..<branch>
+```
+
+Filter for:
+- `feat:` / `fix:` commits that close a plan or issue (grep the message for `Plan NNN` / `Issue NNN`).
+- `docs:` commits that close research notes or benchmarks (these may already be half-documented).
+- Promotions / demotions (search for `promote`, `demote`, `default-on`, `opt-in`).
+
+Cross-reference against the repo's `.plans/`, `.issues/`, `.benchmarks/`,
+`.research/` folders — read the highwater files to know the current max number.
+
+### Step 3 — Classify each landed item
+
+For each undocumented plan/issue, classify it:
+
+| Verdict | What to write |
+|---|---|
+| **GOAT PASS + promoted to default-on** | Add to the default-features list in README. Add/update the feature table row in `.docs/01_orientation/overview.md` (or equivalent). Mark the plan's TL;DR with the promotion date. |
+| **GOAT PASS + stays opt-in** | Add to the opt-in features table in README. Update the `.docs/` feature catalog. Honest about why it stays opt-in (heavy, fusion-pending, diagnostic-only). |
+| **GOAT FAIL / negative result** | Add to the negative-results section (`09_feature_catalog/negative_results.md` for katgpt-rs, equivalent elsewhere). Mark the plan with the failure mode. **Keep the entry** — negative results are load-bearing. |
+| **Issue closed (investigation)** | If it changes a primitive's status (e.g. "map-fidelity hypothesis exhausted"), update that primitive's README/docs entry. If it's pure investigation with no status change, it may not need a doc writeup — judge case by case. |
+| **Research note (PASS/Gain/GOAT)** | If it led to a plan, the plan entry is the writeup. If it's a standalone PASS verdict with no plan (e.g. "already shipped"), add a one-liner to the relevant `.docs/` group README. |
+
+### Step 4 — Write the updates
+
+Apply the repo-specific rules:
+
+#### katgpt-rs (the public engine)
+- **README.md**: feature showcase entries (one `###` section per primitive with a GOAT gate table), the opt-in features table, the default-features list, the Documentation Index.
+- **`.docs/01_orientation/overview.md`**: the full feature-flag table (one row per flag).
+- **`.docs/09_feature_catalog/`**: opt-in features + negative results.
+- **`.docs/<group>/README.md`**: the group's fusion map + file list.
+- Numbering: never reuse a plan/issue/benchmark/research number. Read the `.highwater` file, use `value + 1`, write it back.
+
+#### riir-ai (the private runtime)
+- **README.md**: crate table + feature showcase.
+- **`.docs/`**: 12 numbered folders — drop new docs in the right group, add one line to the group README.
+- Cross-repo: if a katgpt-rs primitive was consumed, note the fusion in the riir-ai doc AND the katgpt-rs doc (bidirectional cross-refs).
+
+#### riir-chain (7-folder `.docs/` book, reindexed 2026-08-08)
+- **README.md**: build surface, feature flags, consumers, drift notes.
+- **`.docs/`**: 7 numbered folders mirroring the `riir-ai/.docs/` format — `01_orientation` (what it is + feature surface + module map + how the ledger works), `02_consensus`, `03_economics`, `04_daemon` (incl. the operator runbook), `05_wallet` (trust boundaries, SIWR, node certificates), `06_operations` (rolling upgrade across protocol versions, e2e coverage, failure scenarios), `07_formal_verification` (pointer — the invariant table stays in `AGENTS.md`). Drop new docs in the right group folder and add one line to that folder's `README.md` index table. The top-level `.docs/README.md` is the entry point.
+- **Division of labour with riir-ai (set 2026-08-08):** riir-chain holds the canonical chain docs; `riir-ai/.docs/07_neuro_symbolic_chain/` is a **fusion map + feature highlights** that links here and keeps only what is riir-ai's own (the Egg/Shell raw-vs-latent boundary, latent precision realms, game-layer sync strategy, CF Workers edge topology). Do not re-centralize chain internals in riir-ai — that duplication is what drifted before. Cross-link bidirectionally.
+- **Module map discipline:** `01_orientation/overview.md` claims to list every `src/` and `crates/riir-chaind/src/` subtree. If a plan adds a module, add the row — a map that silently omits modules reads as "these do not exist".
+- **AGENTS.md**: the FV (Lean 4) invariant table lives here (mirrored in `.proofs/README.md`), NOT in `.docs/`. Plan 016 spec self-tests live next to each spec module under `.proofs/RiirChainProof/`.
+
+#### riir-neuron-db (10-folder `.docs/` book; 10th added 2026-07-30)
+- **README.md**: build surface — feature gates (default-on / transitive / opt-in / per-feature prose sections for promoted primitives) + Formal Verification summary + License. Prose sections are reserved for promoted default-on features; opt-in features get table rows only.
+- **`.docs/`**: 10 numbered folders mirroring the `riir-ai/.docs/` format. Drop new docs in the right group folder (by capability: shard substrate / freeze-thaw / consolidation / vessel / specialized / zone / examples / FV / **local-kv Warm tier**), add one line to that folder's `README.md` index table. The top-level `.docs/README.md` is the entry point. The `05_secure_vessel/vessel_primitive.md` doc is the restored home of the old `15_vessel.md` (corrected: riir-neuron-db is "this crate", NOT katgpt-rs per Plan 006). The `10_local_kv/` folder covers the `LocalKvStore` + `CommitLevel`/`CommitBatch` + WAL compaction + BM25 (the Warm tier substrate backing per-player state recovery in riir-mmorpg-examples Plan 013, added Issue 043).
+- **AGENTS.md**: the FV (Lean 4) invariant table lives here (mirrored in `.proofs/README.md`), NOT in `.docs/`. The `.docs/09_formal_verification/` folder is the narrative overview; `AGENTS.md` is the authoritative invariant table.
+- Cross-repo: if a primitive was consumed by `riir-ai` or `riir-chain`, the fusion is documented bidirectionally.
+
+#### riir-train (6-folder `.docs/` book, reindexed 2026-07-15)
+- **6 numbered folders** (`01_orientation/` … `06_cross_cutting/`), unnumbered `.md` files inside — mirrors the `riir-ai/.docs/` format.
+- Training-method research vault: adapter training, distillation/RL, data filtering, cross-cutting audits.
+- `README.md` is minimal — role + sibling layout.
+- `main` branch (no `develop`).
+
+#### riir-game-sdk (10-folder `.docs/` book; 10th added for multiplayer topology)
+- **README.md**: build surface — boundary rule, leaf constraint, spatial canonical, feature gates, Phase 2/3 status table.
+- **`.docs/`**: 10 numbered folders mirroring the `riir-ai/.docs/` / `riir-neuron-db/.docs/` format. Drop new docs in the right group folder (by capability: spatial-entity / tick-world / rules-ai / game-builder / zone-living-world / gm-dashboard / examples / lessons / **multiplayer-topology**), add one line to that folder's `README.md` index table. The top-level `.docs/README.md` is the entry point. The `10_multiplayer_topology/` folder covers the two-binary authority/player production model + avatar/game sync facade (the consumer pattern for the documented C1/C2/C4 chain topologies).
+- **AGENTS.md**: authoritative repo-local context (phase status, boundary rule rationale, leaf-constraint argument, the canonical-failure lessons). The `09_lessons/` folder is the narrative mirror of those lessons.
+- `examples/`: showcase examples are part of the doc surface (Issue 517 rule) AND documented in `.docs/08_examples/`.
+- **Leaf constraint reminder**: this crate has zero sibling path deps. Docs that reference sibling repos use relative links only — never imply a code dependency.
+
+#### riir-mmorpg-examples (no `.docs/` folder — AGENTS.md-centric)
+- POC consumer of `riir-game-sdk` (orchard multiplayer: 1000-NPC swarm + cross-target Bevy binary).
+- **No `.docs/` folder** — documentation lives in:
+  - `AGENTS.md` — the authoritative narrative (role, topology, plans/issues/benchmarks index, canonical-failure lessons, honest POC-grade caveats).
+  - `README.md` — build surface (status, build commands, env vars, Plan/Issue index).
+  - `.plans/` / `.issues/` / `.benchmarks/` — individual plan/issue/benchmark files.
+- The `AGENTS.md` is large (~1000+ lines) and IS the doc surface — `doc-sync` for this repo means keeping `AGENTS.md` sections current with landed plans.
+
+#### riir-clippy (11-folder `.docs/` book)
+- **`.docs/`**: 11 numbered folders mirroring the `riir-ai/.docs/` format — corpus / drafter / pruner / verify / ruliology / examples / benchmarks / lessons / self-evolve / domains. Drop new docs in the right group folder, add one line to that folder's `README.md` index table.
+- **`AGENTS.md`**: the batch-mining progress notes + sweep records live here (the cross-repo clippy-heal record home). A landed heal slice in a sibling repo (katgpt-rs, riir-train, riir-ai) gets its progress note in the SAME commit as the heal — a later `doc-sync` run defers to the healing session (never write progress notes for someone else's in-flight sweep).
+- **README.md**: Status + Quick Start + Usage + feature gates.
+
+#### riir-unity (no `.docs/` folder — AGENTS.md-centric)
+- **`AGENTS.md`**: domain boundary (no Rust crates here; UPM package is build output; no engine substrate in C#) + the Unity MCP rules + the issue log. Doc-sync = issue-log sections for resolved issues + module-map freshness (the `Packages/com.riir.viewbridge/` population + scene wiring notes).
+- The Rust side of any feature lives in `riir-viewbridge` — cross-repo arcs (e.g. Issue 004) document on BOTH sides at arc close.
+
+#### riir-viewbridge (no `.docs/` folder — AGENTS.md-centric)
+- **`AGENTS.md`**: workspace layout (core/derive/abi/xtask) + boundary rules (latent/raw wall, generated-bindings rule, catch_unwind) + the issue log.
+- **`.benchmarks/`**: GOAT records (e.g. Bench 002 node GOAT). Doc-sync = issue-log resolution entries + benchmark cross-refs.
+
+### Step 5 — Verify
+
+- **No broken links**: every `[...](.plans/NNN_*.md)` must point to a file that exists.
+- **No stale numbers**: if a README entry says "ratio 0.01" but the benchmark says "0.27", the README is wrong — update it.
+- **Numbering discipline**: `.highwater` files must be bumped when new plans/issues land.
+- **Honesty**: a GOAT FAIL stays a GOAT FAIL in the docs. A "stays opt-in" primitive is documented as opt-in with the reason. Never upgrade a verdict in the docs without the benchmark to back it.
+
+### Step 6 — Commit
+
+Per the global `AGENTS.md` rule: **always commit at task completion**. Use `docs:`
+prefix. Stay on the repo's working branch (`develop` for most, `main` for
+riir-train). Do not push.
+
+```sh
+git add .docs/ README.md .plans/ .issues/ .benchmarks/ .research/
+git commit -m "docs: sync .docs + README with recent plans (NNN, NNN, NNN)"
+```
+
+## Cross-repo coordination
+
+The 5-repo (now 10-repo) family shares numbering namespaces for
+plans/issues/benchmarks/research **within each repo** but NOT across repos.
+When a katgpt-rs primitive is consumed by riir-ai, the fusion is documented
+**bidirectionally**: the katgpt-rs doc notes "consumed by riir-ai/NNN", and the
+riir-ai doc notes "consumes katgpt-rs/NNN".
+
+Formal verification (Lean 4) has its own cross-repo pattern (Research 351):
+each repo's `.proofs/` instance is self-documenting via its invariant table in
+`AGENTS.md`. The `doc-sync` skill does NOT cross-port Lean files between repos
+(coordinator rule C4: private proofs stay private).
+
+## Shape-change contract (when `.docs/` grows a new top-level `NNN_*` folder)
+
+**This is the root-cause guard for skill drift.** The recurring failure mode: a
+plan adds a top-level `.docs/NNN_*/` folder to a repo, lands the commit, and
+nobody updates this skill file — so the next `doc-sync` run operates on a
+stale folder-count assumption (canonical drifts: `riir-neuron-db` 9→10 via
+Issue 043, `riir-game-sdk` 9→10 via the multiplayer-topology docs, `riir-chain`
+flat→7 via the 2026-08-08 reindex, `riir-ai` 11→12 via Plan 455's orphaned
+`02_inference/` folder discovered 2026-08-08). This contract makes the update a
+grep-able checklist instead of an implicit expectation.
+
+**Trigger:** any plan/issue/commit that adds a new top-level `.docs/NNN_*/`
+folder to `katgpt-rs`, `riir-ai`, `riir-chain`, `riir-neuron-db`,
+`riir-train`, `riir-game-sdk`, `riir-clippy`, or `riir-mmorpg-examples`
+(`riir-mmorpg-examples`, `riir-unity`, and `riir-viewbridge` have no
+`.docs/` today — adding one is itself a shape change that requires this
+contract).
+
+**Checklist (run in the SAME pass as the folder-adding commit):**
+
+- [ ] **Verify ground truth.** `ls <repo>/.docs/` and count the `NNN_*`
+  folders. Do not trust the skill's current number — it may already be stale.
+- [ ] **Update the table row** in `## The workspace repos and their
+  doc shapes` above: bump the folder count, extend the range
+  (`…NN_<new-folder>/`), and add a short provenance note
+  (plan/issue number + one-phrase capability description).
+- [ ] **Update the Step 4 section** for that repo: change the header
+  count, add the new folder's name to the capability list, and add a
+  one-sentence description of what the folder covers.
+- [ ] **Grep-verify zero stale counts.** After the edit, run
+  `grep -nE "<old_count> (numbered|folder)" ~/.agents/skills/doc-sync/SKILL.md`
+  for the repo you touched — it MUST return zero hits. (Example: after
+  bumping riir-neuron-db from 9 to 10, `grep -nE "9 (numbered|folder)"`
+  filtered to the neuron-db rows must be empty.)
+- [ ] **Commit.** This file is NOT in a git repo (`~/.agents/` is on-disk
+  only), so the update lands by saving — but the repo-side commit that adds
+  the folder should reference this contract in its message (e.g.
+  `docs: add .docs/10_local_kv/ (shape-change contract: doc-sync SKILL.md
+  updated)`).
+
+**Who runs this:** the agent executing the plan that adds the folder — NOT a
+later `doc-sync` run. `doc-sync` is the consumer of the skill; the contract is
+the producer-side obligation. A `doc-sync` run that discovers a stale count
+(row says 9, disk says 10) is a SIGNAL that the producer skipped this
+contract — fix the skill then, but also note the gap.
+
+## Anti-patterns
+
+- **Do not** write a doc entry for a plan that hasn't landed yet. Speculative docs go in `.proposals/`.
+- **Do not** remove a negative-result entry when closing its issue — the negative result is load-bearing documentation.
+- **Do not** upgrade a GOAT FAIL to a PASS in the docs without the benchmark file to back it.
+- **Do not** impose a `.docs/` shape that differs from the repo's existing convention (e.g. don't create a `.docs/` folder for `riir-mmorpg-examples`, `riir-unity`, or `riir-viewbridge`, which are AGENTS.md-centric) — respect the repo's existing shape. As of 2026-08-18, seven of the ten repos use numbered folders (`riir-clippy` joined with its 11-folder book) and three are AGENTS.md-centric. The rule is about matching the shape, not about whether to have one — and a shape change is a deliberate, committed decision governed by the **Shape-change contract** above (it updates THIS file in the same pass via the grep-able checklist, not something a sync run improvises).
+- **Do not** renumber existing docs — the numbering discipline is monotonic and never reused.
+- **Do not** document trivial mechanical commits (lockfile bumps, clippy fixes) unless they close a tracked issue.
+
+## Run log
+
+| Date | Scope | Verdict | Record |
+|---|---|---|---|
+| 2026-08-15 | Full quarterly gate, all 7 repos | 3 gaps found + fixed; 4 clean; 1 deferred to sibling | katgpt-rs (baseline `382da3ca`, only audit docs after — CLEAN), riir-chain (`283f1661`, only CI after — CLEAN), riir-neuron-db (`bafb2ea` = HEAD — CLEAN), riir-train (deferred: sibling actively working Plan 337, uncommitted plan edits — documenting a partially-landed plan violates the anti-pattern rule). Fixes: **riir-game-sdk** `1460448` (README bullet + new `.docs/04_rules_ai/coverage_curiosity.md` + folder index row + 15 missing feature-table rows in `01_orientation/overview.md` — the table had silently stopped at 07-22 while Cargo.toml grew 26 more features), **riir-ai** `5aea89969` (README `riir-games` crate row + `.docs/02_crates/riir_games/README.md` feature table: the whole August swarm-family cluster — `tamed_aura`, `clr_collective_threat`, `demo_coverage_curiosity`, `swarm_se2_perception` + swarm row's pet/deliberation/flee/inventory extension + 11→19 files + module map; folder was last synced 08-08), **riir-mmorpg-examples** `6cbe97e` (AGENTS.md gained the missing Issue 667 consumer-side section — 6 landed commits incl. the P3-fix Playwright saga had zero AGENTS.md presence; README env-var rows were already current). |
+
+| 2026-08-15 | riir-train follow-up (deferred item closed same day) | 1 gap fixed | Plan 337 landed (Bench 457/458 committed, riir-ai substrate fix 237d99350 in) -> deferral lifted: new .docs/04_distillation_rl/flashmemory_indexer_training.md (recipe + D2 PASS mid-band / D3 PARTIAL regime-capped verdicts + GQA-bug found+fixed) + .docs/06_cross_cutting/lm_head_gradient_alignment.md (Issue 451: C14 exonerated 2.44x floor + alignment-factor reporting rule) + group/folder/top index rows. Plan 338 correctly skipped (Phase 1 not started, anti-pattern rule). |
+
+| 2026-08-16 | Idle-queue item 13 sweep (post-gate window, all 7 repos) | 5 clean/deferred-by-rule; 1 fix | katgpt-rs (`380c3556` 693-H2 fix — cross-repo record committed in riir-ai AGENTS resolved-table, CLEAN), riir-neuron-db (3 post-baseline feats — CLEAN: karma_history.md + auto-ridge/error-taxonomy rows landed INSIDE the feat commits; the last-`docs:`-commit heuristic missed them — the inverse of the 08-15 narrow-sync lesson: producer-side sync can also be complete-but-invisible, grep before declaring a gap), riir-mmorpg-examples (`a25d9e5` — AGENTS.md updated in-commit, CLEAN), riir-ai (Plan 022 substrate feats karma-history/social-layer — DEFERRED to plan close per anti-pattern rule + Plan 337 precedent; Issue 697 stays a live PARTIAL-tracked file = its own record, not a gap), riir-chain + riir-train (windows empty, CLEAN). Fix: riir-game-sdk `40f0971` (.docs/01_orientation/overview.md vocabulary enumeration + `types`/`social` — the `2de19ad` social re-export had landed undocumented). |
+
+| 2026-08-17 | katgpt-rs (idle-queue unit, compute-gated window) | 5-feature gap sync | Baseline window `382da3ca`/`380c3556`..develop: landed-but-undocumented = `cluster_lm_head` (Plan 574 + Issues 657/658/661/666 — G2b recall 1.0000, 8.3× structured, honest G3 FAIL 0.08× uniform, promotion blocked on Issue 662 real-checkpoint bench), `bigram_markov` (Issue 659 — 181 ns/call primitive gate PASS, consumer gate deferred to riir-ai Bonsai Plan 528), `switch_cost` (Issue 663 — GOAT PASS Bench 660), `ugc_schedule` (Issue 664 — always-on substrate by design, G1b promotion FAIL honest negative), `gpu_inference` refresh (Issue 660 — single-submit 7.86× + width-8 2.37×, Benches 661/662). Landed as `75a634ac`: README +3 opt-in rows + gpu_inference row refresh, overview.md +3 flag rows, opt_in_features.md §78/79/80, negative_results.md §39. Note: Issue 662 is sibling-ACTIVE (bench harness authored in riir-ai, run RAM-gated — `5357e045`); §78 wording kept measurement-agnostic. |
+
+| 2026-08-17 | riir-game-sdk (idle-queue unit, bonsai-saturated window) | 1 gap fixed | Baseline `9c8a203`..develop: `1186c1d` trivial clippy fix (no doc), `94f3198` the gap — the warm_tier_impl karma_history extension (KarmaRing/KarmaEventKind/KarmaHistory/KarmaParams via riir-neuron-db/karma_history, consumer riir-mmorpg-examples Issue 061) shipped with a thorough src/lib.rs doc comment but ZERO book coverage (grep-verified: no karma hits in .docs/README/AGENTS.md — the inverse of the 08-16 complete-but-invisible lesson: source-comment sync without book sync). Fixed as `3687de6`: AGENTS.md warm_tier_impl sub-bullet + overview.md feature-table row both extended. Plan 022 Phase D narrative deferred to the mmorpg-examples plan close (sibling-owned, mid-flight). neuron-db producer side already documented (`.docs/04_consolidation_retrieval/karma_history.md` in-commit). |
+
+| 2026-08-17 | katgpt-rs verdict propagation (idle-queue unit, bonsai-saturated window) | 2 stale surfaces fixed | Closes the loop the morning sync left open: the 08-17 5-feature sync deliberately kept `cluster_lm_head` wording measurement-agnostic (`75a634ac`, Issue 662 sibling-active); the sibling measured Bench 688 PERMANENT NEGATIVE (08:54 riir-ai `5672f962d`) + updated catalog §78 only (`835b6fc0`, 08:58) — README L2907 + overview.md L809 still said "promotion blocked on the real-checkpoint measurement (Issue 662)" (the overview row also carried the outdated 'MiniCPM5-1B first' plan detail; the run used Gemma 2 2B). Fixed as `fc802ff6`: both rows now carry the Bench 688 verdict (admissible 99.95% = uniform regime, packed 0.44×, exactness held) with the cross-repo bench link (`../riir-ai/...` README convention). Multi-surface grep verified: no other stale 662 surfaces (Bench 662 hits are the different numbering series — gpu_inference width-N GOAT). Issue 659 checked + left alone (T1-T3 landed 07:32 `856e702e`, consumer gate `[-]` deferred with live unblock condition — a legitimately open issue, not hygiene). |
+
+| 2026-08-17 | riir-game-sdk (idle-queue unit, bonsai-saturated window) | 3-gap sync: new workspace member + always-on vocabulary module + 5 Plan-022 forwards | Baseline `3687de6`..develop: (1) **`stealth` / Plan 003** — a whole new workspace member `crates/riir-stealth` (alarm.rs 535 + modifiers.rs 115 + demo 587 LOC, all GOAT gates PASS, opt-in) had ZERO book coverage: added `.docs/04_rules_ai/stealth_alarm.md` + folder row + overview row + AGENTS.md member bullet/tree/path-dep-list/feature bullet + README.md workspace enumerations (which were ALSO missing `games-cluster` since 2026-07-24 — second-order rot catch). (2) **`src/entity_sync/`** (always-on vocabulary, not a feature — the Monster-channel 16B/entity batch with the over-cap shared-channel guard + wasm32 overflow closure) — added `.docs/10_multiplayer_topology/entity_sync.md` + folder row. (3) **5 Plan-022 facade forwards** (`combat_claim_sync`/`karma_sync`/`party_sync`/`heal_claim_sync`/`hero_planner`, 08-16/17) — overview rows + one compact AGENTS.md family bullet (hero_planner's native-only wasm32 caveat documented; full narrative honestly deferred to the mmorpg Plan 022 close per the 08-16 precedent). Also: headless_demos count 8→10 (item_vessel_e2e section added — it was only referenced in the overview row), stale counts fixed in `.docs/README.md` ×2 + `08_examples/README.md` + AGENTS.md table. Landed as game-sdk `b885d38`. |
+
+| 2026-08-18 | Full gate, all 10 repos (user-directed `all repo` — 7 skill repos + riir-clippy + riir-unity + riir-viewbridge; skill table extended same pass) | 3 gaps fixed; 4 clean; 3 deferred-by-rule (in-flight sibling WIP) | Fixes: **riir-game-sdk** `7766fba` (`7499ba7` forage forwards — 2 overview feature-table rows + AGENTS bullet + swarm.md forage-ecology section; the `54ca8ad` stealth VisionProfile fix verified mechanical, no doc), **riir-neuron-db** `67c1715` (Issue 602 ED-challenge verdict into phase_gate.md — the load-bearing negative result: 12.6x pooled correlation advantage but Simpson reversal between grains, NO GATE CHANGE, ED promoted to regime diagnostic; Issues 599/601 verified already landed in-commit per the 08-16 lesson), **riir-mmorpg-examples** `894a703` (Plan 539 FOV-composition section + Bench 021 addendum — the `6341aa9` docs commit had touched only the bench file; + `crates/riir-viewbridge-node` stub — a whole workspace crate with zero AGENTS.md presence, the module-map-omission class; narrative deferred to riir-unity Issue 004 close). Clean: riir-ai (717/718/719/720 rows current; Plan 022 Phase L substrate defers to plan close), riir-unity (Issue 004 self-documenting). Deferred: katgpt-rs (benches/ heal mid-flight, dirty files; heals mechanical — riir-clippy progress notes are the record home), riir-train (gpu-crate heal mid-flight), riir-clippy (2 proposers dirty), riir-chain (Issue 031 T0.1 mid-flight self-documenting, BLOCKERs routed to remediation), mmorpg Issues 068/069/070 (sibling actively measuring — new dirty files appeared mid-run). Not pushed per Step 6 (mmorpg carries a sibling's unpushed commit). |
+
+| 2026-08-19 | Full gate, all 10 repos (user-directed `doc-sync all`) | 5 gaps fixed; 5 clean/deferred-by-rule | Fixes: **katgpt-rs** `f8f194e0` (3 overview flag rows + 2 README rows + catalog §83 ignition_schedule [Bench 666 GOAT G1-G4, opt-in pending the riir-clippy consumer pilot] + negative_results §40 Issue 671 pair-scored selection G2 FAIL [collinearity root cause, redirect to riir-train/717] — §81 freedom + §82 effective_degree had ALSO landed without overview rows, second-order rot catch; + 2 stale untracked issue drafts removed [659/670, both RESOLVED per AGENTS.md, never committed]), **riir-ai** `a57c3d394` (Issue 725 residency-as-borrow watch item COMMITTED — it was untracked while riir-clippy Research 069 references it 4x as the canonical record, the broken-cross-reference class; + stale untracked Bench 697_issue726 pre-rename duplicate + stale OPEN-snapshot Issue 721 draft removed [both superseded by tracked records: 698 rename + AGENTS.md 721 row]), **riir-game-sdk** `33ad206` (`eebcd62` target_coordination forward landed undocumented — overview row + AGENTS bullet, the mmorpg Plan 024 family pattern), **riir-neuron-db** `ba386e8` (Issues 600+603 storage-challenger negatives into local_kv_store.md — ART arms A-D + arm-E skiplist, candidate list closed with no survivor, Bench 485), **riir-viewbridge** `8bb0a04` (NodeConnect/NodeTier adapter surface `04b57e0` added to the Issue 002 close — it was documented only on the riir-unity side). Clean: riir-mmorpg-examples (`795975a` sibling doc-sync landed 08-19; subsequent commits self-documenting), riir-unity (`12a553c` in-commit), riir-train (docs commits self-documenting; Plans 339/341/463 mid-flight → anti-pattern defer), riir-chain (033 round actively iterating; issue/plan files are the records per repo convention). Deferred: riir-clippy (dirty `corpus.rs` — sibling Batch 68 tantivy WIP). Not pushed per Step 6. |
+
+| 2026-08-19 | Verification scan (post-gate window, idle-queue item 13 — the AM full gate ran earlier same day) | All repos CLEAN or deferred-by-rule; no gaps | Window since the AM gate: only self-documenting commits (riir-clippy d8b3ce5 x86 re-gate docs-in-commit + the sibling's clippy-bench docs commits; katgpt-rs fd29c339 audit row in-commit). Per-repo: mmorpg CLEAN (e685614 top), game-sdk CLEAN (e6e40ef debuginfo-cap = mechanical, anti-pattern rule), neuron-db CLEAN (heal slices record in riir-clippy AGENTS per convention), chain CLEAN (081/082 issue-file records per convention; **Issue 080 merge conflict RESOLVED** — 3a61cc4a, the session-start blocker cleared), unity DEFER (4 dirty files, sibling node-scene active), viewbridge CLEAN. |
+
+| 2026-08-22 | Idle-queue item 13 (during the sibling riir-train 472 T6 auction-CDF measurement — doc-only units, Plan 337 discipline) | 2 gaps fixed; rest clean/deferred-by-rule | Fixes: **riir-game-sdk** `a0ddb83` (5 landed commits 08-21/22 with zero doc coverage: `spectral_hero_gate` facade → overview row + AGENTS feature bullet; the riir-e2e tiered-durability drills + formal GOAT — `game_warm_failure` Bench 023, `game_settlement_chaos` Bench 024 + `settlement_e2e` feature + test_gate row context, GOAT G1 seeded sweep `f215e99` + G8 30-min soak `2be9052` Bench 025 — into the AGENTS riir-e2e bullet; `gm_asset` GM panel + the repo's FIRST riir-dapps edge into the viz bullet; `vessel_pack --signing-key` into the asset-converter bullet. **False-positive catch:** the overview's only "Bench 025" hit was mmorpg's target_coordination bench — different numbering series; grep the repo's OWN .benchmarks/ before declaring coverage). **katgpt-rs** `6575ef21` (the Issue 676 `spectral_pencil` closeout `9795a9bd` landed the narrative doc `.docs/02_inference/spectral_pencil.md` but missed ALL THREE flag surfaces — catalog §84 + overview flag-table row + README showcase entry; the narrow-producer-sync lesson re-hit). Clean/deferred: riir-ai (741/744/736 arcs sibling-ACTIVE — anti-pattern defer to plan close; the 040/080 docs self-landed), riir-mmorpg-examples (080 self-documented in-commit), riir-train (sibling WIP), neuron-db/chain/dapps/clippy/unity/viewbridge (no landed-but-undocumented windows). |
+
+| 2026-08-23 | Full gate, all 11 repos (idle doc-sync after the 08-22 window) | 4 gaps fixed; rest clean/deferred-by-rule | Fixes: **katgpt-rs** `ad221606` (the 08-22 narrow-producer-sync class struck TWICE more: `verdict_margin` [Plan 545 T1, `a6860dd6`] + `gaussianity_probe` [Issue 681, `34a96163`, declared Cargo feature with Bench 673] both landed with ZERO book coverage — verdict_margin extended onto all 3 signed_coupling surfaces [README showcase ¶ + overview row + catalog §85], gaussianity_probe got README showcase § + overview row + catalog §86). **riir-ai** `fdcc462f2` (`social_pressure` [Issue 745 / Plan 545, landed `7949fc6e7`] had AGENTS-row-only coverage — +1 feature row in `.docs/02_crates/riir_games/README.md` [verified placed between demo_coverage_curiosity + swarm_se2_perception] + root README riir-games crate-row extension; **push REJECTED mid-run** by the sibling's 742 commits landing on origin — resolved via the worktree cherry-pick + push + `reset --mixed` dance, sibling WIP untouched; the skill's no-push rule exists for exactly this, but with zero local unpushed commits + pathspec-only staging the dance is the safe push path). **riir-train** `77d23662` (new `.docs/03_adapter_training/edge_lora_distribution_guard.md` [riir-ai Issue 743 / Bench 494] + fusion-map + doc-index rows + the STALE "EdgeLoRA (in riir-gpu)" README location fixed — moved to riir-train-gpu by riir-ai 741 T11a; the module-table refresh for the 741 TAIL evictions rides with that issue's close). **riir-game-sdk** `6766191` (`art_vessel_impl` [riir-mmorpg-examples Issue 081, landed `1a6fe62` AFTER the 08-22 sync] onto overview row + AGENTS feature bullet — the vessel_impl sibling-of pattern). Clean: riir-clippy (only `docs:` commits post-baseline), riir-chain (040 close self-documenting), riir-dapps/unity/viewbridge (docs + chores), neuron-db (mechanical fixes; 040 path→git refactor self-recorded), mmorpg (**the `?transport=local` fix `50cc197` made code match the ALREADY-documented README L183 row — no gap; a reminder that the inverse gap [code-behind-docs] is invisible to baseline heuristics**), riir-ai evpi_gate (Plan 544 docs self-landed in `.docs/02_crates/cgsp_runtime.md` — the 08-22 deferral correctly aged out). Deferred-by-rule: riir-ai Issue 742 (T1.8/T9 active, GPU-window run pending) + Issue 741 TAIL (evictions mid-flight), riir-train Plan 342 (active). |
+| 2026-08-24 | riir-train (scoped idle-loop unit during two live sibling sessions — 4090 Plan-342 + M3 Plan-346/game-sdk) | CLEAN / deferred-by-rule; no commit | Baseline `77d23662`..HEAD `fa46f627`: every landed item is a mid-flight plan (342 T1.2-scored cluster — sibling-ACTIVE on the 4090 with untracked bench-511 WIP; 343 T1.5/1.6/1.7 interleaved docs commits; 345 T1.1; 346 A1/A2/A3/B1/B2 — M3 sibling landing it live; 335 T4.2g INCONCLUSIVE — plan still Active with 5 unchecked, hyperball correctly has ZERO book rows while un-promoted/un-demoted), an open issue (476/477/478 — their own tracked records per repo convention), a self-documenting `docs:` commit (344 STOP-gate `ac3997f2`, 349 recipes `ae1ab425`, 342 closeout `8a31a8c9`, AGENTS lint-heal `339b7889`), or mechanical (gitignore, Cargo.lock). HEAD highwater 510 consistent with newest bench. **Methodology note:** the M3 working tree carries stale sync residue (working-tree Bench 510 deleted, untracked stale 479 draft) — all classification done against `git show HEAD:` content, never the dirty tree; residue deliberately untouched (the 4090 sibling's push dance owns it). |
+
+| 2026-08-26 | riir-train (scoped decision-item unit — verify docs reflect the `e4f61f16` Plan-347 Phase-5 adjudication + the edge_lora path note) | 1 gap fixed; rest verified current | **Fixed:** `syre_static_bias_wd.md` reopen-basis item (4) presented Phase-5 Muon composition as merely-deferred — annotated **adjudicated NOT FIRED 2026-08-26** citing plan §Phase 5 (landed `42ae879a` on main via the worktree dance; sibling holds the shared checkout on `sync/p348-d-civ-ab-0826`). **Verified current, no change:** all 4 edge_lora doc references carry the corrected `riir-train-gpu` location (README:149's Issue-741-T11a note = the 08-23 fix holding); `.docs/03_adapter_training/README.md`'s two syre rows accurately say "stays opt-in with a recorded reopen basis" (bases 1-3 remain live); the `deferral_coverage_map.md` R347 hits are the .research numbering series, not the plan — different namespace, no drift. Classification against `git show main:` throughout (working tree = sibling branch). |
+
+| 2026-08-26 (later unit — decision-item doc-sync over `95ea624d`) | riir-train (scoped decision-item unit — verify the last merged commit + the window since `42ae879a`; parse/git-only, no cargo, Plan 337 discipline under the still-running p335 arm) | CLEAN / deferred-by-rule; no commit | **`95ea624d` self-documenting** (book page + both README indexes + issue T2.1 `[x]` — it IS the docs commit). Window `42ae879a..origin/main` = 7 commits, all classified: Plans **353/354 landed on main mid-flight** (the p354 sibling's work now merged: `f81e2f0c` feat Phase-5 harness + `c43e0fde` Bench 546 NO PROMOTION + `a0e05807` T7 LaProp stays OPT-IN) → **defer to plan close per the anti-pattern rule** — 353 has T5.1 unchecked (G1 capability gate); 354 has 11 unchecked incl. its OWN closeout task "T1 Consolidated verdict table; doc-sync; issue hygiene". Zero book/README hits for laprop/ultrafuser (grep vs `origin/main:` content) = correct per the hyperball zero-book-rows precedent for un-promoted/un-demoted features — no verdict-propagation surface exists. `58ddc093` (Issue 481 resolved+removed, record inlined into Plan 349) + `1f689c8b`/`0020e3f1` (mechanical docs) need nothing. **No Cargo.toml/Cargo.lock changes in the window** → no feature-table surface. Highwater 482 ≥ 469 consistent. Classification against `git show origin/main:` throughout (working tree = sibling branch). |
+
+| 2026-08-26 (arm_c-liveness dispatch unit — decision-item doc-sync over `be332d9c`) | riir-train (scoped decision-item unit — window `95ea624d..be332d9c`; parse/git-only, no cargo, Plan 337 discipline under the still-running p335 arm at PID 94779; classification against `git show origin/main:` throughout — working tree = sibling branch `sync/p348-d-civ-ab-0826` with 2 dirty gpu files untouched) | CLEAN / deferred-by-rule; no commit | Window = the 353-close + 354-T3/T4 + 346-A4/483 + 344/342-fix cluster. **Plan 353 CLOSED** (`be332d9c` status refresh; COMPLETE 2026-08-26, G1–G4 PASS, T5.5 NO PROMOTION, all opt-in) → **zero book rows is CORRECT per the hyperball precedent** (grep vs `origin/main:` content: zero ultrafuser/laprop/two-stage-gate hits in README/.docs; the single README "Two-Stage" hit is Plan 192 RiM — different plan, the cross-numbering false-positive class the 08-22 run warned about). **Plan 354 mid-flight** (9 unchecked rows incl. its own closeout doc-sync task) → anti-pattern defer. Highwaters consistent (plans 355 / issues 485 / benches 548; Issues 483/484/485 tracked files = own records). 342/344/346/483 docs commits self-documenting. No Cargo.toml dep/feature changes in window → no feature-table surface. |
+| 2026-08-26 (handoff unit — decision-item doc-sync over the Plans 575/576/577 commits) | katgpt-rs (scoped: `b9fa4a07`+`6dcce272`+`06e8a7dd`; sibling's `43f0cacf`/`0489787d`/`eca969bb` interleaves checked — `eca969bb` IS a boundary-guard run log, self-documenting) | 4 gaps fixed (the narrow-producer-sync class, 3rd recurrence) | **Fixed:** the Plan 577 commit landed catalog §87 ONLY — `risk_control_exit` had ZERO coverage anywhere, and BOTH features were missing from `overview.md`'s flag table + README (grep-verified 0 hits pre-fix). Landed: overview +2 flag rows, README +2 showcase sections (the §84+ convention — recent features go as `###` showcase prose after gaussianity_probe, NOT opt-in table rows; the table stopped at §83), catalog §88 risk_control_exit (GOAT ALL PASS table), negative_results §41 (the FK-vs-gradient separation non-reproduction — §38/§39 "shipped-but-failed" precedent). **Number corrections vs the handoff summary:** the ns/exit figure is **3.90/5.18 across two release runs** (summary said 3.96 — bench doc is ground truth); feature-on lib = 1972 (681) / 1969 (682), not 1990. **Highwater regression fixed:** the sibling's `43f0cacf` created Bench 683 WITHOUT bumping `.highwater`, and `06e8a7dd` then wrote 682 — the stale-read collision class (Bench 675 precedent); bumped 682→683. **Deferred-to-sibling:** `stale_residual` (43f0cacf, NEGATIVE verdict) has zero doc coverage but its issue file is still UNTRACKED = mid-flight closeout — their arc. Author-attribution catch: "Howard-adjacent" was wrong for 494 (Xi Wang et al., JHU+Apple; the Howard is Samuel Howard of 505 — different paper). |
+
+| 2026-08-27 (dispatch housekeeping unit — the riir-train check the recent windows skipped) | riir-train (window `be332d9c..origin/main` = 16 commits; parse/git-only, no cargo; classification against `git show origin/main:` throughout — working tree = sibling branch `sync/p348-d-civ-ab-0826` with 3 dirty files untouched) | CLEAN / deferred-by-rule; no commit | 12 docs commits all self-documenting (346/347/352/353 adjudication notes + `8e8e7352` the first-dispatch adjudication, Research 430 + Issues 486/487 files, the `runs.jsonl` convention files at `c536b47a` = their own records); 4 feat commits all mid-flight plans → anti-pattern defer (343 T3.2 harness landed but Status Active — the 500M-token RUN stays GPU-gated despite 0 unchecked rows; 354 has 7 unchecked incl. its own closeout doc-sync task); zero book/README hits for laprop/ultrafuser/speculative_decode/maglev (grep vs `origin/main:` content — correct per the hyperball zero-book-rows precedent for un-promoted features; the new `speculative_decode` Cargo feature is a mid-flight test-harness gate, not a doc surface); highwaters consistent (plans 356 / issues 487 / benches 551 / research 430 = newest tracked files). |
+
+| 2026-08-27 (decision-item unit — verify plan rows 342/344/346/352/357 at origin/main) | riir-train (window `8d5ff609..origin/main@0d2dd064` = 16 commits, 15 docs + 1 feat already classified by the prior run; parse/git-only, no cargo; classification against `git show origin/main:` throughout — working tree = sibling branch with 3 dirty files untouched) | CLEAN — all 5 named plan rows verified accurate; no commit | **342** 2 unchecked = the waiter chain (T3.8d GPU run in-flight) matches the dispatch log; **344** 8 unchecked all-blocked behind the live p344 waiter (pid 25432) matches; **346** Status "CPU-complete, 21 [x], A4/A4-risk/A5 [-] GPU-gated" + 0 unchecked matches; **352** backlog record carries all 9 dispatch records incl. the ninth (`0d2dd064`, present in the Status line); **357** correctly ABSENT from main (sibling's unmerged filing; referenced only in 352's dispatch-log prose — no broken link); **358** (new, `aba5c585`) DRAFT/not-scheduled → zero book rows correct per the hyperball precedent. Book (README/.docs) untouched in window (last-touched `f9fee9a7`, older); no Cargo.toml changes → no feature-table surface; highwater 358 == newest plan. No gaps, no fixes. |
+
+ `git log -- .docs README.md AGENTS.md` reported
+  `5a1330b` as game-sdk's newest doc-touching commit while `git log -- AGENTS.md`
+  (and pickaxe) proved `1977d83` (2 days newer) had touched AGENTS.md. Per-file
+  logs + `git log -S '<landed-string>' -- <file>` pickaxes are the reliable
+  baseline tools; always re-verify a suspicious baseline per-file before
+  declaring a range clean.
+- **Narrow producer-side syncs leave holes the baseline heuristic can't see.**
+  riir-ai's `.docs` baseline (`b6cddbb61`, 08-15 AM) POSTDATES the coverage-curiosity
+  cluster (08-14 21:14), so the strict baseline..HEAD range was empty — yet grep
+  proved zero `.docs`/README hits for the feature. The intervening narrow syncs
+  (mop, arg_runtime) each fixed their own feature and skipped everything else.
+  Gate runs should grep the book for recently-landed headline features, not just
+  trust the range.
+- **Grep extraction regex must include digits.** `^[a-z_]+ =` over `[features]`
+  silently dropped `avatar_sync_ed25519` and `game_sync_p2p` (digit-containing
+  names) — nearly filed phantom "documented-but-dead feature" findings. Use
+  `^[a-z0-9_]+ =`.
+
+## TL;DR
+
+Diff git history against the last `docs:` commit. For each landed plan/issue,
+write the matching README/docs entry using the repo's existing shape and the
+verdict from its benchmark file. Commit with `docs:` prefix on the working
+branch. Never upgrade a verdict without proof; never delete a negative result.
