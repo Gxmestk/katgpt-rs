@@ -1,6 +1,6 @@
 # Bench 684 — Prover-Selection GOAT: D+Al vs Strength (Issue 692 T5)
 
-**Verdict: PASS — ranking provers by Theorem 3.1's complementarity bound γ·(D+Al) instead of by strength picks the prover that actually delivers a wired gain, on a controlled PAV harness, at every paper α (16 seeds). `prover_selection` promoted to DEFAULT-ON in katgpt-core (commit `b0772308`).**
+**Verdict: PASS — ranking provers by Theorem 3.1's complementarity bound γ·(D+Al) instead of by strength picks the prover that actually delivers a wired gain, on a controlled PAV harness, at every paper α (16 seeds). `prover_selection` promoted to DEFAULT-ON in katgpt-core (commit `1b65662f`).**
 
 - **Source:** arXiv:2410.08146 (Setlur et al., "Rewarding Progress") via [Research 509](../.research/509_Rewarding_Progress_PAV_Prover_Advantage.md) §5's defend-wrong obligation
 - **Date:** 2026-08-27 (4090 box, pure CPU — seeded arithmetic, zero GPU)
@@ -67,6 +67,6 @@ Gate passed modellessly (pure seeded arithmetic, no training) → per Issue 692'
 - `crates/katgpt-core/Cargo.toml` — `prover_selection = []` stays as an inert alias, comment records DEFAULT-ON + the gate.
 - Root `Cargo.toml` — `prover_selection = ["katgpt-core/prover_selection"]` forward + the `[[bench]]` entry.
 
-Commit: `b0772308` (bench + promotion, 2026-08-27).
+Commit: `1b65662f` (bench + promotion, 2026-08-27).
 
 **Companion verdict — Issue 692 T4 (dd_tree `BestAdvantage`) REFUTED BY MECHANISM, no code shipped:** scoring rollout i by `Q_i − mean_j Q_j` cannot change selection — `mean_j Q_j` is rollout-independent, so argmax is identical to `BestQ` at every seed (the same rank-invariance Research 509 §2.2 used to reject the QGF and riir-clippy consumers: the K rollouts of one `best_of_k_rollouts` call form a single within-state pool sharing the same marginals; a per-depth-centered variant also sums to a constant shift since all rollouts share the depth count). Fusion D corrected in Research 509; the enum arm is NOT added (no-op API surface, the "no vocabulary with zero consumers" rule).

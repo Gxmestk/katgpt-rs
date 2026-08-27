@@ -2,7 +2,7 @@
 
 > **Source:** [Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning](https://arxiv.org/abs/2410.08146) — Setlur, Nagpal, Fisch, Geng, Eisenstein, R. Agarwal, A. Agarwal, Berant, Kumar (Google DeepMind/Research), ICML 2025. 339 citations — the canonical PRM paper.
 > **Date:** 2026-08-27
-> **Status:** RECORD (Issue 692 closed 2026-08-27: T1–T3 landed `fcfb5f8c`/`983c6fb8`, T4 refuted-by-mechanism — Fusion D correction below, T5 GOAT PASS [Bench 684](../.benchmarks/684_prover_selection_goat.md) `b0772308` — `prover_selection` DEFAULT-ON in katgpt-core; riir-train Plan 356 remains the open training arm)
+> **Status:** RECORD (Issue 692 closed 2026-08-27: T1–T3 landed `fcfb5f8c`/`983c6fb8`, T4 refuted-by-mechanism — Fusion D correction below, T5 GOAT PASS [Bench 684](../.benchmarks/684_prover_selection_goat.md) `1b65662f` — `prover_selection` DEFAULT-ON in katgpt-core; riir-train Plan 356 remains the open training arm)
 > **Classification:** Public (generic math) + private consumers + riir-train training arm
 > **Related:** 250 (self-advantage — single-policy cousin), 160/180 (SDPG centered_log_ratio — oracle/student cousin), 373 (ReMax expected-max — same Bernoulli-K form), 494 (conformal dual-threshold), 322-riir-ai (civ critic stop rule — adjacent, closed), 426-riir-train (TETHER blend — level-signal blend family)
 
@@ -126,7 +126,7 @@ Not all 4 YES → not Super-GOAT. Gain with issue + plan.
 
 Any quality claim ("complementarity selection beats strength selection for drafters") needs a head-to-head in `riir-poc`-style harness: paper-arm (D+Al-ranked prover), frozen baseline (strength-ranked), shipped analog — on a controlled toy (e.g., the Go-puzzle or doc-repro speculative harness), verdict table printed. Latency/architectural claims need only a bench. The K\* law needs only the exhaustive Bernoulli sweep gate (verify peak == closed form across a (Q,V) grid) — that one is pure math, no PoC.
 
-> **T5 status (2026-08-27, Issue 692 T5, katgpt-rs `b0772308`): DISCHARGED — GOAT PASS, T1 promoted to DEFAULT-ON.** [Bench 684](../.benchmarks/684_prover_selection_goat.md) runs the exact three-arm shape above on a controlled PAV harness (64×8 Bernoulli logs, cross-state beam retention, 16 seeds × α ∈ {0.2,0.4,0.6}): the D+Al pick (peer, strength 0.49) beats the strength pick (flat 0.95 solver) at every α (mean +0.005–0.007 retained-θ, 75–87% cell win-rate), beats the shipped no-prover baseline at α ≥ 0.4, and the anti-aligned prover's bound goes negative (pre-gate rejects). Honest α=0.2 noise-floor finding recorded in the bench. T4 (dd_tree BestAdvantage) refuted by mechanism — see the Fusion D correction above.
+> **T5 status (2026-08-27, Issue 692 T5, katgpt-rs `1b65662f`): DISCHARGED — GOAT PASS, T1 promoted to DEFAULT-ON.** [Bench 684](../.benchmarks/684_prover_selection_goat.md) runs the exact three-arm shape above on a controlled PAV harness (64×8 Bernoulli logs, cross-state beam retention, 16 seeds × α ∈ {0.2,0.4,0.6}): the D+Al pick (peer, strength 0.49) beats the strength pick (flat 0.95 solver) at every α (mean +0.005–0.007 retained-θ, 75–87% cell win-rate), beats the shipped no-prover baseline at α ≥ 0.4, and the anti-aligned prover's bound goes negative (pre-gate rejects). Honest α=0.2 noise-floor finding recorded in the bench. T4 (dd_tree BestAdvantage) refuted by mechanism — see the Fusion D correction above.
 
 ## 6. Cross-references
 
