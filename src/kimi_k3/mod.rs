@@ -60,7 +60,12 @@ pub use model::{
 /// per-layer capture, replay-from-layer-ℓ+1 on stale/corrected residuals,
 /// KL/top-1 outcome metrics, and the Approach-B closed-form δ-predictors
 /// (router-logit + x_in-linear, fit via the katgpt-attn-match OLS substrate).
-#[cfg(feature = "kimi_k3_loader")]
+// Issue 691: the module's code consumes katgpt_core::stale_residual, which
+// only exists under the root `stale_residual` feature (it forwards
+// katgpt-core/stale_residual). Gating on `kimi_k3_loader` alone made the lib
+// un-compilable under every loader-implying feature set (kimi_k3_backward
+// included) — found by Issue 694's PoC harness check at clean HEAD 271a8b10.
+#[cfg(all(feature = "kimi_k3_loader", feature = "stale_residual"))]
 pub mod stale_residual;
 
 // Safetensors loader + tiktoken tokenizer (gated by `kimi_k3_loader`).
