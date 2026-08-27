@@ -1,0 +1,88 @@
+# Research 510: ActFlow — Certified Frontier Expansion & Generable Sets
+
+**Status:** DISTILLED — pending owner decision (plans filed: [katgpt-rs 580](../.plans/580_certified_frontier_primitive.md) + [riir-train 357](../../riir-train/.plans/357_actflow_discrete_expansion.md); issue filed: [riir-clippy 048](../../riir-clippy/.issues/048_gp_acquisition_layer.md))
+
+**Date:** 2026-08-27
+**Source:** [arXiv:2606.08802](https://arxiv.org/abs/2606.08802) — De Santi, Lee, Perez Jensen, Protopapas, Tang, Liu, Chatterjee, Yue, Krause (ETH Zürich / ETH AI Center / UPenn / Caltech / FutureHouse), *"Active Flow Expansion for Out-of-Distribution Discovery: from Theory to Molecules"*, June 2026. Code: [github.com/riccardodesanti/active_diffusion_models](https://github.com/riccardodesanti/active_diffusion_models) (pixi; `toy`/`qm9`/`geom_drugs`/`stable_diffusion` setups; peptide + protein branches).
+
+## TL;DR
+
+ActFlow departs from data-distribution matching and views a generative model through its **generable set** — the τ-level set of its terminal density, `Ω^τ_θ = {x : p^θ₁(x) ≥ τ}`. The learning principle becomes *expand the generable set to cover the valid design space* `Ω* = {x : v(x)=1}`, via a loop of: self-generate samples → steer toward high verifier-uncertainty regions in a learned representation (KL-regularized to the current model) → query a black-box validity verifier → signed fine-tune (accepted attract, rejected repel). Theory: first statistical guarantees for OOD flow modeling, via **local-to-global reachability** of a Lipschitz-certified safe-set expansion over the learned representation.
+
+**Verdict: Gain — GOAT-tier, dual-track.** The load-bearing structural finding from the adversarial panel: **only 1 of ActFlow's 4 loop components (the flow weight update) touches gradient descent — the paper's entire guarantee apparatus (Theorems F.5/F.8/F.9, Lemmas E.2–E.4/F.2–F.7, Prop 1) is proven about the GD-free parts** (uncertainty model, acquisition, certified expansion). Path 0 → the math half is **MODELLESS-VALIDABLE**; the training loop → **Path 0.5** (riir-train Plan 357).
+
+**Not Super-GOAT — novelty gate Q1 fails on published prior art:** safe-set expansion via GP lower-confidence-bound + Lipschitz reachability is the SAFEOPT lineage (Sui et al. 2015/2018; ActSafe ships "the expansion operator for the safe set" verbatim). ActFlow's genuine novelty is the *generable-set framing for generative models* + the flow-model reachability theory. Our claim survives as a **fusion**: certified frontier expansion as the game-AI curiosity/territory mechanism composed with our shipped substrates — novel in combination, known as an operator.
+
+## The paper in one page
+
+- **Generable set** (Def 1): `Ω^τ_θ = {x : p^θ₁(x) ≥ τ}`. τ→0 = support (overstates coverage); small τ>0 = region reliably reachable under a finite sampling budget. Central limitation of pre-training: `Ω^τ_pre ⊂ Ω*` with volume ≪ (Eq 6).
+- **Active exploration** (Eq 9): `x_{t+1} ~ argmax_q E[σ_t(φ_s(x))] − β·KL(q ‖ p^θ_t)` — uncertainty bonus, KL leash to the current model. β→∞ = standard sampling; β→0 = pure uncertainty max (can leave the region where the prior is a useful validity bias).
+- **Uncertainty** (Eq 10): GP posterior variance, **linear kernel over the frozen representation** `k(x,x') = ⟨φ_s(x), φ_s(x')⟩` — closed-form Bayesian-linear-regression variance. Implementation alternates GP and a 5-MLP deep ensemble over score-net features at noise timestep **s ≈ 0.8–0.9** (intermediate-noise geometry is most explorable; s=0.95 near-data measured worst).
+- **Verifier + signed update** (Apx D): binary validity labels partition the replay buffer; update `∇L⁺ − α_t·∇L⁻` with α_t as gradient-norm fraction (α ≈ 0–0.005; rejected = unlearning signal, SISS reduction). Warm-up: defer fine-tuning until ≥4096 valid samples; LoRA runs use weight decay 1e-1..1e-2 on LoRA params.
+- **Theory**: verifier modeled as logistic `Pr[y=1|z] = s(g(z))`, `Ω* = {z : s(g(z)) ≥ h}`; kernelized-logistic confidence sequences `[s(μ_t) ± β_t(δ)·σ_t]`; **safe-set expansion** `S_t = S_{t−1} ∪ {x : ∃x'∈S_{t−1}, s(μ_t(x')) − β̂_t σ_t(x') − L_s L_g d(x,x') ≥ h}` (Eq 32); **one-step reachability** `R_ε(S) = {z : ∃z'∈S, s(g(z')) − L_s L_g d(z,z') − ε ≥ h}` (Eq 15); H-fold iteration covers the reachable valid set `R^H_ε(S₀) ⊆ Ω^τ_T*` with sample complexity `T* ≳ (α·γ/ε)²`; validity floor (Cor F.8); full coverage iff every valid point is H-hop-connected (Cor F.9).
+- **Passive-exploration impossibility** (Prop 1, Apx C): in a Gaussian abstraction, passive sampling hits a valid frontier cone with probability `≤ η·exp(−(m−1)/2·cos²φ)` — **exponentially unlikely when valid directions are sparse**. Closed-loop verifier filtering alone (Rec-F) provably insufficient; active steering toward the frontier is required.
+- **Results**: coverage (valid clusters) 2–6× pre-trained across QM9 / GEOM-Drugs / therapeutic peptides / protein sequences; Rec-NF collapses validity to 0%; Rec-F raises validity but *shrinks* coverage. Discrete-diffusion variant (Apx G, Alg 2): uncertainty-tilted path measure `ℙ^σ ∝ ℙ^θ⁰·exp(σ(X₁)/β)`, trained via weighted denoising CE with importance weights (off-policy RL) + replay re-masking.
+
+## Path 0 component table (§3.5 — coverage × extraction)
+
+| Component | Formula | Extractable without GD? | Ships here? (closest substrate) | Disposition |
+|---|---|---|---|---|
+| GP posterior variance, linear kernel | `σ²(x) = k(x,x) − k(x,X)(K+λI)⁻¹k(X,x)` | **Yes — exact** (posterior variance of Bayesian linear regression; rank-1 Cholesky update online) | No (BetaPosterior is count-based per-candidate; DualPoolBandit is pool routing) | **open primitive** → Plan 580 |
+| Confidence schedule | `β_t(δ) = 4L_s B + 2L_s √(2κ/λ·(γ+log 1/δ))`; for sigmoid `L_s = 1/4`, `κ = 1/(s(B)(1−s(B)))` closed-form | **Yes** | No | Plan 580 |
+| Safe-set expansion (certified frontier) | Eq 32: LCB + Lipschitz decay, monotone union | **Yes** — pure set algebra | **No** — see signal-diff below | **open primitive** → Plan 580 |
+| One-step reachability operator | Eq 15: `R_ε(S)`, H-fold iterate | **Yes** — grid/bitmap dilation with hop budget `(s(g)−h−ε)/(L_s L_g)` | No (dual-pool "reachability" = bandit non-trapping — different concept, same word) | Plan 580 |
+| Posterior mean μ_t (kernel logistic) | ridge / logistic MAP | **Needs a solve** — honest flag | Beta-Bernoulli per-cell (house bandits) or ridge mean `k(x,X)(K+λI)⁻¹y` = closed-form substitutes | Plan 580 (substitute documented) |
+| Safe uncertainty sampling (acquisition) | Eq 33/14: `argmax_{x∈S_t} σ_t(x)`, approx factor α | **Yes** | No (EVPI gate is *when*, this is *where*) | Plan 580 |
+| Halting / sample complexity | `T ≳ 8α²β̂²γ_T/ε²`; stop when `σ ≤ ε/(2β̂)` | **Yes** | No | Plan 580 |
+| Information gain + decay law | `γ_t = ½ log det(I+(λκ)⁻¹K_t)`; `max σ ≤ √(2γ_T/(T·log(1+(λκ)⁻¹)))` | **Yes** | No | Plan 580 |
+| Frontier-sparsity impossibility | Prop 1: `≤ η·exp(−(m−1)cos²φ/2)` + Laurent–Massart radius `ρ_η` + spherical-cap bound | **Yes — it's a theorem** | No | Plan 580 (bounds) + pre-registered G8 prediction |
+| KL-regularized tilted acquisition | `w = exp(σ/β)` reweight of prior samples (Eq 56/59 GD-free half) | **Yes** (sample K from prior, weight, select) | No (sampling module composes) | Plan 580 (policy half) |
+| Sphere-exclusion coverage + Vendi diversity | greedy clustering; `exp(−Σλᵢ log λᵢ)` over kernel eigenvalues | **Yes** | No | Plan 580 (measurement substrate) |
+| Intermediate-noise tier law | explore at s ∈ [0.8, 0.9] | **Yes — config/tier rule** | Conceptually ships as the two-brain zone abstraction (raw coords ↔ pure noise ↔ zone-level belief) | documented in this note |
+| Signed retain/forget buffer weighting | `L⁺ − α_t·L⁻`, α as count/mass ratio | **GD-free form:** signed evidence accumulation (counts/EMA) | Partial — EvidenceTier + Withdrawn demotion is verdict-state, not signed mass; healer compile-reverts decrement counts only | riir-clippy Issue 048 (+ game-side signed mask biasing as follow-up) |
+| Flow weight update (continued pre-training, DPS, WDCE) | gradient descent | **No — genuinely GD** | dllm / dflash trainers (riir-train) | Path 0.5 → riir-train Plan 357 |
+
+## Signal-diff checks (§3.6 — the four closest shipped cousins)
+
+1. **Viable Manifold Graph (Plan 312, DEFAULT-ON, `viable_manifold_graph.rs`)** — *consumes a CALLABLE viability predicate* `V(z)` (closure, evaluable anywhere) to build `SafeManifoldGraph` + navigate via geodesics/random-walks that stay viable **by construction**. ActFlow's certified frontier *consumes QUERY FEEDBACK under an UNKNOWN black-box verifier* — the set is not given, it is **grown** with confidence certificates, and the theory bounds the query count. Diff: **navigation-on-known-viable vs certified-growth-under-unknown-validity**. They compose, not compete: ActFlow grows the node set → VMG navigates it (see Fusion).
+2. **EVPI gate (riir-ai Issue 738, `cgsp_runtime/evpi_gate.rs`)** — fires perception when an unknown's plausible set **straddles the decision boundary** (optimistic vs pessimistic extreme points through the NPC's own decision fn). ActFlow's acquisition targets **max posterior variance within the certified set**. Diff: *when-to-look (decision-flip relevance) vs where-to-look-next (frontier uncertainty)*. The ActFlow theory adds what EVPI lacks: the Lipschitz reachability *certificate* on what a look can safely unlock, and the halting law for when a zone stops being worth looking at.
+3. **Demonstration-coverage curiosity (riir-games Issue 672, `swarm/coverage_curiosity.rs`)** — `DemonstratedSkill::covered_mask` (u32 bitmask over 32 discrete ranks) driven by EXTERNAL demonstrations + dot+sigmoid bias. ActFlow's generable set is a **density level-set over a continuous latent space grown by the agent's own sampling + verifier feedback**. Diff: *discrete mask + external exemplars vs continuous certified level-set + self-generated queries*. The covered_mask storage pattern is the right persistence encoding for certified cells.
+4. **BetaPosterior selection (riir-clippy `self_evolve.rs::select_best_candidate`)** — per-candidate success/fail counts → ε-quantile of Beta. ActFlow's GP variance is **input-space** uncertainty over span/rule *embeddings* — which (rule, span) pair to QUERY next, not which recorded candidate to replay. Diff: *per-candidate history vs input-space epistemic variance* — orthogonal to the two measured selection-mode negatives (Entropic Bench 035, TetherBlend Bench 042), which modified pool scoring under starved per-candidate evidence; at the rule level the store is NOT starved (8K+ verdict-bearing trajectories, P5 closed).
+
+## Fusion (the novel combination)
+
+**Grow-then-navigate** — the certified frontier is the missing **acquisition/build** half of the Viable Manifold Graph stack:
+`CertifiedFrontier` (LCB + Lipschitz dilation, monotone) *grows* the viable node set under an unknown verifier → `build_safe_manifold_graph` consumes the certified cells as nodes → `manifold_geodesic` navigates. The whole becomes: **NPCs provably expand survivable territory (every revealed cell certified reachable-safe from a known-good neighbor), then path-plan inside it** — with Prop 1 as the mathematical justification for why *directed* frontier curiosity is necessary at all (passive wander is exponentially blind to sparse frontiers).
+
+Secondary fusions:
+- **Certified brain vs think brain**: the two-brain model gains a third structure — decaying `GenericSpatialBelief` (rumor: fades) vs **monotone certified set** (knowledge: never regresses). Monotonicity `S_{t−1} ⊆ S_t` is the difference between knowledge and rumor, and it is a provable property here.
+- **Straddling gate**: deep-inside (LCB ≥ h) and far-outside (UCB < h) cells get zero queries — the EVPI decision-flip shape, now with a Lipschitz-certified frontier instead of a disc.
+- **DEC resonance**: the frontier of S is `∂S` — `exterior_derivative` on the certified-cell cochain yields the frontier for free; `codifferential` on the expansion flow = belief-mass conservation check (curiosity = positive divergence). Decorative, not load-bearing.
+- **Healer active learning** (riir-clippy 048): GP acquisition over the 8-D span embeddings on the shipped `CompileDriver.ordering` seam + `select_best_candidate` A/B — the trajectory store is already the (x, y) training set.
+- **Coverage metrics**: sphere-exclusion + Vendi give the living-world engine honest territory/diversity scoreboards ("are 1000 NPCs doing 100 different things or one thing 1000 times?").
+
+## Latent ↔ raw boundary
+
+Certified frontier state is **think-brain latent** (per-NPC, local, never synced directly). What crosses the sync boundary: the scalar outputs — certified-cell count, frontier-uncertainty scalar, validity floor percentage (Cor F.8: `vol(R^H_ε(S₀))·(h/(1−h))/Z̄`) — raw, committed as game scalars. Validity *feedback* (did the behavior keep the NPC alive/thriving) enters as a raw binary event and accumulates as latent Beta counts / GP observations. Bridge functions zero-alloc, gateable, sync-invariant — same contract as every house latent op. `L_s·L_g = ‖w‖/4` is closed-form for dot+sigmoid heads (one norm per freeze/thaw cycle), so every house sigmoid gate acquires a provable decay radius for free.
+
+## Honest caveats
+
+1. **SAFEOPT prior art** — the certified expansion operator is established safe-BO art (Sui et al. 2015/2018; ActSafe). We ship it the way we ship bandits: known-art operator, novel fusion + domain.
+2. **μ_t substitution** — the paper's posterior mean is a kernel-logistic MAP (deterministic convex solve, not closed-form). The primitive ships Beta-Bernoulli per-cell or ridge mean as the honest closed-form substitute; σ_t (the load-bearing uncertainty) is exact regardless.
+3. **Theory assumptions** — compact domain, known Lipschitz constants, RKHS-bounded validity, calibrated logistic verifier. In game latent space these are design choices, not givens; the soundness property test (G1) is only as good as the calibration of the substitute mean.
+4. **Prop 1 is a Gaussian warm-up**, not a general impossibility theorem — usable as a design law + pre-registered G8 prediction, not a guarantee.
+5. **s-timestep band is empirical** in their domains (molecules/proteins); our analog (zone-level abstraction) is a hypothesis to ablate, not a constant to copy.
+6. **Curse of dimensionality**: linear-kernel information gain `γ_T ~ d_eff·log T` — uncertainty elimination is fast in 8-D game latents, slower on 64-D shards. The DEC boundary-vs-volume caveat does not apply (this is not a boundary-flux op), but per-cell GP cost scales with buffer depth; keep the certified set on the zone grid, not the raw embedding.
+7. **Wall-clock caveat for the drafter track** (Issue 717 verdict): any trained-drafter coverage gain only converts to tok/s at the batched/tree-verify seam — gate on acceptance + coverage, wall-clock secondary.
+
+## Routing (dual-track)
+
+- **Modelless half** → [katgpt-rs Plan 580](../.plans/580_certified_frontier_primitive.md): `certified_frontier` module in katgpt-core behind `certified_frontier = []` (std-only). GOAT: G1 soundness property test (Lemma E.2 as an adversarial property test — zero unsafe certifications), G1b monotonicity, G2 crowd-scale batch (1000 NPC-class queries under µs/NPC via rank-1 Cholesky updates), G3 feature-off clean, G4 fixed-capacity zero-alloc, **UQ floor** (Report-the-Floor adaptation: beat adjacency-only naive expansion on growth × violation product), G8 four-arm PoC in `riir-poc` (certified-frontier vs curiosity-only vs passive vs never-look, Prop 1's exponential separation pre-registered).
+- **Training half** → [riir-train Plan 357](../../riir-train/.plans/357_actflow_discrete_expansion.md): ActFlow-discrete (Apx G) on `GpuDllmTrainer`/`DFlashTrainer` with `syn`-parse + `cargo check` as the free binary verifier (R1, 6–10 GPU-h 4090); signed unlearning over the healer's compile-revert buffer (R2); warm-up-4096 + wd-on-LoRA config adoption (R3, keep our pinned lr 1e-3). GOAT: coverage of syn-valid + check-valid completions vs frozen / **Rec-F (= our Stage-2 filter, verbatim)** / modelless `NgramDrafter` baselines.
+- **Healer acquisition** → [riir-clippy Issue 048](../../riir-clippy/.issues/048_gp_acquisition_layer.md): GP ordering on the shipped seams, 0 GPU-h, M3-local, A/B vs BetaPosterior (bars 0.9240/0.9379).
+
+## Cross-references
+
+- Closest shipped cousins: [R294 + Plan 312 Viable Manifold Graph](294_Viable_Manifold_Graph_Primitive.md) (navigation), riir-ai Issue 738 EVPI gate (when-to-look), riir-games Issue 672 coverage curiosity (discrete mask), riir-clippy Plan 005/Bench 035 selection modes
+- Canonical decomposition precedent: Flow Sampling (training-loop instantiation, math ours) — vocab.md §7
+- Prior art: Sui et al. 2015 (SAFEOPT), Sui et al. 2018 (stagewise safe BO), ActSafe (openreview, safe-set expansion operator), Alemohammad et al. 2024 (recursive self-generation collapse — the Rec-NF failure), Alberti et al. 2025 (SISS unlearning — the signed update's reduction)
