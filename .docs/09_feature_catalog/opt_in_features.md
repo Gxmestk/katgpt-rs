@@ -3012,3 +3012,41 @@ threshold is not enough.
 this module yet. Phase 3 is what flips it (each with its own consumer gate):
 MCTS termination, Plan 304 fusion `GainCostLoopHalter`, Bebop Issue 023
 re-gate, riir-ai Research 339 wiring.
+
+## 89. prover_selection — prover-selection statistics: rank by complementarity, not strength (Issue 692)
+
+Prover-selection kernels distilled from "Rewarding Progress: Scaling
+LLM Inference via Data-Centric Verifiers" (Setlur et al., 2024,
+[arXiv:2410.08146](https://arxiv.org/abs/2410.08146);
+Issue 692 / [Research 509](../../.research/509_Rewarding_Progress_PAV_Prover_Advantage.md)):
+which prover's signal should a consumer trust? Not the strongest one — the
+paper's core finding is that the strongest prover is often the least
+*distinguishable* from the policy it scores (A^μ ≈ 0 everywhere).
+
+- **`distinguishability` / `alignment` / `theorem_bound` / `selection_gate`**
+  (T1) — the D/Al complementarity selector: estimators over logged Bernoulli
+  means + Theorem 3.1's predicted-gain bound `γ·(D+Al)` with a sigmoid-gated
+  exposure
+- **`first_pit`** (T2) — the changepoint kernel (first index where Q̂ < ε),
+  consumed by riir-clippy's PAV data curation (riir-train Plan 356 A1) via a
+  same-signature twin
+- **`k_star` / `bok_advantage`** (T3) — the K* interior-optimum law: the
+  closed-form rollout count maximizing the gap + the BoK gap
+  `A(K) = (1−V)^K − (1−Q)^K`, gate-pinned against the empirical argmax on an
+  exhaustive (Q,V) grid
+
+### GOAT (Bench 684) — ALL PASS ⇒ promoted DEFAULT-ON 2026-08-27 (the `rating` precedent)
+
+| Gate | Result |
+|---|---|
+| G1 correctness | Exhaustive unit gates; `k_star` pinned against empirical argmax on the exhaustive (Q,V) grid |
+| G2 selector | The complementarity bound picks the peer that delivers a wired gain over the strength-trap top prover (`strong_flat`: strength 0.948, D 0.003) at **every paper α**, 16 seeds, on the controlled PAV retention harness (64×8, mean true θ of the retained beam strictly higher) |
+| G3 no-regression | katgpt-core default lib **1978/0/7** post-promotion (the module's 27 tests now default-included); clippy 0 |
+| G4 alloc/perf | Pure modelless arithmetic — no allocation sites, no deps, zero-cost-unless-invoked |
+| G5 consumer | riir-clippy PAV data curation (Plan 356 A1) consumes `first_pit` via the same-signature twin |
+
+**DEFAULT-ON** — pure math, no dep surface, zero-cost-unless-invoked (the
+`rating` precedent); the Cargo feature remains as an inert alias. Companion
+refutation recorded (Issue 692 T4): the dd_tree `BestAdvantage` variant
+(score by `Q_i − mean_j Q_j`) is rank-invariant vs `BestQ` by mechanism —
+not shipped.

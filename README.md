@@ -3243,6 +3243,29 @@ for λ≳5). Reopen paths: a diffusion-sampler-shaped harness + approximate
 kernel features; the riir-ai crowd-targeting plan (Guide 344) waits on that
 reopen.
 
+### ⚖️ prover_selection — Prover-Selection Statistics: rank by complementarity, not strength (Issue 692, arXiv:2410.08146)
+
+Which prover's rollout signal should a consumer trust? Not the strongest one —
+"Rewarding Progress" (Setlur et al.) shows the strongest prover is often the
+least *distinguishable* from the policy it scores (A^μ ≈ 0 everywhere). Ships
+the **D/Al complementarity selector**: `distinguishability` + `alignment`
+estimators + Theorem 3.1's predicted-gain bound `γ·(D+Al)` with a
+sigmoid-gated exposure, the `first_pit` changepoint kernel (first index where
+Q̂ < ε — consumed by riir-clippy's PAV data curation via the riir-train Plan
+356 A1 twin), and the K⭻ interior-optimum law (`k_star` rollout count + the
+`bok_advantage` gap).
+
+**DEFAULT-ON since 2026-08-27** ([Bench 684](.benchmarks/684_prover_selection_goat.md),
+GOAT G1–G5 PASS — the `rating` precedent: pure modelless arithmetic, no dep
+surface, zero-cost-unless-invoked; the Cargo feature stays as an inert alias).
+On a controlled PAV harness (64×8 retention task, 16 seeds), ranking provers
+by `theorem_bound(D, Al, γ)` picks the complementary peer over the
+strength-trap top prover at **every paper α** — retained-beam mean θ strictly
+higher than the strength arm — while the strength arm's top pick
+(`strong_flat`, strength 0.95, D 0.003) delivers no wired gain. Companion
+refutation: the dd_tree `BestAdvantage` variant (score by `Q_i − mean_j Q_j`)
+is rank-invariant vs `BestQ` by mechanism — not shipped (Research 509 §5).
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional
