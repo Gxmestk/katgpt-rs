@@ -5,7 +5,7 @@
 > **Status:** DISTILLED — pending owner decision (training arm filed as riir-train Plan 358; two low-cost bench checks identified below)
 > **Classification:** Public (the primitive ships publicly in katgpt-core; this note is the lineage synthesis + moat record)
 > **Related Research:** 387 (FwPKM — the *descendant* paper; this paper is its ancestor), 455 (Hebbian Kernel Memory — our value-construction track), 199/481 (memory caching / TFIDF slot ranking), 453 (Variable Rank Domain Expert — PEER-adjacent), 302+ndb (HOPE shard capacity metric)
-> **Companion:** riir-train `.plans/358_memory_layers_kb_adapters_training.md` (the model-based arm); riir-ai `.research/350` (KBLaM — the companion paper distilled same session)
+> **Companion:** riir-train `.plans/358_memory_layers_kb_adapters_training.md` (the model-based arm); riir-ai `.research/351` (KBLaM — the companion paper distilled same session)
 
 ---
 
@@ -40,7 +40,7 @@
 | A5 | Scaling law: facts ↑ monotone to 64M keys; facts ≫ reasoning | 📋 evidence → decision rule | Use: product-key memory for fact-shaped load (lore, tables, "who said what"); planner/decision substrate for reasoning-shaped load. Cf. ndb HOPE capacity metric (Research 302) — the provisioning law `N ≈ ρ·F` |
 | A6 | Gains largest early (200B tok) | ✅ limit case shipped | Sparse memory is the fast-knowledge channel; δ-rule one-step writes are the degenerate "instantly learned fact" — no warmup by construction |
 | A7 | Backward strategies (atomics/lock/reverse_indices) | 🟡 determinism angle unclaimed | `reverse_indices` (sort-by-slot, batched apply) = **fixed accumulation order → bit-identical sums across thread counts**. Directly relevant to concurrent Hebbian writes into a shared table under replay/quorum. No such scheduler ships in our episodic path |
-| A8 | Random negative keys + sink anchor: minor/inconsistent | ✅ simplification license | Their negative result licenses BLAKE3-derived keys (construction quality second-order). The **sink anchor → closed-form abstention** (`abstain iff max score ≤ anchor + β`) is a free OOD detector — see riir-ai Research 350 §refusal, where it composes with KBLaM's threshold refusal |
+| A8 | Random negative keys + sink anchor: minor/inconsistent | ✅ simplification license | Their negative result licenses BLAKE3-derived keys (construction quality second-order). The **sink anchor → closed-form abstention** (`abstain iff max score ≤ anchor + β`) is a free OOD detector — see riir-ai Research 351 §refusal, where it composes with KBLaM's threshold refusal |
 | A9 | Trainable values (the memory content) | ✅ modelless analog shipped | `PkmEpisodicStore` δ-rule + `hebbian_kernel_memory` + ndb `sleep_hebbian` (deterministic, margin-verified). Trained arm → riir-train Plan 358 Phase A |
 | A10 | Parallel sharded EmbeddingBag (multi-GPU) | — out of scope | Engineering for H100 clusters; our tables are 32–128MB scale, single-node |
 
@@ -71,7 +71,7 @@ Our shipped default-on stack is exactly (1)+(2): frozen BLAKE3 keys + δ-rule/He
 - `.plans/408_Product_Key_Memory_Primitive.md` (landed; phases 1–5) + `.benchmarks/408_pkm_goat.md`
 - Research 387 (FwPKM) — descendant paper; its fusion table F1–F6 landed as 408 Phases 4–5 + this note's Hebbian row
 - Research 455 (Hebbian Kernel Memory) + ndb `.research/303_Hebbian_Fact_Storing_Shard_SuperGOAT_Guide.md` — the value-construction track
-- riir-ai `.research/350_kblam_kb_attention_dilution_guide.md` — companion paper (same session); the abstention composite (A8 anchor × KBLaM threshold)
+- riir-ai `.research/351_kblam_kb_attention_dilution_guide.md` — companion paper (same session); the abstention composite (A8 anchor × KBLaM threshold)
 - riir-train `.plans/358_memory_layers_kb_adapters_training.md` — Phase A
 - Prior art: Lample 2019 (1907.05242), PEER (2407.04153), UltraMem (2411.12364), UltraMemV2 (2508.18756), Kim & Jung (2010.03881)
 
