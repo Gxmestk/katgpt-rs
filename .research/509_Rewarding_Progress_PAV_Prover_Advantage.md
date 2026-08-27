@@ -2,7 +2,7 @@
 
 > **Source:** [Rewarding Progress: Scaling Automated Process Verifiers for LLM Reasoning](https://arxiv.org/abs/2410.08146) — Setlur, Nagpal, Fisch, Geng, Eisenstein, R. Agarwal, A. Agarwal, Berant, Kumar (Google DeepMind/Research), ICML 2025. 339 citations — the canonical PRM paper.
 > **Date:** 2026-08-27
-> **Status:** DISTILLED — pending owner decision (open-primitive issue 692 + riir-train Plan 356 filed)
+> **Status:** RECORD (Issue 692 closed 2026-08-27: T1–T3 landed `fcfb5f8c`/`983c6fb8`, T4 refuted-by-mechanism — Fusion D correction below, T5 GOAT PASS [Bench 684](../.benchmarks/684_prover_selection_goat.md) `b0772308` — `prover_selection` DEFAULT-ON in katgpt-core; riir-train Plan 356 remains the open training arm)
 > **Classification:** Public (generic math) + private consumers + riir-train training arm
 > **Related:** 250 (self-advantage — single-policy cousin), 160/180 (SDPG centered_log_ratio — oracle/student cousin), 373 (ReMax expected-max — same Bernoulli-K form), 494 (conformal dual-threshold), 322-riir-ai (civ critic stop rule — adjacent, closed), 426-riir-train (TETHER blend — level-signal blend family)
 
@@ -83,6 +83,8 @@ Verified numerically: Q=.5, V=.3 → K\*≈1.98 (A(1)=.20, A(2)=.24, A(3)=.22 �
 
 **Fusion D — BestAdvantage rollout mode × dd_tree (smallest code delta):** `WidthSelectionMode::BestQ` exploits (re-picks the same high-Q tree); add `BestAdvantage` scoring rollouts by Q_i − mean_j Q_j (centering across the K rollouts = cross-state comparison within the fan-out). Gate: diversity+quality of selected paths vs BestQ at equal K.
 
+> **Fusion D status (2026-08-27, Issue 692 T4): REFUTED BY MECHANISM — no code shipped.** The K rollouts of one `best_of_k_rollouts` call form a **single within-state pool** (they share the same marginals/prefix), and `mean_j Q_j` is rollout-independent, so `argmax_i (Q_i − mean_j Q_j) ≡ argmax_i Q_i` — selection identical to `BestQ` at every seed, by the same rank-invariance argument §2.2 used to reject the QGF and riir-clippy consumers. The per-depth-centered steelman (`Σ_d (q_{i,d} − mean_j q_{j,d})`) also collapses: all rollouts share the depth count, so the baseline sums to one constant shift. "Cross-state" bites only when candidates come from *different* states (the bench-684 beam-retention direction) — the dd_tree fan-out is not that. The enum arm is NOT added (no-op API surface). Record: [Bench 684](../.benchmarks/684_prover_selection_goat.md).
+
 ---
 
 ## 4. Verdict
@@ -123,6 +125,8 @@ Not all 4 YES → not Super-GOAT. Gain with issue + plan.
 ## 5. PoC obligation (defend-wrong, for whoever picks up 692)
 
 Any quality claim ("complementarity selection beats strength selection for drafters") needs a head-to-head in `riir-poc`-style harness: paper-arm (D+Al-ranked prover), frozen baseline (strength-ranked), shipped analog — on a controlled toy (e.g., the Go-puzzle or doc-repro speculative harness), verdict table printed. Latency/architectural claims need only a bench. The K\* law needs only the exhaustive Bernoulli sweep gate (verify peak == closed form across a (Q,V) grid) — that one is pure math, no PoC.
+
+> **T5 status (2026-08-27, Issue 692 T5, katgpt-rs `b0772308`): DISCHARGED — GOAT PASS, T1 promoted to DEFAULT-ON.** [Bench 684](../.benchmarks/684_prover_selection_goat.md) runs the exact three-arm shape above on a controlled PAV harness (64×8 Bernoulli logs, cross-state beam retention, 16 seeds × α ∈ {0.2,0.4,0.6}): the D+Al pick (peer, strength 0.49) beats the strength pick (flat 0.95 solver) at every α (mean +0.005–0.007 retained-θ, 75–87% cell win-rate), beats the shipped no-prover baseline at α ≥ 0.4, and the anti-aligned prover's bound goes negative (pre-gate rejects). Honest α=0.2 noise-floor finding recorded in the bench. T4 (dd_tree BestAdvantage) refuted by mechanism — see the Fusion D correction above.
 
 ## 6. Cross-references
 

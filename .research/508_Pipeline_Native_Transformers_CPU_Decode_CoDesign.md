@@ -4,7 +4,7 @@
 > **Date:** 2026-08-26
 > **Status:** DISTILLED — §6.3 Approach A+B **MEASURED NEGATIVE** ([Bench 683](../.benchmarks/683_stale_residual_poc.md), Issue 691 closed 2026-08-26: residual-dominance fails on Bonsai-27B AND Gemma-2-2B AND K3-0.40B — ratio ≈ k/√L, k≈1.5–3 → the 0.05 bar needs ≥~1000 layers); extractions #1–#3 landed in `katgpt-core/stale_residual`; riir-train Issue 482 (delay-arch screening) unaffected and still queued
 > **Related Research:** 110 (Ciot ternary CPU — our Plasma tier), 066 (TileRT persistent pipeline), 161 (dMoE block routing), 059 (MoE spec-decode co-design), 447 (Kimi K3 latent MoE), 456 (Gigatoken cache hierarchy); riir-ai 328 (deepseek v3 noaux_tc router — the exact router family in `moe.rs`)
-> **Related Issues:** [katgpt-rs 691](../.issues/691_stale_residual_speculative_layer_pipelining_poc.md) (§6.3 Approach A/B POC), [riir-train 482](../../riir-train/.issues/482_delay_architecture_screening_dense_delay_expert_delay.md) (delay-arch screening)
+> **Related Issues:** katgpt-rs 691 (§6.3 Approach A/B POC — closed 2026-08-26, file removed; record = Bench 683 + git history), [riir-train 482](../../riir-train/.issues/482_delay_architecture_screening_dense_delay_expert_delay.md) (delay-arch screening)
 > **Classification:** Public (katgpt-rs — transformer-stack inference mechanics)
 
 ---
@@ -64,7 +64,7 @@ For **standard** (non-rewritten) transformers, exploit residual dominance (‖δ
 - **Approach A**: run layer ℓ+1 speculatively on stale `x_in^ℓ` while ℓ computes; accept + post-hoc correction if ‖δℓ‖ below threshold, else rollback + recompute. Paper's own success criterion: >50% of layers with ratio < 0.05 and top-1 preserved.
 - **Approach B**: closed-form-fit linear predictor router-logits→FFN-delta for corrected speculative input (R² > 0.7 target).
 
-**First measured verdict (ours — the paper never ran it):** the premise fails on every architecture class we hold — 0 of 8/64/26 layers under 0.05 on K3-0.40B / Bonsai-27B / Gemma-2-2B respectively (medians 0.15–54). The measured law is `ratio ≈ k/√L`, k≈1.5–3 (per-layer ‖δ‖ stays O(1) while the stream grows ~√L) → passing 0.05 needs ≥~1000 layers. Approach B's router predictor reaches held-out R² 0.445 at best (< 0.7). Record: [Bench 683](../.benchmarks/683_stale_residual_poc.md), [Issue 691](../.issues/691_stale_residual_speculative_layer_pipelining_poc.md) (closed).
+**First measured verdict (ours — the paper never ran it):** the premise fails on every architecture class we hold — 0 of 8/64/26 layers under 0.05 on K3-0.40B / Bonsai-27B / Gemma-2-2B respectively (medians 0.15–54). The measured law is `ratio ≈ k/√L`, k≈1.5–3 (per-layer ‖δ‖ stays O(1) while the stream grows ~√L) → passing 0.05 needs ≥~1000 layers. Approach B's router predictor reaches held-out R² 0.445 at best (< 0.7). Record: [Bench 683](../.benchmarks/683_stale_residual_poc.md), Issue 691 (closed, file removed — see git history).
 
 ---
 

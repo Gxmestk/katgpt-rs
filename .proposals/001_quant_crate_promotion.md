@@ -201,6 +201,7 @@ win on different d), keep both opt-in and document the decision matrix.
 
 - `mux_latent/` promotion (12 files) — fuzzy MUX dep boundary, deferred.
   See `issues/001_deferred_promotion_candidates.md`.
+  **(RESOLVED 2026-08-26, Issue 001: moved to `katgpt-core/src/mux_latent/` as its own module, commit `348347bd` — the deferral premise was disproved; issue file removed at close.)**
 - `proof_cert/` promotion (7 files) — cross-cuts chain/WASM runtime,
   deferred. Same issue.
 - `dash_attn/` promotion (16 files) — separate, larger lift; deserves its
