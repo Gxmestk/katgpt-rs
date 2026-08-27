@@ -6,6 +6,7 @@
 > **Related Research:** 080 (VPD co-evolution), 021 (G-Zero Proposer×Generator), 074-riir-ai (NS-RL three-mode co-evolution taxonomy), 098 (PrudentBanker safe-phased bandit), 300 (SelfCompact closed-unit compaction gate), 301 (Misalignment Indicator Probe Bank)
 > **Related Plans:** 137 (PrudentBanker safe-phased bandit ✅), 279 (Manifold Power Iteration MoE Router — Gram cache invalidation on snapshot bump ✅), 315-riir-ai (Policy Cache Cascade — `invalidate_zone_on_collapse` ✅), 253-riir-neuron-db (Merkle-Octree Curator Consensus), 002-riir-neuron-db (`can_freeze` consolidation gate ✅)
 > **Cross-ref (riir-ai / riir-neuron-db):** Issue 004 (katgpt-rs/.issues/) for Super-GOAT fusion follow-up; Plan 336 (katgpt-rs/.plans/) for GOAT implementation; potential riir-ai guide if fusion verdict promotes
+> **PASS-Redirects (synthesis):** Kim et al. [arXiv:2608.24735 "Meta^n: Recursive Self-Improvement through Emergent Depth"] — its consolidation mode (monotone per-task best via frozen inherited traces) and convergence-set depth are the same zero-regression / ε-best-belief family this note distills; the ships-as-BetaPosterior + `consolidate_gated` mapping is recorded in Research 512 §2.2.
 > **Classification:** Public
 
 ---

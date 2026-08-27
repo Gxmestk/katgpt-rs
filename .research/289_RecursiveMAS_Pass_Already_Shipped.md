@@ -7,6 +7,7 @@
 > **Related Research:** 247 (Dense Latent Heterogeneous Comms — **the same research family, already Super-GOAT**), 073/108 (LT2 Looped), 097/136 (Training-Free Loop Wrapper), 273 (ELT Elastic Looped), 242/276 (Topological recurrent belief), 243/277 (Temporal Derivative Kernel), 192/217 (NextLat BeliefDrafter), 123/273/303 (Latent Functor), 257/286 (FuncAttn rank-k projection), 251 (Token Economics — explicitly notes LatentMAS/Q-KVComm covered)
 > **Related Plans:** 311 (riir-ai NPC mind-reading runtime — **the Super-GOAT we already shipped, more sophisticated than this paper**), 280 (CS-KV-Importance Probe), 108 (LT2 Looped forward), 273/303 (Latent Functor), 286/318 (FuncAttn rank-k), 283 (Self-Advantage Recursion Gate), 304 (Gain/Cost Loop Halting)
 > **Verdict: PASS.** Every individual primitive RecursiveMAS introduces is already shipped in our quintet — most at higher fidelity. The paper's value is its **training recipe** (inner-outer loop co-optimization with backprop through frozen LLMs) → **riir-train**. No file/plan/guide created beyond this classification note.
+> **PASS-Redirects (synthesis):** Kim et al. [arXiv:2608.24735 "Meta^n: Recursive Self-Improvement through Emergent Depth"] — same bi-level-already-shipped verdict class (Research 512): fixed Ω + growing input, every extracted principle ships grep-verified; Ω itself remains LLM code-generation.
 
 ---
 
