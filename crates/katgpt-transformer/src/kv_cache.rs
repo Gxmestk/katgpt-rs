@@ -89,13 +89,14 @@ pub struct MultiLayerKVCache {
     ///   the former 2× mirrored layout that guaranteed it was removed in
     ///   Issue 683 (never exercised, saving never measured).
     ///
-    /// ⚠ Downstream note (2026-08-24): `riir_engine::transformer::gemma4`'s
-    /// `forward_gemma4_impl` still carries a mirrored-write +
-    /// mirrored-contiguous-read branch keyed on `sliding_capacity(l) > 0` that
-    /// assumes `2·W·kvd` buffers. No live construction sets a non-zero capacity
-    /// so it never runs, but do NOT pass a cache built by the sliding-bounded
-    /// constructors into that forward until the branch migrates to plain
-    /// modulo (Issue 683 follow-up, riir-ai).
+    /// ⚠ Downstream note (updated 2026-08-27): riir-ai's `forward_gemma4_impl`
+    /// migrated to the plain-modulo convention (riir-ai Issue 752, commit
+    /// `fbc598ab9`) — single write at `pos % W` + a two-slice straddling
+    /// gather — so caches built by the sliding-bounded constructors are now
+    /// SAFE to pass into that forward (pinned bit-identical vs unbounded by
+    /// `crates/riir-engine/tests/gemma4_sliding_ring_wrap.rs`). The original
+    /// 2026-08-24 warning (mirrored-write branch assuming `2·W·kvd` buffers)
+    /// is obsolete.
     pub sliding_capacity: Vec<usize>,
 }
 
