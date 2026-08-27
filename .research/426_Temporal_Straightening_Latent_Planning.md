@@ -240,3 +240,5 @@ A "defend-wrong" PoC at `riir-poc/` is **not required** for this verdict. §3.6 
 The verdict is a PASS, not a parity-backed downgrade of a quality claim. The §3.6 PoC mandate triggers on the latter; it does not trigger on a structural-coverage PASS where the paper's benefit pathway (GD planning) doesn't exist in the runtime.
 
 If a future plan *does* consume the paper's framing for a runtime change (e.g. wiring `mean_curvature` as a secondary router signal per Plan 342's deferred follow-up), THAT plan would carry its own quality-gate PoC. This research note does not.
+
+> **Cross-ref (2026-08-27, disambiguation):** Hanna & Ameisen [arXiv:2604.12493 "Latent Planning Emerges with Scale"] reuses the phrase "latent planning" in a *different* sense than this note's source: there it means a causal representation→output licensing property of an agent (forward: rep causes future token; backward: rep causes licensing context), verified by intervention — not trajectory straightening for gradient-based planning. The two are complementary, not duplicates; the causal-verification sense is distilled as riir-ai Research 348. Grep both senses when matching "latent planning".

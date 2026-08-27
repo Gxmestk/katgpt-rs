@@ -228,3 +228,5 @@ Source paper 2606.07612 is **Pass as a mechanism** (it has none) but its **L1/L2
 ---
 
 **Executable form:** the §4 table is materialized as `katgpt_rs::claim_rubric` (Plan 307, `crates/katgpt-core`-adjacent `src/claim_rubric/`). The seven primitive rows are round-tripped as integration tests in `katgpt-rs/tests/claim_rubric_test.rs` — if this note revises a score, that test file is the single source of truth. Run with `cargo test --no-default-features --features claim_rubric`.
+
+> **Cross-ref (2026-08-27):** Hanna & Ameisen [arXiv:2604.12493 "Latent Planning Emerges with Scale"] — the published L3 exemplar this rubric predicts: intervention + specificity control (random-feature arms, App. F) + direct-vs-full-effect split, all on planning claims; and a measured C9 instance (App. G: probes 0.6–0.7 F1, patching <10% output change — probe language downgraded to L1 in their framework, exactly the vocabulary enforcement this note mandates). The two-condition planning test (forward/backward licensing) is being wired as a concrete L3 instance via riir-ai Issue 762 / Research 348.
