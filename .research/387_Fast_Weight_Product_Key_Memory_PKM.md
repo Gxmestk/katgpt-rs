@@ -3,7 +3,7 @@
 > **Source:** Tianyu Zhao & Llion Jones (Sakana AI), "Fast-weight Product Key Memory", [arXiv:2601.00671](https://arxiv.org/abs/2601.00671), 24 Feb 2026.
 > **Code:** https://github.com/SakanaAI/fast-weight-product-key-memory
 > **Date:** 2026-07-07
-> **Status:** Active — open primitive scoped, plan open
+> **Status:** RECORD — primitive LANDED (Plan 408, phases 1–5, DEFAULT-ON since 2026-07-07: `ProductKeyMemory` + `FrozenProductKeyMemory` + `PkmEpisodicStore`, GOAT `.benchmarks/408_pkm_goat.md`). Lineage synthesis + the shipped-vs-trained moat record: Research 511 (the ANCESTOR paper, Meta's "Memory Layers at Scale" arXiv:2412.09764, distilled 2026-08-27 — confirms frozen-table PKM + Hebbian value construction are unclaimed in published literature, i.e. our shipped combination).
 > **Classification:** **Public** (modelless engine primitive — the PKM retrieval factorization only; gradient updates are forbidden and replaced by the shipped delta-rule analog)
 > **Related Research:** 006 (Raven RSM — complementary O(1) slot routing), 278 (Engram — complementary O(1) hash-addressed lookup axis), 053 (δ-Mem — the modelless analog of FwPKM's "fast weight update"), 243/277 (Temporal Derivative — the curiosity signal that replaces "novelty detection via gating"), 276 (Personality-Weighted Composition — same sigmoid×direction output gate)
 > **Companion plan:** [`.plans/408_Product_Key_Memory_Primitive.md`](../.plans/408_Product_Key_Memory_Primitive.md)
