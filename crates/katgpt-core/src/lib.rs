@@ -2668,6 +2668,23 @@ pub mod bounded_target;
 #[cfg(feature = "bounded_target")]
 pub mod realization_gap;
 
+// RVM modelless extraction (Issue 696 / Research 433, riir-train,
+// arXiv:2608.23664 — anchored reward-weighted velocity regression, Choi et
+// al.): the DT2 ANTI-COMMON-MODE scalar gate (peak-quantile statistic +
+// context-scaled threshold + median subtraction over the hack-carrying
+// population + band window — resists capture by the population-dominant
+// degenerate mode; the CLR crowd-panic failure is the named consumer, T3
+// PoC pending) and the ANCHORED SIGNED-REACH blend operator (out = anchor
+// + A·(cand − anchor); five regimes clamp/blend/adopt/overshoot/repel;
+// bit-identical pole fast paths at A ∈ {0,1}; A(r) schedules linear /
+// 2σ(kr)−1 / (2r−1)/β̄). Both zero-alloc, modelless,
+// sigmoid-not-softmax by construction. Opt-in POC — promotion only via the
+// issue's consumer PoC gates (T3 headline; T4 operator A/Bs).
+#[cfg(feature = "anti_common_mode")]
+pub mod anti_common_mode;
+#[cfg(feature = "anchored_reach")]
+pub mod anchored_reach;
+
 // Kinematic rollout primitive (Plan 578 / Research 506, arXiv:2608.09926 —
 // LDR, Li et al.): the modelless core of latent dynamics reasoning —
 // finite-difference state (order ladder 0→3), O(1) Newton-backward closed-
