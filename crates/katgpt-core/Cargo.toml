@@ -252,6 +252,30 @@ contrastive_scope = []
 # consumer-side; DEFAULT_C is a prior, calibrate per use-site.
 bounded_target = []
 
+# anti_common_mode (Issue 696 T1 / Research 433, arXiv:2608.23664 RVM
+# §C.3): the DT2 dynamic-tracking reward shape as a scalar gate —
+# peak-quantile statistic (mean of the fastest 5%, select_nth_unstable_by
+# partition, total_cmp), context-scaled threshold (τ = 6·context; paper:
+# 6·min(H,W)/256), median subtraction over the hack-carrying population
+# (cancels the population-dominant common mode exactly), and the band
+# window (both extremes → 0, only the genuine middle band earns signal).
+# Zero-alloc: &mut [f32] in-place reorder contract (multiset preserved).
+# Opt-in POC — promotion ONLY via the T3 consumer PoC (CLR crowd-panic
+# re-enable); named consumer: tick_swarm_emotions_collective.
+anti_common_mode = []
+
+# anchored_reach (Issue 696 T2 / Research 433, arXiv:2608.23664 RVM Eq. 7):
+# the anchored signed-reach blend `out = anchor + A·(cand − anchor)` —
+# scalar or per-axis A, zero-alloc *_into forms, BIT-IDENTICAL pole fast
+# paths at A ∈ {0, 1} (clamp / plain adoption — the composed form loses
+# bits: 1e-30 + (1e-40 − 1e-30) = 0.0), and the A(r) schedule
+# constructors (linear r / house-sigmoid 2σ(kr)−1 via fast_sigmoid /
+# sign-flip (2r−1)/β̄). Five regimes: clamp / blend / adopt /
+# overshoot / repel. Sigmoid-not-softmax by construction (pointwise — RVM
+# never normalizes across the group). Opt-in POC — promotion via the T4
+# consumer A/Bs; INDEPENDENT of anti_common_mode.
+anchored_reach = []
+
 # ignition_schedule (Issue 459 T5, 2026-08-19): closed-form logistic
 # ignition curves z(t) = K·σ(ζt−c), the patience law t* = ln(1/ε)/ζ, and a
 # ζ-descending ordering helper — the modelless half of NQF staged learning
