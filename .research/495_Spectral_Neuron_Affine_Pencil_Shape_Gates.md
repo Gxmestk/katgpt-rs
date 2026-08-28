@@ -267,7 +267,7 @@ the composed selling point (attributable + shape-guaranteed + personality-
 certified + tamper-checkable) has no published match. §1.5 all-4-YES ⇒
 **Super-GOAT PASS**. Mandatory outputs landed in the same session: the
 private guide [riir-ai/.research/356](../../riir-ai/.research/356_Spectral_Certified_Decision_Stack_Guide.md)
-+ rollout [riir-ai Plan 554](../../riir-ai/.plans/554_spectral_certified_decision_rollout.md).
++ rollout [riir-ai Plan 555](../../riir-ai/.plans/555_spectral_certified_decision_rollout.md).
 Issue 736 resolved + removed (noise-reduction); this note's §PoC Addendum
 remains the canonical raw-number record.
 
