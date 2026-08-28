@@ -956,6 +956,16 @@ pub mod interpolation_geometry;
 #[cfg(feature = "viable_manifold_graph")]
 pub mod viable_manifold_graph;
 
+// Certified Frontier — modelless safe-set expansion (Plan 580, Research 510,
+// arXiv:2606.08802 De Santi et al.; SAFEOPT lineage). The acquisition half of
+// the grow-then-navigate stack whose navigation half is `viable_manifold_graph`
+// above: grow a monotone provably-valid cell set from binary verifier outcomes,
+// then answer where to look next and when to stop. Phase 0 PASS (Bench 687:
+// 0 violations, monotone, 51.4x frontier-vs-passive). Opt-in.
+#[cfg(feature = "certified_frontier")]
+pub mod certified_frontier;
+
+
 // Canvas Schema Compiler — declared causal topology for attention masks
 // (Plan 419, Research 398, Valdez *Canvas Engineering* July 2026). The
 // modelless half: a typed CanvasSchema compiler that lowers a declared region
@@ -1115,6 +1125,14 @@ pub use viable_manifold_graph::{
     ClosurePredicate, GraphBuildConfig, SafeManifoldGraph, ViabilityPredicate, VolumeFieldConfig,
     build_safe_manifold_graph, manifold_curiosity_walk, manifold_geodesic, manifold_random_walk,
     pullback_volume,
+};
+
+#[cfg(feature = "certified_frontier")]
+pub use certified_frontier::{
+    CertifiedFrontier, DilationFeasibility, FrontierCell, FrontierConfig, PosteriorBuffer,
+    SIGMOID_LIPSCHITZ, SPHERE_EXCLUSION_MAX_CENTERS, SphereExclusion, advance_horizon, beta_mean_variance,
+    confidence_schedule, laurent_massart_radius, linear_information_gain, should_advance,
+    sphere_exclusion_coverage, spherical_cap_bound, vendi_diversity,
 };
 
 #[cfg(feature = "ac_prefix")]
