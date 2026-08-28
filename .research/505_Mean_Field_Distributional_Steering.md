@@ -3,8 +3,8 @@
 > **Source:** [A Mean-Field Framework for Inference-Time Distributional Control of Diffusion Models](https://arxiv.org/abs/2608.08770) — Samuel Howard, Nikolas Nüsken (Oxford Stats), arXiv:2608.08770, 9 Aug 2026, SPIGM workshop @ ICML 2026
 > **Date:** 2026-08-24
 > **Status:** Active
-> **Related Research:** 290 (Latent Field Steering — the pointwise/heuristic special case this generalizes), 248 (BoM single-pass diverse sampling — batch-level heuristic this grounds), 468 (Beckmann MFG — the other mean-field flavor: transport vs tilt), 236 (QGF — per-action reward-gradient steering), 499 (Jagged Judges / signed_coupling — opinion-distribution observability), 143 (Latent CCE Moderator — crowd-level heuristic control)
-> **Related Plans:** 577 (this paper's plan — the open primitive)
+> **Related Research:** 290 (Latent Field Steering — the pointwise/heuristic special case this generalizes), 248 (BoM single-pass diverse sampling — batch-level heuristic this grounds), 468 (Beckmann MFG — the other mean-field flavor: transport vs tilt), 236 (QGF — per-action reward-gradient steering), 499 (Jagged Judges / signed_coupling — opinion-distribution observability), 143 (Latent CCE Moderator — crowd-level heuristic control), 517 (CDM amortized twist — the opaque-reward + learned-head delta this note's closed-form Table-2 rewards leave open)
+> **Related Plans:** 577 (this paper's plan — the open primitive), 581 (twist_smc — opaque-reward steering + modelless amortization, consumes this module)
 > **Cross-ref (riir-ai):** Research 344 (Crowd Distribution Targeting Game Runtime Guide)
 > **Classification:** Public
 
