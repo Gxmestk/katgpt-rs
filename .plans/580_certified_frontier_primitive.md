@@ -1,6 +1,6 @@
 # Plan 580: Certified Frontier — Open Primitive
 
-**Status:** OPEN — pending owner decision (not yet scheduled)
+**Status:** **Phase 0 EXECUTED + PASSED 2026-08-28** ([Bench 687](../.benchmarks/687_certified_frontier_phase0_poc.md), example `crates/katgpt-core/examples/certified_frontier_01_basic.rs`) — run under the owner's standing "continue remains, make decisions for best perf/sec prod grade" delegation, because T0 is precisely the gate that informs the scheduling decision. All three stated exits PASS. **Phase 1 is justified, but with a scope amendment — see T0.3 below: the dilation half is CONDITIONAL and coarse grids make `expand_certified` a silent no-op.** Phases 1-4 remain owner-scheduled.
 **Date:** 2026-08-27
 **Research:** [katgpt-rs/.research/510_ActFlow_Certified_Frontier_Expansion.md](../.research/510_ActFlow_Certified_Frontier_Expansion.md)
 **Source paper:** [arXiv:2606.08802](https://arxiv.org/abs/2606.08802) — De Santi et al., *Active Flow Expansion for Out-of-Distribution Discovery*, 2026 (safe-set expansion operator = SAFEOPT lineage, Sui et al. 2015/2018)
@@ -34,9 +34,11 @@ The paper's entire theory (soundness, monotone growth, reachability coverage, ha
 
 ## Phase 0 — Self-contained PoC (no feature gate)
 
-- [ ] **T0.1** `examples/certified_frontier_01_basic.rs` — self-contained (std only, LCG RNG): 2D checkerboard-validity world (the paper's own illustrative setup), seed set = one valid cell, verifier = ground-truth predicate queried ONLY through the buffer. Run 500 rounds of acquire→query→expand; print ASCII map of certified vs true-valid region + violation count.
-- [ ] **T0.2** Verify the headline separation: passive random querying vs frontier acquisition on a *sparse-frontier* variant (valid corridor of opening angle φ) — expect the Prop-1-predicted exponential gap in coverage@budget.
-- Exit: example reproduces certified growth with ZERO violations on the dense world + visible separation on the sparse world.
+- [x] **T0.1** `examples/certified_frontier_01_basic.rs` — self-contained (std only, LCG RNG): 2D checkerboard-validity world (the paper's own illustrative setup), seed set = one valid cell, verifier = ground-truth predicate queried ONLY through the buffer. Run 500 rounds of acquire→query→expand; print ASCII map of certified vs true-valid region + violation count.
+- [x] **T0.2** Verify the headline separation: passive random querying vs frontier acquisition on a *sparse-frontier* variant (valid corridor of opening angle φ) — expect the Prop-1-predicted exponential gap in coverage@budget.
+- [x] **T0.3 (ADDED — the question the stated exits do not ask)** Does the Lipschitz dilation contribute anything? **Measured: CONDITIONAL, with a law.** Dilation certifies a cell only when `best_cb − h >= L·spacing`, and `L·spacing` is the largest adjacent `|Δp|` on the grid. Sweep (dense world, 6 000 queries, 0 violations throughout): 16×16 → **0 dilated** (headroom 0.2083 < cost 0.2942); 32×32 → **0 dilated** (0.1437 < 0.1496); 64×64 → 6 dilated (0.0884 > 0.0745); 96×96 → **30 of 113 = 27%** dilated (0.0833 > 0.0495). Predicted crossover and observed crossover agree on all four points. **Cause: a single GLOBAL Lipschitz constant charges plateau hops the steepest-cliff price** — and the paper's `L = L_s·L_g` is global the same way, so this is not an artifact of the Beta substitute. *First attempt at this measurement was confounded and is recorded as such: counting end-state "certified but never queried" reads 0 everywhere, because the frontier policy hands max posterior σ to any freshly-certified cell and queries it moments later. Attribution must happen at the moment `cb` crosses `h`.*
+- **Exit: MET 2026-08-28** — zero violations on the dense world (30/30 certified, monotone), and 51.4× separation on the sparse world (passive 1.0 vs frontier 51.4 mean over 5 seeds, 0 violations on both arms). Passive certifies only the seed cell at every seed.
+- **Phase 1 scope amendments carried by T0.3** (decide before T1.4 writes function 4): (a) `FrontierConfig`/`CertifiedFrontier` must expose a `dilation_feasible()`-style predicate — a coarse grid makes `expand_certified` allocate, relax and certify nothing, silently; (b) a local/anisotropic Lipschitz estimate is where the value is, the global constant is what makes the coarse rows dead; (c) if Phase 1 must be cut, cut the dilation side — functions 6 + 7 delivered the entire 51.4× at a grid resolution where dilation contributed zero.
 
 ## Phase 1 — Module skeleton
 
