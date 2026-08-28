@@ -1,6 +1,7 @@
 # Plan 580: Certified Frontier — Open Primitive
 
-**Status:** **Phase 0 EXECUTED + PASSED 2026-08-28** ([Bench 687](../.benchmarks/687_certified_frontier_phase0_poc.md), example `crates/katgpt-core/examples/certified_frontier_01_basic.rs`) — run under the owner's standing "continue remains, make decisions for best perf/sec prod grade" delegation, because T0 is precisely the gate that informs the scheduling decision. All three stated exits PASS. **Phase 1 is justified, but with a scope amendment — see T0.3 below: the dilation half is CONDITIONAL and coarse grids make `expand_certified` a silent no-op.** Phases 1-4 remain owner-scheduled.
+**Status:** **Phases 0-3 EXECUTED + PASSED 2026-08-28; NOT PROMOTED (stays opt-in)** — G1/G2/G3/G4 all PASS ([Bench 688](../.benchmarks/688_certified_frontier_goat.md), commits `e3f64479` + this one). The T3.4 floor gate SPLIT: the primitive is the only arm that holds delta (0.000 vs the floor's 0.306, 6.1x over), but LOSES the plan's stated `growth * (1 - violation_rate)` composite — which the bench measures to be **degenerate** (it expands to the true-positive count, so it carries no false-positive penalty and is maximised by certifying everything; the floor scored exactly `n_valid` on all 5 seeds). Promotion deferred to a re-gate on the corrected two-stage metric proposed in Bench 688, because redefining a gate's metric after seeing the result and promoting on the redefinition is how a gate stops being a gate. Phase 4 T4.1/T4.3 remain open.
+**Phase 0 status (superseded, kept for the record):** **EXECUTED + PASSED 2026-08-28** ([Bench 687](../.benchmarks/687_certified_frontier_phase0_poc.md), example `crates/katgpt-core/examples/certified_frontier_01_basic.rs`) — run under the owner's standing "continue remains, make decisions for best perf/sec prod grade" delegation, because T0 is precisely the gate that informs the scheduling decision. All three stated exits PASS. **Phase 1 is justified, but with a scope amendment — see T0.3 below: the dilation half is CONDITIONAL and coarse grids make `expand_certified` a silent no-op.** Phases 1-4 remain owner-scheduled.
 **Date:** 2026-08-27
 **Research:** [katgpt-rs/.research/510_ActFlow_Certified_Frontier_Expansion.md](../.research/510_ActFlow_Certified_Frontier_Expansion.md)
 **Source paper:** [arXiv:2606.08802](https://arxiv.org/abs/2606.08802) — De Santi et al., *Active Flow Expansion for Out-of-Distribution Discovery*, 2026 (safe-set expansion operator = SAFEOPT lineage, Sui et al. 2015/2018)
@@ -42,38 +43,96 @@ The paper's entire theory (soundness, monotone growth, reachability coverage, ha
 
 ## Phase 1 — Module skeleton
 
-- [ ] **T1.1** Feature `certified_frontier = []` in katgpt-core + root passthrough (no deps — pure std).
-- [ ] **T1.2** `certified_frontier.rs` with module doc citing R510 + arXiv:2606.08802 + SAFEOPT lineage.
-- [ ] **T1.3** Types: `CertifiedFrontier`, `FrontierConfig { lambda, delta, b_rkhs, h, lipschitz: f32, alpha }`, `FrontierScratch` (fixed-capacity Cholesky factor + kernel column).
-- [ ] **T1.4** Fns 1–8 above + `#[inline]` hot paths. Export behind cfg in lib.rs.
+- [x] **T1.1** Feature `certified_frontier = []` in katgpt-core + root passthrough (no deps — pure std).
+- [x] **T1.2** `certified_frontier.rs` with module doc citing R510 + arXiv:2606.08802 + SAFEOPT lineage.
+- [x] **T1.3** Types: `CertifiedFrontier`, `FrontierConfig { lambda, delta, b_rkhs, h, lipschitz: f32, alpha }`, `FrontierScratch` (fixed-capacity Cholesky factor + kernel column).
+- [x] **T1.4** Fns 1–8 above + `#[inline]` hot paths. Export behind cfg in lib.rs.
+
+**Phase 1 outcome (2026-08-28, commit `e3f64479`):** shipped as planned plus
+the three T0.3 amendments — `dilation_feasibility()` is a first-class predicate
+(a coarse lattice makes the dilation a silent no-op and the return value cannot
+distinguish "nothing left" from "nothing affordable"); `FrontierCell::lipschitz`
+takes a per-cell a-priori bound so a plateau hop is not charged the
+steepest-cliff global price; acquisition (which carried the whole 51.4x) was
+built first. `SphereExclusion { centers, saturated }` replaced a bare count so
+the alloc-free 256-center cap is reported, not silently truncating.
 
 ## Phase 2 — Core correctness
 
-- [ ] **T2.1** `posterior_variance_linear`: pinned against a dense-solve reference (nalgebra-free: hand-rolled small Cholesky, or compare rank-1 incremental vs batch solve at N=64 — must agree to 1e-6).
-- [ ] **T2.2** `expand_certified` soundness property test (Lemma E.2 as a test): plant a known validity fn, adversarial query sequences (order-shuffled, corrupted labels calibrated by the model), assert **zero uncertified-valid→actually-invalid admissions** at the configured δ across ≥1000 seeds.
-- [ ] **T2.3** Monotonicity property: certified set never shrinks across arbitrary query sequences.
-- [ ] **T2.4** Confidence schedule: monotone in t; β_0 sanity; κ/L_s closed-form spot-checks.
-- [ ] **T2.5** Halting law: once `should_advance` fires, one `reachability_dilation` hop admits no violations (the Lemma E.4/F.7 contract, executed).
-- [ ] **T2.6** Sphere-exclusion: order-pinned determinism (fixed order → bit-identical cluster count); Vendi on planted eigenvalues.
+- [x] **T2.1** `posterior_variance_linear`: pinned against a dense-solve reference (nalgebra-free: hand-rolled small Cholesky, or compare rank-1 incremental vs batch solve at N=64 — must agree to 1e-6).
+- [x] **T2.2** `expand_certified` soundness property test (Lemma E.2 as a test): plant a known validity fn, adversarial query sequences (order-shuffled, corrupted labels calibrated by the model), assert **zero uncertified-valid→actually-invalid admissions** at the configured δ across ≥1000 seeds.
+- [x] **T2.3** Monotonicity property: certified set never shrinks across arbitrary query sequences.
+- [x] **T2.4** Confidence schedule: monotone in t; β_0 sanity; κ/L_s closed-form spot-checks.
+- [x] **T2.5** Halting law: once `should_advance` fires, one `reachability_dilation` hop admits no violations (the Lemma E.4/F.7 contract, executed).
+- [x] **T2.6** Sphere-exclusion: order-pinned determinism (fixed order → bit-identical cluster count); Vendi on planted eigenvalues.
+
+**Phase 2 outcome (2026-08-28, commit `e3f64479`):** 22/22 green. Incremental
+Cholesky vs an independent dense f64 solve at N=64, D=8: max abs 1.161e-6, max
+rel 7.252e-6. Zero unsound certifications across 1000 adversarial seeds and
+under the deployed policy. Halting law fires at 185 / 728 / 2961 observations
+for eps = 0.2 / 0.1 / 0.05 — the predicted 1/eps^2 scaling.
+
+Two findings recorded rather than smoothed over. (1) The halting law is
+**per-cell and expensive**: `advance_horizon` prices eps=0.05 at ~1e6 rounds, so
+a run spreading queries over a grid never fires it; T2.5 prints that gap instead
+of asserting it away. (2) T2.5's first parameterisation (96x96, 6000 rounds) was
+**vacuous** — 0.65 observations per cell certified nothing, so the dilation
+soundness check ran against an empty set. 48x48 with 200 000 rounds admits ~129
+cells by dilation and is the shipped gate.
 
 ## Phase 3 — GOAT gates
 
-- [ ] **T3.1 G2 perf**: batch acquisition + expansion at crowd scale — 1000 frontier queries (one per NPC) with buffer N=256, D=8; target < 1 µs/query amortized (rank-1 updates, precomputed inverse); release-only gate.
-- [ ] **T3.2 G4 alloc-free**: `FrontierScratch` capacity stable across 1000 expand/acquire cycles (tracking allocator).
-- [ ] **T3.3 G3 no-regression**: feature-off build clean; default surface untouched until promotion.
-- [ ] **T3.4 UQ floor** (Report-the-Floor adaptation — this primitive claims a coverage guarantee): bench certified-growth × violation-rate against the naive floor = **adjacency-only expansion** (certify any neighbor of a valid-labeled cell, no uncertainty model). The primitive must dominate the floor on the product metric (growth ⋅ (1 − violation rate)); if it cannot, demote to documented-negative.
-- [ ] **T3.5 Bench doc**: `.benchmarks/580_certified_frontier_goat.md` with the floor table.
+- [x] **T3.1 G2 perf**: batch acquisition + expansion at crowd scale — 1000 frontier queries (one per NPC) with buffer N=256, D=8; target < 1 µs/query amortized (rank-1 updates, precomputed inverse); release-only gate.
+- [x] **T3.2 G4 alloc-free**: `FrontierScratch` capacity stable across 1000 expand/acquire cycles (tracking allocator).
+- [x] **T3.3 G3 no-regression**: feature-off build clean; default surface untouched until promotion.
+- [x] **T3.4 UQ floor** (Report-the-Floor adaptation — this primitive claims a coverage guarantee): bench certified-growth × violation-rate against the naive floor = **adjacency-only expansion** (certify any neighbor of a valid-labeled cell, no uncertainty model). The primitive must dominate the floor on the product metric (growth ⋅ (1 − violation rate)); if it cannot, demote to documented-negative.
+- [x] **T3.5 Bench doc**: [`.benchmarks/688_certified_frontier_goat.md`](../.benchmarks/688_certified_frontier_goat.md) with the floor table. (Numbered 688 per the monotonic-numbering rule, not 580 — the plan's placeholder name would have recycled a plan number as a benchmark number.)
+
+**Phase 3 outcome (2026-08-28, [Bench 688](../.benchmarks/688_certified_frontier_goat.md)):**
+
+- **G2 PASS** — 0.264 us/query against a 1 us budget. First measured at
+  **3.428 us (FAIL)**; two fixes gave 13.2x. Cached candidacy + cached Beta sd
+  took it to 1.080; splitting the four hot acquisition fields into a contiguous
+  `acq_sigma` lane and replacing the scalar argmax with a branch-free 8-wide max
+  reduction plus a short-circuiting `position` took it to 0.264. The lane is
+  derived state maintained at every mutation point, so
+  `acquisition_lane_matches_a_full_rescan` pins it against a reference argmax at
+  every step of a run.
+- **G4 PASS** — 0 allocs / 0 deallocs over 1000 full-operator cycles. The
+  instrument was **revert-probed** (an injected `vec!` produced 1000/1000; its
+  removal returned to 0), because a green alloc gate that cannot go red is not a
+  gate.
+- **G3 PASS** — feature-off default build clean, clippy `-D warnings` clean.
+- **T3.4 SPLIT** — see the status line. The diagnostic sweep (T3.4b) answered
+  the question the floor comparison raises: the shipped confidence schedule
+  spends **0.000 of a 0.05 budget** while certifying 35% of the valid region,
+  and a 4x narrower width still holds delta. So the growth deficit is a loose
+  bound, not the query budget — the paper's Eq 31/37 is derived for a kernel
+  logistic model where information pools through the RKHS norm, while this
+  module's default posterior is a per-cell Beta with no pooling at all.
+- **Shipped as a result:** `beta_union_bound(cells, rounds, delta)` =
+  `sqrt(2 ln(cells*rounds/delta))` — **+33% certified growth (308 -> 410) at
+  zero measured violations**. Offered, not defaulted; its doc states the
+  sub-Gaussian approximation plainly and names the exact Clopper-Pearson variant
+  as the rigorous follow-up.
 
 ## Phase 4 — Fusion surface
 
 - [ ] **T4.1** `CertifiedFrontier → SafeManifoldGraph` adapter fn (nodes from certified cells; edges via existing kNN + midpoint check): one example running grow-THEN-navigate end-to-end.
-- [ ] **T4.2** Straddling-gate helper `query_is_decision_relevant(lcb, ucb, h, cell_diam) -> bool` (the EVPI-shape prune) — pure fn + unit tests.
+- [x] **T4.2** Straddling-gate helper `query_is_decision_relevant(lcb, ucb, h, cell_diam) -> bool` (the EVPI-shape prune) — pure fn + unit tests.
 - [ ] **T4.3** riir-poc four-arm gate (riir-ai side, follow-up issue there): certified-frontier vs curiosity-only vs passive vs never-look at equal perception budget; 16 seeds; Prop-1 separation pre-registered as the PASS prediction.
 
 ## Phase 5 — Promotion
 
+**Phase 5 decision (2026-08-28): T5.2 — stays opt-in.** G1–G4 all PASS and the
+primitive is the only arm holding delta, but (a) the stated floor gate FAILS on
+its literal metric, (b) there is no in-tree consumer yet (T4.1/T4.3 open), and
+(c) opt-in costs nothing (std-only, zero deps). Bench 688 proposes the corrected
+two-stage gate — admissibility (violation rate <= delta) as a hard filter, then
+growth among admissible arms only — for the re-gate once a consumer exists.
+
 - [ ] **T5.1** If G1–G4 + floor PASS → add to `default = [...]` (both Cargo.tomls) + README showcase row + `.docs/01_orientation/overview.md` Feature Flags row.
-- [ ] **T5.2** If floor FAILS → keep opt-in, document the regime where adjacency-only wins (dense-frontier worlds), demote honestly in R510 footer.
+- [x] **T5.2** If floor FAILS → keep opt-in, document the regime where adjacency-only wins (dense-frontier worlds), demote honestly in R510 footer.
 
 ## Risk register
 

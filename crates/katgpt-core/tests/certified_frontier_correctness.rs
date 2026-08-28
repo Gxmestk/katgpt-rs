@@ -798,3 +798,89 @@ fn capacity_and_bounds_are_refused_not_wrapped() {
     }
     assert_eq!(f.acquire_frontier_target(&cfg), Some(1));
 }
+
+#[test]
+fn cached_beta_sd_tracks_the_closed_form_exactly() {
+    // `observe` maintains a cached sd so acquisition is O(cells) with no
+    // divide/sqrt per cell. A drift here would silently corrupt every bound,
+    // so pin the cache against the closed form on every step.
+    let mut f = CertifiedFrontier::<1, 1>::new();
+    f.push_cell([0.0]).unwrap();
+    assert!((f.sigma(0) - (1.0f32 / 12.0).sqrt()).abs() < 1e-6, "prior sd");
+    let mut rng = Lcg::new(0xCA5);
+    let (mut v, mut i) = (0u32, 0u32);
+    for _ in 0..500 {
+        let ok = rng.next_f32() < 0.7;
+        f.observe(0, ok);
+        match ok {
+            true => v += 1,
+            false => i += 1,
+        }
+        let expected = beta_mean_variance(v, i).1.sqrt();
+        assert!(
+            (f.sigma(0) - expected).abs() < 1e-7,
+            "cached sd drifted: {} vs {expected}",
+            f.sigma(0)
+        );
+    }
+}
+
+#[test]
+fn acquisition_lane_matches_a_full_rescan() {
+    // `acquire_frontier_target` reads a struct-of-arrays lane maintained
+    // incrementally at every mutation point. A missed refresh would not fail
+    // loudly — it would quietly bias the query sequence — so pin the lane
+    // against a reference rescan of the public cell view at EVERY step.
+    fn reference(f: &CertifiedFrontier<CELLS, 2>) -> Option<usize> {
+        let mut best: Option<(usize, f32)> = None;
+        for (j, c) in f.cells().iter().enumerate() {
+            if !c.certified && !c.near_certified {
+                continue;
+            }
+            let s = f.sigma(j);
+            if best.is_none_or(|(_, bs)| s > bs) {
+                best = Some((j, s));
+            }
+        }
+        best.map(|(j, _)| j)
+    }
+
+    let cfg = FrontierConfig {
+        h: H,
+        lipschitz: lipschitz_bound(),
+        cell_spacing: 1.0 / (GRID - 1) as f32,
+        acquire_radius: 1.5 / (GRID - 1) as f32,
+        ..FrontierConfig::default()
+    };
+    let (mut f, truth) = build_world();
+    assert_eq!(f.acquire_frontier_target(&cfg), reference(&f), "empty lane");
+    f.seed_certified(0, &cfg);
+
+    let mut rng = Lcg::new(0x1A4E);
+    for t in 1..=4000u32 {
+        assert_eq!(
+            f.acquire_frontier_target(&cfg),
+            reference(&f),
+            "lane diverged from a full rescan at t={t}"
+        );
+        let Some(i) = f.acquire_frontier_target(&cfg) else {
+            break;
+        };
+        f.observe(i, rng.next_f32() < truth[i]);
+        let beta = confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2);
+        f.expand_certified(&cfg, beta);
+        if t % 1000 == 0 {
+            f.reachability_dilation(&cfg, 1);
+        }
+    }
+    assert!(f.certified_count() > 1, "run certified nothing beyond the seed");
+
+    // A radius change invalidates the cached candidacy; rebuild must restore
+    // agreement rather than leaving the lane stale.
+    let wider = FrontierConfig {
+        acquire_radius: 6.0 / (GRID - 1) as f32,
+        ..cfg
+    };
+    f.rebuild_neighborhoods(&wider);
+    assert_eq!(f.acquire_frontier_target(&wider), reference(&f), "after rebuild");
+}

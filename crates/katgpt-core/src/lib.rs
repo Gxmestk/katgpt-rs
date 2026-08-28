@@ -1130,8 +1130,8 @@ pub use viable_manifold_graph::{
 #[cfg(feature = "certified_frontier")]
 pub use certified_frontier::{
     CertifiedFrontier, DilationFeasibility, FrontierCell, FrontierConfig, PosteriorBuffer,
-    SIGMOID_LIPSCHITZ, SPHERE_EXCLUSION_MAX_CENTERS, SphereExclusion, advance_horizon, beta_mean_variance,
-    confidence_schedule, laurent_massart_radius, linear_information_gain, should_advance,
+    SIGMOID_LIPSCHITZ, SPHERE_EXCLUSION_MAX_CENTERS, SphereExclusion, advance_horizon,
+    beta_mean_variance, beta_union_bound, confidence_schedule, laurent_massart_radius, linear_information_gain, should_advance,
     sphere_exclusion_coverage, spherical_cap_bound, vendi_diversity,
 };
 

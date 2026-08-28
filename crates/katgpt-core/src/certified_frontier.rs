@@ -69,6 +69,14 @@ fn sigmoid(z: f32) -> f32 {
     1.0 / (1.0 + (-z).exp())
 }
 
+/// Acquisition-lane sentinel for a cell that is not a candidate. Below every
+/// real sigma (which is a non-negative sd), so the argmax skips it without a
+/// branch.
+const NOT_A_CANDIDATE: f32 = -1.0;
+
+/// sd of the `Beta(1, 1)` prior — the sigma of a never-observed cell.
+const BETA_PRIOR_SD: f32 = 0.288_675_13; // sqrt(1/12)
+
 #[inline]
 fn dot<const D: usize>(a: &[f32; D], b: &[f32; D]) -> f32 {
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
@@ -172,10 +180,22 @@ pub struct FrontierCell<const D: usize> {
     /// Externally supplied posterior sd, e.g. from [`PosteriorBuffer`]. `NaN`
     /// (the default) uses the Beta-Bernoulli sd.
     pub sigma_override: f32,
+    /// `true` when a certified cell lies within `cfg.acquire_radius`. Cached
+    /// so acquisition is `O(cells)` instead of `O(cells * certified)`: the
+    /// neighbourhood is stamped once, when a cell becomes certified, rather
+    /// than re-scanned on every query. Maintained by the module; a caller that
+    /// changes `acquire_radius` mid-run must call
+    /// [`CertifiedFrontier::rebuild_neighborhoods`].
+    pub near_certified: bool,
     /// `true` once the cell was admitted by a Lipschitz hop rather than by its
     /// own observations. Pure bookkeeping — this is the T0.3 attribution, and
     /// it must be read at the moment `cb` crosses `h`, never at end-state.
     pub by_dilation: bool,
+    /// Beta-Bernoulli sd, recomputed on each `observe` so that acquisition —
+    /// which touches every cell on every query — is a flag test and a compare
+    /// rather than a divide and a square root. Private: it is derived state,
+    /// and a stale write here would silently corrupt every bound.
+    beta_sigma: f32,
 }
 
 impl<const D: usize> FrontierCell<D> {
@@ -190,7 +210,9 @@ impl<const D: usize> FrontierCell<D> {
             certified: false,
             lipschitz: f32::NAN,
             sigma_override: f32::NAN,
+            near_certified: false,
             by_dilation: false,
+            beta_sigma: BETA_PRIOR_SD,
         }
     }
 }
@@ -251,6 +273,41 @@ pub fn confidence_schedule(t: u32, delta: f32, lambda: f32, b_rkhs: f32, d_eff: 
     let delta = delta.clamp(f32::EPSILON, 1.0);
     let inner = 2.0 * kappa / lambda.max(f32::EPSILON) * (gamma + (1.0 / delta).ln());
     4.0 * SIGMOID_LIPSCHITZ * b_rkhs + 2.0 * SIGMOID_LIPSCHITZ * inner.max(0.0).sqrt()
+}
+
+/// Union-bound confidence width for the **Beta-Bernoulli substrate**:
+/// `sqrt(2 ln(cells * rounds / delta))`.
+///
+/// The alternative to [`confidence_schedule`], and measurably tighter — see
+/// the derivation and the caveat before choosing between them.
+///
+/// [`confidence_schedule`] is the paper's Eq 31/37, derived for a **kernel
+/// logistic** model in which information pools across the input space through
+/// the RKHS norm. This module's default posterior is a per-cell Beta-Bernoulli
+/// with no pooling at all, so that schedule is answering a harder question than
+/// the one being asked, and it shows: Bench 688 T3.4b measured the shipped
+/// schedule spending **0.000 of a 0.05 budget** while certifying 35% of the
+/// valid region, where a 4x narrower width still held `delta` at 0.023.
+///
+/// This width instead counts the comparisons directly — `cells * rounds` of
+/// them — and asks for a per-comparison failure of `delta / (cells * rounds)`.
+///
+/// # The assumption, stated plainly
+///
+/// The `sqrt(2 ln(1/delta'))` z-score is the **sub-Gaussian** tail, applied
+/// here to a Beta posterior that is only approximately Gaussian. That makes
+/// this width *derived-but-approximate* where [`confidence_schedule`] is
+/// worst-case-rigorous. It is offered, not defaulted, and a caller who adopts
+/// it owes the empirical calibration check that Bench 688 runs — measured
+/// violation rate against `delta`, on their own field. For a rigorous
+/// small-`n` bound use an exact Clopper-Pearson / Beta quantile instead; this
+/// is the closed-form, allocation-free middle.
+#[inline]
+#[must_use]
+pub fn beta_union_bound(cells: usize, rounds: u32, delta: f32) -> f32 {
+    let m = (cells.max(1) as f32) * (rounds.max(1) as f32);
+    let delta = delta.clamp(f32::EPSILON, 1.0);
+    (2.0 * (m / delta).ln()).max(0.0).sqrt()
 }
 
 /// The halting law: a certified hop is guaranteed once `sigma <= eps / (2 beta)`.
@@ -538,6 +595,18 @@ pub struct CertifiedFrontier<const MAX_CELLS: usize, const D: usize> {
     /// Pre-hop `cb` snapshot, so one `reachability_dilation` pass is exactly
     /// one hop and cannot chain through cells certified within the same pass.
     hop_cb: [f32; MAX_CELLS],
+    /// Acquisition lane, held struct-of-arrays: `sigma` for a candidate cell,
+    /// `-1.0` for a non-candidate.
+    ///
+    /// `acquire_frontier_target` runs on every query and needs four fields out
+    /// of a ~56-byte cell, so scanning `cells` streams ~57 KiB through L1 to
+    /// read ~5 KiB of live data. This lane is one contiguous `f32` array and
+    /// turns acquisition into a branch-free argmax. Every mutation that can
+    /// change a cell's candidacy or sigma refreshes it through
+    /// [`Self::touch_acquisition`]; the correctness suite's
+    /// `acquisition_lane_matches_a_full_rescan` pins every step of a run
+    /// against a reference argmax over [`Self::cells`].
+    acq_sigma: [f32; MAX_CELLS],
     len: usize,
     certified: u32,
     /// Cells certified by a Lipschitz hop rather than by their own tally.
@@ -557,6 +626,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         Self {
             cells: [FrontierCell::default(); MAX_CELLS],
             hop_cb: [0.0; MAX_CELLS],
+            acq_sigma: [NOT_A_CANDIDATE; MAX_CELLS],
             len: 0,
             certified: 0,
             dilated: 0,
@@ -621,6 +691,55 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         self.dilated
     }
 
+    /// Refresh cell `i`'s acquisition lane from its current candidacy + sigma.
+    #[inline]
+    fn touch_acquisition(&mut self, i: usize) {
+        let c = &self.cells[i];
+        self.acq_sigma[i] = match c.certified || c.near_certified {
+            true => match c.sigma_override.is_finite() {
+                true => c.sigma_override,
+                false => c.beta_sigma,
+            },
+            false => NOT_A_CANDIDATE,
+        };
+    }
+
+    /// Stamp `near_certified` on everything within `acquire_radius` of `i`.
+    ///
+    /// Called once per certification, which is what moves the neighbourhood
+    /// scan off the per-query path.
+    fn mark_neighborhood(&mut self, i: usize, cfg: &FrontierConfig) {
+        let r2 = cfg.acquire_radius * cfg.acquire_radius;
+        if r2 <= 0.0 {
+            return;
+        }
+        let center = self.cells[i].feat;
+        for j in 0..self.len {
+            if !self.cells[j].near_certified && sq_dist(&center, &self.cells[j].feat) <= r2 {
+                self.cells[j].near_certified = true;
+                self.touch_acquisition(j);
+            }
+        }
+    }
+
+    /// Recompute every `near_certified` flag from scratch.
+    ///
+    /// Only needed when `cfg.acquire_radius` changes mid-run — the flags are
+    /// maintained incrementally otherwise. `O(cells * certified)`.
+    pub fn rebuild_neighborhoods(&mut self, cfg: &FrontierConfig) {
+        for j in 0..self.len {
+            self.cells[j].near_certified = false;
+        }
+        for i in 0..self.len {
+            if self.cells[i].certified {
+                self.mark_neighborhood(i, cfg);
+            }
+        }
+        for j in 0..self.len {
+            self.touch_acquisition(j);
+        }
+    }
+
     /// Seed a cell as certified from caller-side a-priori knowledge.
     ///
     /// Sets `cb` to `h` — the weakest bound consistent with "known valid", so
@@ -632,6 +751,8 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         self.cells[i].cb = self.cells[i].cb.max(cfg.h);
         self.cells[i].certified = true;
         self.certified += 1;
+        self.touch_acquisition(i);
+        self.mark_neighborhood(i, cfg);
         true
     }
 
@@ -640,10 +761,13 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         if i >= self.len {
             return false;
         }
+        let c = &mut self.cells[i];
         match valid {
-            true => self.cells[i].valid += 1,
-            false => self.cells[i].invalid += 1,
+            true => c.valid += 1,
+            false => c.invalid += 1,
         }
+        c.beta_sigma = beta_mean_variance(c.valid, c.invalid).1.sqrt();
+        self.touch_acquisition(i);
         true
     }
 
@@ -655,7 +779,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         let c = &self.cells[i];
         match c.sigma_override.is_finite() {
             true => c.sigma_override,
-            false => beta_mean_variance(c.valid, c.invalid).1.sqrt(),
+            false => c.beta_sigma,
         }
     }
 
@@ -688,6 +812,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         for i in 0..self.len {
             let feat = self.cells[i].feat;
             self.cells[i].sigma_override = buf.posterior_variance_linear(&feat, scratch).sqrt();
+            self.touch_acquisition(i);
         }
     }
 
@@ -708,6 +833,8 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
             if !c.certified && c.cb >= cfg.h {
                 c.certified = true;
                 newly += 1;
+                self.touch_acquisition(i);
+                self.mark_neighborhood(i, cfg);
             }
         }
         self.certified += newly;
@@ -810,6 +937,8 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
                     self.cells[j].certified = true;
                     self.cells[j].by_dilation = true;
                     admitted += 1;
+                    self.touch_acquisition(j);
+                    self.mark_neighborhood(j, cfg);
                 }
             }
             self.certified += admitted;
@@ -832,28 +961,39 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     /// restricting to certified cells makes growth depend entirely on a
     /// dilation that a coarse lattice cannot afford.
     ///
+    /// `O(cells)` and branch-free — a single argmax over the contiguous
+    /// acquisition lane. Candidacy is stamped once per certification rather
+    /// than rescanned per query. `cfg` is accepted for signature stability and
+    /// is unused; the radius is baked into the cached flags, so changing it
+    /// mid-run requires [`Self::rebuild_neighborhoods`].
+    ///
     /// `cfg.alpha` scales the returned cell's sigma threshold only through
     /// [`should_advance`]; acquisition itself is scale-free.
     #[must_use]
-    pub fn acquire_frontier_target(&self, cfg: &FrontierConfig) -> Option<usize> {
-        let r2 = cfg.acquire_radius * cfg.acquire_radius;
-        let mut best: Option<(usize, f32)> = None;
-        for j in 0..self.len {
-            let candidate = self.cells[j].certified
-                || (r2 > 0.0
-                    && (0..self.len).any(|i| {
-                        self.cells[i].certified
-                            && sq_dist(&self.cells[i].feat, &self.cells[j].feat) <= r2
-                    }));
-            if !candidate {
-                continue;
-            }
-            let s = self.sigma(j);
-            if best.is_none_or(|(_, bs)| s > bs) {
-                best = Some((j, s));
+    pub fn acquire_frontier_target(&self, _cfg: &FrontierConfig) -> Option<usize> {
+        let lane = &self.acq_sigma[..self.len];
+        // Two branch-free passes beat one scalar argmax: tracking the index
+        // inline creates a loop-carried dependency on an unpredictable branch,
+        // which is what pinned this at ~1 ns/cell. Pass 1 is an 8-wide max
+        // reduction with no dependency between lanes; pass 2 short-circuits.
+        let mut acc = [NOT_A_CANDIDATE; 8];
+        let mut chunks = lane.chunks_exact(8);
+        for ch in &mut chunks {
+            for (a, &v) in acc.iter_mut().zip(ch.iter()) {
+                *a = a.max(v);
             }
         }
-        best.map(|(j, _)| j)
+        let mut best = chunks.remainder().iter().fold(NOT_A_CANDIDATE, |a, &b| a.max(b));
+        for &a in &acc {
+            best = best.max(a);
+        }
+        if best <= NOT_A_CANDIDATE {
+            return None;
+        }
+        // Exact equality is sound here: `best` is copied straight out of the
+        // lane, never computed from it, and the lane holds no NaN. Ties go to
+        // the lowest index, as documented.
+        lane.iter().position(|&s| s == best)
     }
 
     /// Straddling gate: is querying this cell decision-relevant at all?
