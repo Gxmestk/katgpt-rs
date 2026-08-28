@@ -808,6 +808,10 @@ required-features = ["engram"]
 # FixedSizeChunker / InMemoryChunkedStore, all of which are gated behind the
 # `chunked_content_store` feature of this crate.
 [[example]]
+name = "certified_frontier_02_navigate"
+required-features = ["certified_frontier", "viable_manifold_graph"]
+
+[[example]]
 name = "chunked_store_basic"
 required-features = ["chunked_content_store"]
 

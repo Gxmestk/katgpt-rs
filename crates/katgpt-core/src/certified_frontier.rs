@@ -1015,3 +1015,110 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         lcb - l * cfg.cell_spacing < cfg.h && cfg.h <= ucb
     }
 }
+
+// ── Plan 580 T4.1 — fusion with the Viable Manifold Graph ──────────────────
+
+/// The grow-then-navigate join: a [`SafeManifoldGraph`] built from a certified
+/// frontier, plus the mapping back.
+///
+/// Only compiled when both features are on.
+#[cfg(feature = "viable_manifold_graph")]
+#[derive(Debug)]
+pub struct CertifiedManifoldGraph {
+    /// The navigable graph. Node ids are **graph-local** and dense.
+    pub graph: crate::viable_manifold_graph::SafeManifoldGraph,
+    /// `node_to_cell[node_id]` is the frontier cell index that node came from.
+    ///
+    /// Without this the composition is unusable: the builder drops cells, so
+    /// graph ids and cell indices diverge, and a caller that navigates to a
+    /// node cannot ask what its certified bound was.
+    pub node_to_cell: Vec<u32>,
+    /// Certified cells rejected by the pullback-volume threshold — certified
+    /// but not navigable. A large count means the two criteria disagree, which
+    /// is information, not an error.
+    pub rejected_by_volume: usize,
+}
+
+/// Build a navigable graph over the **certified** cells only (Plan 580 T4.1).
+///
+/// This is the fusion the primitive exists for: [`CertifiedFrontier`] answers
+/// *which latent cells are provably valid* and
+/// [`crate::viable_manifold_graph`] answers *how to move between them without
+/// leaving the viable set*. Growth supplies the nodes that navigation was
+/// previously missing.
+///
+/// # Two filters, deliberately both
+///
+/// A cell becomes a node iff it is **certified** (`p(z) >= h`, from the
+/// verifier) **and** its pullback volume is under `build_cfg.volume_threshold`
+/// (the decoder is well-conditioned there). These are different questions —
+/// validity versus navigability — and a cell can pass one and fail the other.
+/// Both filters are applied here rather than inside the builder, which is what
+/// makes an exact `node_to_cell` mapping possible: the builder is handed a
+/// pre-filtered sample set with the threshold already satisfied.
+///
+/// # Cost
+///
+/// Allocates (`Vec` samples + the graph itself) and evaluates one Jacobian SVD
+/// per certified cell. This is a **build-time** operation — the zero-alloc
+/// guarantee covers the query path (`acquire`/`observe`/`expand`), not this.
+///
+/// `f` must be `Copy` because both the volume field and the builder consume it;
+/// pass `&closure` if the closure itself is not `Copy`.
+#[cfg(feature = "viable_manifold_graph")]
+pub fn certified_manifold_graph<const MAX_CELLS: usize, const D: usize, F>(
+    frontier: &CertifiedFrontier<MAX_CELLS, D>,
+    f: F,
+    volume_cfg: &crate::viable_manifold_graph::VolumeFieldConfig,
+    build_cfg: &crate::viable_manifold_graph::GraphBuildConfig,
+    scratch: &mut crate::subspace_phase_gate::JacobianSvdScratch,
+) -> CertifiedManifoldGraph
+where
+    F: Fn(&[f32], &mut [f32]) + Copy,
+{
+    use crate::viable_manifold_graph::{
+        ClosurePredicate, GraphBuildConfig, build_safe_manifold_graph, pullback_volume,
+    };
+
+    let mut node_to_cell = Vec::new();
+    let mut samples = Vec::new();
+    let mut rejected_by_volume = 0;
+    for (i, cell) in frontier.cells().iter().enumerate() {
+        if !cell.certified {
+            continue;
+        }
+        if pullback_volume(f, &cell.feat, scratch, volume_cfg) > build_cfg.volume_threshold {
+            rejected_by_volume += 1;
+            continue;
+        }
+        node_to_cell.push(i as u32);
+        samples.extend_from_slice(&cell.feat);
+    }
+
+    // Both filters already ran, so the builder must keep everything it is
+    // handed — otherwise `node_to_cell` would silently misalign.
+    let keep_all = GraphBuildConfig {
+        volume_threshold: f32::INFINITY,
+        ..*build_cfg
+    };
+    let always_viable = ClosurePredicate(|_: &[f32]| true);
+    let graph = build_safe_manifold_graph(
+        f,
+        &samples,
+        D,
+        &always_viable,
+        volume_cfg,
+        &keep_all,
+        scratch,
+    );
+    debug_assert_eq!(
+        graph.n_nodes(),
+        node_to_cell.len(),
+        "builder dropped a pre-filtered node — node_to_cell would misalign"
+    );
+    CertifiedManifoldGraph {
+        graph,
+        node_to_cell,
+        rejected_by_volume,
+    }
+}

@@ -884,3 +884,81 @@ fn acquisition_lane_matches_a_full_rescan() {
     f.rebuild_neighborhoods(&wider);
     assert_eq!(f.acquire_frontier_target(&wider), reference(&f), "after rebuild");
 }
+
+#[cfg(feature = "viable_manifold_graph")]
+#[test]
+fn t4_1_geodesics_over_a_certified_graph_never_leave_the_certified_set() {
+    use katgpt_core::certified_frontier::certified_manifold_graph;
+    use katgpt_core::subspace_phase_gate::JacobianSvdScratch;
+    use katgpt_core::viable_manifold_graph::{
+        GraphBuildConfig, VolumeFieldConfig, manifold_geodesic,
+    };
+
+    fn decode(z: &[f32], out: &mut [f32]) {
+        out[0] = z[0];
+        out[1] = z[1];
+        out[2] = (2.0 * z[0]).sin() * (2.0 * z[1]).cos();
+    }
+
+    let cfg = FrontierConfig {
+        h: H,
+        lipschitz: lipschitz_bound(),
+        cell_spacing: 1.0 / (GRID - 1) as f32,
+        ..FrontierConfig::default()
+    };
+    let (mut f, truth) = build_world();
+    let mut rng = Lcg::new(0x4A1);
+    for t in 1..=40_000u32 {
+        let i = rng.below(CELLS);
+        f.observe(i, rng.next_f32() < truth[i]);
+        let beta = confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2);
+        f.expand_certified(&cfg, beta);
+    }
+    assert!(f.certified_count() >= 2, "need at least two nodes to navigate");
+
+    let mut scratch = JacobianSvdScratch::with_capacity(2, 3);
+    let cmg = certified_manifold_graph(
+        &f,
+        decode,
+        &VolumeFieldConfig::default(),
+        &GraphBuildConfig {
+            volume_threshold: 2.0,
+            edge_midpoint_check: true,
+            k_nearest: 6,
+        },
+        &mut scratch,
+    );
+
+    // The mapping is the load-bearing part: the builder drops cells, so graph
+    // ids and cell indices diverge and a misalignment would be silent.
+    assert_eq!(cmg.graph.n_nodes(), cmg.node_to_cell.len());
+    for (node, &cell) in cmg.node_to_cell.iter().enumerate() {
+        assert!(
+            f.cells()[cell as usize].certified,
+            "node {node} maps to an uncertified cell {cell}"
+        );
+        let latent = cmg.graph.node_latent(node as u32);
+        let feat = f.cells()[cell as usize].feat;
+        assert!(
+            (latent[0] - feat[0]).abs() < 1e-6 && (latent[1] - feat[1]).abs() < 1e-6,
+            "node {node} latent does not match cell {cell} — mapping is misaligned"
+        );
+    }
+
+    // Walk every reachable pair from node 0 and assert the invariant that makes
+    // the composition worth having.
+    let mut checked = 0usize;
+    for dst in 1..cmg.graph.n_nodes() {
+        let Some(path) = manifold_geodesic(&cmg.graph, 0, dst as u32) else {
+            continue;
+        };
+        checked += 1;
+        for n in &path {
+            let cell = cmg.node_to_cell[*n as usize] as usize;
+            assert!(f.cells()[cell].certified, "geodesic left the certified set");
+            assert!(f.cells()[cell].cb >= H, "path node below its certified bound");
+            assert!(truth[cell] >= H, "path node was actually invalid");
+        }
+    }
+    assert!(checked > 0, "no reachable pair — the navigation check was vacuous");
+}

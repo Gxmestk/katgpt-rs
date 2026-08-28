@@ -1135,6 +1135,11 @@ pub use certified_frontier::{
     sphere_exclusion_coverage, spherical_cap_bound, vendi_diversity,
 };
 
+// Plan 580 T4.1 — grow-then-navigate: certified cells become the node source
+// the Viable Manifold Graph was missing. Needs both halves.
+#[cfg(all(feature = "certified_frontier", feature = "viable_manifold_graph"))]
+pub use certified_frontier::{CertifiedManifoldGraph, certified_manifold_graph};
+
 #[cfg(feature = "ac_prefix")]
 pub use ac_prefix::{AcPrefix, AcPrefixMask};
 
