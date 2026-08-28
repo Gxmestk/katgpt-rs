@@ -254,6 +254,23 @@ composition; Sturm quorum predicates) is ARMED — owner decision point.
 Curiosity-at-kinks is recorded refuted at toy scale and does NOT proceed
 to Phase B wiring.
 
+### Re-gate EXECUTED — PASS (2026-08-29)
+
+The armed re-gate ran same-window as T3's Bench 794 landing (the trigger
+had long fired: structural 5/5 + 2/3 behavioral). Per-fusion prior-art
+searches (arXiv full-text + DBLP + citation graphs + dual-vocab workspace
+grep; Scholar unsearchable until the 2026-09-15 quota reset — caveat
+recorded): all three fusion compositions ABSENT (F1 seeded eigengap
+personalities; F2 certificate-Lipschitz composition through committed
+gates; F3 Sturm quorum predicates — application-layer novelty only), and
+the composed selling point (attributable + shape-guaranteed + personality-
+certified + tamper-checkable) has no published match. §1.5 all-4-YES ⇒
+**Super-GOAT PASS**. Mandatory outputs landed in the same session: the
+private guide [riir-ai/.research/356](../../riir-ai/.research/356_Spectral_Certified_Decision_Stack_Guide.md)
++ rollout [riir-ai Plan 554](../../riir-ai/.plans/554_spectral_certified_decision_rollout.md).
+Issue 736 resolved + removed (noise-reduction); this note's §PoC Addendum
+remains the canonical raw-number record.
+
 ---
 
 ## PASS-Redirects
