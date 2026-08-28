@@ -351,10 +351,7 @@ pub fn synthesize_cross_game(
             let pattern_short: String = source.answer.chars().take(60).collect();
             cross.push(ReflectionQA {
                 question: format!(
-                    "What strategic concept is shared between {domain} and {other} when considering pattern: \"{pattern}\"?",
-                    domain = domain,
-                    other = other,
-                    pattern = pattern_short
+                    "What strategic concept is shared between {domain} and {other} when considering pattern: \"{pattern_short}\"?"
                 ),
                 answer: format!(
                     "Both {domain} and {other} reward timing and positional awareness. In {domain}, the key pattern is: {full}",
@@ -377,14 +374,10 @@ pub fn synthesize_cross_game(
 
         cross.push(ReflectionQA {
             question: format!(
-                "How does the {domain} concept of \"{concept}\" relate to similar concepts in other game domains?",
-                domain = domain,
-                concept = concept_short
+                "How does the {domain} concept of \"{concept_short}\" relate to similar concepts in other game domains?"
             ),
             answer: format!(
-                "The {domain} concept parallels other domains' emphasis on resource management and strategic positioning. Key insight: {concept}",
-                domain = domain,
-                concept = concept_long
+                "The {domain} concept parallels other domains' emphasis on resource management and strategic positioning. Key insight: {concept_long}"
             ),
             step: ReflectionStep::CrossGameSynthesis,
             domain: ReflectionDomain::CrossGame,

@@ -81,11 +81,7 @@ fn main() {
     println!("║  Plan 337 T3.3 — Tropical matvec vs simd_matvec (G2 perf)  ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "  {iters} iterations per shape, {warmup} warmup iters discarded.",
-        iters = ITERS,
-        warmup = WARMUP
-    );
+    println!("  {ITERS} iterations per shape, {WARMUP} warmup iters discarded.");
     println!();
 
     // G2 gate per Plan 337: "tropical matvec ≥ as fast as simd_matvec at D=64".
@@ -127,12 +123,7 @@ fn main() {
             "FAIL"
         };
         println!(
-            "  {d:>5} | {lin:>10.2} ns | {trop:>10.2} ns | {speedup:>7.2}x | {verdict:>8}",
-            d = d,
-            lin = linear_ns,
-            trop = tropical_ns,
-            speedup = speedup,
-            verdict = per_dim_verdict
+            "  {d:>5} | {linear_ns:>10.2} ns | {tropical_ns:>10.2} ns | {speedup:>7.2}x | {per_dim_verdict:>8}"
         );
         results.push((d, speedup, within_1_20x));
     }

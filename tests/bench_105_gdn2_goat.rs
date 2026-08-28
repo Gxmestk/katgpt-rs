@@ -413,14 +413,8 @@ fn goat_6_context_scaling_flat_o1() {
         );
     }
     println!("│ {} │", "-".repeat(42));
-    println!(
-        "│ GDN2  spread (max-min)/mean: {spread:.3}                │",
-        spread = gdn2_max_spread
-    );
-    println!(
-        "│ Flat  growth (last/first):   {growth:.2}x                │",
-        growth = flat_growth
-    );
+    println!("│ GDN2  spread (max-min)/mean: {gdn2_max_spread:.3}                │");
+    println!("│ Flat  growth (last/first):   {flat_growth:.2}x                │");
     println!("└{}┘", "─".repeat(46));
 
     // GDN2 single-step cost should be nearly constant — max spread < 30% of mean

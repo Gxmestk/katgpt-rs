@@ -810,8 +810,8 @@ fn main() {
     let w = hero.len().max(sub.len());
     println!();
     println!("╔{}╗", "═".repeat(w + 2));
-    println!("║ {:<width$} ║", hero, width = w);
-    println!("║ {:<width$} ║", sub, width = w);
+    println!("║ {hero:<w$} ║");
+    println!("║ {sub:<w$} ║");
     println!("╚{}╝", "═".repeat(w + 2));
     println!();
     println!("Leaderboard (single-shot, this run):");

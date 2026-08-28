@@ -234,11 +234,7 @@ fn bench_kv_outer_vs_q_outer() {
     println!("╔══════════════════════════════════════════════════════════════════════════╗");
     println!("║  Plan 256 Phase 2 — KV-Outer vs Q-Outer Sparse Prefill (GOAT gate)     ║");
     println!(
-        "║  HEAD_DIM={HD}, BLOCK_SIZE={BS}, N_QUERIES={NQ}, TOP_K={TK}                       ║",
-        HD = HEAD_DIM,
-        BS = BLOCK_SIZE,
-        NQ = N_QUERIES,
-        TK = TOP_K
+        "║  HEAD_DIM={HEAD_DIM}, BLOCK_SIZE={BLOCK_SIZE}, N_QUERIES={N_QUERIES}, TOP_K={TOP_K}                       ║"
     );
     println!("╠═══════════════╦════════════════╦════════════════╦═════════╦═════════╣");
     println!("║ Context       ║ Q-Outer (ms)   ║ KV-Outer (ms)  ║ Speedup ║ Match   ║");
@@ -291,8 +287,7 @@ fn bench_kv_outer_vs_q_outer() {
             }
             matched = if max_diff < 1e-3 { "OK" } else { "FAIL" };
             println!(
-                "║ (32K check)   ║ max_diff = {md:.2e}                                          ║",
-                md = max_diff
+                "║ (32K check)   ║ max_diff = {max_diff:.2e}                                          ║"
             );
         }
 
@@ -327,12 +322,7 @@ fn bench_kv_outer_vs_q_outer() {
     // — it sharpens the regime boundary that the recommendation already names.
     println!();
     println!("── O2 (Issue 015): N_QUERIES sweep — KV-outer vs Q-outer speedup ──");
-    println!(
-        "    HEAD_DIM={HD}, BLOCK_SIZE={BS}, TOP_K={TK}",
-        HD = HEAD_DIM,
-        BS = BLOCK_SIZE,
-        TK = TOP_K
-    );
+    println!("    HEAD_DIM={HEAD_DIM}, BLOCK_SIZE={BLOCK_SIZE}, TOP_K={TOP_K}");
     println!(
         "    avg_queries/block = (N_QUERIES × TOP_K) / n_blocks (theoretical max amortization)"
     );

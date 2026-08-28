@@ -368,8 +368,7 @@ mod tests {
         let js = js_divergence(&p, &q, &mut m);
         assert!(
             (js - LN_2).abs() < 1e-4,
-            "JS(disjoint) should be ln 2 = {ln2}, got {js}",
-            ln2 = LN_2
+            "JS(disjoint) should be ln 2 = {LN_2}, got {js}"
         );
     }
 
