@@ -4,6 +4,7 @@
 > **Date:** 2026-07-11
 > **Status:** Done
 > **Related Research:** 002 (Speculative Decoding — Leviathan), 162 (TRAS), 194 (CaDDTree), 218 (Breakeven Complexity), 316 (DSpark — Hardware-Aware Prefix Scheduler)
+> **PASS-Redirects (synthesis):** vLLM blog 2026-08-23 ["Exploring Speculative Decoding in vLLM on AMD GPUs"](https://vllm.ai/blog/2026-08-23-speculative-decoding-amd-gpus) — the capability-matrix sequel to this doc's Dynamic SD record: five drafter families (native MTP, Gemma 4 MTP, EAGLE-3, DFlash, DSpark) with matched checkpoints from six publishers, all pre-distilled in our corpus (Research 518 maps them; PASS). Their tuning guidance ("N=7 frequently among the higher-throughput settings; larger values did not consistently increase throughput") is the same non-monotonic-N law the shipped `HardwareAwarePrefixScheduler` + Bebop `AcceptanceForecast` solve adaptively — the blog's per-position acceptance heatmap is exactly the `c_{r,j}` survival signal the scheduler consumes.
 > **Related Plans:** 182 (TRAS), 219 (CaDDTree budget), 250 (Breakeven), 339 (Hardware-Aware Prefix Scheduler)
 > **Classification:** Public
 
