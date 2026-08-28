@@ -1,4 +1,4 @@
-# Bench 689: Numeric-Stability Deviation-Contextualization Probe — Phase 1 GOAT (Issue 697)
+# Bench 691: Numeric-Stability Deviation-Contextualization Probe — Phase 1 GOAT (Issue 697)
 
 **Status:** Phase 1 GOAT **PASS** (G1 ✓ golden/idempotence/planted-gate, G2 ✓ 151–163 µs/report @ N=4096 vs 250 µs bound, G3 ✓ 1978 default / 1996 feature lib tests, G4 ✓ steady-state 0 allocs). Opt-in `numeric_stability`; Phase 2 (attention lab) + T3.2/T3.3 open. First consumer: riir-ai gate layer; riir-train side: Issue 492.
 

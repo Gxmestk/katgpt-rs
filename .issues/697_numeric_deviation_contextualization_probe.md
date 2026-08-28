@@ -1,6 +1,6 @@
 # Issue 697: Numeric-Deviation Contextualization Probe (arXiv:2405.02803)
 
-**Status:** Phase 1 DONE (T1.1–T1.5 + T3.1) — 2026-08-28, commit `5d43d785` (bench: [`.benchmarks/689_numeric_stability_probe_goat.md`](../.benchmarks/689_numeric_stability_probe_goat.md)); Phase 2 (attention lab) + T3.2/T3.3 open.
+**Status:** Phase 1 DONE (T1.1–T1.5 + T3.1) — 2026-08-28, commit `5d43d785` (bench: [`.benchmarks/691_numeric_stability_probe_goat.md`](../.benchmarks/691_numeric_stability_probe_goat.md)); Phase 2 (attention lab) + T3.2/T3.3 open.
 **Date:** 2026-08-28
 **Research:** [`.research/515_Is_Flash_Attention_Stable_Numeric_Deviation_Contextualization.md`](../.research/515_Is_Flash_Attention_Stable_Numeric_Deviation_Contextualization.md)
 **Source:** [arXiv:2405.02803](https://arxiv.org/abs/2405.02803) "Is Flash Attention Stable?" (Meta FAIR + Harvard, 2024)
