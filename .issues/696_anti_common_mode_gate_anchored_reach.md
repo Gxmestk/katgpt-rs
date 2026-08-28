@@ -1,6 +1,6 @@
 # Issue 696: RVM modelless extraction — anti-common-mode scalar gate + anchored signed-reach blend operator
 
-**Status:** T1+T2 DONE (2026-08-28, feat `89f78b09`, bench [688](../.benchmarks/688_anti_common_mode_anchored_reach_goat.md): G1 9+8 unit gates PASS, G2 blend 234 ns / score 6023 ns @ N=1000 — the sub-µs ask honestly missed on the score axis (two exact selection passes, sub-µs at N ≲ 160), G3 default 1978/0/7 + feature-on = default + module tests, G4 0 allocs; both features opt-in — promotion only via T3. T3/T4/T5 OPEN.
+**Status:** T1+T2 DONE (2026-08-28, feat `89f78b09`, bench [690](../.benchmarks/690_anti_common_mode_anchored_reach_goat.md): G1 9+8 unit gates PASS, G2 blend 234 ns / score 6023 ns @ N=1000 — the sub-µs ask honestly missed on the score axis (two exact selection passes, sub-µs at N ≲ 160), G3 default 1978/0/7 + feature-on = default + module tests, G4 0 allocs; both features opt-in — promotion only via T3. T3/T4/T5 OPEN.
 
 ## Source pattern (why these two primitives)
 
@@ -32,4 +32,4 @@ G1 correctness (unit gates above, bit-identical where claimed); G2 perf (zero-al
 - arXiv:2608.23664 §C.3 (DT/DT2 reward construction) + Eq. 7 (anchored regression family)
 - CLR records: riir-mmorpg-examples Plans 018/019, Bench 010 (detection G8), Bench 011 (composition)
 - Sibling precedent: katgpt-rs Issue 695 (`bounded_target` + `realization_gap`, the Research 432 extraction — same paper family, complementary halves)
-- Bench 688 — T1+T2 GOAT-shape record (`.benchmarks/688_anti_common_mode_anchored_reach_goat.md`): gates + measured G2 + honest scope notes
+- Bench 690 — T1+T2 GOAT-shape record (`.benchmarks/690_anti_common_mode_anchored_reach_goat.md`): gates + measured G2 + honest scope notes

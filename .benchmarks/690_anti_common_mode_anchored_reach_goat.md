@@ -1,4 +1,4 @@
-# Bench 688 — `anti_common_mode` gate + `anchored_reach` operator (Issue 696 T1+T2)
+# Bench 690 — `anti_common_mode` gate + `anchored_reach` operator (Issue 696 T1+T2)
 
 **Issue:** [696](../.issues/696_anti_common_mode_gate_anchored_reach.md) ·
 **Research:** [433](../../riir-train/.research/433_RVM_Anchored_Velocity_Regression.md) (riir-train)
