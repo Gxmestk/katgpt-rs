@@ -99,6 +99,8 @@ The online learning loop (gradient step at test time) is the novel part, but:
 - LT2 (P108) provides the loop mechanism without gradients
 - D2F (P066) provides the diffusion mechanism for parallelism
 
+> **Update (R516, 2026-08):** arXiv:2602.21204 "Test-Time Training with KV Binding Is Secretly Linear Attention" (NVIDIA, ICML 2026) proves this framing as a THEOREM for the whole TTT-KVB class (multi-layer MLP fast weights + momentum + weight norm): the inner loop merely parameterizes the linear-attention kernel φ and remixes effective values — measured residual of full TTT over the reduced linear-attention form is only +0.87 ppl / +0.24 dB. The "online learning loop is the novel part" position above is refuted for KV-binding variants (it stands for the E2E class). ViTTT itself reduces: GLU → gated linear attention; DWConv → sliding-window linear attention. See `516_TTT_KVB_Secretly_Linear_Attention.md`.
+
 ---
 
 ## What Does NOT Map
