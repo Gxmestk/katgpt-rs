@@ -1,6 +1,6 @@
 # Bench 691: Numeric-Stability Deviation-Contextualization Probe — Phase 1 GOAT (Issue 697)
 
-**Status:** Phase 1 GOAT **PASS** (G1 ✓ golden/idempotence/planted-gate, G2 ✓ 151–163 µs/report @ N=4096 vs 250 µs bound, G3 ✓ 1978 default / 1996 feature lib tests, G4 ✓ steady-state 0 allocs). Opt-in `numeric_stability`; Phase 2 (attention lab) + T3.2/T3.3 open. First consumer: riir-ai gate layer; riir-train side: Issue 492.
+**Status:** Phase 1 GOAT **PASS** (G1 ✓ golden/idempotence/planted-gate, G2 ✓ 151–163 µs/report @ N=4096 vs 250 µs bound, G3 ✓ 1978 default / 1996 feature lib tests, G4 ✓ steady-state 0 allocs). **Phase 2 LANDED 2026-08-29** (attention lab + T3.2 schedule — see the Phase 2 section below; feature lib 2005/0/9, default 1978/0/7 unchanged). Opt-in `numeric_stability`. T3.3 (consumer follow-ups) files on first consumption; riir-train side: Issue 492.
 
 > **Issue:** katgpt-rs Issue 697 · **Research:** 515 · **Paper:** "Is Flash Attention Stable?", [arXiv:2405.02803](https://arxiv.org/abs/2405.02803) (Golden et al., Meta FAIR + Harvard 2024) · **Feature:** `numeric_stability` (opt-in) · **Date:** 2026-08-28 · **Box:** M3 Max (G2 numbers release; suite counts debug unless noted)
 
@@ -40,8 +40,8 @@
 
 ## Scope (what is deliberately NOT here)
 
-- **Phase 2 (T2.1/T2.2)** — the perturbable tiled online-softmax attention lab (tile shape / dim order / mantissa / seq-len knobs, ordering-law gates, square-tile negative control): open; will live in this directory.
-- **T3.2 `tol(S)` schedule** — offline fit + pinned constant table + the two-length probe (first consumer: the Issue 753 f16-KV 80K-ctx path): open.
+- **Phase 2 (T2.1/T2.2) — LANDED 2026-08-29**, see the Phase 2 section below.
+- **T3.2 `tol(S)` schedule — LANDED 2026-08-29** (pinned table + two-length probe; the Issue 753 f16-KV consumer wiring remains T3.3's).
 - **T3.3 consumers** — the riir-ai gate layer consumes first (do not fork the probe); the riir-train drift probe + divergence ledger is riir-train Issue 492.
 - **Anti-claim held:** nothing here establishes training stability (arXiv:2510.04212 owns the mechanism); the probe contextualizes divergence similarity only.
 
@@ -50,6 +50,53 @@ Run it:
 ```bash
 cargo test -p katgpt-core --features numeric_stability --lib numeric_stability
 cargo test -p katgpt-core --features numeric_stability --lib --release numeric_stability -- --nocapture   # G2 numbers
+cargo test -p katgpt-core --lib                                                                            # G3 default
+cargo clippy -p katgpt-core --features numeric_stability --lib
+```
+
+---
+
+# Phase 2 — the perturbable reference attention lab + the tol(S) schedule (Issue 697 T2.1/T2.2/T3.2, 2026-08-29)
+
+**Status: LANDED — G1 ✓ (two-tier golden identity + 9 gate tests), G2 n/a-by-design (offline instrument, no hot path — honest scope recorded), G3 ✓ (feature 2005/0/9, default 1978/0/7 unchanged, clippy 0 both states), determinism ✓ (bit-identical repeats pinned).** New file `crates/katgpt-core/src/numeric_stability/lab.rs` (~700 lines incl. tests), same opt-in feature, no new deps.
+
+## What shipped
+
+- **T2.1 — the lab**: `lab_attention` (scalar f64, canonical flash-attention update order: rescale running `l`/`acc` BEFORE adding the new tile's PV; direct division, not reciprocal-multiply — that choice is load-bearing for the golden identity) over knobs `LabConfig { seq_len, head_dim, bc, br, axis_swap, mantissa_bits, quantize_ops, scale }`; `naive_attention_f64` (two-pass FP64 golden, ascending-`j` accumulation); `truncate_mantissa` reused from Phase 1 (storage quantization on inputs always; `quantize_ops` extends truncation to every intermediate op — the "arithmetic in format F" emulation).
+- **T2.2 — the four ordering laws pinned as tests** (the paper's constants deliberately NOT imported):
+  1. **Mantissa law** (`mantissa_ordering_law_two_lengths`): deviation non-increasing across a 10-point ladder (6→52 bits) at S=128 AND S=256. PASS.
+  2. **Rescale-count law** (`rescale_count_spearman_grid`): Spearman ρ(R, dev) over a 3×3 (S,T) grid = **0.8892** (floor pinned 0.7); endpoint law R=15 strictly exceeds R=0. PASS.
+  3. **Tile-area law** (`tile_area_ordering_two_formats`): larger Bc → less deviation, reproduced at bits=10 AND bits=16. PASS.
+  4. **Dim-order swap + square control** (`dim_order_swap_changes_deviation_square_invariant`): swap measurably changes deviation at (Bc=64, Br=16) — std 9.143e-3 vs swapped differs; **square row (Bc=Br=32) is BIT-IDENTICAL under the swap** (the paper's free negative control). PASS.
+- **T3.2 — the `tol(S)` schedule**: pinned table `TOL_TABLE_PINNED` (4 rows, S ∈ {64,128,256,512}, measured deviation × `TOL_HEADROOM`=2.0 policy), `band_at` linear interpolation, blake3 fit-inputs hash `TOL_FIT_HASH_PINNED` (config pinned exactly; row VALUES pinned within the ±20% cross-libm band `TOL_FIT_BAND` — `f64::exp` is platform-libm, the honest portability concession). **Two-length probe through the Phase-1 acceptance rule** (`tol_schedule_table_two_length_no_class_flip`): at S₀=64 Accept under its own band; at 8·S₀=512 the STALE S₀ band REJECTS (the flip hazard, asserted non-vacuous); under the SCHEDULE band at 512 still ACCEPTS — the verdict class is preserved, which is the issue's requirement.
+
+## Measured (M3 Max, debug-profile suite runs, deterministic inputs LAB_SEED)
+
+| Quantity | Value |
+|---|---|
+| Multi-tile f64 golden (S=128, D=16, Bc=Br=32, R=3) | max rel diff **1.523e-15** (≈ 7 ulps; pinned bound 3.0e-15) |
+| Table rows (bits=10, D=16, T=32, ×2 headroom) | md: 1.0273e-2 / 2.3168e-2 / 4.8828e-2 / 9.3769e-2 · w1: 6.6093e-3 / 1.7704e-2 / 3.8393e-2 / 7.7170e-2 |
+| Deviation growth 64→512 (md) | **9.1×** (R ratio 15/1 = 15 — sub-linear in R at this range, inside the 32× envelope assert) |
+| Spearman ρ(R, dev), 9 grid points | **0.8892** (floor 0.7) |
+| Swap (Bc=64, Br=16, S=128, bits=10) | dev_std = 9.143e-3, ≠ dev_swapped |
+| Feature lib suite | **2005 passed / 0 failed / 9 ignored** |
+| Default lib suite | **1978 passed / 0 failed / 7 ignored** (unchanged — feature-gated) |
+| clippy (default + feature states) | **0 warnings** |
+
+## Honest notes
+
+1. **The golden identity is two-tier because it must be.** Single-tile configs are BIT-IDENTICAL to the naive reference (the correction is exactly `exp(−inf)=0`, the running max IS the global max, and every accumulation matches the naive order — including `0 + lsum = lsum` exactness and direct division, NOT reciprocal-multiply). Multi-tile exact equality is STRUCTURALLY impossible (fp addition is not associative across the rescale-grouped numerator — that non-associativity IS the measured mechanism), so the gate is the pinned 1.5e-15 relative bound. Any future "simplify the lab to reciprocal-multiply" would silently break the bit-identity tier.
+2. **The dimension-order knob is the axis ASSIGNMENT swap, and the square-tile control is why.** On a scalar emulator a pure loop re-nest cannot change bits (per-element accumulation order is unchanged) — the implementable form of the paper's dim-order knob is swapping which tile size rides Q vs K. At Bc ≠ Br that changes the partition (and R — the paper's fixed-R isolation is documented, not reproduced); at Bc == Br it is provably the identity, which is EXACTLY the paper's square-tile negative control, pinned bit-identical. The paper's law survives as: swap measurably changes deviation (non-square) + square row invariant.
+3. **G2 is honestly n/a by design**: the lab allocates per call and runs scalar f64 — it is a measurement apparatus for gates and pre-swap triage, never a hot path; the Plan 418 zero-alloc convention governs production paths and Phase 1's probe (which ships `_into`), not this instrument. Recorded so nobody "optimizes" the lab into a production kernel by accident.
+4. **The debug-timing flake class fired once during validation** (`subspace_phase_gate::jacobian_svd_r8x8_latency_gate`, a <100 µs debug guard, failed once under a sibling's concurrent cargo build at 70% CPU, passed on immediate re-run and in the final green suite) — the same load-sensitivity already recorded in Phase 1's note 5. Nothing regressed; recorded per the house flake rule.
+5. **The TOL_HEADROOM=2.0 is a documented POLICY constant** (the lab's own deviation must sit strictly inside the band so the acceptance verdicts are strict comparisons, not margin-line ties → Inconclusive); it is NOT the paper's 2–5× (that stays grep-absent per Phase 1's rule).
+6. **Cross-libm portability**: same-platform re-measurement is bit-exact; the pinned rows are asserted within ±20% so the gate survives the M3↔4090 libm difference. The fit-input HASH pins the config exactly — config determinism and value portability are separate pins by design.
+
+Run it:
+
+```bash
+cargo test -p katgpt-core --features numeric_stability --lib numeric_stability::lab
+cargo test -p katgpt-core --features numeric_stability --lib numeric_stability::lab -- --ignored --nocapture print_measurements   # re-pin constants
 cargo test -p katgpt-core --lib                                                                            # G3 default
 cargo clippy -p katgpt-core --features numeric_stability --lib
 ```

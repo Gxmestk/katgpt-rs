@@ -81,14 +81,23 @@
 //! (one allocation) by design. `accept` allocates nothing (pure
 //! comparisons).
 //!
-//! Phase 1 ships T1.1–T1.5 + the T3.1 planted-deviation gate. Phase 2 (the
-//! perturbable reference attention lab) and T3.2/T3.3 (`tol(S)` schedule +
-//! consumer follow-ups) stay open; the lab will live in this directory.
-//! First consumer: the riir-ai gate layer. The riir-train side (drift
-//! probe + divergence ledger) is riir-train Issue 492.
+//! Phase 1 ships T1.1–T1.5 + the T3.1 planted-deviation gate. Phase 2 — the
+//! perturbable reference attention lab ([`lab`]: tile-shape / dim-order /
+//! mantissa / seq-len knobs, the four ordering laws pinned as tests, and the
+//! T3.2 `tol(S)` pinned schedule) — landed 2026-08-29. T3.3 (consumer
+//! follow-ups) files on first consumption (substrate-first: the riir-ai gate
+//! layer consumes; do not fork the probe). The riir-train side (drift probe
+//! + divergence ledger) is riir-train Issue 492.
 
+pub mod lab;
 pub mod probe;
 
+pub use lab::{
+    AxisSwap, LAB_SEED, LabConfig, PINNED_F64_MULTITILE_REL, PINNED_SPEARMAN_FLOOR, TOL_FIT_BAND,
+    TOL_FIT_HASH_PINNED, TOL_FIT_PINNED, TOL_HEADROOM, TOL_TABLE_PINNED, TolFitInputs, band_at,
+    deviation_report, fill_lab_inputs, lab_attention, lcg_next_f32, max_abs_diff_f64,
+    max_rel_diff_f64, naive_attention_f64, run_pair, spearman_rho, tol_fit_inputs_hash,
+};
 pub use probe::{
     DeviationReport, F64_MANTISSA_BITS, NumericStabilityError, R2_LABEL, ReferenceBands, Verdict,
     accept, reference_r1_two_draws, reference_r2_custom, reference_r2_roundtrip,
