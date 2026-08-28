@@ -53,12 +53,27 @@
 //!   any non-finite OUTPUT statistic is refused as `0.0` (no admissible
 //!   signal). A poisoned population is a caller bug — garbage in, zero out,
 //!   loudly documented here.
-//! - **Float shift-invariance is bit-exact only for exactly-representable
-//!   shifts** (Sterbenz): a constant population cancels to `m' = 0.0` with
-//!   identical bits for any `c`, and shifting `[10×95, 14×5]` by `+1000`
-//!   keeps `m' = 4.0` bit-exact — but an arbitrary real-world shift carries
-//!   rounding. The gate is *statistically* common-mode-free; only the
-//!   constant-mode case is exactly free.
+//! - **Float cancellation is bit-exact only in narrow regimes.** Two
+//!   measured limits (riir-ai Bench 794 §Findings, the CLR consumer PoC):
+//!   (1) a constant population cancels to `m' = 0.0` with identical bits
+//!   only when the top-5% mean accumulates EXACTLY (dyadic-friendly
+//!   constants like 95); for a constant like `0.7f32` the accumulation
+//!   drifts ~1 ulp, so peak − median ≈ −8e-8 ≠ 0.0 bit-wise — the gate is
+//!   unaffected (the degenerate dynamic range closes the band
+//!   independently of `m'`), but read "statistically common-mode-free",
+//!   not "bit-free", for non-dyadic constants. (2) Shifting
+//!   `[10×95, 14×5]` by `+1000` keeps `m' = 4.0` bit-exact (Sterbenz —
+//!   exactly-representable shifts), but an arbitrary real-world shift
+//!   carries rounding.
+//! - **Composition note for per-element consumers** (Bench 794 §Findings 2):
+//!   under the context-scaled threshold `τ = dynamic range`, the per-element
+//!   band window's falling edge is structurally unreachable —
+//!   `m'_i ≤ max − median ≤ range = τmid`, so the per-element window is a
+//!   pure median-relative rising ramp and the band's refusal edge lives in
+//!   the population statistic ([`score`]). A per-element consumer that wants
+//!   a genuine hi-edge must derive τ from a scale LARGER than the observed
+//!   range (e.g. the theoretical max at current density), at the cost of a
+//!   config constant.
 //!
 //! # Cost
 //!

@@ -210,6 +210,10 @@ fn g2_two_mode_steering_distinct() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "release-only timing gate (debug ~10x + machine-marginal under load; the struct-size half stays pinned by the release run)"
+)]
 fn g4_latency_smoke_and_struct_size() {
     const D: usize = 8;
     const K: usize = 8;
