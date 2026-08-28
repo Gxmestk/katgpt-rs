@@ -1,6 +1,6 @@
 # Issue 697: Numeric-Deviation Contextualization Probe (arXiv:2405.02803)
 
-**Status:** Open — unowned, POC/proof task (probe primitive + reference-band gate)
+**Status:** Phase 1 DONE (T1.1–T1.5 + T3.1) — 2026-08-28, commit `5d43d785` (bench: [`.benchmarks/689_numeric_stability_probe_goat.md`](../.benchmarks/689_numeric_stability_probe_goat.md)); Phase 2 (attention lab) + T3.2/T3.3 open.
 **Date:** 2026-08-28
 **Research:** [`.research/515_Is_Flash_Attention_Stable_Numeric_Deviation_Contextualization.md`](../.research/515_Is_Flash_Attention_Stable_Numeric_Deviation_Contextualization.md)
 **Source:** [arXiv:2405.02803](https://arxiv.org/abs/2405.02803) "Is Flash Attention Stable?" (Meta FAIR + Harvard, 2024)
@@ -12,11 +12,11 @@ The stack's kernel numeric gates all pin hand-picked absolute/relative bands (q8
 
 ## Phase 1 — Probe primitive (`katgpt-core`, feature `numeric_stability`, opt-in)
 
-- [ ] **T1.1** `truncate_mantissa(f64, bits)` format emulator + known-value vectors + idempotence test (truncate twice == once).
-- [ ] **T1.2** `DeviationReport { max_diff, wasserstein_1d }` computed over tensor pairs; delegate 1-D Wasserstein to `mag::transfer::wasserstein1d`; sorted-quantile determinism (no HashMap-order leakage).
-- [ ] **T1.3** Acceptance rule: `accept(reports, refs: &ReferenceBands, margin) -> {Accept, Reject, Inconclusive}`; margin configurable, NO default derived from the paper's context-specific 2–5×.
-- [ ] **T1.4** Reference builders: `R1` from two seeds of the init distribution; `R2` proxy from round-trip quantize→dequant — with a doc-truth tripwire test pinning the lower-bound labeling (house precedent: EMPTY_HASH preimage test).
-- [ ] **T1.5** Scope-limit tripwire: API docs + test assert the protocol bounds divergence similarity, NOT training stability (the paper's explicit anti-claim; 2510.04212 owns the mechanism).
+- [x] **T1.1** `truncate_mantissa(f64, bits)` format emulator + known-value vectors + idempotence test (truncate twice == once).
+- [x] **T1.2** `DeviationReport { max_diff, wasserstein_1d }` computed over tensor pairs; delegate 1-D Wasserstein to `mag::transfer::wasserstein1d`; sorted-quantile determinism (no HashMap-order leakage).
+- [x] **T1.3** Acceptance rule: `accept(reports, refs: &ReferenceBands, margin) -> {Accept, Reject, Inconclusive}`; margin configurable, NO default derived from the paper's context-specific 2–5×.
+- [x] **T1.4** Reference builders: `R1` from two seeds of the init distribution; `R2` proxy from round-trip quantize→dequant — with a doc-truth tripwire test pinning the lower-bound labeling (house precedent: EMPTY_HASH preimage test).
+- [x] **T1.5** Scope-limit tripwire: API docs + test assert the protocol bounds divergence similarity, NOT training stability (the paper's explicit anti-claim; 2510.04212 owns the mechanism).
 
 ## Phase 2 — Perturbable reference attention lab (host numeric, no GPU dep)
 
@@ -25,7 +25,7 @@ The stack's kernel numeric gates all pin hand-picked absolute/relative bands (q8
 
 ## Phase 3 — Falsifiability + consumers
 
-- [ ] **T3.1** Planted-deviation gate: deviations at 0.1× / 1.0× / 10× of the reference band must land Accept / margin-line / Reject (a gate that cannot fail proves nothing).
+- [x] **T3.1** Planted-deviation gate: deviations at 0.1× / 1.0× / 10× of the reference band must land Accept / margin-line / Reject (a gate that cannot fail proves nothing).
 - [ ] **T3.2** `tol(S)` schedule helper: offline fit `tol(S) = tol(S₀)·f(S/S₀)` from the lab, emitted as a pinned constant table (determinism: hash the fit inputs); two-length probe — a kernel passing tol(S₀) must not flip verdict class at 8×S₀. First consumer: the Issue 753 f16-KV path (80K ctx vs its fixed-shape validation).
 - [ ] **T3.3** Consumer follow-ups filed on first consumption (substrate-first: riir-ai gate layer consumes; do not fork the probe). riir-train side is Issue 492.
 
