@@ -100,3 +100,9 @@ cargo test -p katgpt-core --features numeric_stability --lib numeric_stability::
 cargo test -p katgpt-core --lib                                                                            # G3 default
 cargo clippy -p katgpt-core --features numeric_stability --lib
 ```
+
+## Resolution — Issue 697 CLOSED (2026-08-29, all tasks done; file removed per the noise-reduction rule)
+
+- **T3.2** — `TOL_TABLE_PINNED` + `band_at` + blake3-pinned fit landed (commit `c5139028`, with Phase 2).
+- **T3.3 (first consumption)** — riir-ai `23d0b775f`, [Bench 798](../../riir-ai/.benchmarks/798_numeric_stability_first_consumption.md): the `cpu_reference` f32-accumulation claim (riir-gpu, Issue 709 H2) contextualized via R1/R2 — Accept at margin 1.0 on all three surfaces (gap 175–744× below the single-step f16 precision-change band); "f64 optional" is now measured evidence. Planted controls live (10× band → Reject). Consumed via feature-forward, not forked.
+- **GPU-lane follow-ups filed** — riir-ai [Issue 775](../../riir-ai/.issues/775_numeric_gate_accept_contextualization.md) (Bench-773-successor gate → `accept()` contextualization, M3 Metal window) + [Issue 776](../../riir-ai/.issues/776_qwen38_kv_f16_tolerance_schedule.md) (qwen38 f16-KV gates → `tol(S)` schedule, 4090 lane). riir-train side remains Issue 492.

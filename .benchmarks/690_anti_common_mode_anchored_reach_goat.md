@@ -106,3 +106,11 @@ pub fn schedule_sign_flip(r: f32, beta_bar: f32) -> f32;    // (2r−1)/β̄
 - T3 (open) — the CLR crowd-panic consumer PoC in the mmorpg harness; the only promotion path.
 - T4 (open) — the three anchored-reach consumer A/Bs.
 - T5 (open) — group-definition A/B sub-note, folds into whichever consumer lands first.
+
+## Resolution — Issue 696 CLOSED (2026-08-29, all tasks done; file removed per the noise-reduction rule)
+
+- **T3 PASS** — riir-ai `50591686c`, [Bench 794](../../riir-ai/.benchmarks/794_clr_anti_common_mode_poc.md): panic+gate border occupancy 27.1% → 0.0% (baseline level, 8/8 seeds) with Bench-010 detection retained bit-identically. **CLR re-promotion DECIDED: stays opt-in** — the G2-with-CLR perf axis is still unmeasured in the composed default path (~5 ms/tick collective scan at production scale, Issue 054 T9) and the Plan-019 demotion was a gameplay-feel call; the gate evidence is in hand for the owner to flip when they next play.
+- **T4(a) MEASURED** — riir-ai `4915a0425`, [Bench 796](../../riir-ai/.benchmarks/796_belief_lead_contrastive_aversion_ab.md): the A=1 dead-reckon read beats frozen belief 2.5–5×; **overshoot (λ>0) REFUTED on turns**; adoption filed as riir-ai [Issue 777](../../riir-ai/.issues/777_belief_dead_reckon_reads.md).
+- **T4(b) PASS** — same bench: A=−1 collapses acceptance ≤0.005, A=0 bit-unchanged; adoption filed as riir-ai [Issue 778](../../riir-ai/.issues/778_contrastive_aversion_entries.md).
+- **T4(c) ALREADY COVERED** — riir-ai `b05d3bd57`, [Bench 797](../../riir-ai/.benchmarks/797_guidance_anchor_follower_ab.md): the shipped leader-plans-once pattern owns the ≥4× economics (measured 768× fewer planner calls / 420× less wall); the (0,1) reach band adds nothing measured — no wiring.
+- **T5 CONFIRMED** — Bench 796: Zone-vs-World standardization flips the emergent structure (incl. an aversion-direction inversion); folded into riir-ai Issue 778 T3/T4.
