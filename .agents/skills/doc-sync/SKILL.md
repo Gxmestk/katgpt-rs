@@ -44,7 +44,7 @@ claims rot:
   every other repo LINKS. Never copy a cross-repo rule into a second file —
   that is the duplication doc-sync exists to catch.
 
-## The workspace repos and their doc shapes (12 as of 2026-08-21)
+## The workspace repos and their doc shapes (14 as of 2026-08-28)
 
 Each repo has a different doc layout. **Read the repo's `AGENTS.md` first** —
 it documents the canonical layout and the numbering discipline.
@@ -58,9 +58,11 @@ it documents the canonical layout and the numbering discipline.
 | `riir-train` | **6 numbered folders** (`01_orientation/` … `06_cross_cutting/`, reindexed from flat on 2026-07-15), unnumbered files inside. Training-method research vault. | Role + sibling layout. | same | `main` (no `develop`) |
 | `riir-game-sdk` | **10 numbered folders** (`01_orientation/` … `10_multiplayer_topology/`; the 10th was added for the two-binary production topology + avatar/game sync facade), unnumbered files inside. Covers all `src/` modules + `examples/`. Matches the `riir-ai/.docs/` / `riir-neuron-db/.docs/` format. | Boundary rule + leaf constraint + spatial canonical + Phase 2/3 status + feature gates. | same | `develop` |
 | `riir-mmorpg-examples` | **No `.docs/` folder** — docs live in `AGENTS.md` (extensive: role, topology, plans/issues/benchmarks index, canonical-failure lessons) + `README.md` (status + build commands + env vars) + `.plans/` / `.issues/` / `.benchmarks/` files. POC consumer of `riir-game-sdk`. | Status + build commands + Plan/Issue index. | same | `develop` |
-| `riir-clippy` | **11 numbered folders** (`01_orientation/` … `11_domains/`), unnumbered files inside. The code-healer vault — corpus/drafter/pruner/verify/self-evolve/domains narrative. `AGENTS.md` carries the batch-mining progress notes (the sweep record home for cross-repo clippy heals). | Status + Quick Start + Usage + feature gates. | same | `develop` |
+| `riir-clippy` | **12 numbered folders** (`01_orientation/` … `11_domains/` + `12_ane/`; the 12th added for the Apple Neural Engine substrate knowledge — private runtime API, MIL/blob formats, M3 Max findings, the Rust-bridge negative result + working ObjC substrate — riir-ai Issue 726 T0 distillation), unnumbered files inside. The code-healer vault — corpus/drafter/pruner/verify/self-evolve/domains narrative. `AGENTS.md` carries the batch-mining progress notes (the sweep record home for cross-repo clippy heals). | Status + Quick Start + Usage + feature gates. | same | `develop` |
 | `riir-unity` | **No `.docs/` folder** — AGENTS.md-centric (domain boundary, Unity MCP rules, issue log) + `.benchmarks/`. The Unity host; Rust work belongs in riir-viewbridge, so doc-sync here = AGENTS.md issue-log sections + module-map freshness. | Role + boundary + sibling layout. | same | `develop` |
 | `riir-viewbridge` | **No `.docs/` folder** — AGENTS.md-centric (workspace layout, boundary rules, latent/raw wall, issue log) + `.benchmarks/` (Bench 002 node GOAT). The Rust FFI side of the Unity bridge. | Role + boundary + build commands. | same | `develop` |
+| `riir-dapps` | **No `.docs/` folder** — AGENTS.md-centric (the one-way game → dapps → chain invariant, the three-test rule, tiered-durability record) + `.plans/` / `.issues/` / `.benchmarks/`. The settlement-composition layer. | Boundary + build + the `direction_gate` + kat rail status. | same | `develop` |
+| `riir-dao` | **No `.docs/` folder** — AGENTS.md-centric (the KAT tokenomics agent: signals → strategy → guard → advisory → commit; the G5 advisory-only verdict) + `.plans/` / `.benchmarks/`. | Boundary + build + the direction gate. | same | `develop` |
 
 ## The sync workflow (per repo)
 
@@ -148,8 +150,8 @@ Apply the repo-specific rules:
   - `.plans/` / `.issues/` / `.benchmarks/` — individual plan/issue/benchmark files.
 - The `AGENTS.md` is large (~1000+ lines) and IS the doc surface — `doc-sync` for this repo means keeping `AGENTS.md` sections current with landed plans.
 
-#### riir-clippy (11-folder `.docs/` book)
-- **`.docs/`**: 11 numbered folders mirroring the `riir-ai/.docs/` format — corpus / drafter / pruner / verify / ruliology / examples / benchmarks / lessons / self-evolve / domains. Drop new docs in the right group folder, add one line to that folder's `README.md` index table.
+#### riir-clippy (12-folder `.docs/` book)
+- **`.docs/`**: 12 numbered folders mirroring the `riir-ai/.docs/` format — corpus / drafter / pruner / verify / ruliology / examples / benchmarks / lessons / self-evolve / domains / **ANE substrate knowledge** (`12_ane/`, riir-ai Issue 726 T0 distillation). Drop new docs in the right group folder, add one line to that folder's `README.md` index table.
 - **`AGENTS.md`**: the batch-mining progress notes + sweep records live here (the cross-repo clippy-heal record home). A landed heal slice in a sibling repo (katgpt-rs, riir-train, riir-ai) gets its progress note in the SAME commit as the heal — a later `doc-sync` run defers to the healing session (never write progress notes for someone else's in-flight sweep).
 - **README.md**: Status + Quick Start + Usage + feature gates.
 
@@ -243,7 +245,7 @@ contract — fix the skill then, but also note the gap.
 - **Do not** write a doc entry for a plan that hasn't landed yet. Speculative docs go in `.proposals/`.
 - **Do not** remove a negative-result entry when closing its issue — the negative result is load-bearing documentation.
 - **Do not** upgrade a GOAT FAIL to a PASS in the docs without the benchmark file to back it.
-- **Do not** impose a `.docs/` shape that differs from the repo's existing convention (e.g. don't create a `.docs/` folder for `riir-mmorpg-examples`, `riir-unity`, or `riir-viewbridge`, which are AGENTS.md-centric) — respect the repo's existing shape. As of 2026-08-18, seven of the ten repos use numbered folders (`riir-clippy` joined with its 11-folder book) and three are AGENTS.md-centric. The rule is about matching the shape, not about whether to have one — and a shape change is a deliberate, committed decision governed by the **Shape-change contract** above (it updates THIS file in the same pass via the grep-able checklist, not something a sync run improvises).
+- **Do not** impose a `.docs/` shape that differs from the repo's existing convention (e.g. don't create a `.docs/` folder for `riir-mmorpg-examples`, `riir-unity`, `riir-viewbridge`, `riir-dapps`, or `riir-dao`, which are AGENTS.md-centric) — respect the repo's existing shape. As of 2026-08-28, eight of the fourteen repos use numbered folders (`riir-clippy` at its 12-folder book, `12_ane/` added by riir-ai Issue 726 T0) and six are AGENTS.md-centric. The rule is about matching the shape, not about whether to have one — and a shape change is a deliberate, committed decision governed by the **Shape-change contract** above (it updates THIS file in the same pass via the grep-able checklist, not something a sync run improvises).
 - **Do not** renumber existing docs — the numbering discipline is monotonic and never reused.
 - **Do not** document trivial mechanical commits (lockfile bumps, clippy fixes) unless they close a tracked issue.
 
