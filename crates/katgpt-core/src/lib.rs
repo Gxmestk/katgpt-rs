@@ -2668,6 +2668,7 @@ pub mod bounded_target;
 #[cfg(feature = "bounded_target")]
 pub mod realization_gap;
 
+
 // RVM modelless extraction (Issue 696 / Research 433, riir-train,
 // arXiv:2608.23664 — anchored reward-weighted velocity regression, Choi et
 // al.): the DT2 ANTI-COMMON-MODE scalar gate (peak-quantile statistic +
@@ -2684,6 +2685,22 @@ pub mod realization_gap;
 pub mod anti_common_mode;
 #[cfg(feature = "anchored_reach")]
 pub mod anchored_reach;
+
+// Numeric-deviation contextualization probe (Issue 697 Phase 1 / Research
+// 515, arXiv:2405.02803 "Is Flash Attention Stable?"): the f64
+// mantissa-truncation format emulator + the two-surface DeviationReport
+// (elementwise max_diff + 1-D Wasserstein delegated to mag::transfer's
+// quantile-grid core) + the reference-band acceptance rule — R1 two-draw
+// init divergence, R2 quantize→dequant round-trip labeled a SINGLE-STEP
+// LOWER BOUND (doc-truth tripwired). The margin is an explicit caller
+// parameter: the paper's 2–5× is context-specific, never a default. Scope
+// limit: divergence similarity, NOT training stability (arXiv:2510.04212
+// owns the mechanism). Zero-alloc *_into hot paths; no new deps; NaN
+// rejected at the boundary. Opt-in — Phase 2 (perturbable attention lab) +
+// T3.2/T3.3 open; first consumer: riir-ai gate layer; riir-train: Issue 492.
+#[cfg(feature = "numeric_stability")]
+pub mod numeric_stability;
+
 
 // Kinematic rollout primitive (Plan 578 / Research 506, arXiv:2608.09926 —
 // LDR, Li et al.): the modelless core of latent dynamics reasoning —

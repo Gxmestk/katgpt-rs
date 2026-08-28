@@ -497,28 +497,83 @@ fn rbf_kernel(a: &[f32], b: &[f32], gamma: f32) -> f32 {
     crate::simd::fast_exp(-gamma * dist_sq)
 }
 
+/// Ascending sort shared by the Wasserstein paths (same comparator the
+/// metric has always used; finite inputs give a total order).
+///
+/// Deliberately the IN-PLACE unstable sort: std's comparator `sort_by`
+/// allocates its merge buffer, which would break the probe's zero-alloc hot
+/// path (Issue 697 G4). Determinism holds — the unstable sort is a
+/// deterministic algorithm, and the metric reads only the sorted VALUE
+/// sequence, in which equal `f32`s are bit-identical and interchangeable —
+/// so the result is bit-identical to a stable sort's (pinned by
+/// `wasserstein_matches_independent_reference`, whose in-test twin uses a
+/// stable `total_cmp` sort).
+fn sort_f32_ascending(v: &mut [f32]) {
+    v.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+}
+
+/// Quantile-grid core shared by `wasserstein1d` and
+/// `wasserstein1d_scalar_into`: both slices must already be sorted ascending.
+/// Empirical quantile functions are compared on a common grid of
+/// `max(m, n)` points (handles unequal sample counts via linear
+/// interpolation).
+fn wasserstein1d_sorted_core(sx: &[f32], sy: &[f32]) -> f32 {
+    let t = sx.len().max(sy.len());
+    let mut dim_dist = 0.0;
+    for k in 0..t {
+        let qx = quantile_interp(sx, (k as f32 + 0.5) / t as f32);
+        let qy = quantile_interp(sy, (k as f32 + 0.5) / t as f32);
+        dim_dist += (qx - qy).abs();
+    }
+    dim_dist / t as f32
+}
+
 /// 1D Wasserstein-1 distance averaged over dimensions.
 ///
 /// For each dimension, both sets are sorted and their empirical quantile
 /// functions are compared on a common grid of `max(m, n)` points (handles
-/// unequal sample counts via linear interpolation).
+/// unequal sample counts via linear interpolation). Behavior-identical to
+/// the pre-Issue-697 form (the per-dimension math moved verbatim into
+/// `wasserstein1d_sorted_core`; the columns are gathered into reused
+/// buffers instead of two fresh `Vec`s per dimension).
 fn wasserstein1d<S: AsRef<[f32]>>(x: &[S], y: &[S], d: usize) -> f32 {
-    let t = x.len().max(y.len());
     let mut total = 0.0;
+    let mut col_x: Vec<f32> = Vec::with_capacity(x.len());
+    let mut col_y: Vec<f32> = Vec::with_capacity(y.len());
     for j in 0..d {
-        let mut col_x: Vec<f32> = x.iter().map(|s| s.as_ref()[j]).collect();
-        let mut col_y: Vec<f32> = y.iter().map(|s| s.as_ref()[j]).collect();
-        col_x.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        col_y.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let mut dim_dist = 0.0;
-        for k in 0..t {
-            let qx = quantile_interp(&col_x, (k as f32 + 0.5) / t as f32);
-            let qy = quantile_interp(&col_y, (k as f32 + 0.5) / t as f32);
-            dim_dist += (qx - qy).abs();
-        }
-        total += dim_dist / t as f32;
+        col_x.clear();
+        col_x.extend(x.iter().map(|s| s.as_ref()[j]));
+        col_y.clear();
+        col_y.extend(y.iter().map(|s| s.as_ref()[j]));
+        sort_f32_ascending(&mut col_x);
+        sort_f32_ascending(&mut col_y);
+        total += wasserstein1d_sorted_core(&col_x, &col_y);
     }
     total / d as f32
+}
+
+/// Zero-alloc 1-D Wasserstein on scalar (d = 1) slices for the
+/// `numeric_stability` probe (Issue 697 T1.2) — reuses the same sort +
+/// quantile-grid core as `wasserstein1d` above; no metric math is duplicated
+/// in the consumer module. Grow-only scratch: buffers are `clear()`ed and
+/// refilled per call (contents unspecified after the call), so the steady
+/// state is allocation-free once capacity covers the larger slice.
+/// Bit-identical to `wasserstein1d` on `&[[f32; 1]]` views of the same data
+/// (pinned by `scalar_into_matches_multidim_substrate_bit_exactly` below).
+#[cfg(feature = "numeric_stability")]
+pub(crate) fn wasserstein1d_scalar_into(
+    x: &[f32],
+    y: &[f32],
+    scratch_x: &mut Vec<f32>,
+    scratch_y: &mut Vec<f32>,
+) -> f32 {
+    scratch_x.clear();
+    scratch_x.extend_from_slice(x);
+    scratch_y.clear();
+    scratch_y.extend_from_slice(y);
+    sort_f32_ascending(scratch_x);
+    sort_f32_ascending(scratch_y);
+    wasserstein1d_sorted_core(scratch_x, scratch_y)
 }
 
 /// Linear-interpolated quantile from a sorted slice at fraction `f ∈ [0, 1]`.
@@ -580,6 +635,40 @@ fn feature_gram<S: AsRef<[f32]>>(samples: &[S], d: usize) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Issue 697 T1.2 substrate cross-pin: the scalar (d = 1) zero-alloc
+    // wrapper used by `numeric_stability` must stay bit-identical to the
+    // multi-dim metric on the same data. Compiled only when the consumer
+    // feature is on (the wrapper is feature-gated to stay dead-code-free).
+    #[cfg(all(test, feature = "numeric_stability"))]
+    #[test]
+    fn scalar_into_matches_multidim_substrate_bit_exactly() {
+        let mut s = 0x1234_5678_9ABC_DEF0u64;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let n = 257; // odd length exercises the quantile grid non-trivially
+        let x: Vec<f32> = (0..n)
+            .map(|_| ((next() >> 40) as f32) / ((1u32 << 24) as f32))
+            .collect();
+        let y: Vec<f32> = (0..n)
+            .map(|_| ((next() >> 40) as f32) / ((1u32 << 24) as f32))
+            .collect();
+        let cx: Vec<[f32; 1]> = x.iter().map(|&v| [v]).collect();
+        let cy: Vec<[f32; 1]> = y.iter().map(|&v| [v]).collect();
+        let multi = wasserstein1d(&cx, &cy, 1);
+        let mut scratch_x = Vec::new();
+        let mut scratch_y = Vec::new();
+        let scalar = wasserstein1d_scalar_into(&x, &y, &mut scratch_x, &mut scratch_y);
+        assert_eq!(
+            multi.to_bits(),
+            scalar.to_bits(),
+            "wasserstein1d_scalar_into drifted from the d=1 substrate metric"
+        );
+    }
 
     fn approx_eq(a: f32, b: f32, tol: f32) -> bool {
         (a - b).abs() < tol

@@ -693,6 +693,25 @@ poincare_navigator = []  # Poincaré Adapter — closed-form latent navigation p
 
 causal_identification = []  # Causal-ID — Algorithmic Syntactic Causal Identification (Plan 457, Research 450, arXiv:2403.09580 Cakiqi & Little 2024). Pure modelless graph rewriting on ADMGs with bidirected confounders: identify(Y, do(A)) returns the interventional signature backbone Y⋆ = An(Y in G[V\A]) via the recursive Shpitser-Pearl ID algorithm (Cakiqi-Little Theorem 1 distillation). The Issue 545 defend-wrong PoC proved S2 strictly dominates Canvas FlowGraph reachability on a 13-node game KG with a NPC1↔NPC2 confounder: S2 produces a 5-node interventional signature that correctly excludes NPC1 (the confounder neighbor); S1 yields only a boolean reaches=true and cannot see the confounder. Four submodules: types (NodeId BLAKE3 [u8;32], Admg, AdmgSignature inline-ArrayVec<32>→heap fallback, IdentificationError with hedge pair for diagnostics), fixing (districts, ancestors, fix_node, try_fixseq greedy fixing sequence — sound per Cakiqi-Little §3.2: order doesn't affect existence), identify (the 6-step recursive ID), subgraph (extract_relevant_subgraph bounded-BFS — caveat #2 mitigation to keep the O(k²)–O(k³) algorithm on a ≤32-node subgraph). DEFAULT-ON (Plan 457 Phase 5 promotion, 2026-07-18): Phase 2 GOAT gate G1+G2+G3+G4 ALL PASS (G4 closed 2026-07-18 by Issue 183 / Benchmark 465: Scratch refactor cut per-call allocs 284→198 (-30%) + latency 8.26→6.07 µs (-27%) on 32-node scenario; remaining graph-construction allocs out of G4 scope); Phase 4 T4.5 synthetic Consumer A bench (.benchmarks/464_causal_id_consumer_a_synthetic.md) cleared the T4.7 promotion gate: 71.7% non-trivial Ok rate + 43 actionable interventional signatures Canvas FlowGraph reachability cannot derive. Promotion follows the codebase pattern (manifold_bandit P370, set_attention P354, poincare_navigator P449): modelless + zero-cost-unless-invoked + GOAT-passes → default-on. Consumer B T4.6 (sleep-cycle trace) remains BLOCKED on real-trace capture + new counterfactual-claim infrastructure (T4.3); per Plan 457 §T4.7 the promotion criterion is Consumer A OR Consumer B, so Consumer A passing alone is sufficient. Algorithm provenance: the PoC caught a soundness bug in the one-pass formulation (districts of G[Y⋆] vs G[V]); this ships the corrected recursive version. Pure modelless — no training, no learned params. Offline-only (24µs on 13 nodes is well outside the 20Hz tick). blake3 + arrayvec already non-optional.
 
+# numeric_stability (Issue 697 Phase 1 / Research 515, arXiv:2405.02803 "Is
+# Flash Attention Stable?"): the numeric-deviation contextualization probe —
+# an f64 mantissa-truncation format emulator (T1.1), the two-surface
+# DeviationReport (elementwise max_diff + 1-D Wasserstein delegated to
+# mag::transfer's quantile-grid core, T1.2), the reference-band acceptance
+# rule accept(reports, refs, margin) with an EXPLICIT caller margin — NO
+# default is derived from the paper's context-specific 2-5x headline
+# (T1.3), the R1 two-draw + R2 quantize->dequant round-trip reference
+# builders (R2 labeled a SINGLE-STEP LOWER BOUND and pinned by a doc-truth
+# tripwire test, T1.4), and the scope-limit tripwire (divergence similarity,
+# NOT training stability — arXiv:2510.04212 owns the mechanism, T1.5). T3.1
+# planted-deviation gate (0.1x/1x/10x of the reference band lands
+# Accept/margin-line/Reject) is the falsifiability proof. Zero-alloc hot
+# paths (*_into grow-only scratch, the Plan 418 pattern); no new deps;
+# deterministic (no HashMap iteration; NaN rejected at the boundary).
+# Opt-in — first consumer: riir-ai gate layer; riir-train side: Issue 492.
+# Phase 2 (perturbable reference attention lab) lands in this module later.
+numeric_stability = []
+
 # Plan 371 Phase 5 — Mean-Field Regime Classifier GOAT gate (G2/G4/G5).
 # G1 (defend-wrong PoC) ships separately in riir-poc/benches/.
 [[bench]]
