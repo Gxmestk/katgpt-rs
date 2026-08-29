@@ -607,6 +607,15 @@ pub struct CertifiedFrontier<const MAX_CELLS: usize, const D: usize> {
     /// `acquisition_lane_matches_a_full_rescan` pins every step of a run
     /// against a reference argmax over [`Self::cells`].
     acq_sigma: [f32; MAX_CELLS],
+    /// Cells whose tally changed since the last `expand_certified`, and the
+    /// flag that keeps the list deduplicated.
+    dirty: [u32; MAX_CELLS],
+    dirty_flag: [bool; MAX_CELLS],
+    dirty_len: usize,
+    /// Largest `beta` seen by `expand_certified`. Guards the incremental path:
+    /// a SHRINKING width can raise an untouched cell's LCB, which is the one
+    /// case the dirty set would miss.
+    last_beta: f32,
     len: usize,
     certified: u32,
     /// Cells certified by a Lipschitz hop rather than by their own tally.
@@ -627,6 +636,10 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
             cells: [FrontierCell::default(); MAX_CELLS],
             hop_cb: [0.0; MAX_CELLS],
             acq_sigma: [NOT_A_CANDIDATE; MAX_CELLS],
+            dirty: [0; MAX_CELLS],
+            dirty_flag: [false; MAX_CELLS],
+            dirty_len: 0,
+            last_beta: f32::NEG_INFINITY,
             len: 0,
             certified: 0,
             dilated: 0,
@@ -689,6 +702,34 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     #[must_use]
     pub fn dilated_count(&self) -> u32 {
         self.dilated
+    }
+
+    /// Queue cell `i` for the next `expand_certified`. Idempotent.
+    #[inline]
+    fn mark_dirty(&mut self, i: usize) {
+        if !self.dirty_flag[i] {
+            self.dirty_flag[i] = true;
+            self.dirty[self.dirty_len] = i as u32;
+            self.dirty_len += 1;
+        }
+    }
+
+    /// Raise one cell's bound and certify it if it crossed `h`. Returns 1 when
+    /// this call is what certified it.
+    #[inline]
+    fn expand_one(&mut self, i: usize, cfg: &FrontierConfig, beta: f32) -> u32 {
+        let lcb = self.lcb(i, beta);
+        let c = &mut self.cells[i];
+        if lcb > c.cb {
+            c.cb = lcb;
+        }
+        if c.certified || c.cb < cfg.h {
+            return 0;
+        }
+        c.certified = true;
+        self.touch_acquisition(i);
+        self.mark_neighborhood(i, cfg);
+        1
     }
 
     /// Refresh cell `i`'s acquisition lane from its current candidacy + sigma.
@@ -767,6 +808,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
             false => c.invalid += 1,
         }
         c.beta_sigma = beta_mean_variance(c.valid, c.invalid).1.sqrt();
+        self.mark_dirty(i);
         self.touch_acquisition(i);
         true
     }
@@ -812,6 +854,9 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         for i in 0..self.len {
             let feat = self.cells[i].feat;
             self.cells[i].sigma_override = buf.posterior_variance_linear(&feat, scratch).sqrt();
+            // A new sigma changes every cell's LCB, so the dirty set is no
+            // longer a sufficient work list.
+            self.mark_dirty(i);
             self.touch_acquisition(i);
         }
     }
@@ -823,20 +868,50 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     /// query sequence (T2.3). Soundness rests on `beta` covering every round,
     /// which is what [`confidence_schedule`]'s monotonicity in `t` buys.
     pub fn expand_certified(&mut self, cfg: &FrontierConfig, beta: f32) -> u32 {
-        let mut newly = 0;
-        for i in 0..self.len {
-            let lcb = self.lcb(i, beta);
-            let c = &mut self.cells[i];
-            if lcb > c.cb {
-                c.cb = lcb;
-            }
-            if !c.certified && c.cb >= cfg.h {
-                c.certified = true;
-                newly += 1;
-                self.touch_acquisition(i);
-                self.mark_neighborhood(i, cfg);
+        // `cb` moves by max, and an untouched cell's LCB can only have FALLEN
+        // if `beta` grew. So when the width is non-decreasing, only cells whose
+        // tally changed can raise a bound — everything else is a no-op that
+        // still costs a divide and a square root. Scanning the dirty set
+        // instead turns the pass from O(cells) into O(observed since last
+        // call), which for the one-observation-per-round shape is O(1).
+        //
+        // The one case that breaks: a SHRINKING beta raises every untouched
+        // cell's LCB. Both shipped widths are non-decreasing
+        // (`confidence_schedule` is monotone in `t`, `beta_union_bound` is
+        // constant for fixed inputs), but a caller may pass anything, so detect
+        // it and fall back rather than silently under-certifying.
+        match beta < self.last_beta {
+            true => self.expand_certified_full(cfg, beta),
+            false => {
+                self.last_beta = beta;
+                let mut newly = 0;
+                for k in 0..self.dirty_len {
+                    let i = self.dirty[k] as usize;
+                    self.dirty_flag[i] = false;
+                    newly += self.expand_one(i, cfg, beta);
+                }
+                self.dirty_len = 0;
+                self.certified += newly;
+                newly
             }
         }
+    }
+
+    /// [`Self::expand_certified`] over every cell, unconditionally — the
+    /// reference path.
+    ///
+    /// `expand_certified` dispatches to this automatically when `beta` shrinks.
+    /// Call it directly only after mutating cell state behind the type's back
+    /// (there is no such path today) or to cross-check the incremental result;
+    /// the correctness suite pins the two against each other over a full run.
+    pub fn expand_certified_full(&mut self, cfg: &FrontierConfig, beta: f32) -> u32 {
+        self.last_beta = self.last_beta.max(beta);
+        let mut newly = 0;
+        for i in 0..self.len {
+            self.dirty_flag[i] = false;
+            newly += self.expand_one(i, cfg, beta);
+        }
+        self.dirty_len = 0;
         self.certified += newly;
         newly
     }

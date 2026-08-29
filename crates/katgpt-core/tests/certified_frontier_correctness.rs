@@ -15,6 +15,7 @@
 //! | T2.4 | `confidence_schedule` monotone in `t`; closed-form `kappa`/`L_s` |
 //! | T2.5 | halting law + dilation soundness against a known Lipschitz field |
 //! | T2.6 | order-pinned sphere exclusion; Vendi on a planted spectrum |
+//! | perf | `expand_certified` dirty-set fast path ≡ `expand_certified_full` over randomized streams (incl. shrinking-beta fallback) |
 #![cfg(feature = "certified_frontier")]
 
 use katgpt_core::certified_frontier::{
@@ -259,6 +260,72 @@ fn t2_2_certification_is_sound_across_1000_adversarial_seeds() {
     assert_eq!(
         total, 0,
         "unsound certifications across 1000 seeds (first at seed {worst_seed})"
+    );
+}
+
+// ── perf — the dirty-set fast path must equal the full rescan ──────────────
+
+/// `expand_certified` scans only cells whose tally changed since the last call
+/// (falling back to a full scan when `beta` shrinks). This pins the fast path
+/// bit-for-bit against [`CertifiedFrontier::expand_certified_full`] — twin
+/// frontiers driven by the SAME observation stream and beta schedule, compared
+/// on newly-certified counts, the certified counter, and every cell's `cb` /
+/// `certified` / `near_certified` state at the end. The schedule is mostly the
+/// monotone `confidence_schedule`, with a shrinking width injected every 7th
+/// round to force the fallback arm.
+#[test]
+fn perf_expand_certified_dirty_set_matches_the_full_rescan() {
+    let cfg = FrontierConfig {
+        h: H,
+        lipschitz: lipschitz_bound(),
+        cell_spacing: 1.0 / (GRID - 1) as f32,
+        ..FrontierConfig::default()
+    };
+    let rounds: u32 = 300;
+    let mut newly_inc_total = 0;
+    let mut newly_full_total = 0;
+
+    for seed in 0..64u64 {
+        let (mut inc, truth) = build_world();
+        let (mut full, _) = build_world();
+        let mut rng = Lcg::new(seed);
+
+        for t in 1..=rounds {
+            let i = rng.below(CELLS);
+            let valid = rng.next_f32() < truth[i];
+            assert!(inc.observe(i, valid) && full.observe(i, valid));
+
+            let beta = match t % 7 == 0 {
+                true => confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2) * 0.5,
+                false => confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2),
+            };
+            newly_inc_total += inc.expand_certified(&cfg, beta);
+            newly_full_total += full.expand_certified_full(&cfg, beta);
+        }
+
+        assert_eq!(inc.len(), full.len());
+        assert_eq!(
+            inc.certified_count(),
+            full.certified_count(),
+            "certified counter diverged at seed {seed}"
+        );
+        for (ci, cf) in inc.cells().iter().zip(full.cells().iter()) {
+            assert_eq!(
+                ci.cb.to_bits(),
+                cf.cb.to_bits(),
+                "cb diverged at seed {seed}"
+            );
+            assert_eq!(ci.certified, cf.certified, "certified flag at seed {seed}");
+            assert_eq!(
+                ci.near_certified, cf.near_certified,
+                "near_certified flag at seed {seed}"
+            );
+        }
+    }
+    assert_eq!(newly_inc_total, newly_full_total);
+    assert!(
+        newly_full_total > 0,
+        "no certifications across the whole run — the equivalence check was vacuous"
     );
 }
 
