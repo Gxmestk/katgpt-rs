@@ -175,6 +175,15 @@ pub mod risk_control_exit;
 // the Bench 682 targeting gate.
 #[cfg(feature = "distributional_steering")]
 pub mod distributional_steering;
+// twist_cache — Plan 581 opaque-reward twisted-SMC steering + modelless
+// twist amortization (Research 517, arXiv:2605.23346 CDM): x̂₀ posterior-mean
+// reward proxy (1 query/particle-step vs M rollouts), BLAKE3 state-keyed
+// value memo, one-shot ridge readout table, β/KL-budget selection
+// (entropic_tilt hoist rule). Consistency for any positive ψ — amortization
+// is variance reduction, never correctness. Opt-in; the trained-head
+// counterpart is riir-train Plan 361 (same GOAT gate, two arms — Bench 692).
+#[cfg(feature = "twist_smc")]
+pub mod twist_cache;
 // entropic_tilt — KL-budgeted max-seeking advantage tilt (TTT-Discover
 // arXiv:2601.16175; prior art RS-GRPO / RSPO). The max-seeking counterpart to
 // `best_belief` above: that scores a candidate from its OWN history counts,
@@ -1973,7 +1982,8 @@ pub use katgpt_types::depth_invariance::{
     feature = "karc_forecaster",
     feature = "geometric_product",
     feature = "tucker_factorization",
-    feature = "svd_cca"
+    feature = "svd_cca",
+    feature = "twist_smc"
 ))]
 pub mod linalg;
 

@@ -89,6 +89,10 @@ pub enum RewardKind {
     Moment = 1,
     /// `Ψ(x,μ) = 2∫k(x,y)(μ−ν)(dy)` — kernel contrast against a target.
     Mmd = 2,
+    /// `Ψ(x) = r(x)` via a caller-supplied black-box closure (Plan 581 T1.1).
+    /// Second variation 0; no closed-form ∇Ψ (the gradient arm uses central
+    /// finite differences — see `ClosureReward`).
+    Closure = 3,
 }
 
 /// A measure-defined reward `R(μ)` with closed-form first variation.
@@ -130,6 +134,61 @@ pub trait MeasureReward {
 pub struct LinearReward {
     /// Direction `a` (d entries): `f(x) = a·x`.
     pub dir: Vec<f32>,
+}
+
+/// The boxed black-box scorer behind the closure row (type alias — the
+/// clippy type_complexity class).
+pub type BoxedScorer = Box<dyn Fn(&[f32]) -> f32>;
+
+/// Opaque pointwise reward row (Plan 581 T1.1): `R(μ) = ∫ r dμ` with `r` a
+/// caller-supplied black-box closure — the degenerate case of R505 Prop 3.1
+/// that recovers plain per-state reward steering, and the row that admits
+/// scorers the Table-2 rows (Linear/Moment/Mmd — all closed-form) cannot
+/// express (classifiers, validator composites, any external oracle).
+///
+/// # Consistency footing (Research 517 / No-GD advocate row 1)
+///
+/// Self-normalized twisted SMC is consistent for ANY positive ψ — the
+/// closure is a *tilt potential* `Ψ(x) = r(x)`, never a modeled density.
+/// Amortization layers over it (twist_smc's x̂₀ proxy / value memo / ridge
+/// table) are variance reduction, never correctness.
+///
+/// # Gradient cost note
+///
+/// There is no closed-form `∇Ψ` for a black-box `r`; the [`FkStepper`]
+/// gradient arm evaluates the closure `2d` times per particle (central
+/// differences at `fd_eps`). That cost is exactly why twist_smc consumers
+/// (Research 517 / Plan 581) steer WEIGHTS-ONLY — the twist reweights via
+/// `ψ ∝ exp(β·V̂)` and never needs `∇Ψ`.
+///
+/// `r` must return finite values (`debug_assert` at the boundary — the
+/// house `is_finite` discipline, as in `entropic_tilt::solve_beta`).
+pub struct ClosureReward {
+    dim: usize,
+    fd_eps: f32,
+    f: BoxedScorer,
+}
+
+impl ClosureReward {
+    /// New row over a black-box scorer. `fd_eps` is the central-difference
+    /// step for the (optional) [`FkStepper`] gradient arm; `1e-3` is a sane
+    /// default for O(1)-scale rewards.
+    pub fn new(dim: usize, fd_eps: f32, f: impl Fn(&[f32]) -> f32 + 'static) -> Self {
+        assert!(dim > 0, "ClosureReward requires dim > 0 (got {dim})");
+        assert!(fd_eps > 0.0 && fd_eps.is_finite(), "fd_eps must be positive finite");
+        Self { dim, fd_eps, f: Box::new(f) }
+    }
+
+    /// Evaluate `r(x)` with the finite boundary check.
+    #[inline]
+    fn eval(&self, x: &[f32]) -> f32 {
+        let v = (self.f)(x);
+        debug_assert!(
+            v.is_finite(),
+            "ClosureReward r(x) must be finite (got {v})"
+        );
+        v
+    }
 }
 
 /// Scalar gain `F` for the moment row (closed over a small table).
@@ -447,6 +506,41 @@ impl MeasureReward for MomentReward {
     }
 }
 
+impl MeasureReward for ClosureReward {
+    #[inline]
+    fn kind(&self) -> RewardKind {
+        RewardKind::Closure
+    }
+    #[inline]
+    fn dim(&self) -> usize {
+        self.dim
+    }
+
+    fn first_variation_into(&self, x: &[f32], _pop: &WeightedPopulation, out: &mut [f32]) {
+        out[0] = self.eval(x);
+    }
+
+    fn second_variation(&self, _x: &[f32], _y: &[f32], _pop: &WeightedPopulation) -> f32 {
+        0.0
+    }
+
+    fn reward(&self, pop: &WeightedPopulation) -> f32 {
+        // Cold path (allocates the normalized-weight vector).
+        let mut w = vec![0.0f32; pop.n()];
+        pop.weights_into(&mut w);
+        let d = self.dim();
+        let mut acc = 0.0f64;
+        for (wi, xi) in w.iter().zip(pop.states().chunks_exact(d)) {
+            acc += *wi as f64 * self.eval(xi) as f64;
+        }
+        acc as f32
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 impl MeasureReward for MmdReward {
     #[inline]
     fn kind(&self) -> RewardKind {
@@ -563,6 +657,45 @@ fn mmd_parts(r: &dyn MeasureReward) -> (f32, &[f32]) {
     (mr.gamma, mr.target.as_slice())
 }
 
+fn closure_parts(r: &dyn MeasureReward) -> &ClosureReward {
+    r.as_any()
+        .downcast_ref::<ClosureReward>()
+        .expect("RewardKind::Closure must be backed by ClosureReward")
+}
+
+/// Central-difference `λ·∇r` for the opaque closure row (Plan 581 T1.1) —
+/// shared by the [`FkStepper`] hot path and the `gradient_steering_into`
+/// cold path. `2d` scorer evals per particle; dims > 64 panic (weights-only
+/// steering is the consumer shape for high-dim opaque rewards). Zero-alloc
+/// (stack FD buffers).
+fn closure_fd_gradient_into(
+    cr: &ClosureReward,
+    states: &[f32],
+    n: usize,
+    lam: f32,
+    out: &mut [f32],
+) {
+    let d = cr.dim();
+    let eps = cr.fd_eps;
+    assert!(
+        d <= 64,
+        "ClosureReward FD gradient supports dim <= 64 (got {d}); \
+         use weights-only steering for high-dim opaque rewards"
+    );
+    let mut xa = [0.0f32; 64];
+    let mut xb = [0.0f32; 64];
+    for i in 0..n {
+        let xi = &states[i * d..(i + 1) * d];
+        for q in 0..d {
+            xa[..d].copy_from_slice(xi);
+            xb[..d].copy_from_slice(xi);
+            xa[q] += eps;
+            xb[q] -= eps;
+            out[i * d + q] = lam * (cr.eval(&xa[..d]) - cr.eval(&xb[..d])) / (2.0 * eps);
+        }
+    }
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 // Gradient steering, cold-path form (Plan 577 T1.4)
 // ──────────────────────────────────────────────────────────────────────────
@@ -646,6 +779,12 @@ pub fn gradient_steering_into(
                     out[i * dim + q] = (coef * acc[q]) as f32;
                 }
             }
+        }
+        RewardKind::Closure => {
+            // Black-box ∇Ψ by central finite differences (Plan 581 T1.1,
+            // λ=1 cold path — see closure_fd_gradient_into).
+            let cr = closure_parts(reward);
+            closure_fd_gradient_into(cr, states, n, 1.0, out);
         }
     }
 }
@@ -864,6 +1003,15 @@ fn eval_psi_all_into(
                 out[i] = (lam as f64 * 2.0 * (emb[i] as f64 - s)) as f32;
             }
         }
+        RewardKind::Closure => {
+            // Pointwise: Ψ(x, μ) = r(x) — no population dependence (the
+            // degenerate ∫r dμ case; the Picard Ψ̇ correction is then a
+            // pure position drift, exactly like the Linear row's shape).
+            let cr = closure_parts(reward);
+            for (o, xi) in out.iter_mut().zip(states.chunks_exact(d)) {
+                *o = lam * cr.eval(xi);
+            }
+        }
     }
 }
 
@@ -979,10 +1127,16 @@ impl FkStepper {
                     }
                 }
             }
+            RewardKind::Closure => {
+                // Black-box ∇Ψ by central finite differences (Plan 581 T1.1):
+                // 2d closure evals per particle — the honest cost that makes
+                // weights-only steering the default consumer shape for opaque
+                // rewards (see ClosureReward's gradient cost note).
+                let cr = closure_parts(reward);
+                closure_fd_gradient_into(cr, states, scratch.n, lam, &mut scratch.grad);
+            }
         }
     }
-
-    /// Phase B of one step: damped-Picard solve for `Ψ̇` at the ADVANCED
     /// positions (paper Alg 4 — both Ψ terms at the same advanced positions,
     /// so `Ψ̇` is pure MEASURE drift), then the FK log-weight update
     /// `A_i += (b_i·∇Ψ_i + Ψ̇_i)·δt` with the per-step delta clamp.
@@ -1585,6 +1739,81 @@ mod tests {
         for i in 0..n {
             assert_eq!(&grad[i * dim..(i + 1) * dim], &dir[..]);
         }
+    }
+
+    // ── Plan 581 T1.3 — ClosureReward row ────────────────────────────
+
+    #[test]
+    fn closure_row_matches_linear_row_on_affine_r() {
+        // T1.3: on affine r = a·x + c the closure row agrees with LinearReward
+        // UP TO THE CONSTANT — the offset shifts every Ψ equally, so the
+        // LSE-normalized tilt (and resampling) is bit-identical (the exact
+        // "degenerate ∫r dμ case" of R505 Prop 3.1).
+        let dim = 3usize;
+        let dir = [0.5f32, -1.0, 2.0];
+        let offset = 0.75f32;
+        let closure = ClosureReward::new(dim, 1e-3, move |x: &[f32]| {
+            dir.iter().zip(x).map(|(&a, &v)| a * v).sum::<f32>() + offset
+        });
+        let linear = LinearReward { dir: dir.to_vec() };
+        let n = 4usize;
+        let states = vec![
+            0.25f32, -0.5, 1.5, 2.0, 0.0, -1.0, 0.5, 0.75, 1.25, -2.0, 0.1, 0.3,
+        ];
+        let mut lw = vec![0.0f32; n];
+        lw[2] = 0.7; // non-uniform weights exercise the LSE path
+        let mut lw2 = lw.clone();
+        let pop_c = WeightedPopulation::new(&states, &mut lw, dim);
+        let pop_l = WeightedPopulation::new(&states, &mut lw2, dim);
+        let x = [1.0f32, 2.0, 3.0];
+        let mut out_c = [0.0f32; 1];
+        let mut out_l = [0.0f32; 1];
+        closure.first_variation_into(&x, &pop_c, &mut out_c);
+        linear.first_variation_into(&x, &pop_l, &mut out_l);
+        let expect_lin = dir[0] * 1.0 + dir[1] * 2.0 + dir[2] * 3.0;
+        assert!((out_l[0] - expect_lin).abs() < 1e-5);
+        assert!((out_c[0] - (expect_lin + offset)).abs() < 1e-5);
+        assert_eq!(closure.second_variation(&x, &x, &pop_c), 0.0);
+        // R(μ) likewise splits by exactly the constant.
+        let r_c = closure.reward(&pop_c);
+        let r_l = linear.reward(&pop_l);
+        assert!((r_c - (r_l + offset)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn closure_gradient_fd_matches_closed_form_on_quadratic() {
+        // r(x) = −(x·x) has closed-form gradient ∇r = −2x; the FD arm in
+        // FkStepper::gradient_into must land within FD truncation error.
+        let dim = 2usize;
+        let reward = ClosureReward::new(dim, 1e-2, |x: &[f32]| -x.iter().map(|v| v * v).sum::<f32>());
+        let n = 3usize;
+        let states = vec![0.5f32, -1.25, 2.0, 0.75, -0.25, 1.5];
+        let lw = vec![0.0f32; n];
+        let mut grad = vec![0.0f32; n * dim];
+        gradient_steering_into(&reward, &states, &lw, dim, &mut grad);
+        // Explicit λ=1 numeric check against the closed form (∇r = −2x;
+        // gradient_steering_into is the λ=1 cold path).
+        let lam = 1.0f32;
+        for (i, xi) in states.chunks_exact(dim).enumerate() {
+            for (q, &v) in xi.iter().enumerate() {
+                assert!(grad[i * dim + q].is_finite());
+                assert!((grad[i * dim + q] - lam * -2.0 * v).abs() < 5e-2);
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "must be finite")]
+    fn closure_nan_reward_rejected_at_boundary() {
+        // T1.3: non-finite r is a caller bug — the debug_assert at the
+        // boundary rejects it (house is_finite discipline).
+        let reward = ClosureReward::new(1, 1e-3, |_x: &[f32]| f32::NAN);
+        let states = [1.0f32];
+        let mut lw = [0.0f32];
+        let pop = WeightedPopulation::new(&states, &mut lw, 1);
+        let mut out = [0.0f32; 1];
+        reward.first_variation_into(&states, &pop, &mut out);
     }
 
     #[test]

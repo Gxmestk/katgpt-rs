@@ -417,6 +417,17 @@ risk_control_exit = []
 # empirical measure μ̂ exposure. Weights-only (no persistent-agent
 # resampling). Opt-in pending the Bench 682 targeting gate (G1).
 distributional_steering = []
+# twist_smc (Plan 581 / Research 517 "CDM — Amortized Twisted SMC in
+# Discrete Diffusion" arXiv:2605.23346, 2026-08-28): opaque-reward twisted-SMC
+# steering + modelless amortization — x̂₀ posterior-mean reward proxy
+# (1 query/particle-step vs M rollouts), BLAKE3 state-keyed value memo,
+# one-shot ridge readout table, β/KL-budget selection (entropic_tilt
+# hoist). Consistency for any positive ψ — amortization is variance
+# reduction, never correctness. Opt-in (Plan 581 Phase 4 GOAT gate =
+# Bench 692; the trained-head counterpart is riir-train Plan 361 — same
+# gate, two arms). numeric_stability is implied only for the
+# proxy_spearman diagnostic (spearman_rho hoist rule).
+twist_smc = ["distributional_steering", "entropic_tilt", "numeric_stability", "dep:papaya"]
 # tether (Issue 675 / Research 426, 2026-08-21): closed-form outcome-fit
 # estimator blend — ρ* per window by OLS against realized outcomes
 # (b(ρ)=(1−ρ)p1+ρp2; exact in-sample never-worse), lag law as API shape,
@@ -1284,6 +1295,17 @@ required-features = ["distributional_steering"]
 [[example]]
 name = "distributional_steering_demo"
 required-features = ["distributional_steering"]
+
+# Plan 581 Phase 4 — twist_smc GOAT gate (T4.1-T4.4): 5 arms at matched
+# reward-query budget — (a) BoM floor, (b) full-M SMC reference (M=8),
+# (c) x̂₀ proxy-only, (d) memo+ridge, (e) no-steer — over a 2-D continuous
+# toy + a discrete constraint-acceptance domain (the quest-grammar shape).
+# Promotion rule: (d) ≥ (a) on downstream reward at matched budget AND
+# diversity non-regression; handoff = the (features, R) cache for
+# riir-train Plan 361's trained head.
+[[test]]
+name = "bench_692_twist_smc_goat"
+required-features = ["twist_smc"]
 
 # Plan 359 Phase 4 T4.3 — BoM Trajectory floor comparison. The BoM Trajectory
 # adapter (`heat_kernel_trajectory_bom`) wraps the near-harmonic perturbation
