@@ -34,10 +34,44 @@ Speculative-selection + pruning. Feature `asymmetric_consensus` (katgpt-speculat
 
 ## Phase 1 — measurement (no flag; the kill gate runs first)
 
+### Phase 1 harness decision (pinned 2026-08-29 — owner call)
+
+**Vehicle: `Ternary-Bonsai-27B-Q2_0.gguf` on M3 Metal.** Gemma-class models are
+deprecated in this workspace (owner, 2026-08-29); earlier drafts that implied a
+gemma-2-2b-class measurement vehicle are void. The measurement is
+inference-only, so the serving model measures its own selection layer.
+
+- **Harness location: `../riir-ai/crates/riir-gpu/tests/`** — a katgpt-rs test
+  cannot host it (katgpt-rs is UPSTREAM of riir-engine/riir-gpu; the dep arrow
+  is one-directional). Shape: `#[ignore]`d, release-only, macOS-gated
+  integration test, run GPU-exclusive (Bench 649 rule). The extractors
+  (`RegexAnswerExtractor`, `DiscreteActionExtractor`) are consumed from
+  `katgpt-speculative` through riir-ai's existing katgpt-rs dep.
+- **Drive pattern (bench_768 protocol):**
+  `load_qwen_deltanet_ternary_weights_gguf` → `CubeCLContext::new()` →
+  `TernaryDeltanetGpuForward::new` → `reset_state()` → `prefill(tokens) ->
+  Vec<f32>` (logits).
+- **K=64 branching without re-prefill:** `checkpoint_speculative_gpu()` once
+  after prefill; per sample `rollback_speculative_gpu(prefix_pos)` → decode
+  the answer via `forward_token` (full logits → CPU temperature sampling +
+  per-token log-prob + entropy). KV correctness rides the validated
+  append-only contract (write-before-read, pos-bounded reads — Issue 746;
+  the seam's rollback round is G1-bit-exact, Issue 717). ~0.4 ms GPU copy per
+  rollback, non-blocking, zero alloc.
+- **Tokenizer:** `riir_engine::tokenizer::BpeTokenizer::from_gguf` (the Bench
+  695/696 protocol) for prompt encode + answer detokenize.
+- **Cost shape:** game-action fixtures are L=1 per sample; math fixtures
+  pinned to ≤4-token answers → whole matrix ≈ 30–40 min GPU-exclusive.
+  Feature set: `--features "cubecl_runtime ternary_gemv speculative_decode"`,
+  `--release`.
+- **T1.4 bench doc lands in `../riir-ai/.benchmarks/`** at that repo's next
+  free number (582 is taken in katgpt-rs by `582_trit_pack_goat.md`; the
+  `.highwater` rule applies per-repo at write time) — link back here.
+
 - [ ] **T1.1** Fixture set: ≥200 prompts with known-correct short answers across two families (math-extraction via `RegexAnswerExtractor` ladder + a discrete game-action analog via `DiscreteActionExtractor`) — both extractor impls already ship in parallel_probe.
 - [ ] **T1.2** Stratum table: K=64 sampled answers → vote-accuracy strata {<25%, 25–50%, >50%} × {P, N} → P(wrong|stratum, branch-class). **G1 kill gate: P(wrong|minority)/P(wrong|majority) ≥ 1.5 in EVERY stratum including <25%.** If G1 fails on our domains, the asymmetric treatment is dead — record the honest negative and close the plan (cheap: no flag, no wiring).
 - [ ] **T1.3** Token-level signal extraction on the same fixtures: per-branch s(t) accumulation → rollout-wrongness AUC. **G2 gate: AUC ≥ 0.70 vs baselines {mean −log p, entropy-sum, length, disagreement-only}.** Record the per-baseline table; any dominant baseline demotes that signal.
-- [ ] **T1.4** Results → `.benchmarks/582_asymmetric_consensus_measurement.md` (next free number; GPU/quiet-box note per the measurement rules).
+- [ ] **T1.4** Results → `../riir-ai/.benchmarks/NNN_asymmetric_consensus_measurement.md` (riir-ai's next free number at write time — see the harness decision above; GPU/quiet-box note per the measurement rules).
 
 ## Phase 2 — `asymmetric_consensus` wiring (only if G1+G2 pass)
 
