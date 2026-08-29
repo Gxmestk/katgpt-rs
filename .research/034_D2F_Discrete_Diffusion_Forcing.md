@@ -3,6 +3,8 @@
 > Xu Wang, Chenkai Xu, Yijie Jin, Jiachun Jin, Hao Zhang, Zhijie Deng
 > Shanghai Jiao Tong University & UC San Diego, Aug 2025
 
+> **PASS-Redirects (synthesis):** Lai/Song/Kim/Mitsufuji/Ermon [arXiv:2510.21890v3 "The Principles of Diffusion Models"] — definitive diffusion monograph (MIT Press 2027); its discrete-diffusion "Road Ahead" chapter and flow-map chapter are reference formalizations of what D2F already ships (block-AR + intra-block denoising). Crosswalk rows: katgpt-rs/.research/271 §6.
+
 ## 1. What D2F Actually Does (Verified by Reading)
 
 ### 1.1 Core Mechanism

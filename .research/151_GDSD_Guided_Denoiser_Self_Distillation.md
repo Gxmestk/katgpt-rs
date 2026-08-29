@@ -4,6 +4,7 @@
 **Source:** arXiv:2605.29398 — Tang et al. (UCL, Alibaba, UNIST, Basel)
 **Status:** Creative Distillation — Modelless + Model-Based Fusion
 **PASS-Redirects (synthesis):** D-OPSD [arXiv:2605.05204 "D-OPSD"] — image-diffusion variant of on-policy self-distillation; targets image-diffusion velocity fields, not the discrete diffusion (dLLM) setting GDSD addresses. The OPSD+privileged-context-teacher pattern is already covered by GDSD's closed-form + SDAR's sigmoid gate. → riir-train if image diffusion is ever shipped.
+**PASS-Redirects (synthesis):** Lai/Song/Kim/Mitsufuji/Ermon [arXiv:2510.21890v3 "The Principles of Diffusion Models"] — definitive diffusion monograph (MIT Press 2027); its guidance chapter (incl. Diff-DPO) and training-objective chapters are principle-level formalizations of the alignment/distillation families GDSD implements for dLLMs. No recipe delta. Crosswalk rows: katgpt-rs/.research/271 §6.
 
 ---
 
