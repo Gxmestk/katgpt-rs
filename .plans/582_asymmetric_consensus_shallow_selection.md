@@ -1,6 +1,6 @@
 # Plan 582: Asymmetric Consensus for Shallow-Reasoning Selection (TTPO modelless extraction)
 
-**Status:** Ready, not started. Origin: arXiv:2608.27448 (TTPO) via [riir-train R435](../riir-train/.research/435_TTPO_Test_Time_Policy_Optimization.md) §User-Challenge Addendum — the modelless decision layer is the gain-bearing track for this stack (gradient TTT is unaffordable on our serving envelope; the L4 fixer's ~191 s/fix + 0/60 EM is the measured proof). Companion gradient plan: riir-train Plan 363 (secondary).
+**Status:** CLOSED-NEGATIVE (2026-08-30) — the Phase 1 kill gates FAILED on the serving model; per T1.2's own rule the plan closes at Phase 1 with no flag and no wiring. Measurement: [riir-ai Bench 819](../riir-ai/.benchmarks/819_plan582_asymmetric_consensus_measurement.md) (Bonsai-27B Metal, K=64 × 200 prompts, rollback determinism probe PASS). Headline: P(wrong|N)/P(wrong|P) = **0.744 (INVERTED)** at 25–50% vote accuracy and 0.960 at >50% (gate asked ≥1.5); <25% stratum unpopulated (attractors concentrate agreement). G2: s = Σ −log p·(1−Ĥ) AUC **0.472 — below random** (baselines: mean −logp 0.571, entropy-sum 0.197 INVERTED, disagreement 0.514). Mechanism: Bonsai's failure modes are degenerate ATTRACTORS (first-operand echo in math, always-forward in action) — consensus concentrates on the wrong answer and the MINORITY carries the corrections, the exact opposite of TTPO's asymmetry. Scope caveat: does not refute the paper (Qwen3 instruct+CoT regime); it kills the mechanism on OUR serving envelope, which is what this plan scoped. Salvage recorded in Bench 819 §caveats (entropy is anti-selective on this model class). Origin: arXiv:2608.27448 (TTPO) via [riir-train R435](../riir-train/.research/435_TTPO_Test_Time_Policy_Optimization.md) §User-Challenge Addendum. Companion gradient plan: riir-train Plan 363 (secondary; its own G0 kill gate should weigh this negative).
 
 ## Summary
 
@@ -32,7 +32,7 @@ Speculative-selection + pruning. Feature `asymmetric_consensus` (katgpt-speculat
 - `ProbeDecision<A>` (Continue/Stop/Prune/StopAndPrune) gains no variants — confidence-scoring composes into the existing `should_prune()` inputs and the stop-time selection hook.
 - Sigmoid discipline: the law's outputs are bounded-[0,1] products; no softmax anywhere.
 
-## Phase 1 — measurement (no flag; the kill gate runs first)
+## Phase 1 — measurement (no flag; the kill gate runs first) — DONE 2026-08-30, GATES FAILED
 
 ### Phase 1 harness decision (pinned 2026-08-29 — owner call)
 
@@ -68,12 +68,14 @@ inference-only, so the serving model measures its own selection layer.
   free number (582 is taken in katgpt-rs by `582_trit_pack_goat.md`; the
   `.highwater` rule applies per-repo at write time) — link back here.
 
-- [ ] **T1.1** Fixture set: ≥200 prompts with known-correct short answers across two families (math-extraction via `RegexAnswerExtractor` ladder + a discrete game-action analog via `DiscreteActionExtractor`) — both extractor impls already ship in parallel_probe.
-- [ ] **T1.2** Stratum table: K=64 sampled answers → vote-accuracy strata {<25%, 25–50%, >50%} × {P, N} → P(wrong|stratum, branch-class). **G1 kill gate: P(wrong|minority)/P(wrong|majority) ≥ 1.5 in EVERY stratum including <25%.** If G1 fails on our domains, the asymmetric treatment is dead — record the honest negative and close the plan (cheap: no flag, no wiring).
-- [ ] **T1.3** Token-level signal extraction on the same fixtures: per-branch s(t) accumulation → rollout-wrongness AUC. **G2 gate: AUC ≥ 0.70 vs baselines {mean −log p, entropy-sum, length, disagreement-only}.** Record the per-baseline table; any dominant baseline demotes that signal.
-- [ ] **T1.4** Results → `../riir-ai/.benchmarks/NNN_asymmetric_consensus_measurement.md` (riir-ai's next free number at write time — see the harness decision above; GPU/quiet-box note per the measurement rules).
+- [x] **T1.1** Fixture set: ≥200 prompts with known-correct short answers across two families (math-extraction via `RegexAnswerExtractor` ladder + a discrete game-action analog via `DiscreteActionExtractor`) — both extractor impls already ship in parallel_probe. *(200 fixtures shipped in `../riir-ai/crates/riir-gpu/tests/plan582_phase1_measurement.rs`)*
+- [x] **T1.2** Stratum table: K=64 sampled answers → vote-accuracy strata {<25%, 25–50%, >50%} × {P, N} → P(wrong|stratum, branch-class). **G1 kill gate: P(wrong|minority)/P(wrong|majority) ≥ 1.5 in EVERY stratum including <25%.** If G1 fails on our domains, the asymmetric treatment is dead — record the honest negative and close the plan (cheap: no flag, no wiring). *(RAN: FAIL — 0.744 INVERTED at 25–50%, 0.960 at >50%; <25% empty. [Bench 819](../riir-ai/.benchmarks/819_plan582_asymmetric_consensus_measurement.md))*
+- [x] **T1.3** Token-level signal extraction on the same fixtures: per-branch s(t) accumulation → rollout-wrongness AUC. **G2 gate: AUC ≥ 0.70 vs baselines {mean −log p, entropy-sum, length, disagreement-only}.** Record the per-baseline table; any dominant baseline demotes that signal. *(RAN: FAIL — AUC 0.472, below random and below best baseline 0.571; entropy-sum inverted at 0.197.)*
+- [x] **T1.4** Results → `../riir-ai/.benchmarks/NNN_asymmetric_consensus_measurement.md` (riir-ai's next free number at write time — see the harness decision above; GPU/quiet-box note per the measurement rules). *([Bench 819](../riir-ai/.benchmarks/819_plan582_asymmetric_consensus_measurement.md); rollback determinism probe PASS — it caught the last-forward-logits side-channel bug on run 1)*
 
-## Phase 2 — `asymmetric_consensus` wiring (only if G1+G2 pass)
+## Phase 2 — `asymmetric_consensus` wiring — DEAD (G1 failed; never entered)
+
+Per T1.2's kill rule, no flag is created and nothing below ships:
 
 - [ ] **T2.1** `ConfidentErrorScorer` (katgpt-speculative): `feed(branch_id, neg_log_p, entropy_norm)` + `branch_score(branch_id) -> f32`; fixed-capacity, zero-alloc, deterministic.
 - [ ] **T2.2** parallel_probe integration: scorer fed from the verify/draft path; `should_prune()` composes `disagreement_streak OR confident_error_mass ≥ θ_ce`; θ_ce pinned from T1.4's ROC knee (frozen constant — the calibration law is the justification for NOT adding a vote-quality estimator).
@@ -81,7 +83,7 @@ inference-only, so the serving model measures its own selection layer.
 - [ ] **T2.4** `ConvergenceSelector` tiebreak mode (katgpt-core, behind the same feature): MajorityVote ties broken by lower confident-error mass; carries the G2 evidence in its doc.
 - [ ] **T2.5** `hint_regret` escalation input: confident-error mass as a triage signal beside the existing band gate (compositional; no behavior change without the feature).
 
-## Phase 3 — GOAT gate + verdict
+## Phase 3 — GOAT gate + verdict — DEAD (never entered)
 
 - [ ] **T3.1 G3 prune economics:** ≥2× verify-token savings at no Maj@K loss vs shipped pruning (bit-identical answer clustering across runs; determinism gate).
 - [ ] **T3.2 G5 no-regression:** flag-off behavior bit-identical on all existing parallel_probe + EqR tests; count-identical lib suites both states; clippy 0.
