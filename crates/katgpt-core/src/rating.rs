@@ -188,7 +188,7 @@ mod tests {
         // expectation for the favorite) — opposite, conserving, symmetric:
         // a 400-gap favorite (E = 10/11) drops K·(0.5 − 10/11) ≈ −13.09.
         let (a, b) = update_scored(1200.0, 800.0, 0.5, STANDARD_K, 400.0);
-        assert!((a - 1186.909_090_909).abs() < 1e-6, "favorite drifts down: {a}");
+        assert!((a - 1_186.909_090_909).abs() < 1e-6, "favorite drifts down: {a}");
         assert!((b - 813.090_909_091).abs() < 1e-6, "underdog drifts up: {b}");
         assert!((a + b - 2000.0).abs() < 1e-9);
     }

@@ -425,7 +425,7 @@ mod tests {
                 let d = distinguishability(&base, &prover);
                 let al = alignment(&base, &prover);
                 assert!(
-                    d.is_finite() && d >= 0.0 && d <= 0.25,
+                    d.is_finite() && (0.0..=0.25).contains(&d),
                     "D out of range at [{q0}, {q1}]: {d}"
                 );
                 let cs_cap = (d * d_pi).sqrt();
@@ -648,7 +648,7 @@ mod tests {
             assert_eq!(bok_advantage(7, q, q), 0.0);
         }
         // Q→V limit: K* → 1/|ln(1−V)| = 1/ln 2 at V = 0.5 (δ = 0.001)
-        assert!((k_star(0.501, 0.5) - 1.442_695).abs() < 0.005);
+        assert!((k_star(0.501, 0.5) - std::f32::consts::LOG2_E).abs() < 0.005);
     }
 
     /// Totality: out-of-domain and NaN inputs surface as NaN (never a
