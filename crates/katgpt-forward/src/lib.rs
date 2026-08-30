@@ -111,6 +111,13 @@ pub struct ForwardContext {
     pub topk_output_buf: Vec<usize>,  // [topk] output indices buffer
     // Loop residual: saves h^(τ-1) for residual gating across weight-shared loops
     pub prev_h: Vec<f32>, // [n_embd]
+    // GRT fixed loop anchor (Issue 698 T2): frozen h^(0), hoisted ONCE at the
+    // end of the first loop iteration under `LoopStabilityMode::FixedAnchor`
+    // and re-injected by the residual gate at every gated iteration instead
+    // of the drifting h^(τ-1). Pre-allocated, zero alloc in hot path. Written
+    // once per forward at tau==0 only when the mode is selected.
+    #[cfg(feature = "loop_stability_fix")]
+    pub loop_anchor: Vec<f32>, // [n_embd]
     // Delta routing: pre-allocated source_refs index buffer (stores block indices, not slices)
     #[cfg(feature = "delta_routing")]
     pub delta_source_indices: Vec<usize>, // pre-allocated capacity for max sources
@@ -221,6 +228,8 @@ impl ForwardContext {
                 config.vocab_size.div_ceil(config.mtp_cluster_size.max(1)),
             ),
             prev_h: vec![0.0; config.n_embd],
+            #[cfg(feature = "loop_stability_fix")]
+            loop_anchor: vec![0.0; config.n_embd],
             #[cfg(feature = "delta_routing")]
             delta_source_indices: {
                 let block_size = 4; // Default B=4

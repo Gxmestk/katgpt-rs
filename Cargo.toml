@@ -222,7 +222,7 @@ validator = ["katgpt-validator/validator"]  # Two-tier syntax pruner (PartialPar
 # below were also removed in the same migration.
 sparse_mlp = ["katgpt-core/sparse_mlp", "katgpt-pruners/sparse_mlp", "katgpt-forward/sparse_mlp", "katgpt-attn/sparse_mlp"]  # TwELL-inspired sparse MLP matmul (Plan 022). Forwarded to katgpt-forward so ForwardContext.active_indices/values compile (Issue 007 Phase F) AND so forward_hla/forward_ahla's sparse MLP path compiles (Issue 007 Phase F.4b — HLA forward lives in katgpt-forward). Forwarded to katgpt-attn so forward_gdn2's sparse MLP path compiles (Issue 007 Phase F.4a). Not in `default` directly; transitively enabled via `substrate_gate` (Issue 181).
 gated_mlp = ["katgpt-transformer/gated_mlp", "katgpt-forward/gated_mlp", "katgpt-attn/gated_mlp"]  # Gated MLP (SwiGLU) — LLaMA-style gated MLP variant (Issue 377). Opt-in: the standard ReLU MLP is the production path. When enabled, mlp_w1 becomes W_gate, mlp_w_up is W_up, mlp_w2 becomes W_down. Forward: SiLU(W_gate·h) ⊙ W_up·h → W_down·. Training-target architecture for aHLA MLP LoRA (Plan 066 Experiment E).
-loop_stability_fix = ["katgpt-core/loop_stability_fix"]  # Inter-loop RMSNorm for weight-shared looped inference (Plan 428). Opt-in: normalize hidden state between T-pass loop iterations to control residual norm growth. PoC validated 3.34× norm ratio vs 11.19× baseline. Zero cost when LoopStabilityMode::None (default).
+loop_stability_fix = ["katgpt-core/loop_stability_fix", "katgpt-forward/loop_stability_fix"]  # Inter-loop RMSNorm (Plan 428) + GRT fixed loop anchor (Issue 698 T2) for weight-shared looped inference. Opt-in: normalize hidden state between T-pass loop iterations to control residual norm growth (PoC: 3.34× norm ratio vs 11.19× baseline); FixedAnchor additionally freezes h^(0) and re-injects it at every gated iteration (GRT Table 11: fixed beats drifting by +0.70 nats). Zero cost when LoopStabilityMode::None (default).
 ppot = ["katgpt-pruners/ppot", "katgpt-speculative/ppot"]  # PPoT logit-parameterized CPU resampling (Plan 026 + 027). Also forwards to katgpt-speculative so the extracted types/knowledge/entropy/rank primitives (Issue 003) compile; the `resample` orchestrator stays in root. Not in `default` directly; transitively enabled via `thinking_cot` (Issue 181).
 domain_latent = ["katgpt-core/domain_latent", "katgpt-pruners/domain_latent", "katgpt-forward/domain_latent"]  # Free Transformer mid-layer domain conditioning (Plan 038). Plan 385: also forwarded to katgpt-forward so forward_base/forward_coda's `domain_latent: Option<&DomainLatent>` parameter compiles when the feature is enabled.
 bandit = ["katgpt-core/review_metrics", "katgpt-pruners/bandit", "katgpt-speculative/bandit"]  # Multi-armed bandit adaptive ScreeningPruner (Plan 030). Enables katgpt-core/review_metrics so the relocated ReviewMetrics (Plan 308 Phase 3 move from root) is re-exported at crate::pruners::review_metrics. Plan 387: flow_pruner moved to katgpt-speculative (local bandit switch — does NOT cycle because the leaf's bandit is a pure tracking flag, no katgpt-pruners dep). Not in `default` directly; transitively enabled via 30+ parents including `bandit_top_p`, `tes_loop`, `federation`, `dreamer`, `data_gate`, `curvature_alloc`, `nds_proxy`, `wealth_pruner`, `freq_bandit`, `sr2am_configurator`, `subterranean`, `collapse_aware_thinking` (Issue 181).
@@ -1292,6 +1292,14 @@ required-features = ["lt2_looped", "loop_stability_fix"]
 [[test]]
 name = "issue_698_t1_gain_spectrum"
 path = "tests/issue_698_t1_gain_spectrum.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
+# Issue 698 T2 — GRT fixed-anchor loop A/B ordering bench (GRT Table 11).
+# Arms: fixed (norm + frozen h^(0)) vs drifting (None / InterLoopNorm) vs
+# zeros (no injection); armed gates (new_loop_stable) make the anchor visible.
+[[test]]
+name = "issue_698_t2_fixed_anchor"
+path = "tests/issue_698_t2_fixed_anchor.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
 
 [[example]]

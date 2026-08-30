@@ -444,12 +444,26 @@ pub enum HybridPattern {
 /// Parameter-free architectural fixes for T-pass loop stability, validated
 /// via the §3.6 defend-wrong PoC benchmark.
 ///
-/// **Only `InterLoopNorm` ships** — the PoC proved it's the sole fix that
+/// **`InterLoopNorm` ships** — the PoC proved it's the sole fix that
 /// controls residual norm growth. FLA-res (direct residual addition of
 /// `prev_h` at every layer) caused catastrophic norm explosion (~2.2B× at
 /// T=12), and Attention Injection was a no-op for single-position attention
 /// (softmax of 1 element = 1.0, so Q doesn't affect the output). Both were
 /// dropped per the defend-wrong verdict.
+///
+/// **`FixedAnchor`** (Issue 698 T2, GRT arXiv:2608.15062 Table 11): composes
+/// the inter-loop norm (GRT's gate consumes LN inputs — normalization is a
+/// prerequisite, not a competitor) with a FROZEN loop anchor: the state
+/// after the first loop iteration (h^(0)) is hoisted once into a dedicated
+/// buffer, and every gated iteration re-injects `ρ_τ ⊙ anchor` instead of
+/// the drifting `ρ_τ ⊙ h^(τ-1)`. Paper ordering (trained anchor-gate
+/// weights): frozen prelude output 2.68 < drifting h(r−1) 3.38 (+0.70 nats)
+/// < raw embedding 3.73 < zeros 8.08. On our prelude-less arch the tau==0
+/// pre-pass state IS the raw embedding — the paper's distinct, worse arm —
+/// so the anchor is hoisted once the FIRST iteration completes (h^(0) is
+/// the prelude-output interpretant). Random-weight caveat: the paper's
+/// numbers are anchor-trained; the ORDERING is the structural claim under
+/// test (`tests/issue_698_t2_fixed_anchor.rs`). Zero cost when not selected.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub enum LoopStabilityMode {
@@ -460,6 +474,12 @@ pub enum LoopStabilityMode {
     /// (tau > 0), before the inner layer pass. PoC: norm ratio 3.34× vs
     /// baseline 11.19×, KL 0.0008, step-size trend converging (14.9 → 2.05).
     InterLoopNorm,
+    /// GRT fixed-anchor loop (Issue 698 T2): the inter-loop norm PLUS a
+    /// frozen anchor hoisted once at the end of the first loop iteration
+    /// (= h^(0)); every gated iteration re-injects `ρ_τ ⊙ anchor` instead
+    /// of the drifting `ρ_τ ⊙ h^(τ-1)`. GRT Table 11: fixed prelude output
+    /// beats drifting h(r−1) by +0.70 nats; zeros are catastrophic (8.08).
+    FixedAnchor,
 }
 
 /// Head-specific sigmoid gate after SDPA, before Wo.

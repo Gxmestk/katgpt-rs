@@ -271,8 +271,16 @@ pub fn forward_looped<'a>(
         // residual norm growth in weight-shared looped inference — the PoC
         // benchmark (examples/loop_stability_poc.rs) validated 3.34× norm ratio
         // vs 11.19× baseline at T=12. Zero cost when LoopStabilityMode::None.
+        // Issue 698 T2 — FixedAnchor composes the norm (GRT's gate consumes LN
+        // inputs: normalization is a prerequisite, not a competitor).
         #[cfg(feature = "loop_stability_fix")]
-        if tau > 0 && config.loop_stability_mode == crate::types::LoopStabilityMode::InterLoopNorm {
+        if tau > 0
+            && matches!(
+                config.loop_stability_mode,
+                crate::types::LoopStabilityMode::InterLoopNorm
+                    | crate::types::LoopStabilityMode::FixedAnchor
+            )
+        {
             crate::types::rmsnorm(&mut ctx.x[..n]);
         }
 
@@ -419,11 +427,23 @@ pub fn forward_looped<'a>(
 
         // Per-loop residual gate: h^(τ) = h̃^(τ) + ρ_τ ⊙ h^(τ-1)
         // ρ_τ is zero-init → first iteration: h^(0) = h̃^(0) (no residual)
+        // Issue 698 T2 — under FixedAnchor the injected state is the FROZEN
+        // anchor (h^(0), hoisted once below) instead of the drifting h^(τ-1):
+        // GRT Table 11 (frozen prelude output 2.68 vs drifting h(r−1) 3.38).
         if tau > 0 {
             let gate_offset = tau * n;
             if gate_offset + n <= residual_gate.gates.len() {
-                // ctx.x += gates ⊙ prev_h  (element-wise fused multiply-accumulate)
-                ctx.hidden[..n].copy_from_slice(&ctx.prev_h[..n]);
+                #[cfg(feature = "loop_stability_fix")]
+                let injected: &[f32] =
+                    if config.loop_stability_mode == crate::types::LoopStabilityMode::FixedAnchor {
+                        &ctx.loop_anchor[..n]
+                    } else {
+                        &ctx.prev_h[..n]
+                    };
+                #[cfg(not(feature = "loop_stability_fix"))]
+                let injected: &[f32] = &ctx.prev_h[..n];
+                // ctx.x += gates ⊙ injected  (element-wise fused multiply-accumulate)
+                ctx.hidden[..n].copy_from_slice(injected);
                 katgpt_core::simd::simd_scale_mul_inplace(
                     &mut ctx.hidden[..n],
                     &residual_gate.gates[gate_offset..gate_offset + n],
@@ -431,6 +451,19 @@ pub fn forward_looped<'a>(
                 );
                 katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.hidden[..n]);
             }
+        }
+
+        // Issue 698 T2 — hoist the fixed anchor once the first loop iteration
+        // completes: anchor = h^(0), the loop core's own first-pass output.
+        // Interpretant note: on our prelude-less arch the tau==0 PRE-pass state
+        // is the raw embedding — the paper's DISTINCT, worse anchor arm (Table
+        // 11: 3.73 vs 2.68) — so the frozen anchor is the first-pass OUTPUT
+        // (the prelude-output analog). One copy per forward, tau==0 only; the
+        // loop always runs ≥ 1 iteration, so the anchor is always valid before
+        // the first gated iteration (tau == 1) can read it.
+        #[cfg(feature = "loop_stability_fix")]
+        if tau == 0 && config.loop_stability_mode == crate::types::LoopStabilityMode::FixedAnchor {
+            ctx.loop_anchor[..n].copy_from_slice(&ctx.x[..n]);
         }
 
         // Plan 283 T2.2 — AdvantageMarginGate dead-compute check.

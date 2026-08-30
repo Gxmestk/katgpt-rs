@@ -81,6 +81,10 @@ tiled_attention = ["katgpt-core/tiled_attention"]
 # Training-free loop window buffers (Issue 091).
 tf_loop = []
 
+# GRT fixed loop anchor buffer (Issue 698 T2): ForwardContext.loop_anchor.
+# Empty tracking flag — root forwards its `loop_stability_fix` here.
+loop_stability_fix = []
+
 # Hydra Adaptive Layer Budget: pre-computed skip plan (Research 148, Plan 165).
 hydra_budget = ["katgpt-pruners/hydra_budget"]
 
