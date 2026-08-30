@@ -232,6 +232,8 @@ The "model-based" path improvements (noted for riir-train):
 2. **Explicit norm penalty** — add `λ · ||h||^2` to the training loss (Readout Blind Spot's training fix).
 3. **Stochastic loop count during training** — randomize loop count to improve OOD robustness (2606.29983).
 
+> **Update 2026-08-30 (arXiv:2608.15062 GRT):** item 3 now has direct measured evidence + a simpler form — GRT's *uniform* depth sampling `r ~ U{1..R}` yields emergent early exit with ZERO auxiliary losses (92% accuracy at half depth), beating MoR/RRT/Ouro/heavy-tail-Poisson; also supplies the fixed-anchor evidence this note's FLT_res variant lacked (frozen prelude anchor beats the drifting `h(r-1)` anchor by 0.70 nats, trained-gate ablation) and a convex (norm-bounded) gate form vs our additive `ResidualGate`. Filed: `riir-train/.plans/364` (training recipe), `.issues/698` (runtime corollaries); full distillation `.research/519`.
+
 These are → riir-train. The PoC tests only the modelless (inference-time) fixes.
 
 ---
