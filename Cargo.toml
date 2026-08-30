@@ -1329,6 +1329,16 @@ name = "issue_698_t5_kv_mean"
 path = "tests/issue_698_t5_kv_mean.rs"
 required-features = ["tf_loop"]
 
+# Issue 698 T7 — per-token difficulty routing GATE PROBE (the issue's own
+# precondition: >=2x marginal-gain separation stratified by step-1
+# entropy/margin; PASS unblocks T7's decode-only design, FAIL records the
+# gate refused with the measurement). Modelless CPU-only; cross-checks T1's
+# pinned spectrum bits for harness parity.
+[[test]]
+name = "issue_698_t7_gate_probe"
+path = "tests/issue_698_t7_gate_probe.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]
