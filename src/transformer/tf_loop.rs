@@ -23,6 +23,9 @@ use crate::types::{self};
 ///      b. Sub-step: x += (1/K)·(y − x)  [damped Euler]
 /// 5. Blend with anchor: x = β·x_anchor + (1−β)·x
 /// 6. Stash:     single forward through window writes canonical KV
+///               (`CacheStrategy::Mean` skips this pass entirely — the loop
+///               iterations' running-mean K/V is written back instead,
+///               Issue 698 T5)
 /// 7. Post-loop: for layer window_end+1..n_layer: standard forward, write KV
 /// 8. LM head
 /// ```
@@ -115,9 +118,15 @@ pub fn forward_training_free_loop<'a>(
     // `k == 0` the buffer is never observed at all.
 
     // 4. Loop K times over the window with sub-stepping
+    //
+    // Issue 698 T5: when `cache_strategy == Mean`, each iteration's freshly
+    // written K/V rows at `pos` are folded into a per-layer incremental
+    // running mean (fixed order ⇒ deterministic f32 sum). The guard is
+    // read-once — `First`/`Last` paths are structurally unchanged.
+    let mean_kv = tf_config.cache_strategy == CacheStrategy::Mean;
     match tf_config.iteration_mode {
         IterationMode::Block => {
-            for _ in 0..k {
+            for it in 0..k {
                 // Forward through window layers
                 for layer_idx in window_start..=window_end {
                     forward_single_layer(
@@ -131,6 +140,17 @@ pub fn forward_training_free_loop<'a>(
                         kvd,
                         n_kv,
                     );
+                    if mean_kv {
+                        fold_kv_mean(
+                            &cache.layers[layer_idx],
+                            &mut ctx.tf_kv_mean_k,
+                            &mut ctx.tf_kv_mean_v,
+                            layer_idx,
+                            pos,
+                            kvd,
+                            it + 1,
+                        );
+                    }
                 }
                 // Save window output
                 ctx.tf_y_buf[..n].copy_from_slice(&ctx.x[..n]);
@@ -141,7 +161,7 @@ pub fn forward_training_free_loop<'a>(
             }
         }
         IterationMode::Layer => {
-            for _ in 0..k {
+            for it in 0..k {
                 for layer_idx in window_start..=window_end {
                     // Forward single layer
                     forward_single_layer(
@@ -155,6 +175,17 @@ pub fn forward_training_free_loop<'a>(
                         kvd,
                         n_kv,
                     );
+                    if mean_kv {
+                        fold_kv_mean(
+                            &cache.layers[layer_idx],
+                            &mut ctx.tf_kv_mean_k,
+                            &mut ctx.tf_kv_mean_v,
+                            layer_idx,
+                            pos,
+                            kvd,
+                            it + 1,
+                        );
+                    }
                     // Sub-step per layer
                     ctx.tf_y_buf[..n].copy_from_slice(&ctx.x[..n]);
                     ctx.x[..n].copy_from_slice(&ctx.tf_x_pre_window[..n]);
@@ -170,9 +201,19 @@ pub fn forward_training_free_loop<'a>(
     }
 
     // 6. Stash: single forward through window writes canonical KV entries
+    //
+    // Issue 698 T5: `Mean` skips this window-forward entirely — the loop's
+    // own running-mean K/V rows are written back instead (one whole window
+    // pass per token deleted). Post-loop consumption follows the `First`
+    // shape: ctx.x stays the blended state.
     {
-        ctx.tf_stash_x[..n].copy_from_slice(&ctx.x[..n]);
-        match tf_config.cache_strategy {
+        // Mean over zero iterations is the pre-window state — First semantics.
+        let cache_strategy = if k == 0 {
+            CacheStrategy::First
+        } else {
+            tf_config.cache_strategy
+        };
+        match cache_strategy {
             CacheStrategy::Last => {
                 // Forward with final state → writes KV
                 for layer_idx in window_start..=window_end {
@@ -190,7 +231,9 @@ pub fn forward_training_free_loop<'a>(
                 }
             }
             CacheStrategy::First => {
-                // Forward with pre-window state → writes KV
+                // Stash the blended state, forward with pre-window state →
+                // writes KV, then restore the blended state.
+                ctx.tf_stash_x[..n].copy_from_slice(&ctx.x[..n]);
                 ctx.x[..n].copy_from_slice(&ctx.tf_x_pre_window[..n]);
                 for layer_idx in window_start..=window_end {
                     forward_single_layer(
@@ -207,6 +250,18 @@ pub fn forward_training_free_loop<'a>(
                 }
                 // Restore the blended state
                 ctx.x[..n].copy_from_slice(&ctx.tf_stash_x[..n]);
+            }
+            CacheStrategy::Mean => {
+                // Write the accumulated running means (the loop already
+                // produced the canonical KV) — NO window-forward here.
+                for layer_idx in window_start..=window_end {
+                    let mean_off = layer_idx * kvd;
+                    let pos_off = pos * kvd;
+                    cache.layers[layer_idx].key[pos_off..pos_off + kvd]
+                        .copy_from_slice(&ctx.tf_kv_mean_k[mean_off..mean_off + kvd]);
+                    cache.layers[layer_idx].value[pos_off..pos_off + kvd]
+                        .copy_from_slice(&ctx.tf_kv_mean_v[mean_off..mean_off + kvd]);
+                }
             }
         }
     }
@@ -346,6 +401,50 @@ fn forward_single_layer(
         config.mlp_hidden,
     );
     katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
+}
+
+/// Fold the freshly written K/V rows at `pos` into the per-layer running
+/// mean (Issue 698 T5).
+///
+/// Incremental streaming mean over the k loop iterations in fixed order —
+/// a deterministic f32 sum:
+///
+/// ```text
+/// mean ← mean + (fresh − mean) / count   (count 1-based)
+/// ```
+///
+/// `count == 1` is the plain copy (also the staleness reset: every Mean
+/// forward rewrites its window rows before the write-back, so no state can
+/// leak across forwards). Zero alloc; the row is kvd-wide, negligible next
+/// to the matmuls it amortises (one deleted window-forward per token).
+#[inline]
+fn fold_kv_mean(
+    layer_cache: &KVCache,
+    mean_k: &mut [f32],
+    mean_v: &mut [f32],
+    layer_idx: usize,
+    pos: usize,
+    kvd: usize,
+    count: usize,
+) {
+    let pos_off = pos * kvd;
+    let mean_off = layer_idx * kvd;
+    let fresh_k = &layer_cache.key[pos_off..pos_off + kvd];
+    let fresh_v = &layer_cache.value[pos_off..pos_off + kvd];
+    let mk = &mut mean_k[mean_off..mean_off + kvd];
+    let mv = &mut mean_v[mean_off..mean_off + kvd];
+    if count <= 1 {
+        mk.copy_from_slice(fresh_k);
+        mv.copy_from_slice(fresh_v);
+        return;
+    }
+    let inv = 1.0f32 / count as f32;
+    for i in 0..kvd {
+        mk[i] += (fresh_k[i] - mk[i]) * inv;
+    }
+    for i in 0..kvd {
+        mv[i] += (fresh_v[i] - mv[i]) * inv;
+    }
 }
 
 /// Delta routing: softmax over delta sources, additive to residual (Plan 097).

@@ -47,6 +47,20 @@ pub enum CacheStrategy {
     Last,
     /// Use the pre-loop hidden state for KV cache (first iteration).
     First,
+    /// Running mean of K/V across the loop iterations (Issue 698 T5).
+    ///
+    /// The window iterations already produce k K/V rows at `pos`; this
+    /// strategy folds their incremental streaming mean (fixed loop order ⇒
+    /// deterministic f32 sum) and writes it back — the dedicated stash
+    /// window-forward is deleted (a whole window pass per token saved).
+    ///
+    /// LOSSY by design: gate callers on per-position argmax stability + a
+    /// pinned max_abs band (the Bench-773 rule — max_rel with a floor
+    /// denominator cannot certify lossy numerics), never bit-identity.
+    /// The k=1 degenerate is exact (one iteration's mean IS that
+    /// iteration's K/V, which equals the `First` stash), so plumbing
+    /// correctness is bit-testable even though the k>1 path is not.
+    Mean,
 }
 
 /// Configuration for training-free loop wrapper (Plan 136).

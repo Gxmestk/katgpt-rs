@@ -1319,6 +1319,16 @@ name = "issue_698_t4_halter_floors"
 path = "tests/issue_698_t4_halter_floors.rs"
 required-features = ["lt2_looped", "loop_stability_fix", "gain_cost_halt"]
 
+# Issue 698 T5 — KV mean-across-steps (CacheStrategy::Mean): the loop's own
+# running-mean K/V replaces the dedicated stash window-forward (one window
+# pass per token deleted). Lossy-surface gate: k=1 degenerate bit-identity
+# (plumbing), per-position argmax stability + pinned max_abs band at k=4,
+# wall-clock speedup.
+[[test]]
+name = "issue_698_t5_kv_mean"
+path = "tests/issue_698_t5_kv_mean.rs"
+required-features = ["tf_loop"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]

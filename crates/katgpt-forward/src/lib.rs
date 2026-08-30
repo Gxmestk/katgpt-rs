@@ -133,6 +133,17 @@ pub struct ForwardContext {
     pub tf_y_buf: Vec<f32>, // [n_embd] temp buffer for window output
     #[cfg(feature = "tf_loop")]
     pub tf_stash_x: Vec<f32>, // [n_embd] stash for KV cache write
+    // Issue 698 T5 (CacheStrategy::Mean): per-window-layer running-mean K/V
+    // rows at `pos`, folded incrementally across the k loop iterations in
+    // fixed order (deterministic f32 sum) and written back after the loop —
+    // replacing the dedicated stash window-forward. Layer-major layout:
+    // row for layer L lives at [L·kvd .. (L+1)·kvd]. Zero alloc in hot path;
+    // fully rewritten (count==1 plain copy) before every read, so no
+    // cross-forward staleness can leak.
+    #[cfg(feature = "tf_loop")]
+    pub tf_kv_mean_k: Vec<f32>, // [n_layer * kv_dim]
+    #[cfg(feature = "tf_loop")]
+    pub tf_kv_mean_v: Vec<f32>, // [n_layer * kv_dim]
     // GQA lookup: kv_group_lut[h] = h * n_kv_head / n_head (pre-computed once)
     pub kv_group_lut: [u8; 128], // fixed-size LUT for GQA head→kv_group mapping (up to 128 heads)
     pub _kv_group_lut_count: usize, // actual number of heads (n_head)
@@ -246,6 +257,10 @@ impl ForwardContext {
             tf_y_buf: vec![0.0f32; config.n_embd],
             #[cfg(feature = "tf_loop")]
             tf_stash_x: vec![0.0f32; config.n_embd],
+            #[cfg(feature = "tf_loop")]
+            tf_kv_mean_k: vec![0.0f32; config.n_layer * kvd],
+            #[cfg(feature = "tf_loop")]
+            tf_kv_mean_v: vec![0.0f32; config.n_layer * kvd],
             kv_group_lut: {
                 let n_head = config.n_head;
                 let n_kv_head = config.n_kv_head;
