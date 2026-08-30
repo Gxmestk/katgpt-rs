@@ -692,11 +692,11 @@ pub use types::ShardEmbedding;
 pub use types::sample_token;
 pub use types::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, Config, ConvergenceSelector,
-    DashAttnConfig, DilationConfig, HlaMode, HybridPattern, InferenceOverrides, InferenceResult,
-    LoopMode, LoraAdapter, LoraPair, ModelArchitecture, ResidualGate, RetrievalHeadRole, Rng,
-    RtTurboConfig, SdpaOutputGate, WeightDtype, kv_dim, lora_apply, matmul, matmul_f16,
-    matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, sample_token_into, softmax,
-    softmax_scaled,
+    CopyLateShape, DashAttnConfig, DilationConfig, HlaMode, HybridPattern, InferenceOverrides,
+    InferenceResult, LoopMode, LoraAdapter, LoraPair, ModelArchitecture, ResidualGate,
+    RetrievalHeadRole, Rng, RtTurboConfig, SdpaOutputGate, WeightDtype, kv_dim, lora_apply,
+    matmul, matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm,
+    sample_token_into, softmax, softmax_scaled,
 };
 
 #[cfg(feature = "domain_latent")]

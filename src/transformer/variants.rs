@@ -431,25 +431,45 @@ pub fn forward_looped<'a>(
         // anchor (h^(0), hoisted once below) instead of the drifting h^(τ-1):
         // GRT Table 11 (frozen prelude output 2.68 vs drifting h(r−1) 3.38).
         if tau > 0 {
-            let gate_offset = tau * n;
-            if gate_offset + n <= residual_gate.gates.len() {
-                #[cfg(feature = "loop_stability_fix")]
-                let injected: &[f32] =
-                    if config.loop_stability_mode == crate::types::LoopStabilityMode::FixedAnchor {
-                        &ctx.loop_anchor[..n]
-                    } else {
-                        &ctx.prev_h[..n]
-                    };
-                #[cfg(not(feature = "loop_stability_fix"))]
-                let injected: &[f32] = &ctx.prev_h[..n];
-                // ctx.x += gates ⊙ injected  (element-wise fused multiply-accumulate)
+            #[cfg(feature = "loop_stability_fix")]
+            let injected: &[f32] =
+                if config.loop_stability_mode == crate::types::LoopStabilityMode::FixedAnchor {
+                    &ctx.loop_anchor[..n]
+                } else {
+                    &ctx.prev_h[..n]
+                };
+            #[cfg(not(feature = "loop_stability_fix"))]
+            let injected: &[f32] = &ctx.prev_h[..n];
+
+            // Issue 698 T3 — convex copy-late path (GRT arXiv:2608.15062
+            // C1a/C4): h^(τ) = g_τ ⊙ src + (1 − g_τ) ⊙ h̃^(τ). The scalar
+            // blend gives the free bound ‖h^(τ)‖ ≤ max(‖src‖, ‖h̃^(τ)‖)
+            // (norm convexity) and an update magnitude ∝ (1 − g_τ): a
+            // copy-late schedule (g_τ → 1) CONTRACTS the loop to a fixed
+            // point — the additive form's constant ρ⊙src injection never
+            // settles (T2: fixed-arm ref drift 2.404 at ρ=0.5). Schedule
+            // absent → the additive path below, byte-identical to pre-T3
+            // behavior (the branch check is data-driven, no cfg).
+            if let Some(g) = residual_gate.convex_gate_at(tau) {
+                // Two-pass scalar blend: h ← (1 − g)·h̃, hidden ← g·src,
+                // h += hidden. Op order pinned by the T3 spec test
+                // (g = 1 → h = src exactly; g = 0 → h unchanged exactly).
+                katgpt_core::simd::simd_scale_inplace(&mut ctx.x[..n], 1.0 - g);
                 ctx.hidden[..n].copy_from_slice(injected);
-                katgpt_core::simd::simd_scale_mul_inplace(
-                    &mut ctx.hidden[..n],
-                    &residual_gate.gates[gate_offset..gate_offset + n],
-                    1.0,
-                );
+                katgpt_core::simd::simd_scale_inplace(&mut ctx.hidden[..n], g);
                 katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.hidden[..n]);
+            } else {
+                let gate_offset = tau * n;
+                if gate_offset + n <= residual_gate.gates.len() {
+                    // ctx.x += gates ⊙ injected  (element-wise fused multiply-accumulate)
+                    ctx.hidden[..n].copy_from_slice(injected);
+                    katgpt_core::simd::simd_scale_mul_inplace(
+                        &mut ctx.hidden[..n],
+                        &residual_gate.gates[gate_offset..gate_offset + n],
+                        1.0,
+                    );
+                    katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.hidden[..n]);
+                }
             }
         }
 

@@ -1302,6 +1302,14 @@ name = "issue_698_t2_fixed_anchor"
 path = "tests/issue_698_t2_fixed_anchor.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
 
+# Issue 698 T3 — convex copy-late gate schedule (GRT C1a/C4): the free
+# norm-bound spec test + the contraction A/B complementing T2 (the constant-ρ
+# additive fixed-anchor arm never settles; the closing schedule must).
+[[test]]
+name = "issue_698_t3_copy_late"
+path = "tests/issue_698_t3_copy_late.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]

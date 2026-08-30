@@ -121,7 +121,7 @@ pub use enums::WallConfig;
 pub use enums::Gemma4LayerType;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
-    DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
+    CopyLateShape, DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
     ModelArchitecture, ResidualGate, RetrievalHeadRole, RtTurboConfig, SdpaOutputGate, WeightDtype,
 };
 #[cfg(feature = "sr2am_configurator")]

@@ -527,14 +527,58 @@ impl SdpaOutputGate {
     }
 }
 
+/// Interpolation shape of a convex copy-late gate schedule (Issue 698 T3).
+///
+/// All shapes interpolate the per-loop copy weight `g_τ` from `g0` (loop 0,
+/// write-open) to `gR` (final loop, copy-closed). GRT arXiv:2608.15062: the
+/// trained gate's effective openness declines monotonically (0.182 → 0.066,
+/// §5) — write-early, copy-late. The shape controls HOW the closure is
+/// distributed across loops; the endpoints control how much.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CopyLateShape {
+    /// Linear: `g_τ = g0 + (gR − g0) · τ / (L − 1)`.
+    #[default]
+    Linear,
+    /// Quadratic ease toward `gR`: `g_τ = g0 + (gR − g0) · (1 − (1 − t)²)`
+    /// with `t = τ / (L − 1)` — closes FAST early, flattens near `gR`.
+    /// Fastest route to the contraction regime (updates ∝ 1 − g_τ shrink
+    /// early).
+    EaseOutClose,
+    /// Piecewise step at the midpoint: `g0` for `τ < L/2`, `gR` after —
+    /// the coarsest 2-phase proxy for the paper's write/copy phases.
+    StepMid,
+}
+
 /// Per-loop residual scaling gate.
 /// h^(τ) = h̃^(τ) + ρ_τ ⊙ h^(τ-1)
 /// Zero-init so first iteration is h̃^(1) (no residual from "previous").
+///
+/// **Convex copy-late mode** (Issue 698 T3, GRT arXiv:2608.15062 C1a/C4):
+/// when `convex_schedule` is `Some`, the per-loop combine switches from the
+/// additive form above to the convex blend
+/// `h^(τ) = g_τ ⊙ src + (1 − g_τ) ⊙ h̃^(τ)` with a SCALAR per-loop `g_τ`.
+/// Two free properties the additive form lacks: (1) boundedness — a scalar
+/// convex blend gives ‖h^(τ)‖ ≤ max(‖src‖, ‖h̃^(τ)‖) by norm convexity (the
+/// additive `h̃ + ρ⊙src` has NO bound — the exact instability Plan 428
+/// fights); (2) contraction — the update magnitude is ∝ (1 − g_τ), so a
+/// copy-late schedule (g_τ → 1) drives the update to zero and the loop
+/// converges to a fixed point (T2 measured the constant-ρ additive arm
+/// NEVER settling: ref drift 2.404 vs 3.2e-8 zeros — the closing schedule is
+/// the required complement). Per-channel gates would forfeit property (1)'s
+/// exactness (p=(1,0), o=(0,1), per-channel g=(1,0) → ‖h‖=√2 > 1); the
+/// scalar schedule is the strongest modelless interpretant.
 #[derive(Clone)]
 pub struct ResidualGate {
     /// Per-loop gates: [loop_count, dim].
     /// Each ρ_τ is element-wise, zero-init.
+    /// Empty under the convex constructors (the convex path never reads it).
     pub gates: Vec<f32>,
+    /// Per-loop scalar copy weights g_τ: [loop_count] (entry τ = gate at loop
+    /// τ; entry 0 is never read — gating starts at τ = 1). `None` = additive
+    /// path (all classic constructors). Values are clamped to [0, 1] at
+    /// construction — the free bound requires g ∈ [0, 1].
+    pub convex_schedule: Option<Vec<f32>>,
 }
 
 impl ResidualGate {
@@ -542,6 +586,7 @@ impl ResidualGate {
     pub fn new(loop_count: usize, dim: usize) -> Self {
         Self {
             gates: vec![0.0; loop_count * dim],
+            convex_schedule: None,
         }
     }
 
@@ -574,7 +619,10 @@ impl ResidualGate {
             let offset = tau * dim;
             gates[offset..offset + dim].fill(decay);
         }
-        Self { gates }
+        Self {
+            gates,
+            convex_schedule: None,
+        }
     }
 
     /// Deterministic loop-stable residual gates with exponential decay
@@ -596,7 +644,99 @@ impl ResidualGate {
             let val = base.powi((tau - 1) as i32);
             gates[offset..offset + dim].fill(val);
         }
-        Self { gates }
+        Self {
+            gates,
+            convex_schedule: None,
+        }
+    }
+
+    /// Convex copy-late schedule with LINEAR interpolation (Issue 698 T3 —
+    /// the issue-pinned entry point; see [`Self::copy_late_schedule_shaped`]
+    /// for the shape sweep).
+    ///
+    /// # Arguments
+    /// * `loop_count` - Number of T-passes (T). The schedule has exactly this
+    ///   many entries; entry 0 is `g0` (never read — gating starts at τ = 1).
+    /// * `g0` - Copy weight at loop 0 (write-open end; low = writes more).
+    /// * `gR` - Copy weight at the final loop (copy-closed end; GRT: g > 0.95
+    ///   is the copy-saturated band).
+    ///
+    /// The `gates` elementwise buffer is left EMPTY — the convex path never
+    /// reads it, and a scalar schedule carries no per-channel data.
+    /// `g0`/`gR` are clamped into [0, 1] (the free norm bound requires it).
+    /// `gR` keeps the paper's notation (g at loop R−1) over snake_case.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn copy_late_schedule(loop_count: usize, g0: f32, gR: f32) -> Self {
+        Self::copy_late_schedule_shaped(loop_count, g0, gR, CopyLateShape::Linear)
+    }
+
+    /// Convex copy-late schedule with an explicit interpolation shape
+    /// (Issue 698 T3).
+    ///
+    /// Builds `convex_schedule[τ] = clamp01(g0 + (gR − g0) · shape(τ/(L−1)))`
+    /// — a SCALAR per-loop copy weight consumed by `forward_looped`'s convex
+    /// blend path: `h^(τ) = g_τ ⊙ src + (1 − g_τ) ⊙ h̃^(τ)`. Modelless: no
+    /// training, deterministic, allocation once at construction (the loop
+    /// reads `schedule[τ]` — zero per-forward allocation).
+    ///
+    /// Form-mismatch caveat (issue 698 T3): existing checkpoints are trained
+    /// under the ADDITIVE form — switching the combine form on shared weights
+    /// is an OOD intervention; the fixture A/B arbitrates
+    /// (`tests/issue_698_t3_copy_late.rs`).
+    ///
+    /// A `loop_count == 0` or `1` schedule is degenerate (no gated loop ever
+    /// reads entry ≥ 1); it is accepted and returns a well-formed schedule.
+    /// `gR` keeps the paper's notation (g at loop R−1) over snake_case.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn copy_late_schedule_shaped(
+        loop_count: usize,
+        g0: f32,
+        gR: f32,
+        shape: CopyLateShape,
+    ) -> Self {
+        let clamp01 = |v: f32| v.clamp(0.0, 1.0);
+        let (a, b) = (clamp01(g0), clamp01(gR));
+        let mut schedule = Vec::with_capacity(loop_count);
+        match shape {
+            CopyLateShape::StepMid => {
+                let mid = loop_count / 2;
+                for tau in 0..loop_count {
+                    schedule.push(if tau < mid { a } else { b });
+                }
+            }
+            CopyLateShape::Linear | CopyLateShape::EaseOutClose => {
+                for tau in 0..loop_count {
+                    let t = if loop_count <= 1 {
+                        0.0
+                    } else {
+                        tau as f32 / (loop_count - 1) as f32
+                    };
+                    let s = match shape {
+                        // 1 − (1 − t)²: derivative 2(1 − t) — closes fast early.
+                        CopyLateShape::EaseOutClose => 1.0 - (1.0 - t) * (1.0 - t),
+                        _ => t,
+                    };
+                    schedule.push(clamp01(a + (b - a) * s));
+                }
+            }
+        }
+        Self {
+            gates: Vec::new(),
+            convex_schedule: Some(schedule),
+        }
+    }
+
+    /// The copy weight at loop `tau` for the CONVEX path, clamped to the
+    /// schedule's last entry when `tau` runs past the end (elastic override
+    /// executing more loops than the schedule was built for: stay at the
+    /// closed end — the contraction regime — rather than going inert).
+    /// Returns `None` when no schedule is installed (additive path).
+    #[inline]
+    pub fn convex_gate_at(&self, tau: usize) -> Option<f32> {
+        let s = self.convex_schedule.as_ref()?;
+        Some(s.get(tau).copied().unwrap_or_else(|| *s.last().unwrap_or(&1.0)))
     }
 }
 
