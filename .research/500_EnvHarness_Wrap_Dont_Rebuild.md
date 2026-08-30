@@ -94,3 +94,5 @@ Rows marked "exists/partial" signal-diffed per §3.6. Delta only — band/regret
 ## PASS-Redirects (synthesis)
 
 None (Gain verdict). Closest cousins updated instead: Research 496 (wrap-axis cross-ref appended below), Guide 340 (§"Wrapper composition" added), riir-train Plan 348 (training deltas).
+
+> **Sibling cross-ref (added 2026-08-30):** Ning et al. [arXiv:2608.05446 "EvoHarness-RL: Learning Self-Evolving Runtime Harness for Long-Horizon LLM Agents"] — the POLICY-side complement of this paper: EnvHarness transforms the ENVIRONMENT through wrapper layers (this note); EvoHarness-RL trains the POLICY's coordination with an external Belief/Progress/Experience workspace (cost-aware GRPO, 96.9% ALFWorld). Different lever on the same GRPO machine — the same Plan 346 (reward) vs Plan 348 (env/batch) split. Training deltas: riir-train Plan 348 Item G; verdict note: riir-train Research 436.
