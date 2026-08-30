@@ -245,6 +245,7 @@ fn run_g2() -> (Vec<G2Row>, bool) {
         let reason_str = match outcome.halt_reason {
             Some(HaltReason::GainBelowCost) => "GainBelowCost",
             Some(HaltReason::Oscillation) => "Oscillation",
+            Some(HaltReason::NonContraction) => "NonContraction",
             None => "(ran to L_max)",
         };
 
@@ -355,6 +356,7 @@ fn run_g3() -> G3Result {
     let reason_str = match outcome.halt_reason {
         Some(HaltReason::GainBelowCost) => "GainBelowCost",
         Some(HaltReason::Oscillation) => "Oscillation",
+        Some(HaltReason::NonContraction) => "NonContraction",
         None => "(ran to L_max — correct)",
     };
     println!("  Halt reason: {reason_str}");
@@ -530,6 +532,7 @@ fn run_g4() -> G4Result {
             let reason_str = match reason {
                 HaltReason::Oscillation => "Oscillation",
                 HaltReason::GainBelowCost => "GainBelowCost",
+                HaltReason::NonContraction => "NonContraction",
             };
             println!(
                 "  GainCostLoopHalter: HALTED at loop {tau} ({reason_str}) — cos_theta was {cos_theta:.3}"
@@ -691,6 +694,7 @@ fn main() {
         let reason_str = match r.halt_reason {
             Some(HaltReason::GainBelowCost) => "GainBelowCost",
             Some(HaltReason::Oscillation) => "Oscillation",
+            Some(HaltReason::NonContraction) => "NonContraction",
             None => "(ran to L_max)",
         };
         println!(

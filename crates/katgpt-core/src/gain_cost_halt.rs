@@ -21,6 +21,14 @@
 // Decision types (T1.3)
 // ─────────────────────────────────────────────────────────────────────
 
+/// Fraction of the episode's FIRST gain below which loop movement is treated
+/// as drift/noise rather than expansion (Issue 698 T4). At the fixed point
+/// the per-loop signal decays to f32 cancellation jitter — consecutive
+/// up-ticks there are numerical noise, not contraction failure. 0.01 mirrors
+/// the LoopCoder-v2 flat-tax convention the forward wiring uses for `cost`
+/// (0.01 × the first step size), so both floors share one scale.
+pub const CONCAVITY_NOISE_FRAC: f32 = 0.01;
+
 /// Result of a single gain/cost halt evaluation.
 ///
 /// Returned by [`GainCostLoopHalter::halt_decision`] each loop. The caller
@@ -59,6 +67,17 @@ pub enum HaltReason {
     GainBelowCost = 0,
     /// Update direction reversed (cos θ < 0) for `oscillation_patience` loops.
     Oscillation = 1,
+    /// The loop signal GREW for `concavity_patience` consecutive loops —
+    /// the update magnitude is expanding, not contracting (Issue 698 T4;
+    /// GRT: extending R past the trained R degrades). Armed via
+    /// [`GainCostLoopHalter::with_concavity_floor`], disarmed by default.
+    ///
+    /// Named for the shipped forward-path signal (step size ‖Δh‖): under a
+    /// contracting loop the step magnitudes decay, so sustained growth is
+    /// the expansion signature. Callers feeding a QUALITY gain signal
+    /// (erank / ΔKL) should read this as "signal re-accelerated" and decide
+    /// whether that is a halt — for step signals it always is.
+    NonContraction = 2,
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -103,6 +122,28 @@ pub struct GainCostLoopHalter {
     pub(crate) oscillation_patience: u8,
     /// Config: L_min floor (refuse to halt below this loop index). Default 1.
     pub(crate) l_min: u8,
+    /// Config: consecutive gain inversions tolerated before halting on
+    /// [`HaltReason::NonContraction`]. `0` disarms the concavity floor —
+    /// the default (Issue 698 T1 measured the per-step gain shape as NOT
+    /// concave mid-run on random weights — a two-phase dip-then-jump — so
+    /// the rule is opt-in, never default-on).
+    pub(crate) concavity_patience: u8,
+    /// Previous loop's gain signal. Seeded on EVERY evaluation — including
+    /// `RefusedFloor` loops — so the first post-floor loop compares against
+    /// the last pre-floor loop (the floor refuses the decision, not the
+    /// measurement).
+    pub(crate) prev_gain: Option<f32>,
+    /// First gain seen this episode — the run's own magnitude scale. An
+    /// inversion only counts when the signal exceeds
+    /// [`CONCAVITY_NOISE_FRAC`] × this value: below that the loop is in the
+    /// drift/noise regime (at the fixed point the per-loop step is pure f32
+    /// jitter, which must not read as expansion). Mirrors the flat-tax
+    /// scale the forward wiring uses for `cost` (0.01 × first step).
+    pub(crate) first_gain: Option<f32>,
+    /// Current streak of consecutive gain inversions (`gain > prev_gain`).
+    /// Reset by any non-inverting loop and by the `NonContraction` halt
+    /// itself (episode semantics: a halt ends the measurement episode).
+    pub(crate) inversion_streak: u8,
 }
 
 impl GainCostLoopHalter {
@@ -125,7 +166,100 @@ impl GainCostLoopHalter {
             tau,
             oscillation_patience,
             l_min,
+            concavity_patience: 0,
+            prev_gain: None,
+            first_gain: None,
+            inversion_streak: 0,
         }
+    }
+
+    /// GRT-context default (Issue 698 T4): `tau = 1.0`,
+    /// `oscillation_patience = 1`, `l_min = 2`, concavity floor disarmed.
+    ///
+    /// # Why l_min = 2 here and NOT in [`Default`]
+    ///
+    /// The GRT paper (arXiv:2608.15062) measured 77% of loss reduction in
+    /// the first 2 loop steps and licenses `l_min = 2`. Our modelless gain
+    /// spectrum (Issue 698 T1, `tests/issue_698_t1_gain_spectrum.rs`,
+    /// fixture `fab06e3f4ba65977`) measured **54.0% by loop 2 / 81.6% by
+    /// loop 4 / 99.2% by loop 8** — the same front-loaded shape with a
+    /// heavier tail, verdict BORDERLINE per the pre-registered bands
+    /// (≥60% would transfer cleanly). Per that verdict the floor ships
+    /// PAIRED WITH the measured table (this constructor + the T1 bench),
+    /// not as a silent global default: [`GainCostLoopHalter::default`]
+    /// keeps `l_min = 1` because its other consumer (the CGSP KnpcSelector
+    /// planning horizon) has no GRT evidence, and flipping it there would
+    /// be exactly the blind cross-domain adoption T1's gate forbids.
+    ///
+    /// Pair with [`Self::with_concavity_floor`] when the loop's step
+    /// magnitudes are expected to contract; see that method for the
+    /// convex-schedule caveat (Issue 698 T3).
+    #[inline]
+    pub fn grt_default() -> Self {
+        Self::new(1.0, 1, 2)
+    }
+
+    /// Arm the concavity floor (Issue 698 T4): halt with
+    /// [`HaltReason::NonContraction`] once the loop signal grows for
+    /// `patience` CONSECUTIVE loops. `patience = 0` disarms (the default).
+    ///
+    /// # Why opt-in
+    ///
+    /// The paper's per-step gain is concave, but Issue 698 T1 measured the
+    /// modelless fixture NOT concave mid-run: the per-step gain dips at
+    /// r=3→4 then jumps at r=4→5 (two-phase convergence). A patience-1
+    /// rule would halt exactly at the phase-2 onset — cutting measurable
+    /// convergence (81.6% → 99.2% happens between loops 4 and 8). The
+    /// measured two-phase shape has ONE inversion, so `patience ≥ 2`
+    /// tolerates it; `patience = 1` is legal but fires on any single blip.
+    ///
+    /// # Convex-schedule caveat (Issue 698 T3)
+    ///
+    /// Under a convex copy-late gate schedule the hidden state converges to
+    /// the SCHEDULE's fixed point (T3 measured the destination moved — KL
+    /// 11.9 nats vs the natural trajectory), and a StepMid schedule's
+    /// closure phase makes the loop grid non-monotone BY PHASE STRUCTURE.
+    /// Callers running convex schedules should either disarm this floor or
+    /// raise `patience ≥ 2`; a step-size bump at a phase boundary is
+    /// schedule structure, not expansion.
+    ///
+    /// # MEASURED REFUTATION on the InterLoopNorm step-size axis (Issue 698
+    /// T4 e2e — keep the floor DISARMED there)
+    ///
+    /// The T4 e2e (`tests/issue_698_t4_halter_floors.rs`) measured the
+    /// production gain signal — step size ‖Δh‖ under `InterLoopNorm` on the
+    /// T1 fixture — GROWING to its fixed point: 13.010 (loop 2) → 20.361
+    /// (loop 8), then a 20.2415 ± 4e-4 plateau with cos θ = 1.0000. The
+    /// convergence is DIRECTIONAL (cos θ → 1.0, KL → 1e-8), not contractive
+    /// in magnitude, so the contraction premise of this floor does not hold
+    /// on that axis at ANY patience: armed at patience 2 the floor halts at
+    /// loop 4, cutting the run exactly at the two-phase knee T1 measured.
+    /// Arming this floor is only correct with a decay-capable signal (a KL /
+    /// erank quality gain) — a companion wiring question, not a floor
+    /// change. The kernel rule itself stays: its contract is pinned by the
+    /// synthetic unit tests below, and the e2e pins the refutation as the
+    /// reproducible artifact.
+    ///
+    /// # NaN safety
+    ///
+    /// A NaN gain never counts as an inversion (`NaN > x` is false), so a
+    /// corrupt signal resets the streak instead of firing the halt — the
+    /// same safe direction as the oscillation detector. A NaN FIRST gain
+    /// keeps the noise floor at NaN, which disarms inversion counting for
+    /// the whole episode (also the safe direction).
+    ///
+    /// # Noise floor
+    ///
+    /// An inversion counts only when the signal exceeds
+    /// [`CONCAVITY_NOISE_FRAC`] (1%) × the episode's first gain. At the
+    /// convergence plateau the per-loop signal is f32 cancellation jitter;
+    /// consecutive up-jitters there are not expansion. The 1% scale mirrors
+    /// the flat-tax `cost` the forward wiring derives from the same first
+    /// step, so both floors share one magnitude reference.
+    #[inline]
+    pub fn with_concavity_floor(mut self, patience: u8) -> Self {
+        self.concavity_patience = patience;
+        self
     }
 
     /// Decide whether to continue looping after loop `loop_idx`.
@@ -140,12 +274,19 @@ impl GainCostLoopHalter {
     ///
     /// # Evaluation order
     /// 1. **L_min floor** — if `loop_idx < l_min`, return [`RefusedFloor`].
+    ///    The gain baseline (`prev_gain`) is seeded BEFORE this check, so
+    ///    refused loops still count as concavity observations (T4).
     /// 2. **Oscillation detector** — if `cos_theta < 0`, bump the counter;
     ///    halt on [`Oscillation`] once it reaches patience. Otherwise reset
     ///    the counter to zero (a single aligned loop clears the history).
     /// 3. **Gain/cost scissors** — if `gain < cost * tau`, halt with
     ///    [`GainBelowCost`].
-    /// 4. Otherwise [`Continue`].
+    /// 4. **Concavity floor** (Issue 698 T4, armed via
+    ///    [`with_concavity_floor`](GainCostLoopHalter::with_concavity_floor))
+    ///    — if the signal grew for `concavity_patience` consecutive loops,
+    ///    halt with [`NonContraction`]. Evaluated LAST: it is an extension
+    ///    guard and only fires when the loop would otherwise continue.
+    /// 5. Otherwise [`Continue`].
     ///
     /// # NaN handling
     /// `cos_theta < 0.0` is `false` for NaN, so a NaN cos θ is treated as
@@ -166,6 +307,19 @@ impl GainCostLoopHalter {
         cost: f32,
         cos_theta: f32,
     ) -> HaltDecision {
+        // Seed/refresh the gain baselines BEFORE the floor: a refused-floor
+        // loop is still a concavity observation (the floor refuses the
+        // decision, not the measurement), so the first post-floor loop
+        // compares against the last pre-floor loop (Issue 698 T4).
+        let prev_gain = self.prev_gain.replace(gain);
+        if self.first_gain.is_none() {
+            // Episode scale. Seeded unconditionally: a NaN first gain keeps
+            // the noise floor at NaN → `gain > NaN` is false → the floor
+            // stays disarmed — the safe (continue) direction for a corrupt
+            // signal, same policy as the oscillation detector.
+            self.first_gain = Some(gain);
+        }
+
         // L_min floor — refuse to halt below representational minimum.
         if loop_idx < self.l_min as usize {
             return HaltDecision::RefusedFloor;
@@ -193,6 +347,38 @@ impl GainCostLoopHalter {
             return HaltDecision::Halt {
                 reason: HaltReason::GainBelowCost,
             };
+        }
+
+        // Concavity floor (Issue 698 T4) — armed extension guard, evaluated
+        // LAST so it only fires when the loop would otherwise continue.
+        // An inversion counts only ABOVE the episode noise floor
+        // (CONCAVITY_NOISE_FRAC × first gain): at the fixed point the signal
+        // is f32 jitter, and consecutive up-jitters are not expansion.
+        // NaN-safe: `NaN > x` is false → resets the streak (continue
+        // direction, same policy as the oscillation detector).
+        if self.concavity_patience > 0
+            && let Some(prev) = prev_gain
+        {
+            let above_noise = self
+                .first_gain
+                .is_some_and(|f| gain > CONCAVITY_NOISE_FRAC * f);
+            if gain > prev && above_noise {
+                self.inversion_streak = self.inversion_streak.saturating_add(1);
+                if self.inversion_streak >= self.concavity_patience {
+                    // Episode reset: the halt ends the measurement
+                    // episode, so a persistent caller (KnpcSelector)
+                    // starts the next episode with a clean streak.
+                    self.inversion_streak = 0;
+                    return HaltDecision::Halt {
+                        reason: HaltReason::NonContraction,
+                    };
+                }
+            } else {
+                // Any non-inverting loop clears the history — one
+                // decaying loop forgives a prior bump (the measured
+                // two-phase gain shape has isolated blips, not runs).
+                self.inversion_streak = 0;
+            }
         }
 
         HaltDecision::Continue
@@ -235,7 +421,9 @@ impl Default for GainCostLoopHalter {
     ///
     /// These are the conservative paper defaults — halt on the first
     /// oscillation and the first gain-below-cost crossover, but never below
-    /// loop 1.
+    /// loop 1. GRT consumers (Issue 698) should prefer [`Self::grt_default`]
+    /// (`l_min = 2`), which is gated on the measured gain spectrum rather
+    /// than adopted blind — see that constructor for the arbitration.
     #[inline]
     fn default() -> Self {
         Self::new(1.0, 1, 1)
@@ -903,6 +1091,17 @@ mod tests {
             1,
             "HaltReason must be exactly 1 byte (#[repr(u8)])"
         );
+        // Issue 698 T4: the halter grew by 4 scalar fields (concavity_patience
+        // u8, prev_gain Option<f32>, first_gain Option<f32>, inversion_streak
+        // u8) — measured 20 → 40 bytes (38 payload + alignment). Guard against
+        // accidental bloat: the halter lives on the caller's stack per forward
+        // pass. If this ever grows past a cache half-word, reconsider the
+        // field set before extending further.
+        assert!(
+            size_of::<GainCostLoopHalter>() <= 48,
+            "GainCostLoopHalter must stay ≤ 48 bytes, got {}",
+            size_of::<GainCostLoopHalter>()
+        );
     }
 
     // ── Plan 304 Phase 2 wiring tests ──────────────────────────────
@@ -996,6 +1195,268 @@ mod tests {
                 reason: HaltReason::Oscillation
             },
             "at loop_idx == l_min (255), the floor lifts and the halter evaluates normally"
+        );
+    }
+
+    // ── Issue 698 T4 — halter floors ─────────────────────────────
+
+    #[test]
+    fn grt_default_uses_l_min_two() {
+        // The GRT floor refuses ALL halt signals at loop 1 (54.0% of the
+        // measured convergence lands by loop 2 — the floor protects it),
+        // even under the most halt-eager inputs.
+        let mut h = GainCostLoopHalter::grt_default();
+        let d1 = h.halt_decision(1, 0.0, f32::MAX, -1.0);
+        assert_eq!(d1, HaltDecision::RefusedFloor, "l_min=2 must refuse loop 1");
+
+        // At loop 2 the floor lifts and the halter evaluates normally.
+        let d2 = h.halt_decision(2, 0.0, f32::MAX, -1.0);
+        assert_eq!(
+            d2,
+            HaltDecision::Halt {
+                reason: HaltReason::Oscillation
+            },
+            "at loop 2 the floor lifts; the eager inputs fire Oscillation"
+        );
+    }
+
+    #[test]
+    fn grt_default_matches_explicit_construction() {
+        // grt_default() is exactly new(1.0, 1, 2) + disarmed concavity —
+        // the documented config, pinned so the constructor cannot drift.
+        let mut g = GainCostLoopHalter::grt_default();
+        let mut e = GainCostLoopHalter::new(1.0, 1, 2);
+        for loop_idx in 1..=6 {
+            let gain = 10.0 - loop_idx as f32; // decaying → no concavity fire
+            let dg = g.halt_decision(loop_idx, gain, 0.0, 0.5);
+            let de = e.halt_decision(loop_idx, gain, 0.0, 0.5);
+            assert_eq!(
+                dg, de,
+                "grt_default must equal new(1.0, 1, 2) at loop {loop_idx}"
+            );
+        }
+    }
+
+    #[test]
+    fn concavity_floor_disarmed_by_default() {
+        // Default (and grt_default) disarm the floor: a strictly rising gain
+        // sequence with cost = 0 (the scissors can never fire) must run
+        // forever — T1 measured per-step gain NOT concave on random weights,
+        // so a default-on rule would fire spuriously.
+        let mut h = GainCostLoopHalter::default();
+        for loop_idx in 1..=32usize {
+            let gain = loop_idx as f32; // strictly increasing
+            let d = h.halt_decision(loop_idx, gain, 0.0, 0.9);
+            assert_eq!(
+                d,
+                HaltDecision::Continue,
+                "disarmed floor must never halt at loop {loop_idx}"
+            );
+        }
+    }
+
+    #[test]
+    fn concavity_floor_fires_after_patience_consecutive_inversions() {
+        // patience = 2: gains 10 → 9 (decay, reset) → 9.5 (inversion 1) →
+        // 10.0 (inversion 2 → Halt::NonContraction). cost = 0 keeps the
+        // scissors silent so ONLY the concavity rule can fire.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(2);
+        let d1 = h.halt_decision(1, 10.0, 0.0, 0.9);
+        assert_eq!(
+            d1,
+            HaltDecision::Continue,
+            "seed loop: no prev, no decision"
+        );
+        let d2 = h.halt_decision(2, 9.0, 0.0, 0.9);
+        assert_eq!(
+            d2,
+            HaltDecision::Continue,
+            "decaying gain resets the streak"
+        );
+        let d3 = h.halt_decision(3, 9.5, 0.0, 0.9);
+        assert_eq!(d3, HaltDecision::Continue, "inversion 1 of 2");
+        let d4 = h.halt_decision(4, 10.0, 0.0, 0.9);
+        assert_eq!(
+            d4,
+            HaltDecision::Halt {
+                reason: HaltReason::NonContraction
+            },
+            "inversion 2 of 2 must halt NonContraction"
+        );
+    }
+
+    #[test]
+    fn concavity_floor_single_inversion_patience_one_fires() {
+        // patience = 1 is the eager setting: it fires on ONE inversion —
+        // exactly the measured two-phase jump shape (T1: gain dips r=3→4
+        // then jumps r=4→5). Legal, but documented as too tight for the
+        // modelless fixture; this pins the semantics so callers choose
+        // patience with the table in hand.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(1);
+        assert_eq!(h.halt_decision(1, 10.0, 0.0, 0.9), HaltDecision::Continue);
+        assert_eq!(
+            h.halt_decision(2, 11.0, 0.0, 0.9),
+            HaltDecision::Halt {
+                reason: HaltReason::NonContraction
+            },
+            "patience=1 must fire on the first inversion"
+        );
+    }
+
+    #[test]
+    fn concavity_floor_tolerates_isolated_blip_at_patience_two() {
+        // The measured two-phase shape: one up-blip followed by a decaying
+        // loop must RESET the streak (patience = 2 tolerates it).
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(2);
+        let gains = [10.0f32, 9.0, 9.5, 9.2, 9.1, 9.05];
+        for (i, &g) in gains.iter().enumerate() {
+            let d = h.halt_decision(i + 1, g, 0.0, 0.9);
+            assert_eq!(
+                d,
+                HaltDecision::Continue,
+                "isolated blip at loop {} must not halt (streak resets on decay)",
+                i + 1
+            );
+        }
+    }
+
+    #[test]
+    fn concavity_floor_respects_l_min_and_seeds_through_it() {
+        // l_min = 3 + patience = 1: loops 1–2 are refused regardless of the
+        // inversion, but they still SEED the baseline — so the first
+        // post-floor loop (3) already compares against loop 2's gain and
+        // fires. The floor refuses the decision, not the measurement.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 3).with_concavity_floor(1);
+        assert_eq!(
+            h.halt_decision(1, 10.0, 0.0, 0.9),
+            HaltDecision::RefusedFloor
+        );
+        assert_eq!(
+            h.halt_decision(2, 9.0, 0.0, 0.9),
+            HaltDecision::RefusedFloor
+        );
+        assert_eq!(
+            h.halt_decision(3, 9.5, 0.0, 0.9),
+            HaltDecision::Halt {
+                reason: HaltReason::NonContraction
+            },
+            "loop 3 compares against loop 2's seeded gain: 9.5 > 9.0 fires"
+        );
+    }
+
+    #[test]
+    fn oscillation_precedence_over_concavity() {
+        // With BOTH signals hot at the floor boundary, Oscillation wins —
+        // the evaluation order is floor → oscillation → scissors →
+        // concavity, and the oscillation detector is the non-convergent
+        // fallback that stays armed under any floor config (T4 contract:
+        // contraction is measured, not proven, for arbitrary weights).
+        let mut h = GainCostLoopHalter::grt_default().with_concavity_floor(1);
+        // Loop 1: refused (floor) — seeds baseline.
+        assert_eq!(
+            h.halt_decision(1, 10.0, 0.0, -1.0),
+            HaltDecision::RefusedFloor
+        );
+        // Loop 2: rising gain (inversion) AND cos θ < 0 (oscillation).
+        assert_eq!(
+            h.halt_decision(2, 11.0, 0.0, -1.0),
+            HaltDecision::Halt {
+                reason: HaltReason::Oscillation
+            },
+            "oscillation must precede the concavity rule in the order"
+        );
+    }
+
+    #[test]
+    fn noncontraction_halt_resets_streak_for_next_episode() {
+        // After a NonContraction halt, the streak is zeroed — a persistent
+        // caller (KnpcSelector reuses its halter across cycles) starts the
+        // next episode clean and is not instantly re-halted.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(1);
+        assert_eq!(h.halt_decision(1, 10.0, 0.0, 0.9), HaltDecision::Continue);
+        assert_eq!(
+            h.halt_decision(2, 11.0, 0.0, 0.9),
+            HaltDecision::Halt {
+                reason: HaltReason::NonContraction
+            }
+        );
+        // Next episode: a decaying gain must Continue (streak was reset).
+        // loop_idx restarts at 1 in the new episode.
+        assert_eq!(
+            h.halt_decision(1, 5.0, 0.0, 0.9),
+            HaltDecision::Continue,
+            "post-halt episode must start with a clean streak"
+        );
+    }
+
+    #[test]
+    fn nan_gain_never_fires_concavity_floor() {
+        // A NaN gain is never an inversion (`NaN > x` is false) — the
+        // corrupt signal resets the streak instead of firing the halt, the
+        // same safe direction as the oscillation detector and the scissors.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(1);
+        assert_eq!(h.halt_decision(1, 10.0, 0.0, 0.9), HaltDecision::Continue);
+        assert_eq!(
+            h.halt_decision(2, f32::NAN, 0.0, 0.9),
+            HaltDecision::Continue,
+            "NaN gain must not fire NonContraction"
+        );
+        // And a subsequent finite gain still compares against the NaN seed:
+        // finite > NaN is FALSE, so the streak stays clear.
+        assert_eq!(h.halt_decision(3, 12.0, 0.0, 0.9), HaltDecision::Continue);
+    }
+
+    #[test]
+    fn concavity_floor_noise_floor_ignores_plateau_jitter() {
+        // The fixed-point regime: the signal has decayed to ~1e-7 of the
+        // episode's first gain and jitters up and down. Consecutive
+        // up-jitters are f32 cancellation noise, NOT expansion — the
+        // CONCAVITY_NOISE_FRAC (1% of first gain) floor must keep the
+        // streak empty and the loop running.
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(1);
+        let gains = [
+            10.0,   // seed (first_gain = 10, noise floor = 0.1)
+            1.2e-7, // decayed into the jitter regime
+            1.5e-7, // up-jitter — below the floor, not counted
+            1.4e-7, // down — resets anyway
+            1.9e-7, // up-jitter again — still below the floor
+            2.2e-7, // and again — patience=1 must NOT fire
+        ];
+        for (i, &g) in gains.iter().enumerate() {
+            let d = h.halt_decision(i + 1, g, 0.0, 0.9);
+            assert_eq!(
+                d,
+                HaltDecision::Continue,
+                "plateau jitter at loop {} must not count as an inversion",
+                i + 1
+            );
+        }
+
+        // A REAL expansion back into the signal regime (≫ 1% of first gain)
+        // is counted: patience=1 fires on the first above-floor inversion.
+        assert_eq!(
+            h.halt_decision(7, 0.5, 0.0, 0.9),
+            HaltDecision::Halt {
+                reason: HaltReason::NonContraction
+            },
+            "above-floor expansion must count and halt at patience=1"
+        );
+    }
+
+    #[test]
+    fn concavity_floor_does_not_change_gain_below_cost_precedence() {
+        // When the scissors fire, GainBelowCost wins over a concurrent
+        // concavity condition (order: scissors BEFORE concavity).
+        let mut h = GainCostLoopHalter::new(1.0, 1, 1).with_concavity_floor(1);
+        assert_eq!(h.halt_decision(1, 10.0, 0.0, 0.9), HaltDecision::Continue);
+        // gain 2.0 < cost 5.0 → scissors halt; the 2.0 < 10.0 fall would
+        // ALSO have cleared the streak — but the scissors run first.
+        assert_eq!(
+            h.halt_decision(2, 2.0, 5.0, 0.9),
+            HaltDecision::Halt {
+                reason: HaltReason::GainBelowCost
+            },
+            "the scissors must win over the concavity rule"
         );
     }
 }

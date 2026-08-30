@@ -1310,6 +1310,15 @@ name = "issue_698_t3_copy_late"
 path = "tests/issue_698_t3_copy_late.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
 
+# Issue 698 T4 — halter floors e2e: grt_default (l_min=2) + the opt-in
+# concavity floor through the production halt path on T1's fixture (armed
+# floor must be a NO-OP on the measured contraction; never-halt control
+# bit-identical to baseline).
+[[test]]
+name = "issue_698_t4_halter_floors"
+path = "tests/issue_698_t4_halter_floors.rs"
+required-features = ["lt2_looped", "loop_stability_fix", "gain_cost_halt"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]
