@@ -1287,6 +1287,13 @@ name = "goat_428_loop_stability"
 path = "tests/goat_428_loop_stability.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
 
+# Issue 698 T1 — loop gain-spectrum measurement bench (GRT corollaries).
+# Pinned fixture + committed Δloss(r) table; gates the issue's T2–T4.
+[[test]]
+name = "issue_698_t1_gain_spectrum"
+path = "tests/issue_698_t1_gain_spectrum.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]
