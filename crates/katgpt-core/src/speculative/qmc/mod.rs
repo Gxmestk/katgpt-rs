@@ -561,6 +561,7 @@ fn prime_factors_u64(mut n: u64) -> Vec<u64> {
     if n > 1 {
         factors.push(n);
     }
+    factors.shrink_to_fit();
     factors
 }
 
@@ -614,7 +615,13 @@ fn prime_factors_u64(mut n: u64) -> Vec<u64> {
 /// Pure arithmetic — no allocations, one `sqrt` + one `ln` per call.
 #[inline]
 pub fn inverse_normal_cdf(u: f32) -> f32 {
-    if u <= 0.0 {
+    const C1: f64 = 0.802853;
+const C2: f64 = 0.010328;
+const D1: f64 = 1.432788;
+const D2: f64 = 0.189269;
+const D3: f64 = 0.001308;
+
+if u <= 0.0 {
         return f32::NEG_INFINITY;
     }
     if u >= 1.0 {
@@ -626,11 +633,6 @@ pub fn inverse_normal_cdf(u: f32) -> f32 {
 
     // Hastings (1955) coefficients.
     const C0: f64 = 2.515517;
-    const C1: f64 = 0.802853;
-    const C2: f64 = 0.010328;
-    const D1: f64 = 1.432788;
-    const D2: f64 = 0.189269;
-    const D3: f64 = 0.001308;
 
     // Exploit symmetry: work with the smaller tail.
     let p = (u as f64).min(1.0 - u as f64);

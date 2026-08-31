@@ -218,8 +218,8 @@ fn test_problem_mutator_goat_diversity() {
     // ── Part 2: Bandit-based diversity (stochastic) ──────────────
     let mut fixed_active_sum = 0usize;
     let mut mutated_active_sum = 0usize;
-    let mut fixed_details = Vec::new();
-    let mut mutated_details = Vec::new();
+    let mut fixed_details = Vec::with_capacity(N_TRIALS);
+    let mut mutated_details = Vec::with_capacity(N_TRIALS);
 
     for trial in 0..N_TRIALS {
         let seed = 42 + trial as u64;

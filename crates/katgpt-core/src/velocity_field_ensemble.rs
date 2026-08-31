@@ -560,8 +560,8 @@ impl Schedule {
     #[inline]
     pub fn alpha_beta(&self, t: f32) -> (f32, f32) {
         match self {
-            Schedule::Linear => (1.0 - t, t),
-            Schedule::Trigonometric => {
+            Self::Linear => (1.0 - t, t),
+            Self::Trigonometric => {
                 let theta = std::f32::consts::FRAC_PI_2 * t;
                 (theta.cos(), theta.sin())
             }
@@ -576,8 +576,8 @@ impl Schedule {
     #[inline]
     pub fn gamma(&self, _t: f32) -> f32 {
         match self {
-            Schedule::Linear => 1.0,
-            Schedule::Trigonometric => std::f32::consts::FRAC_PI_2,
+            Self::Linear => 1.0,
+            Self::Trigonometric => std::f32::consts::FRAC_PI_2,
         }
     }
 

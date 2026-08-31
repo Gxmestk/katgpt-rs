@@ -60,6 +60,8 @@ fn shannon_entropy(probs: &[f32]) -> f32 {
 // ── Main ───────────────────────────────────────────────────────────
 
 fn main() {
+    use katgpt_rs::speculative::{ThinkingConfig, ThinkingSelector};
+
     println!("╔════════════════════════════════════════════════════════════════╗");
     println!("║   DendriticGate Adaptive Thinking Demo — Plan 260            ║");
     println!("╚════════════════════════════════════════════════════════════════╝");
@@ -269,8 +271,6 @@ fn main() {
 
     // ── Section 6: ThinkingController Arm ───────────────────────
     separator("Section 6: ThinkingMode::Dendritic — Bandit Arm 4");
-
-    use katgpt_rs::speculative::{ThinkingConfig, ThinkingSelector};
 
     // Demonstrate that Dendritic is available as a thinking mode
     let adaptive_config = ThinkingConfig {

@@ -477,10 +477,11 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
         for i in 0..k_bounded {
             let logits_offset = i * draft_config.vocab_size;
             if logits_offset + draft_config.vocab_size <= self.d2f_ctx.logits_flat.len() {
-                let logits_p = &self.d2f_ctx.logits_flat
+                use katgpt_core::simd::fast_exp;
+
+let logits_p = &self.d2f_ctx.logits_flat
                     [logits_offset..logits_offset + draft_config.vocab_size];
                 let max_logit = simd_max_f32(logits_p);
-                use katgpt_core::simd::fast_exp;
                 let mut sum_exp = 0.0f32;
                 let mut top1 = 0.0f32;
                 for &l in logits_p {
@@ -595,6 +596,7 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
 
         // Safety: always return at least one token (position 0 always pushes
         // accept-or-correction; the k==0 early return above covers the rest).\n        debug_assert!(!accepted.is_empty());
+        accepted.shrink_to_fit();
         accepted
     }
 }

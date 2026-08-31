@@ -450,6 +450,15 @@ mod tests {
         // Simulate a "vocab" with realistic duplication patterns:
         // 25% of tokens are case/whitespace variants of others. Target ~20%
         // compression as a sanity floor (paper reports 23% on real 128k).
+        impl TokenizerSpec for OwnedTokenizer {
+            fn vocab_size(&self) -> u32 {
+                self.tokens.len() as u32
+            }
+            fn decode_token(&self, raw_id: TokenId) -> &[u8] {
+                self.tokens[raw_id.0 as usize].as_bytes()
+            }
+        }
+
         let mut tokens: Vec<String> = Vec::with_capacity(1000);
         let base_words = ["cat", "dog", "run", "jump", "quick", "brown", "fox"];
         for i in 0..1000 {
@@ -469,14 +478,6 @@ mod tests {
         // Use an owned-strings tokenizer shim.
         struct OwnedTokenizer {
             tokens: Vec<String>,
-        }
-        impl TokenizerSpec for OwnedTokenizer {
-            fn vocab_size(&self) -> u32 {
-                self.tokens.len() as u32
-            }
-            fn decode_token(&self, raw_id: TokenId) -> &[u8] {
-                self.tokens[raw_id.0 as usize].as_bytes()
-            }
         }
         let tok = OwnedTokenizer { tokens };
         let map = build_surjective_map(&tok);

@@ -475,9 +475,10 @@ pub fn signed_coupling_update_into(
         let mut discordant = 0.0f32;
         for (&j, &sign) in neighbors.iter().zip(signs) {
             let s = states[j as usize];
-            match sign > 0 {
-                true => concordant += s,
-                false => discordant += s,
+            if sign > 0 {
+                concordant += s;
+            } else {
+                discordant += s;
             }
         }
         out_probs[i] = sigmoid(w_plus * concordant + w_minus * discordant + intrinsic[i]);

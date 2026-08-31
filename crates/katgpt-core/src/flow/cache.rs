@@ -718,6 +718,7 @@ mod tests {
                     }
                 }
             }
+            q.shrink_to_fit();
             q
         }
 

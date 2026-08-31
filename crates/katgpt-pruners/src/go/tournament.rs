@@ -598,6 +598,7 @@ pub fn run_tournament_batch(
         }
     }
 
+    results.shrink_to_fit();
     results
 }
 

@@ -143,6 +143,7 @@ impl BattleState {
                 }
             }
         }
+        result.shrink_to_fit();
         result
     }
 

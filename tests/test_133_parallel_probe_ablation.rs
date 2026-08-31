@@ -114,8 +114,7 @@ fn ablation_parallel_probe_components() {
         let r = run_ablation(name, config);
         let steps_str = r
             .steps_to_stop
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "> 20".to_string());
+            .map_or_else(|| "> 20".to_string(), |s| s.to_string());
         println!(
             "{:<15} {:>12} {:>10} {:>12}",
             r.name, steps_str, r.active_at_end, r.reached_consensus

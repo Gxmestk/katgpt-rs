@@ -379,9 +379,10 @@ fn goat_574_clustered_lm_head() {
     println!(
         "\nPROMOTION: {} — AGENTS.md requires the quality gate to pass modellessly;\n\
          a speedup on a wrong argmax is not a modelless gain.",
-        match g2_absolute && g3 {
-            true => "ELIGIBLE",
-            false => "BLOCKED (G2b)",
+        if g2_absolute && g3 {
+            "ELIGIBLE"
+        } else {
+            "BLOCKED (G2b)"
         }
     );
 

@@ -31,6 +31,7 @@ fn seeded_anchors(seed: u32, n: usize, d: usize) -> Vec<f32> {
         state ^= state << 5;
         out.push(((state as f32) / (u32::MAX as f32)) * 2.0 - 1.0);
     }
+    out.shrink_to_fit();
     out
 }
 

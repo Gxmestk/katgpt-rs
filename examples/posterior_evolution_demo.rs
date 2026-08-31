@@ -32,6 +32,12 @@ fn main() {
     const EPISODES: usize = 100;
     const SUCCESS_RATES: [f32; NUM_ARMS] = [0.9, 0.5, 0.1];
 
+    impl ScreeningPruner for FixedPruner {
+        fn relevance(&self, _: usize, _: usize, _: &[usize]) -> f32 {
+            1.0
+        }
+    }
+
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║    Posterior-Guided Pruner Evolution — BAKE Precision Demo   ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
@@ -43,11 +49,6 @@ fn main() {
 
     // Simple pruner that returns fixed relevance per arm
     struct FixedPruner;
-    impl ScreeningPruner for FixedPruner {
-        fn relevance(&self, _: usize, _: usize, _: &[usize]) -> f32 {
-            1.0
-        }
-    }
 
     let mut pgp = PosteriorGuidedPruner::new(FixedPruner, NUM_ARMS, EvidenceContext::Generic);
 

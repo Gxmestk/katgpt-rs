@@ -339,11 +339,10 @@ impl VocabChannelDecomposer {
         let mut mask = vec![false; vocab_size];
 
         for _ in 0..self.config.max_channels {
-            let channel =
-                match self.discover_channel(neuron_weight, lm_head, vocab_size, n_embd, &mask) {
-                    Some(ch) => ch,
-                    None => break,
-                };
+            let Some(ch) = self.discover_channel(neuron_weight, lm_head, vocab_size, n_embd, &mask)
+            else {
+                break;
+            };
 
             if channel.kurtosis < self.config.kurtosis_threshold {
                 break;

@@ -112,12 +112,12 @@ impl TokenClass {
     #[inline]
     pub fn label(self) -> &'static str {
         match self {
-            TokenClass::Content => "Content",
-            TokenClass::Function => "Function",
-            TokenClass::Other => "Other",
-            TokenClass::BracketOpen => "BracketOpen",
-            TokenClass::BracketClose => "BracketClose",
-            TokenClass::CopyN(_) => "CopyN",
+            Self::Content => "Content",
+            Self::Function => "Function",
+            Self::Other => "Other",
+            Self::BracketOpen => "BracketOpen",
+            Self::BracketClose => "BracketClose",
+            Self::CopyN(_) => "CopyN",
         }
     }
 }

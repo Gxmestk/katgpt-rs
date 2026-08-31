@@ -97,6 +97,8 @@ fn g5_zero_alloc_steady_state() {
     #[cfg(debug_assertions)]
     {
         // Warmup.
+        const MEASURED_ITERS: usize = 1000;
+
         for _ in 0..10 {
             apply_field_to_crowd(&mut states, D, &positions, &zones, &field);
         }
@@ -104,7 +106,6 @@ fn g5_zero_alloc_steady_state() {
 
         assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
-        const MEASURED_ITERS: usize = 1000;
         for _ in 0..MEASURED_ITERS {
             apply_field_to_crowd(&mut states, D, &positions, &zones, &field);
         }
@@ -129,12 +130,12 @@ fn g5_zero_alloc_steady_state() {
     #[cfg(not(debug_assertions))]
     {
         use std::time::Instant;
+        const N: usize = 10_000;
+
         for _ in 0..10 {
             apply_field_to_crowd(&mut states, D, &positions, &zones, &field);
         }
         std::hint::black_box(&states);
-
-        const N: usize = 10_000;
         let t0 = Instant::now();
         for _ in 0..N {
             apply_field_to_crowd(&mut states, D, &positions, &zones, &field);

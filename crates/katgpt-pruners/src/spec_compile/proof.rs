@@ -57,7 +57,7 @@ impl SpecProof {
                 total_blocked += rule.allowed.len();
             }
         }
-        SpecProof {
+        Self {
             commitment,
             spec_source: source.to_owned(),
             rule_count: spec.rules.len(),
@@ -96,7 +96,7 @@ impl SpecCommitment {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |d| d.as_millis() as u64);
-        SpecCommitment { proof, timestamp }
+        Self { proof, timestamp }
     }
 
     /// Create a commitment from a compiled spec and its source.

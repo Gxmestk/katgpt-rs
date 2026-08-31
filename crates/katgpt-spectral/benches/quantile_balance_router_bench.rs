@@ -57,6 +57,7 @@ fn build_skewed_scores(seed: u64, m: usize, n: usize) -> Vec<f32> {
             s.push(offset + jitter);
         }
     }
+    s.shrink_to_fit();
     s
 }
 

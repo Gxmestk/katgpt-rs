@@ -209,7 +209,7 @@ fn main() {
     println!("         ESS = {ess:.1} / {N}");
     print!("         top-10 weights: ");
     for t in top.iter().take(10) {
-        print!("{:.4} ", t);
+        print!("{t:.4} ");
     }
     println!();
     println!(

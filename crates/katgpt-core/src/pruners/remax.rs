@@ -609,9 +609,10 @@ mod tests {
     /// bug, which would produce O(0.01) systematic errors.
     #[test]
     fn test_g1_monte_carlo_expected_max() {
-        let mut rng = McRng::new(0x5EED_1234_5678_9ABC);
         const TRIALS: usize = 500_000;
         const TOLERANCE: f32 = 3e-3;
+
+        let mut rng = McRng::new(0x5EED_1234_5678_9ABC);
 
         let ks: &[usize] = &[2, 5, 10, 50, 128];
         let ms: &[usize] = &[2, 3, 5, 10]; // M=1 is the mean, covered elsewhere
@@ -666,9 +667,10 @@ mod tests {
     /// formula directly. Reference R is set above max(q) so EI is nonzero.
     #[test]
     fn test_g1_monte_carlo_expected_improvement() {
-        let mut rng = McRng::new(0xCAFE_BABE_DEAD_BEEF);
         const TRIALS: usize = 500_000;
         const TOLERANCE: f32 = 3e-3;
+
+        let mut rng = McRng::new(0xCAFE_BABE_DEAD_BEEF);
 
         let ks: &[usize] = &[2, 5, 10];
         let ms: &[usize] = &[2, 3, 5]; // EI uses M−1 draws
@@ -736,8 +738,9 @@ mod tests {
     /// Note: m ≤ 1 is excluded because J_{m−1} requires m−1 > 0.
     #[test]
     fn test_g1_recurrence_jm_minus_jm1_equals_ei_mean() {
-        let mut rng = McRng::new(0xBEEF_CAFE_1234_5678);
         const TOLERANCE: f32 = 1e-4;
+
+        let mut rng = McRng::new(0xBEEF_CAFE_1234_5678);
 
         let ms: &[f32] = &[1.25, 1.5, 2.0, 2.5, 3.0];
 

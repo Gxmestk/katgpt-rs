@@ -567,6 +567,7 @@ fn enumerate_targets(num_keys: usize, num_boxes: usize, num_levers: usize) -> Ve
         targets.push(Target::Lever(k));
     }
     targets.push(Target::Goal);
+    targets.shrink_to_fit();
     targets
 }
 

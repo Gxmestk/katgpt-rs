@@ -403,6 +403,8 @@ mod tests {
         // interior path is a branch-free FMA loop — measured per-call at
         // N=1000 (the issue's sub-µs ask is recorded honestly in
         // .benchmarks/688 §G2).
+        const RUNS: u32 = 5_000;
+
         let n = 1000usize;
         let anchor: Vec<f32> = (0..n).map(|i| i as f32 * 0.5).collect();
         let cand: Vec<f32> = (0..n).map(|i| i as f32 * 0.5 + 3.0).collect();
@@ -414,7 +416,6 @@ mod tests {
             blend_into(&anchor, &cand, &axes, &mut out);
         }
         std::hint::black_box(&out);
-        const RUNS: u32 = 5_000;
         let t0 = std::time::Instant::now();
         let mut acc = 0.0f32;
         for _ in 0..RUNS {

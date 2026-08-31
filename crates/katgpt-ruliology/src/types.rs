@@ -127,6 +127,7 @@ impl WinMatrix {
 
         // Sort descending by payoff.
         front.sort_by(|a, b| b.1.total_cmp(&a.1));
+        front.shrink_to_fit();
         front
     }
 
@@ -178,6 +179,7 @@ impl RuliologyPruner {
             }
             let _ = id; // suppress unused warning
         }
+        result.shrink_to_fit();
         result
     }
 }

@@ -193,6 +193,17 @@ pub fn bench_hla_memory(_config: &Config) -> BenchResult {
 
 #[cfg(feature = "hla_attention")]
 pub fn bench_hla_quality(_config: &Config) -> BenchResult {
+    fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
+        let (mut dot, mut norm_a, mut norm_b) = (0.0f32, 0.0f32, 0.0f32);
+        for i in 0..a.len() {
+            dot += a[i] * b[i];
+            norm_a += a[i] * a[i];
+            norm_b += b[i] * b[i];
+        }
+        let denom = norm_a.sqrt() * norm_b.sqrt();
+        if denom < 1e-8 { 0.0 } else { dot / denom }
+    }
+
     let bench_config = Config::micro();
     let mut rng = Rng::new(42);
     let weights = TransformerWeights::new(&bench_config, &mut rng);
@@ -237,17 +248,6 @@ pub fn bench_hla_quality(_config: &Config) -> BenchResult {
             &bench_config,
         );
         ahla_logits.push(logits.to_vec());
-    }
-
-    fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
-        let (mut dot, mut norm_a, mut norm_b) = (0.0f32, 0.0f32, 0.0f32);
-        for i in 0..a.len() {
-            dot += a[i] * b[i];
-            norm_a += a[i] * a[i];
-            norm_b += b[i] * b[i];
-        }
-        let denom = norm_a.sqrt() * norm_b.sqrt();
-        if denom < 1e-8 { 0.0 } else { dot / denom }
     }
 
     let mut hla_sims = Vec::with_capacity(n_tokens);

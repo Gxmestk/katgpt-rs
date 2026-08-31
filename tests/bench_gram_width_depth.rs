@@ -76,16 +76,16 @@ impl GoatVerdict {
 
     fn label(self) -> &'static str {
         match self {
-            GoatVerdict::Pass(_) => "✅ PASS",
-            GoatVerdict::Fail(_) => "❌ FAIL",
-            GoatVerdict::Inconclusive => "⚠️  INCONCLUSIVE",
+            Self::Pass(_) => "✅ PASS",
+            Self::Fail(_) => "❌ FAIL",
+            Self::Inconclusive => "⚠️  INCONCLUSIVE",
         }
     }
 
     fn value_str(self) -> String {
         match self {
-            GoatVerdict::Pass(v) | GoatVerdict::Fail(v) => format!("{v:.2}"),
-            GoatVerdict::Inconclusive => "N/A".to_string(),
+            Self::Pass(v) | Self::Fail(v) => format!("{v:.2}"),
+            Self::Inconclusive => "N/A".to_string(),
         }
     }
 }

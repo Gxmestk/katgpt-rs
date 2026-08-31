@@ -96,6 +96,8 @@ fn g5_zero_alloc_steady_state() {
         // Warm up: any one-time lazy init or `ensure_capacity` resize settles
         // here. After 50 calls, the cached (n, d, k) matches and
         // `ensure_capacity` is a no-op.
+        const MEASURED_ITERS: usize = 100;
+
         for _ in 0..50 {
             funcattn_forward(
                 &x_basis,
@@ -113,7 +115,6 @@ fn g5_zero_alloc_steady_state() {
 
         assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
-        const MEASURED_ITERS: usize = 100;
         for _ in 0..MEASURED_ITERS {
             funcattn_forward(
                 &x_basis,

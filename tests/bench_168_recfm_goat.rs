@@ -78,8 +78,8 @@ fn proof_p1_ddtree_branch_quality() {
 
     let mut total_baseline_nodes = 0usize;
     let mut total_recfm_nodes = 0usize;
-    let mut baseline_path_lengths = Vec::new();
-    let mut recfm_path_lengths = Vec::new();
+    let mut baseline_path_lengths = Vec::with_capacity(n_sets);
+    let mut recfm_path_lengths = Vec::with_capacity(n_sets);
 
     for set_idx in 0..n_sets {
         let seed = 42 + set_idx as u32;
@@ -150,9 +150,9 @@ fn proof_p1_ddtree_branch_quality() {
 // ══════════════════════════════════════════════════════════════════════════
 
 fn proof_p2_lt2_convergence() {
-    println!("\n── P2: LT2 — RecFM convergence over K iterations ──────────\n");
-
     const DIM: usize = 64;
+
+    println!("\n── P2: LT2 — RecFM convergence over K iterations ──────────\n");
     let k = 4;
     let n_iters = 100;
 

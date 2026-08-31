@@ -508,6 +508,7 @@ impl VanillaTransformer {
                 }
             }
         }
+        table.shrink_to_fit();
         table
     }
 

@@ -247,7 +247,9 @@ pub fn save_results_csv(results: &[BenchResult], path: &str) -> std::io::Result<
 /// Append benchmark results to cumulative `bench/timeseries.csv` for regression tracking.
 /// Creates file with header if missing; otherwise appends rows.
 pub fn append_timeseries_csv(results: &[BenchResult], path: &str) -> std::io::Result<()> {
-    let commit = std::process::Command::new("git")
+    use std::io::Write;
+
+let commit = std::process::Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
         .output()
         .ok().map_or_else(|| "unknown".into(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
@@ -256,8 +258,6 @@ pub fn append_timeseries_csv(results: &[BenchResult], path: &str) -> std::io::Re
     let features = active_features();
 
     let file_exists = std::path::Path::new(path).exists();
-
-    use std::io::Write;
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -672,6 +672,7 @@ pub fn run_all(config: &Config) -> Vec<BenchResult> {
     let game_results = games::bench_e2e_game_timing(config);
     results.extend(game_results);
 
+    results.shrink_to_fit();
     results
 }
 

@@ -105,6 +105,7 @@ fn drive_loop(
             break;
         }
     }
+    out.shrink_to_fit();
     out
 }
 

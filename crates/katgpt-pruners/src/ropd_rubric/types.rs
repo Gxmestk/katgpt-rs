@@ -134,7 +134,7 @@ impl RubricVector {
     ///
     /// `Vec<(criterion_index, gap_magnitude)>` sorted by `weight × gap` descending.
     /// Empty if references are empty.
-    pub fn gap_vs_references(&self, references: &[RubricVector]) -> Vec<(usize, f32)> {
+    pub fn gap_vs_references(&self, references: &[Self]) -> Vec<(usize, f32)> {
         if references.is_empty() || self.scores.is_empty() {
             return Vec::new();
         }
@@ -167,7 +167,7 @@ impl RubricVector {
     ///
     /// Returns `(criterion_index, gap_magnitude)` sorted by `weight × gap` descending.
     /// Only criteria where `reference_score > student_score` are included.
-    pub fn gap_criteria(&self, reference: &RubricVector) -> Vec<(usize, f32)> {
+    pub fn gap_criteria(&self, reference: &Self) -> Vec<(usize, f32)> {
         if self.scores.is_empty() {
             return Vec::new();
         }
@@ -199,12 +199,12 @@ impl RubricVector {
     /// Computes `reference.weighted_score() - self.weighted_score()`.
     ///
     /// Returns 0.0 if both scores are equal, positive if reference is better.
-    pub fn to_scalar_delta(&self, reference: &RubricVector) -> f32 {
+    pub fn to_scalar_delta(&self, reference: &Self) -> f32 {
         reference.weighted_score() - self.weighted_score()
     }
 
     /// Whether any criterion has a gap vs the given reference.
-    pub fn has_any_gap(&self, reference: &RubricVector, threshold: f32) -> bool {
+    pub fn has_any_gap(&self, reference: &Self, threshold: f32) -> bool {
         let n = self.scores.len().min(reference.scores.len());
         for i in 0..n {
             if reference.scores[i] - self.scores[i] > threshold {
@@ -218,7 +218,7 @@ impl RubricVector {
     pub fn has_criterion_gap(
         &self,
         criterion_idx: usize,
-        reference: &RubricVector,
+        reference: &Self,
         threshold: f32,
     ) -> bool {
         let student = self.scores.get(criterion_idx).copied().unwrap_or(0.0);
@@ -244,7 +244,7 @@ impl RubricVector {
     ///
     /// Use this when you need the raw gap vector for per-criterion reward signals.
     /// Use [`gap_criteria()`](Self::gap_criteria) when you need sorted/filtered gaps for targeting.
-    pub fn per_criterion_gaps(&self, reference: &RubricVector) -> Vec<f32> {
+    pub fn per_criterion_gaps(&self, reference: &Self) -> Vec<f32> {
         let n = self.scores.len().min(reference.scores.len());
         (0..n)
             .map(|i| (reference.scores[i] - self.scores[i]).max(0.0))
@@ -283,7 +283,7 @@ impl RubricVector {
     /// Same `weighted_score` (0.571) → **different** `quadratic_reward` (0.429 ≠ 0.214).
     /// Profile A has concentrated failures (actionable) → higher reward → bandit explores more.
     /// Profile C has spread failures (less actionable) → lower reward → bandit explores less.
-    pub fn quadratic_weighted_reward(&self, reference: &RubricVector) -> f32 {
+    pub fn quadratic_weighted_reward(&self, reference: &Self) -> f32 {
         let n = self.scores.len().min(reference.scores.len());
         let total_weight: f32 = self.weights.iter().take(n).copied().sum();
         if total_weight.abs() < f32::EPSILON || n == 0 {

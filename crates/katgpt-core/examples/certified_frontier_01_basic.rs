@@ -329,6 +329,7 @@ impl Frontier {
                 out.push(c);
             }
         }
+        out.shrink_to_fit();
         out
     }
 

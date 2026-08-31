@@ -176,6 +176,7 @@ impl ClassGroupPigeonhole {
             units.push(C64::new(angle.cos(), angle.sin()));
         }
 
+        units.shrink_to_fit();
         units
     }
 
@@ -220,6 +221,7 @@ impl ClassGroupPigeonhole {
             units.push(C64::new(angle.cos(), angle.sin()));
         }
 
+        units.shrink_to_fit();
         units
     }
 
@@ -238,6 +240,7 @@ impl ClassGroupPigeonhole {
             let angle = 2.0 * std::f64::consts::PI * k as f64 / n_roots as f64;
             units.push(C64::new(angle.cos(), angle.sin()));
         }
+        units.shrink_to_fit();
         units
     }
 }

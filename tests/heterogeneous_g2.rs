@@ -63,6 +63,7 @@ fn perturbed_cost(base: [[f32; 2]; 2], seed: u64) -> Vec<f32> {
             out.push((val + noise).max(0.01)); // keep positive
         }
     }
+    out.shrink_to_fit();
     out
 }
 

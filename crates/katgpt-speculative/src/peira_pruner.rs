@@ -186,7 +186,7 @@ mod tests {
         pruner.set_alignment(0.5);
         // factor = 0.5^0.5 = sqrt(0.5) ≈ 0.7071
         let rel = pruner.relevance(0, 0, &[]);
-        let expected = 0.5f32.powf(0.5);
+        let expected = 0.5f32.sqrt();
         assert!(
             (rel - expected).abs() < 1e-5,
             "Expected {expected}, got {rel}"
@@ -231,7 +231,7 @@ mod tests {
         // factor = 0.64^0.5 = 0.8
         // relevance = 0.5 * 0.8 = 0.4
         let rel = pruner.relevance(0, 0, &[]);
-        let expected = 0.5 * 0.64f32.powf(0.5);
+        let expected = 0.5 * 0.64f32.sqrt();
         assert!(
             (rel - expected).abs() < 1e-5,
             "Expected {expected}, got {rel}"

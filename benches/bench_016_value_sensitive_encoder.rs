@@ -492,11 +492,11 @@ enum EncoderKind {
 impl EncoderKind {
     fn name(self) -> &'static str {
         match self {
-            EncoderKind::Geometry => "Geometry",
-            EncoderKind::DispNorms => "DispNorms",
-            EncoderKind::DispStats => "DispStats",
-            EncoderKind::StateNorms => "StateNorms",
-            EncoderKind::DispRatios => "DispRatios",
+            Self::Geometry => "Geometry",
+            Self::DispNorms => "DispNorms",
+            Self::DispStats => "DispStats",
+            Self::StateNorms => "StateNorms",
+            Self::DispRatios => "DispRatios",
         }
     }
 }

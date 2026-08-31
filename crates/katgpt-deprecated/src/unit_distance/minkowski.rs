@@ -292,6 +292,7 @@ impl MinkowskiLattice {
         // General case: recursive enumeration
         let mut coeffs = vec![0i64; self.dim];
         self.enumerate_polydisc(&mut coeffs, 0, range, radius_sq, &mut points, &mut buf);
+        points.shrink_to_fit();
         points
     }
 
@@ -382,6 +383,7 @@ impl MinkowskiLattice {
                 points.push(C64::new(re as f64, im as f64));
             }
         }
+        points.shrink_to_fit();
         points
     }
 }

@@ -76,6 +76,7 @@ impl LeoHead for BenchLeoTeacher {
                 q.push(0.05);
             }
         }
+        q.shrink_to_fit();
         q
     }
     #[inline]
@@ -132,6 +133,7 @@ impl LeoHead for BenchUvfaStudent {
                 q.push(goal_q * 0.85);
             }
         }
+        q.shrink_to_fit();
         q
     }
     #[inline]

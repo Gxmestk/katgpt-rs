@@ -106,8 +106,8 @@ impl RelocatePair {
     /// sequentially via [`RelocateOp::apply_into`].
     pub fn to_ops(&self, n_stages: usize, anchor_token_idx: usize) -> [RelocateOp; 2] {
         let (src_a_frac, src_b_frac, dst_frac) = match self {
-            RelocatePair::LateEarly => (0.82, 0.10, 0.45),
-            RelocatePair::Custom { src_a, src_b, dst } => (*src_a, *src_b, *dst),
+            Self::LateEarly => (0.82, 0.10, 0.45),
+            Self::Custom { src_a, src_b, dst } => (*src_a, *src_b, *dst),
         };
         let dst_stage = frac_to_stage(dst_frac, n_stages);
         [

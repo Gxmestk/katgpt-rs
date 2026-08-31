@@ -150,6 +150,7 @@ impl MuxLatentEncoder {
             }
         }
 
+        result.shrink_to_fit();
         result
     }
 

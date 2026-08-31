@@ -85,11 +85,12 @@
 /// ```
 #[inline]
 pub fn smooth_min_similarity(cosines: &[f32], beta: f32) -> f32 {
+    use crate::simd::fast_exp;
+
     assert!(beta > 1.0, "beta must be > 1.0, got {beta}");
     assert!(!cosines.is_empty(), "cosines must not be empty");
 
     let log_beta = beta.ln();
-    use crate::simd::fast_exp;
     // Σ(β^(1-c_i) - 1) + 1
     // mul_add for FMA fusion: (1-c) * ln(β) computed in one instruction.
     let sum = cosines
@@ -590,6 +591,8 @@ mod tests {
         // Corollary 2: |recos| >= |cos| - eps for all pairs. Fuzz 1000 pairs.
         // Use a fixed seed for determinism (the GOAT G1 gate depends on this).
         // Simple LCG — no dep on a PRNG crate.
+        const EPS: f32 = 1e-4;
+
         let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
         let mut next = || {
             // xorshift64
@@ -599,7 +602,6 @@ mod tests {
             // Map to f32 in [-5, 5].
             ((state >> 40) as f32) / ((1u64 << 24) as f32) * 10.0 - 5.0
         };
-        const EPS: f32 = 1e-4;
         for _ in 0..1000 {
             let a: [f32; 8] = std::array::from_fn(|_| next());
             let b: [f32; 8] = std::array::from_fn(|_| next());

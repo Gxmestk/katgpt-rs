@@ -167,15 +167,15 @@ impl Arena {
 #[test]
 #[ignore = "slow: ~1 min/game at budget=50 under wasmi; build the wasm32 artifact first (see module doc)"]
 fn wasmi_puct_int8_winrate_vs_greedy() {
-    let (mut store, instance) = setup_wasmi();
+    const NUM_GAMES: usize = 20;
+
+let (mut store, instance) = setup_wasmi();
 
     // int8 PUCT: budget=50, c_puct=1.5, top_k=8. Same config as the f32
     // reference test, only the forward path differs.
     let c_puct_bits = 1.5f32.to_bits();
     let arena = Arena::new(&store, &instance);
     arena.init_int8.call(&mut store, (50, c_puct_bits, 8)).expect("arena_init_int8");
-
-    const NUM_GAMES: usize = 20;
     let start = Instant::now();
     let mut puct_wins = 0usize;
     let mut games_summary: Vec<String> = Vec::with_capacity(NUM_GAMES);

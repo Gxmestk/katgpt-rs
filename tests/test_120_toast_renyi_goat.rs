@@ -28,15 +28,16 @@ mod tests {
         }
 
         let mut vocab_to_id = HashMap::new();
-        let mut id_to_vocab = Vec::new();
-
-        // Special tokens
-        for (id, tok) in [
+        let cap_iter = [
             (0usize, b"<pad>".to_vec()),
             (1, b"<bos>".to_vec()),
             (2, b"<eos>".to_vec()),
             (3, b"<unk>".to_vec()),
-        ] {
+        ];
+        let mut id_to_vocab = Vec::with_capacity(cap_iter.len());
+
+        // Special tokens
+        for (id, tok) in cap_iter {
             vocab_to_id.insert(tok.clone(), id);
             id_to_vocab.push(tok);
         }

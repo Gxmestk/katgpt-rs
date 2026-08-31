@@ -26,6 +26,8 @@ fn jacobian_svd_at_into_zero_alloc_after_warmup() {
     // map exercises the same Jacobi sweeps + SOA writes. A diagonal map is
     // the simplest deterministic choice and avoids reproducing the lib-test
     // `known_rank3_map_r8x8` helper (private to the lib's test module).
+    const N_CALLS: usize = 1000;
+
     let mut w_diag = [0.0f32; 64];
     w_diag[0] = 10.0;
     w_diag[9] = 5.0;
@@ -49,8 +51,6 @@ fn jacobian_svd_at_into_zero_alloc_after_warmup() {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut sink: f32 = 0.0;
     for _ in 0..N_CALLS {
         jacobian_svd_at_into(f, &x, 1e-4, &mut scratch);

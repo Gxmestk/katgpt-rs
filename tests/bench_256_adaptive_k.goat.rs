@@ -41,6 +41,7 @@ fn expand_block_keys(centroid: &[f32], block_idx: usize) -> Vec<f32> {
             keys.push(c + ((seed as f32) * 0.0001).sin() * 0.02);
         }
     }
+    keys.shrink_to_fit();
     keys
 }
 
@@ -494,12 +495,8 @@ fn bench_adaptive_k_vs_fixed_k() {
         "  (reframes recall ratio {recall_ratio:.3}: adaptive picks fewer but higher-value blocks)"
     );
     eprintln!(
-        "    [O3 aggregate] precision@adapt_k={p:.4}  weighted_recall={w:.4}  \
-         recall_ratio={rr:.4}  adapt_k≈{ak:.2}",
-        p = o3_avg_precision,
-        w = o3_avg_weighted,
-        rr = recall_ratio,
-        ak = avg_k_adapt,
+        "    [O3 aggregate] precision@adapt_k={o3_avg_precision:.4}  weighted_recall={o3_avg_weighted:.4}  \
+         recall_ratio={recall_ratio:.4}  adapt_k≈{avg_k_adapt:.2}",
     );
 
     let pass_savings = savings_ratio <= 0.75;

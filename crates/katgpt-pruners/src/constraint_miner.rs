@@ -214,6 +214,7 @@ pub fn extract_frequent_sequences(paths: &[Vec<usize>], min_support: usize) -> V
     // Sort by support descending (highest frequency first)
     patterns.sort_by(|a, b| b.support.cmp(&a.support));
 
+    patterns.shrink_to_fit();
     patterns
 }
 
@@ -247,6 +248,7 @@ pub fn mine_and_insert(
         }
     }
 
+    constraints.shrink_to_fit();
     constraints
 }
 

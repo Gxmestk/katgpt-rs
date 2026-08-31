@@ -157,9 +157,7 @@ fn run_phase(
 
 fn print_header() {
     println!(
-        "╔═══ Freeze/Thaw — Go {board_size}×{board_size} ({rounds} rounds × 3 phases) ═══════╗",
-        board_size = BOARD_SIZE,
-        rounds = ROUNDS,
+        "╔═══ Freeze/Thaw — Go {BOARD_SIZE}×{BOARD_SIZE} ({ROUNDS} rounds × 3 phases) ═══════╗",
     );
     println!("║  Phase 1 LEARN:    naive GoHL vs Validator  (bandit learns)  ║");
     println!("║  Phase 2 FROZEN:   frozen GoHL vs Validator  (test it)      ║");
@@ -223,44 +221,29 @@ fn print_verdict(frozen_stats: &PhaseStats, baseline_stats: &PhaseStats) {
     println!("  Metric          Frozen    Baseline      Δ");
     println!("  ──────────────────────────────────────────────────");
     println!(
-        "  Win Rate        {f:>5.1}%    {b:>5.1}%    {d:+.1}pp  {icon}",
-        f = frozen_pct,
-        b = baseline_pct,
-        d = win_diff,
-        icon = win_icon,
+        "  Win Rate        {frozen_pct:>5.1}%    {baseline_pct:>5.1}%    {win_diff:+.1}pp  {win_icon}",
     );
     println!(
-        "  Avg Score       {f:>+6.1}    {b:>+6.1}    {d:+.1}     {icon}",
-        f = frozen_delta,
-        b = baseline_delta,
-        d = score_diff,
-        icon = score_icon,
+        "  Avg Score       {frozen_delta:>+6.1}    {baseline_delta:>+6.1}    {score_diff:+.1}     {score_icon}",
     );
     println!();
 
     if win_diff > 5.0 {
-        println!(
-            "  ✅ Frozen knowledge helps! +{diff:.0}pp win rate vs Validator.",
-            diff = win_diff,
-        );
+        println!("  ✅ Frozen knowledge helps! +{win_diff:.0}pp win rate vs Validator.",);
     } else if win_diff > 0.0 {
         println!(
-            "  🟡 Marginal improvement: +{diff:.0}pp win rate. May need more learning rounds.",
-            diff = win_diff,
+            "  🟡 Marginal improvement: +{win_diff:.0}pp win rate. May need more learning rounds.",
         );
     } else if win_diff == 0.0 {
         println!("  ➖ No difference — frozen knowledge has no measurable effect.");
         println!("     Both GoHL players use the same category priors, so the bandit");
         println!("     needs more rounds or finer granularity to matter vs Validator.");
     } else {
-        println!(
-            "  ❌ Frozen knowledge hurts: {diff:.0}pp worse. Possible overfitting.",
-            diff = win_diff,
-        );
+        println!("  ❌ Frozen knowledge hurts: {win_diff:.0}pp worse. Possible overfitting.",);
     }
 
     println!();
-    println!("  Frozen file: {path} (92 bytes)", path = FREEZE_PATH);
+    println!("  Frozen file: {FREEZE_PATH} (92 bytes)");
 }
 
 // ── Main ───────────────────────────────────────────────────────
@@ -269,7 +252,7 @@ fn main() {
     print_header();
 
     // ── Phase 1: LEARN (HL vs Validator, bandit learns) ───────
-    println!("━━━ Phase 1: LEARN ({rounds} rounds) ━━━", rounds = ROUNDS);
+    println!("━━━ Phase 1: LEARN ({ROUNDS} rounds) ━━━");
 
     let mut hl_player = GoHLPlayer::new();
     let mut validator_learn = GoValidatorPlayer;
@@ -291,10 +274,7 @@ fn main() {
     println!();
 
     // ── Phase 2: FROZEN (thawed HL vs Validator) ──────────────
-    println!(
-        "━━━ Phase 2: FROZEN ({rounds} rounds, thawed HL vs Validator) ━━━",
-        rounds = ROUNDS,
-    );
+    println!("━━━ Phase 2: FROZEN ({ROUNDS} rounds, thawed HL vs Validator) ━━━",);
 
     let loaded: GoFrozenBandit = match load_frozen(path) {
         Ok(f) => f,
@@ -323,10 +303,7 @@ fn main() {
     println!();
 
     // ── Phase 3: BASELINE (naive HL vs Validator) ─────────────
-    println!(
-        "━━━ Phase 3: BASELINE ({rounds} rounds, naive HL vs Validator) ━━━",
-        rounds = ROUNDS,
-    );
+    println!("━━━ Phase 3: BASELINE ({ROUNDS} rounds, naive HL vs Validator) ━━━",);
 
     let mut naive_hl = GoHLPlayer::new();
     let mut validator2 = GoValidatorPlayer;

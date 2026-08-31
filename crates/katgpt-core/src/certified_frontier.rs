@@ -736,13 +736,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     #[inline]
     fn touch_acquisition(&mut self, i: usize) {
         let c = &self.cells[i];
-        self.acq_sigma[i] = match c.certified || c.near_certified {
-            true => match c.sigma_override.is_finite() {
-                true => c.sigma_override,
-                false => c.beta_sigma,
-            },
-            false => NOT_A_CANDIDATE,
-        };
+        self.acq_sigma[i] = if c.certified || c.near_certified { if c.sigma_override.is_finite() { c.sigma_override } else { c.beta_sigma } } else { NOT_A_CANDIDATE };
     }
 
     /// Stamp `near_certified` on everything within `acquire_radius` of `i`.
@@ -803,10 +797,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
             return false;
         }
         let c = &mut self.cells[i];
-        match valid {
-            true => c.valid += 1,
-            false => c.invalid += 1,
-        }
+        if valid { c.valid += 1 } else { c.invalid += 1 }
         c.beta_sigma = beta_mean_variance(c.valid, c.invalid).1.sqrt();
         self.mark_dirty(i);
         self.touch_acquisition(i);
@@ -819,10 +810,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     #[must_use]
     pub fn sigma(&self, i: usize) -> f32 {
         let c = &self.cells[i];
-        match c.sigma_override.is_finite() {
-            true => c.sigma_override,
-            false => c.beta_sigma,
-        }
+        if c.sigma_override.is_finite() { c.sigma_override } else { c.beta_sigma }
     }
 
     /// Lower confidence bound `mu - beta * sigma`, clamped to `[0, 1]`.
@@ -880,9 +868,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         // (`confidence_schedule` is monotone in `t`, `beta_union_bound` is
         // constant for fixed inputs), but a caller may pass anything, so detect
         // it and fall back rather than silently under-certifying.
-        match beta < self.last_beta {
-            true => self.expand_certified_full(cfg, beta),
-            false => {
+        if beta < self.last_beta { self.expand_certified_full(cfg, beta) } else {
                 self.last_beta = beta;
                 let mut newly = 0;
                 for k in 0..self.dirty_len {
@@ -894,7 +880,6 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
                 self.certified += newly;
                 newly
             }
-        }
     }
 
     /// [`Self::expand_certified`] over every cell, unconditionally — the
@@ -920,14 +905,8 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
     /// back to `cfg.lipschitz` for any cell without a local bound.
     #[inline]
     fn hop_lipschitz(&self, i: usize, j: usize, cfg: &FrontierConfig) -> f32 {
-        let li = match self.cells[i].lipschitz.is_finite() {
-            true => self.cells[i].lipschitz,
-            false => cfg.lipschitz,
-        };
-        let lj = match self.cells[j].lipschitz.is_finite() {
-            true => self.cells[j].lipschitz,
-            false => cfg.lipschitz,
-        };
+        let li = if self.cells[i].lipschitz.is_finite() { self.cells[i].lipschitz } else { cfg.lipschitz };
+        let lj = if self.cells[j].lipschitz.is_finite() { self.cells[j].lipschitz } else { cfg.lipschitz };
         li.max(lj)
     }
 
@@ -950,17 +929,11 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         for i in 0..self.len {
             if self.cells[i].certified {
                 best = best.max(self.cells[i].cb - cfg.h);
-                let li = match self.cells[i].lipschitz.is_finite() {
-                    true => self.cells[i].lipschitz,
-                    false => cfg.lipschitz,
-                };
+                let li = if self.cells[i].lipschitz.is_finite() { self.cells[i].lipschitz } else { cfg.lipschitz };
                 min_l = min_l.min(li);
             }
         }
-        let l = match min_l.is_finite() {
-            true => min_l,
-            false => cfg.lipschitz,
-        };
+        let l = if min_l.is_finite() { min_l } else { cfg.lipschitz };
         let hop_cost = l * cfg.cell_spacing;
         DilationFeasibility {
             best_headroom: best,
@@ -1083,10 +1056,7 @@ impl<const MAX_CELLS: usize, const D: usize> CertifiedFrontier<MAX_CELLS, D> {
         }
         let lcb = self.lcb(i, beta);
         let ucb = self.ucb(i, beta);
-        let l = match self.cells[i].lipschitz.is_finite() {
-            true => self.cells[i].lipschitz,
-            false => cfg.lipschitz,
-        };
+        let l = if self.cells[i].lipschitz.is_finite() { self.cells[i].lipschitz } else { cfg.lipschitz };
         lcb - l * cfg.cell_spacing < cfg.h && cfg.h <= ucb
     }
 }

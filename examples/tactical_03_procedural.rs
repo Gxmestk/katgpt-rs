@@ -269,7 +269,7 @@ impl DungeonStats {
             });
         }
 
-        DungeonStats {
+        Self {
             total_monsters,
             total_treasures,
             total_walls,
@@ -476,19 +476,17 @@ fn main() {
     let solvability_ok = solvability >= 50.0;
     println!(
         "  Solvability ≥ 50%           : {} ({solvability:.0}%)",
-        match solvability_ok {
-            true => "✅ PASS",
-            false => "❌ FAIL",
+        if solvability_ok {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
         }
     );
 
     let dungeon_ok = dungeon_successes >= 3;
     println!(
         "  Multi-floor ≥ 3/5           : {} ({dungeon_successes}/5)",
-        match dungeon_ok {
-            true => "✅ PASS",
-            false => "❌ FAIL",
-        }
+        if dungeon_ok { "✅ PASS" } else { "❌ FAIL" }
     );
 
     assert!(

@@ -31,7 +31,9 @@ counting_allocator!();
 fn kinematics_g4_zero_alloc_steady_state() {
     // Warmup: settle the lattice OnceLock (a one-time static init — no heap,
     // but let any lazy machinery settle before measuring).
-    {
+    const CALLS: usize = 10_000;
+
+{
         let mut st = KinState::<4>::new(1.0).unwrap();
         let mut x = [0.0f32; 4];
         for t in 0..8u32 {
@@ -60,8 +62,6 @@ fn kinematics_g4_zero_alloc_steady_state() {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const CALLS: usize = 10_000;
     let mut sink = 0.0f32;
     let mut st = KinState::<4>::new(1.0).unwrap();
     let mut x = [0.0f32; 4];

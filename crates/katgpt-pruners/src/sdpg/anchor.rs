@@ -19,12 +19,12 @@ pub enum KlAnchor {
 impl KlAnchor {
     /// Default URKL anchor with β=0.01.
     pub fn default_urkl() -> Self {
-        KlAnchor::Urkl { beta: 0.01 }
+        Self::Urkl { beta: 0.01 }
     }
 
     /// Default UFKL anchor with β=0.01.
     pub fn default_ufkl() -> Self {
-        KlAnchor::Ufkl { beta: 0.01 }
+        Self::Ufkl { beta: 0.01 }
     }
 
     /// Compute per-arm anchoring adjustment to subtract from Q-values.
@@ -33,7 +33,7 @@ impl KlAnchor {
     pub fn anchor_loss(&self, q: &[f32], q_ref: &[f32]) -> Vec<f32> {
         assert_eq!(q.len(), q_ref.len());
         match self {
-            KlAnchor::Ufkl { beta } => q
+            Self::Ufkl { beta } => q
                 .iter()
                 .zip(q_ref.iter())
                 .map(|(&qi, &ri)| {
@@ -50,7 +50,7 @@ impl KlAnchor {
                     }
                 })
                 .collect(),
-            KlAnchor::Urkl { beta } => q
+            Self::Urkl { beta } => q
                 .iter()
                 .zip(q_ref.iter())
                 .map(|(&qi, &ri)| {

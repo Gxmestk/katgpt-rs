@@ -339,7 +339,7 @@ pub fn estimate_interval(
     let moment_denom = 3.0 * (m - 1) as f64;
     let mean_q_r = scratch.q_stats.iter().map(|q| q * q).sum::<f64>() / m as f64;
     let b_alpha = mean_q_r.sqrt().max(1e-9); // r = α/2 = 2
-    let tau = (q - p) as f64 * b_alpha * (7.0 * log_term / moment_denom).powf(0.5);
+    let tau = (q - p) as f64 * b_alpha * (7.0 * log_term / moment_denom).sqrt();
     #[cfg(debug_assertions)]
     if std::env::var("UGC_DEBUG").is_ok() {
         let raw_mean = scratch.q_stats.iter().sum::<f64>() / m as f64;
@@ -364,7 +364,7 @@ pub fn estimate_interval(
         .sum::<f64>()
         / (m - 1) as f64;
     let r_hat = (2.0 * var * log_term / m as f64).sqrt()
-        + 4.0 * (q - p) as f64 * b_alpha * (7.0 * log_term / moment_denom).powf(0.5);
+        + 4.0 * (q - p) as f64 * b_alpha * (7.0 * log_term / moment_denom).sqrt();
 
     UgcIntervalEstimate {
         hat_h: hat_h as f32,
@@ -659,6 +659,7 @@ pub fn equal_sqrt_mass_grid(profile: &UgcProfile, n: usize) -> Vec<f32> {
         }
     }
     out.push(profile.t_grid[g]);
+    out.shrink_to_fit();
     out
 }
 
@@ -667,7 +668,9 @@ pub fn equal_sqrt_mass_grid(profile: &UgcProfile, n: usize) -> Vec<f32> {
 /// `e(i,j) = √((λ_j−λ_i)·mass(i..j))`. Returns `k+1` grid indices
 /// (`0` and `G` included; ascending).
 pub fn dp_partition(profile: &UgcProfile, k: usize) -> Vec<usize> {
-    let g = profile.increments.len();
+    const INF: f64 = f64::INFINITY;
+
+let g = profile.increments.len();
     assert!(k >= 1 && k <= g, "need 1 <= K <= number of intervals");
     let mut prefix = vec![0.0f64; g + 1];
     for i in 0..g {
@@ -677,7 +680,6 @@ pub fn dp_partition(profile: &UgcProfile, k: usize) -> Vec<usize> {
         let s = (profile.lambda_grid[j] - profile.lambda_grid[i]) as f64;
         (s * (prefix[j] - prefix[i]).max(0.0)).sqrt()
     };
-    const INF: f64 = f64::INFINITY;
     let mut v = vec![vec![INF; g + 1]; k + 1];
     let mut arg = vec![vec![0usize; g + 1]; k + 1];
     v[1][0] = 0.0;

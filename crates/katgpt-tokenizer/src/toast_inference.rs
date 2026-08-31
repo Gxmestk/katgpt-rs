@@ -39,6 +39,7 @@ impl ToastTokenizerImpl {
             Self::encode_pretoken(tokenizer, &bytes[start..], &mut token_ids);
         }
 
+        token_ids.shrink_to_fit();
         token_ids
     }
 

@@ -255,7 +255,7 @@ pub fn set_diffusion_decode<F: SetCausalForwardFn>(
     let max_gen_step = gen_steps.iter().copied().max().unwrap_or(0);
 
     let mut forward_passes = 0usize;
-    let mut confidence_history = Vec::new();
+    let mut confidence_history = Vec::with_capacity(max_gen_step + 1);
     let mut all_committed = false;
 
     // Hoisted out of both loops: gen_steps doesn't change between iterations,
@@ -485,9 +485,9 @@ fn sample_token(
     temperature: f32,
     rng: &mut Rng,
 ) -> (usize, f32) {
-    debug_assert_eq!(logits.len(), vocab, "logits length must equal vocab_size");
-
     use katgpt_core::simd::fast_exp;
+
+    debug_assert_eq!(logits.len(), vocab, "logits length must equal vocab_size");
 
     // Find max for numerical stability (skip mask token).
     //

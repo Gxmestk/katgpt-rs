@@ -715,6 +715,7 @@ pub fn build_dd_tree_screened_synonyms(
         }
     }
 
+    tree.shrink_to_fit();
     tree
 }
 

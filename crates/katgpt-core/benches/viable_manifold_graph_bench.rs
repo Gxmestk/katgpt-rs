@@ -160,6 +160,7 @@ fn make_1000_samples_4d(seed: u64) -> Vec<f32> {
             v.push(rng.f32() * 10.0 - 5.0); // [-5, 5)
         }
     }
+    v.shrink_to_fit();
     v
 }
 

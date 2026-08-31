@@ -82,6 +82,7 @@ impl RegionBatching for RegionBatcher {
             offset += region.token_count;
         }
 
+        tokens.shrink_to_fit();
         tokens
     }
 
@@ -156,6 +157,7 @@ impl RegionBatching for RegionBatcher {
             }
         }
 
+        sub_regions.shrink_to_fit();
         sub_regions
     }
 }

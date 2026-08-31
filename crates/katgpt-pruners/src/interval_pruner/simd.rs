@@ -225,6 +225,7 @@ fn scalar_find_intervals(mask: &[bool]) -> Vec<(usize, usize)> {
         intervals.push((start, i));
     }
 
+    intervals.shrink_to_fit();
     intervals
 }
 

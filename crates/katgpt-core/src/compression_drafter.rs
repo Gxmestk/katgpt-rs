@@ -417,6 +417,7 @@ pub fn corpus_alphabet(data: &[u8]) -> Vec<u8> {
         }
     }
     alphabet.sort_unstable();
+    alphabet.shrink_to_fit();
     alphabet
 }
 

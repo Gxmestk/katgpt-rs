@@ -64,6 +64,7 @@ fn bench_bt_rank_goat_proof() {
             }
         }
 
+        comparisons.shrink_to_fit();
         comparisons
     }
 
@@ -155,6 +156,9 @@ fn bench_bt_rank_goat_proof() {
     const NOISE_STD: f32 = 0.3;
     const N_TRIALS: usize = 500;
     const SEED: u64 = 42;
+
+    const K_SPARSE: usize = 2;
+    const SPARSE_HIT_THRESHOLD: f64 = 0.50;
 
     println!("\n{}", "═".repeat(72));
     println!("🐐 GOAT PROOF: Bradley-Terry vs Pointwise Selection");
@@ -290,9 +294,6 @@ fn bench_bt_rank_goat_proof() {
     // ════════════════════════════════════════════════════════════════
 
     println!("\n── Proof 3: BT handles sparse comparisons (K=2) ────────────");
-
-    const K_SPARSE: usize = 2;
-    const SPARSE_HIT_THRESHOLD: f64 = 0.50;
     let mut top3_hit_count = 0usize;
 
     for trial in 0..N_TRIALS {

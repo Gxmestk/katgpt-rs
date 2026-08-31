@@ -105,6 +105,7 @@ pub fn block_select_entmax(block_scores: &[f32], cfg: &FlashPrefillConfig) -> Ve
     }
 
     // Monotonic k_block iteration keeps `selected` sorted & unique.
+    selected.shrink_to_fit();
     selected
 }
 

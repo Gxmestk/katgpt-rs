@@ -96,8 +96,9 @@ fn limit_small_recall_by_leg() {
     println!("{:<22} {:>9} {:>9} {:>9}", "leg / variant", "R@2", "R@10", "R@20");
     println!("{}", "-".repeat(54));
 
-    let mut results = Vec::new();
-    for (label, fx) in [("plain", &plain), ("synonym", &syn)] {
+    let cap_iter = [("plain", &plain), ("synonym", &syn)];
+    let mut results = Vec::with_capacity(cap_iter.len());
+    for (label, fx) in cap_iter {
         let dense = dense_ranking(fx);
         let d2 = mean_recall(fx, 2, &dense);
         let d10 = mean_recall(fx, 10, &dense);

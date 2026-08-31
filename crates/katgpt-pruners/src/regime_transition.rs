@@ -503,6 +503,7 @@ impl<P: ConstraintPruner> AdversarialBreaker<P> {
             minus[i] = minus[i].wrapping_sub(1);
             variants.push(minus);
         }
+        variants.shrink_to_fit();
         variants
     }
 

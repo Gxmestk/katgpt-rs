@@ -247,6 +247,7 @@ pub fn js_divergence_batch(dists: &[&[f32]], scratch_m: &mut [f32]) -> Vec<f32> 
         js = js.clamp(0.0, core::f32::consts::LN_2);
         out.push(js);
     }
+    out.shrink_to_fit();
     out
 }
 

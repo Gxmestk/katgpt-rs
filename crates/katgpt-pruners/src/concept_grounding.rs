@@ -216,6 +216,7 @@ impl ConceptGrounding for TemplateGrounding {
             });
         }
 
+        mappings.shrink_to_fit();
         mappings
     }
 
@@ -270,6 +271,7 @@ impl ConceptGrounding for TemplateGrounding {
             ));
         }
 
+        chain.shrink_to_fit();
         chain
     }
 

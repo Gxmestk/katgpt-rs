@@ -544,6 +544,16 @@ fn test_screening_pruner_biases_sampling() {
 
 #[test]
 fn test_screening_pruner_zero_relevance_excludes_token() {
+    impl katgpt_rs::speculative::ScreeningPruner for BlockRangeScreener {
+        fn relevance(&self, _depth: usize, token_idx: usize, _parent_tokens: &[usize]) -> f32 {
+            if (3..=6).contains(&token_idx) {
+                0.0
+            } else {
+                1.0
+            }
+        }
+    }
+
     let config = Config::micro_dllm();
     let mut rng = Rng::new(1200);
     let (weights, _) = train_tiny_model(&config, &mut rng);
@@ -558,15 +568,6 @@ fn test_screening_pruner_zero_relevance_excludes_token() {
 
     // Screener that gives relevance 0.0 to tokens 3..6
     struct BlockRangeScreener;
-    impl katgpt_rs::speculative::ScreeningPruner for BlockRangeScreener {
-        fn relevance(&self, _depth: usize, token_idx: usize, _parent_tokens: &[usize]) -> f32 {
-            if (3..=6).contains(&token_idx) {
-                0.0
-            } else {
-                1.0
-            }
-        }
-    }
 
     let screener = BlockRangeScreener;
     let result = d2f_decode_block(

@@ -243,6 +243,8 @@ mod tests {
         use std::time::Instant;
 
         // Build a 10-predicate chain
+        const ITERS: usize = 10_000;
+
         let mut lattice = WorkflowLattice::new();
         for i in 0..10u32 {
             let mut node = PredicateNode::new(i);
@@ -253,8 +255,6 @@ mod tests {
             lattice.add_node(node);
         }
         lattice.propagate();
-
-        const ITERS: usize = 10_000;
 
         // Warm up
         for _ in 0..100 {

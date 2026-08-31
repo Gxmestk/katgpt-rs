@@ -99,6 +99,7 @@ pub fn build_merkle_levels(hashes: &[[u8; 32]]) -> Vec<Vec<[u8; 32]>> {
         levels.push(next);
         n = half;
     }
+    levels.shrink_to_fit();
     levels
 }
 
@@ -129,6 +130,7 @@ pub fn build_proof_from_levels(levels: &[Vec<[u8; 32]>], leaf_index: usize) -> V
         }
         idx /= 2;
     }
+    siblings.shrink_to_fit();
     siblings
 }
 
@@ -179,6 +181,7 @@ pub fn build_binary_merkle_proof(hashes: &[[u8; 32]], leaf_index: usize) -> Vec<
         idx /= 2;
         n /= 2;
     }
+    siblings.shrink_to_fit();
     siblings
 }
 

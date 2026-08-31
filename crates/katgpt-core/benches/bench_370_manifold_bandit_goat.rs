@@ -603,6 +603,7 @@ fn gen_clustered_embeddings_bench(trial: u64) -> Vec<Vec<f32>> {
             embeddings.push(point);
         }
     }
+    embeddings.shrink_to_fit();
     embeddings
 }
 
@@ -1045,7 +1046,9 @@ fn gate_g3_nonstationarity() -> GateResult {
 }
 
 fn gate_g4_latency() -> GateResult {
-    println!(
+    const BATCH: usize = 1000;
+
+println!(
         "\n--- G4: Latency (depth {}, branching {}, {} leaves) ---",
         DEPTH_G4,
         BRANCHING_G4,
@@ -1069,7 +1072,6 @@ fn gate_g4_latency() -> GateResult {
     for _ in 0..LATENCY_WARMUP {
         black_box(tree.sample(&mut rng));
     }
-    const BATCH: usize = 1000;
     let mut sample_ns = Vec::with_capacity(LATENCY_ITERS / BATCH);
     for _ in 0..(LATENCY_ITERS / BATCH) {
         let t0 = Instant::now();

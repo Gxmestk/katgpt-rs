@@ -113,11 +113,11 @@ fn wasmi_puct_latency() {
     // small so this fits in a reasonable test runtime; the per-move number
     // is what we report).
     for &(budget, label) in &[(50u32, "b50"), (100u32, "b100"), (200u32, "b200")] {
-        wasmi_puct_init.call(&mut store, (budget, c_puct_bits, 8)).expect("puct_init");
+        const MOVES: usize = 5;
+
+wasmi_puct_init.call(&mut store, (budget, c_puct_bits, 8)).expect("puct_init");
         // Warmup one move (populate arena, JIT... well, no JIT, but consistent state).
         let _ = wasmi_puct_search.call(&mut store, (cells_ptr, 0, 255, 0)).expect("warmup");
-
-        const MOVES: usize = 5;
         let start = Instant::now();
         for _ in 0..MOVES {
             let _ = wasmi_puct_search.call(&mut store, (cells_ptr, 0, 255, 0)).expect("search");

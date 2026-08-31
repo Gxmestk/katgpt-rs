@@ -187,6 +187,7 @@ impl BomberProcedure {
                 });
             }
         }
+        edges.shrink_to_fit();
         edges
     }
 

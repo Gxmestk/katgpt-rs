@@ -196,11 +196,12 @@ fn random_prompt(rng: &mut fastrand::Rng) -> Vec<u32> {
 #[test]
 fn g1_exact_recovery_random_init() {
     // Headline G1: random init → random prompts → exact recovery.
-    let mut rng = fastrand::Rng::with_seed(0xC0DE);
+    const N_PROMPTS: usize = 8;
+
+let mut rng = fastrand::Rng::with_seed(0xC0DE);
     let transformer = ToyTransformer::new(&mut rng);
 
     let mut success_count = 0;
-    const N_PROMPTS: usize = 8;
     for prompt_seed in 0..N_PROMPTS {
         let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5 + prompt_seed as u64);
         let prompt = random_prompt(&mut prompt_rng);
@@ -518,10 +519,10 @@ mod grad {
         // meaningful gradients. The standard 1/sqrt(D) init produces near-
         // zero intermediate activations (GELU saturates near the origin),
         // making the Jacobian tiny and convergence glacial.
-        let mut rng = fastrand::Rng::with_seed(0xC0DE);
-        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
-
         const N_PROMPTS: usize = 8;
+
+let mut rng = fastrand::Rng::with_seed(0xC0DE);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
         let mut recovered_count = 0;
         for prompt_seed in 0..N_PROMPTS {
             let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5 + prompt_seed as u64);
@@ -560,10 +561,10 @@ mod grad {
         // tests (hidden_at calls) total across all 8 prompts × 8 positions.
         // Uses scale 1.0 (see `grad_guided_recovers_all_random_prompts` for
         // why the standard 1/sqrt(D) scale is too flat for gradient-guided).
-        let mut rng = fastrand::Rng::with_seed(0xC0DE);
-        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
-
         const N_PROMPTS: usize = 8;
+
+let mut rng = fastrand::Rng::with_seed(0xC0DE);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
         let mut random_total = 0_usize;
         let mut grad_total = 0_usize;
 
@@ -805,7 +806,9 @@ mod robustness {
         // either fail or recover a DIFFERENT prompt. We inject noise at 2× the
         // half-margin and verify that exact recovery of the ORIGINAL prompt is
         // NOT guaranteed (either Failed, or Recovered != original).
-        let mut rng = fastrand::Rng::with_seed(0xB0_70 + 1);
+        const N_TRIALS: usize = 20;
+
+let mut rng = fastrand::Rng::with_seed(0xB0_70 + 1);
         let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
 
         let prompt: Vec<u32> = vec![3, 7, 11, 15, 19, 23, 27, 31];
@@ -824,7 +827,6 @@ mod robustness {
         // exact recovery (either Failed or wrong prompt).
         let noise_level = half_margin * 2.0;
         let mut exact_recovery_count = 0;
-        const N_TRIALS: usize = 20;
         for trial in 0..N_TRIALS {
             let mut trial_rng = fastrand::Rng::with_seed(0xBAD + trial as u64);
             let mut noisy_buf = transformer.forward_full(&prompt);

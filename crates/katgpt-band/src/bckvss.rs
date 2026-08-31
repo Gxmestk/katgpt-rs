@@ -561,6 +561,7 @@ impl SyntheticScm {
             });
             start = end;
         }
+        out.shrink_to_fit();
         out
     }
 
@@ -590,6 +591,7 @@ impl SyntheticScm {
             out.push(if dom == query_task { 1.0 } else { 0.0 });
             start = end;
         }
+        out.shrink_to_fit();
         out
     }
 }

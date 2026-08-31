@@ -32,7 +32,9 @@ fn spectral_pencil_t10_goat_serial() {
     {
         const D: usize = 16;
         const N: usize = 8;
-        let init = seeded_dense::<D, N>(b"goat-alloc", 6);
+        const CALLS: usize = 1_000;
+
+let init = seeded_dense::<D, N>(b"goat-alloc", 6);
         let pencil = DensePencil::<D, N> { a0: init.a0, a: init.a };
         let tri_init = seeded_tridiag::<D, N>(b"goat-alloc-tri", 6);
         let tri_pencil = TridiagPencil::<D, N> { a0: tri_init.a0, a: tri_init.a };
@@ -53,8 +55,6 @@ fn spectral_pencil_t10_goat_serial() {
 
         let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
         let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-        const CALLS: usize = 1_000;
         let mut sink = 0.0_f32;
         for i in 0..CALLS {
             x[1] = (i % 7) as f32 * 0.2 - 0.6;

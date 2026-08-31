@@ -265,6 +265,7 @@ mod tests {
         for row in 0..4u32 {
             m.push((0..4).map(|col| (row * 4 + col + 1) as f32).collect());
         }
+        m.shrink_to_fit();
         m
     }
 

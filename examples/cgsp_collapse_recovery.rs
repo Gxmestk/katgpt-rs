@@ -179,14 +179,14 @@ where
 // ════════════════════════════════════════════════════════════════════════════
 
 fn main() {
+    const TAU_LOW: f32 = 0.30;
+    const COLLAPSED_ARM: usize = 3;
+    const RECOVERY_CAP: usize = 200;
+
     println!("╔══════════════════════════════════════════════════════════════════════╗");
     println!("║   CGSP Collapse Recovery — Plan 274 Phase 4 (T4.4)                  ║");
     println!("║   Force one-hot priority table → measure cycles to recover          ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝");
-
-    const TAU_LOW: f32 = 0.30;
-    const COLLAPSED_ARM: usize = 3;
-    const RECOVERY_CAP: usize = 200;
 
     let pool = make_8_direction_pool();
     let target = Target::new(pool[0].clone());

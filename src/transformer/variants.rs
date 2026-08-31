@@ -194,8 +194,9 @@ pub fn forward_looped<'a>(
         &mut katgpt_core::gain_cost_halt::GainCostLoopHalter,
     >,
 ) -> &'a mut [f32] {
-    cache.advance_pos(pos);
     use crate::types::HybridPattern;
+
+cache.advance_pos(pos);
 
     let n = config.n_embd;
     let hd = config.head_dim;

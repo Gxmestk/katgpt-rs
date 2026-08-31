@@ -92,6 +92,9 @@ fn build_ensemble() -> VelocityFieldEnsemble<ClosureField<D, fn(&[f32], &mut [f3
 // one alloc-counted region).
 #[test]
 fn g3_eval_and_batch_zero_alloc_after_warmup() {
+    const N_CALLS: usize = 1000;
+    const N_BATCHES: usize = 100;
+
     let mut ensemble = build_ensemble();
     let mut scratch = EnsembleFitScratch::<P, D>::new();
 
@@ -130,8 +133,6 @@ fn g3_eval_and_batch_zero_alloc_after_warmup() {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut total: f32 = 0.0;
     for i in 0..N_CALLS {
         let x = &xs[i % N_PAIRS];
@@ -174,8 +175,6 @@ fn g3_eval_and_batch_zero_alloc_after_warmup() {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_BATCHES: usize = 100;
     let mut total: f32 = 0.0;
     for _ in 0..N_BATCHES {
         ensemble.eval_batch_into(&batch_x_refs, &mut batch_out_refs, &mut eval_scratch);

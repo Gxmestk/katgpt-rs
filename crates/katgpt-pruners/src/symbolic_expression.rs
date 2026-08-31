@@ -45,10 +45,10 @@ impl BasisFn {
     #[inline]
     pub fn evaluate(&self, x: f32) -> f32 {
         match self {
-            BasisFn::Identity => x,
-            BasisFn::Square => x * x,
-            BasisFn::Cube => x * x * x,
-            BasisFn::Sigmoid => sigmoid(x),
+            Self::Identity => x,
+            Self::Square => x * x,
+            Self::Cube => x * x * x,
+            Self::Sigmoid => sigmoid(x),
         }
     }
 }
@@ -216,7 +216,7 @@ impl SymbolicExpression {
 
         let bias = f32::from_le_bytes(payload[offset..offset + 4].try_into().ok()?);
 
-        Some(SymbolicExpression { terms, bias })
+        Some(Self { terms, bias })
     }
 }
 

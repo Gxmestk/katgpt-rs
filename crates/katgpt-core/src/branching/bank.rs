@@ -836,6 +836,7 @@ fn sorted_union(a: &[u64], b: &[u64]) -> Vec<u64> {
         result.push(b[j]);
         j += 1;
     }
+    result.shrink_to_fit();
     result
 }
 

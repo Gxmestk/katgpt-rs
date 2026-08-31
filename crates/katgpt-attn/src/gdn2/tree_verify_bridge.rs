@@ -562,13 +562,13 @@ mod tests {
     /// T4.4: commit_gdn2_tree_layer updates S₀ identically to sequential forward.
     #[test]
     fn test_commit_matches_sequential() {
+        const T: usize = 4;
+
         let config = Config::micro(); // head_dim=4, n_kv_head=4, n_layer=1
         let d_k = config.head_dim;
         let d_v = config.head_dim;
         let n_kv_heads = config.n_kv_head;
         let alpha = 0.9f32;
-
-        const T: usize = 4;
         let t = T;
         let parents = [usize::MAX, 0, 1, 2];
 
@@ -629,6 +629,8 @@ mod tests {
     /// T4.4: verify on a branching tree matches per-branch sequential.
     #[test]
     fn test_tree_verify_matches_sequential_branching() {
+        const T: usize = 4;
+
         let config = Config::micro(); // head_dim=4, n_kv_head=4
         let d_k = config.head_dim;
         let d_v = config.head_dim;
@@ -642,7 +644,6 @@ mod tests {
         // |
         // 3
         let parents = [usize::MAX, 0, 0, 1];
-        const T: usize = 4;
         let t = T;
 
         let mut rng_state = 77u32;

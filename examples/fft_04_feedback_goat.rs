@@ -46,31 +46,31 @@ enum Strategy {
 impl Strategy {
     const fn label(self) -> &'static str {
         match self {
-            Strategy::Greedy => "Greedy",
-            Strategy::Validator => "Validator",
-            Strategy::HL => "HL",
+            Self::Greedy => "Greedy",
+            Self::Validator => "Validator",
+            Self::HL => "HL",
             #[cfg(feature = "g_zero")]
-            Strategy::GZero => "GZero",
+            Self::GZero => "GZero",
         }
     }
 
     const fn emoji(self) -> &'static str {
         match self {
-            Strategy::Greedy => "🐱",
-            Strategy::Validator => "🐶",
-            Strategy::HL => "🐵",
+            Self::Greedy => "🐱",
+            Self::Validator => "🐶",
+            Self::HL => "🐵",
             #[cfg(feature = "g_zero")]
-            Strategy::GZero => "🧠",
+            Self::GZero => "🧠",
         }
     }
 
-    fn all() -> &'static [Strategy] {
+    fn all() -> &'static [Self] {
         &[
-            Strategy::Greedy,
-            Strategy::Validator,
-            Strategy::HL,
+            Self::Greedy,
+            Self::Validator,
+            Self::HL,
             #[cfg(feature = "g_zero")]
-            Strategy::GZero,
+            Self::GZero,
         ]
     }
 }

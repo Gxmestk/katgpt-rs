@@ -115,8 +115,8 @@ impl KarcLodTier {
     #[inline]
     pub const fn m(self) -> usize {
         match self {
-            KarcLodTier::Lod0 => 4,
-            KarcLodTier::Lod1 | KarcLodTier::Lod2 => 8,
+            Self::Lod0 => 4,
+            Self::Lod1 | Self::Lod2 => 8,
         }
     }
 
@@ -124,9 +124,9 @@ impl KarcLodTier {
     #[inline]
     pub const fn k(self) -> usize {
         match self {
-            KarcLodTier::Lod0 => 2,
-            KarcLodTier::Lod1 => 4,
-            KarcLodTier::Lod2 => 8,
+            Self::Lod0 => 2,
+            Self::Lod1 => 4,
+            Self::Lod2 => 8,
         }
     }
 
@@ -153,10 +153,10 @@ impl KarcLodTier {
     }
 
     /// All tiers in increasing-fidelity order.
-    pub const ALL: [KarcLodTier; 3] = [
-        KarcLodTier::Lod0,
-        KarcLodTier::Lod1,
-        KarcLodTier::Lod2,
+    pub const ALL: [Self; 3] = [
+        Self::Lod0,
+        Self::Lod1,
+        Self::Lod2,
     ];
 }
 

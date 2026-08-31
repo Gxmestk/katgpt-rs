@@ -612,7 +612,7 @@ fn t698_t3_copy_late_fixture_ab_and_contraction() {
     }
 
     // ── Per-arm references + settling metric ─────────────────────
-    let mut refs = Vec::new();
+    let mut refs = Vec::with_capacity(gates.len());
     for (_arm, cfg, gate) in &gates {
         refs.push(ref_outputs(cfg, &weights, gate, &sdpa_gate));
     }

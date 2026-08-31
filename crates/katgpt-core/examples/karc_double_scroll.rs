@@ -92,6 +92,7 @@ fn generate_double_scroll(n: usize, dt: f64, transient: usize, substeps: usize) 
         out.push(state[1] as f32);
         out.push(state[2] as f32);
     }
+    out.shrink_to_fit();
     out
 }
 

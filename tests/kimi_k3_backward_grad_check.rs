@@ -755,10 +755,7 @@ fn issue460_saturated_output_gate_keeps_gradients_finite() {
 
     let (weights, runtime, saved, saturated) = {
         let neg = build(-1.0e3);
-        match neg.3 > 0 {
-            true => neg,
-            false => build(1.0e3),
-        }
+        if neg.3 > 0 { neg } else { build(1.0e3) }
     };
 
     // The premise: the gate really did underflow to an exact zero. Without this

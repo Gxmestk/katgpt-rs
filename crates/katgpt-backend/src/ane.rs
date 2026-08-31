@@ -739,6 +739,8 @@ fn run_lm_head_into(
 /// in microseconds. Returns `AneError::ResidencyFailed` if latency exceeds
 /// the 1000µs threshold, indicating the model likely fell back to CPU.
 pub fn validate_residency(model: &coreml::Model, config: &Config) -> Result<u64, AneError> {
+    const THRESHOLD_US: u64 = 1000;
+
     let mut rng = katgpt_types::Rng::new(0);
     let n_embd = config.n_embd;
     let mut hidden: Vec<f32> = Vec::with_capacity(n_embd);
@@ -750,8 +752,6 @@ pub fn validate_residency(model: &coreml::Model, config: &Config) -> Result<u64,
     let start = std::time::Instant::now();
     run_lm_head_into(model, &hidden, &mut logits, config.vocab_size)?;
     let elapsed_us = start.elapsed().as_micros() as u64;
-
-    const THRESHOLD_US: u64 = 1000;
     if elapsed_us > THRESHOLD_US {
         return Err(AneError::ResidencyFailed {
             latency_us: elapsed_us,
@@ -1194,6 +1194,8 @@ mod tests {
 
     #[test]
     fn test_ane_residency_validation() {
+        const ANE_RESIDENCY_THRESHOLD_US: u64 = 1000;
+
         let config = Config::micro();
         let mut rng = katgpt_types::Rng::new(42);
         let weights = TransformerWeights::new(&config, &mut rng);
@@ -1216,7 +1218,6 @@ mod tests {
         assert!(result.is_ok(), "lm_head prediction should succeed");
 
         let elapsed_us = elapsed.as_micros() as u64;
-        const ANE_RESIDENCY_THRESHOLD_US: u64 = 1000;
 
         if elapsed_us > ANE_RESIDENCY_THRESHOLD_US {
             eprintln!(

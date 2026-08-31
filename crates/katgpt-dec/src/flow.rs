@@ -147,6 +147,9 @@ impl DecFlowField {
     /// Returns `Vec<[f32; 2]>` with one entry per vertex, compatible with `FlowField` API.
     /// The output is row-major: `result[y * width + x] = [vx, vy]`.
     pub fn to_flow_vectors(&self) -> Vec<[f32; 2]> {
+        const INV_DEG_3: f32 = 1.0 / 3.0;
+        const INV_DEG_4: f32 = 0.25;
+
         let w = self.width;
         let h = self.height;
         let n_vertices = w * h;
@@ -185,8 +188,6 @@ impl DecFlowField {
         // is independent per vertex — fusing the loops or precomputing the recip
         // does not change FP reduction order (verified safe for arena_proof test).
         const INV_DEG_2: f32 = 0.5;
-        const INV_DEG_3: f32 = 1.0 / 3.0;
-        const INV_DEG_4: f32 = 0.25;
         for y in 0..h {
             let is_interior_y = y > 0 && y < h - 1;
             for x in 0..w {

@@ -62,9 +62,8 @@ fn verify_real_tokenizer_token_count() {
 #[test]
 fn verify_exact_token_ids_match_python() {
     let model_path = "data/kimi-k3-0.40b/tiktoken.model";
-    let data = match std::fs::read(model_path) {
-        Ok(d) => d,
-        Err(_) => return,
+    let Ok(d) = std::fs::read(model_path) else {
+        return;
     };
     let ranks = load_tiktoken_bpe(&data).expect("parse");
     let tok = TiktokenTokenizer::from_ranks(&ranks).with_special_tokens(1, 2, 0);

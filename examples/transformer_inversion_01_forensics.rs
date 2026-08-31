@@ -296,7 +296,9 @@ fn fmt_prompt(prompt: &[u32]) -> String {
 }
 
 fn main() {
-    println!("╔══════════════════════════════════════════════════════════════════════╗");
+    const N_PROMPTS: usize = 4;
+
+println!("╔══════════════════════════════════════════════════════════════════════╗");
     println!("║  SipIt Transformer Inversion — Prompt Forensics Demo (Plan 561)    ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();
@@ -319,7 +321,6 @@ fn main() {
 
     let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5);
     let mut all_recovered = 0_usize;
-    const N_PROMPTS: usize = 4;
     for i in 0..N_PROMPTS {
         let prompt: Vec<u32> = (0..T).map(|_| prompt_rng.u32(0..V)).collect();
         let audit_log = capture_audit_log(&model, &prompt);

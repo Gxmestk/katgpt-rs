@@ -80,6 +80,8 @@ fn bench_cna_steering_goat_proof() {
     const TOTAL_SLOTS: usize = N_LAYERS * MLP_HIDDEN; // 768
     const SEED: u64 = 42;
 
+    const ITERATIONS: usize = 1000;
+
     println!("\n{}", "═".repeat(72));
     println!("🐐 GOAT PROOF: CNA Steering — Contrastive Neuron Attribution");
     println!("   arXiv:2605.12290 — Targeted Neuron Modulation via Contrastive Pair Search");
@@ -155,8 +157,6 @@ fn bench_cna_steering_goat_proof() {
     println!("\n── Benchmark B: Modulation Overhead ────────────────────────");
     println!("        k | iterations | total_us | per_call_ns");
     println!("{}", "-".repeat(55));
-
-    const ITERATIONS: usize = 1000;
     let circuit_sizes = [0usize, 10, 50, 100, 500];
     let mut per_call_ns_50 = 0.0f64;
 

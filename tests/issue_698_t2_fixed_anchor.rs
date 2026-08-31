@@ -410,7 +410,7 @@ fn t698_t2_fixed_anchor_ab_ordering() {
 
     // ── Per-arm references + soundness probe ─────────────────────
     // ── Per-arm references + soundness probe ───────────────
-    let mut refs = Vec::new();
+    let mut refs = Vec::with_capacity(gates.len());
     for (arm, cfg, gate) in &gates {
         let r = ref_outputs(*arm, cfg, &weights, gate, &sdpa_gate);
         refs.push(r);

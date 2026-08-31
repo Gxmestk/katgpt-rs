@@ -615,7 +615,6 @@ mod tests {
                 Vec::new()
             }
         }
-        let probe = stub_probe(0.0);
         struct ZeroExt;
         impl ActivationExtractor for ZeroExt {
             fn extract_activation<'a>(
@@ -631,6 +630,8 @@ mod tests {
                 scratch
             }
         }
+
+        let probe = stub_probe(0.0);
         let mut sel =
             FpcgSelector::new(EmptyGen, ZeroExt, probe, SteeringDirection::Positive, 5, 4);
         let mut rng = Rng::with_seed(0);

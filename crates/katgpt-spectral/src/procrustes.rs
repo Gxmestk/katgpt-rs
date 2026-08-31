@@ -594,12 +594,12 @@ pub fn orthogonal_procrustes(
 /// `xtx` and `x_new` are caller-owned scratch, both `d * d` elements.
 #[inline]
 fn polar_iteration(x: &[f32], d: usize, out: &mut [f32], xtx: &mut [f32], x_new: &mut [f32]) {
-    debug_assert_eq!(x.len(), d * d);
+    const N_ITERS: usize = 15;
+
+debug_assert_eq!(x.len(), d * d);
     debug_assert_eq!(out.len(), d * d);
     debug_assert_eq!(xtx.len(), d * d);
     debug_assert_eq!(x_new.len(), d * d);
-
-    const N_ITERS: usize = 15;
 
     // X_0 = x. Iterate in-place on `out` (use out as X_k).
     out[..d * d].copy_from_slice(&x[..d * d]);

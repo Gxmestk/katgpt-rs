@@ -1269,8 +1269,6 @@ mod tests {
     /// config is a true no-op, not just "close enough."
     #[test]
     fn t6_default_config_k_npc_has_no_effect() {
-        let pool = make_orthonormal_pool(8, 8);
-
         fn run(pool: &[Direction], k_npc: u8) -> Vec<f32> {
             let conj = PoolConjecturer::new(pool.to_vec(), 42);
             let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
@@ -1290,6 +1288,8 @@ mod tests {
             }
             lp.bandit().priorities().to_vec()
         }
+
+        let pool = make_orthonormal_pool(8, 8);
 
         let p_default = run(&pool, 1);
         let p_extreme = run(&pool, 99);

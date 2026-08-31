@@ -558,6 +558,7 @@ mod tests {
             apps.push(ApplicationOutcome::new(false, false, 4, task));
             task += 1;
         }
+        apps.shrink_to_fit();
         apps
     }
 

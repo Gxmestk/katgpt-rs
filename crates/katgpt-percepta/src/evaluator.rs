@@ -442,9 +442,8 @@ impl GraphEvaluator {
 
         // Generate tokens autoregressively
         for _ in 0..max_steps {
-            let next_tok = match self.predict_next(&vals) {
-                Some(t) => t,
-                None => break,
+            let Some(t) = self.predict_next(&vals) else {
+                break;
             };
             predicted.push(next_tok.clone());
 

@@ -84,6 +84,7 @@ fn generate_mixed_heads(
     for _ in 0..n_local {
         heads.push(local_attention(seq_len, 4));
     }
+    heads.shrink_to_fit();
     heads
 }
 

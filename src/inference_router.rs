@@ -916,6 +916,7 @@ impl InferenceRouter {
                 result.push(c);
             }
         }
+        result.shrink_to_fit();
         result
     }
 }

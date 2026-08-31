@@ -78,6 +78,8 @@ fn synthetic_input_for_gemma2_config() -> WeaverInput<'static> {
 #[test]
 #[ignore = "requires WEAVER_CHECKPOINT_PATH env var pointing to the real checkpoint"]
 fn real_checkpoint_loads_and_produces_nonzero_residual() {
+    const MEASURED_RUNS: usize = 20;
+
     let path = std::env::var("WEAVER_CHECKPOINT_PATH").unwrap_or_else(|_| {
         // Default to the riir-train output path (works when katgpt-rs and
         // riir-train are siblings, which is the standard repo layout).
@@ -182,7 +184,6 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
     //
     // The parallel path is the Issue 131 G4 optimization that passes the gate.
     const WARMUP_RUNS: usize = 3;
-    const MEASURED_RUNS: usize = 20;
 
     // ── Path 1: Allocating (`correct`) ──
     for _ in 0..WARMUP_RUNS {

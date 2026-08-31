@@ -136,7 +136,7 @@ impl BorelRegion {
         };
 
         Some(
-            BorelRegion::new(label, combined, self.token_count.min(other.token_count))
+            Self::new(label, combined, self.token_count.min(other.token_count))
                 .with_precision(self.boundary_precision.min(other.boundary_precision)),
         )
     }
@@ -359,7 +359,7 @@ pub fn precision_smooth_label(
 impl BFCP {
     /// Apply precision-weighted smoothing to a new partition based on a previous partition.
     /// Returns adjusted partition where high-precision regions resist label changes.
-    pub fn precision_smooth(&self, new_partition: &BFCP) -> BFCP {
+    pub fn precision_smooth(&self, new_partition: &Self) -> Self {
         let mut smoothed = new_partition.clone();
         let min_regions = self.regions.len().min(smoothed.regions.len());
         for i in 0..min_regions {

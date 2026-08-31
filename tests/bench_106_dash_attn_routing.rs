@@ -514,9 +514,7 @@ fn goat_proof_adaptive_support() {
         delta = avg_hard - avg_easy
     );
     println!(
-        "│ PASS: avg_hard ({avg_hard:.1}) > avg_easy ({avg_easy:.1})                           │",
-        avg_hard = avg_hard,
-        avg_easy = avg_easy
+        "│ PASS: avg_hard ({avg_hard:.1}) > avg_easy ({avg_easy:.1})                           │"
     );
     println!("│ This proves DashAttention's adaptive sparsity: the entmax           │");
     println!("│ support automatically expands for hard (ambiguous) queries          │");

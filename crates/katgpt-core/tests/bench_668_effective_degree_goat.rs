@@ -46,6 +46,7 @@ fn manifold_points(n: usize, phase: f32) -> Vec<f32> {
             out.push((0.6 * (f * t).sin() + 0.25 * (0.5 * f * t).cos()) / f.sqrt());
         }
     }
+    out.shrink_to_fit();
     out
 }
 

@@ -55,14 +55,14 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        GateResult {
+        Self {
             name,
             passed: true,
             detail: detail.into(),
         }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        GateResult {
+        Self {
             name,
             passed: false,
             detail: detail.into(),
@@ -126,6 +126,7 @@ fn taxonomy_256() -> Vec<TaxonomyNode<'static>> {
     }
     // Sort by id for binary-search (TaxonomyValidator::new requires sorted).
     nodes.sort_by_key(|n| n.id);
+    nodes.shrink_to_fit();
     nodes
 }
 

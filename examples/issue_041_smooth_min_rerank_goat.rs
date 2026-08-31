@@ -100,6 +100,7 @@ fn generate_word_embeddings() -> Vec<Vec<f32>> {
         }
     }
 
+    embeddings.shrink_to_fit();
     embeddings
 }
 

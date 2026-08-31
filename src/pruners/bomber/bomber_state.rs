@@ -317,6 +317,7 @@ impl BomberState {
                 expired.push(bomb.clone());
             }
         }
+        expired.shrink_to_fit();
         expired
     }
 

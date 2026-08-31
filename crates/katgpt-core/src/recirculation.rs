@@ -205,8 +205,8 @@ impl RecircPair {
     #[must_use]
     pub fn to_op(&self, n_stages: usize, alpha: f32, ramp_ticks: u32, convex: bool) -> RecircOp {
         let (src_f, dst_f) = match self {
-            RecircPair::PaperBands => Self::for_depth(n_stages),
-            RecircPair::Custom { src, dst } => (*src, *dst),
+            Self::PaperBands => Self::for_depth(n_stages),
+            Self::Custom { src, dst } => (*src, *dst),
         };
         let src_stage = frac_to_stage(src_f, n_stages);
         let dst_stage = frac_to_stage(dst_f, n_stages);

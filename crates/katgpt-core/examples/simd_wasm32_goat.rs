@@ -140,8 +140,8 @@ enum Tol {
 impl Tol {
     fn check(self, a: f32, b: f32) -> bool {
         match self {
-            Tol::Exact => a.to_bits() == b.to_bits(),
-            Tol::Ulp { abs, rel } => {
+            Self::Exact => a.to_bits() == b.to_bits(),
+            Self::Ulp { abs, rel } => {
                 let d = (a - b).abs();
                 d <= abs || d <= rel * b.abs()
             }

@@ -36,12 +36,12 @@ impl PrunerExpr {
     }
 
     /// Create an AND expression.
-    pub fn and(lhs: PrunerExpr, rhs: PrunerExpr) -> Self {
+    pub fn and(lhs: Self, rhs: Self) -> Self {
         Self::And(Box::new(lhs), Box::new(rhs))
     }
 
     /// Create an OR expression.
-    pub fn or(lhs: PrunerExpr, rhs: PrunerExpr) -> Self {
+    pub fn or(lhs: Self, rhs: Self) -> Self {
         Self::Or(Box::new(lhs), Box::new(rhs))
     }
 
@@ -51,12 +51,12 @@ impl PrunerExpr {
     /// Returns `Unknown` if any referenced atom is not in the map.
     pub fn eval(&self, atom_results: &[bool]) -> PrunerResult {
         match self {
-            PrunerExpr::Atom(id) => match atom_results.get(*id) {
+            Self::Atom(id) => match atom_results.get(*id) {
                 Some(true) => PrunerResult::Accept,
                 Some(false) => PrunerResult::Reject,
                 None => PrunerResult::Unknown,
             },
-            PrunerExpr::And(lhs, rhs) => match lhs.eval(atom_results) {
+            Self::And(lhs, rhs) => match lhs.eval(atom_results) {
                 PrunerResult::Reject => PrunerResult::Reject,
                 PrunerResult::Unknown => match rhs.eval(atom_results) {
                     PrunerResult::Reject => PrunerResult::Reject,
@@ -64,7 +64,7 @@ impl PrunerExpr {
                 },
                 PrunerResult::Accept => rhs.eval(atom_results),
             },
-            PrunerExpr::Or(lhs, rhs) => match lhs.eval(atom_results) {
+            Self::Or(lhs, rhs) => match lhs.eval(atom_results) {
                 PrunerResult::Accept => PrunerResult::Accept,
                 PrunerResult::Unknown => match rhs.eval(atom_results) {
                     PrunerResult::Accept => PrunerResult::Accept,
@@ -78,8 +78,8 @@ impl PrunerExpr {
     /// Collect all atom IDs referenced in this expression.
     pub fn atom_ids(&self) -> Vec<usize> {
         match self {
-            PrunerExpr::Atom(id) => vec![*id],
-            PrunerExpr::And(l, r) | PrunerExpr::Or(l, r) => {
+            Self::Atom(id) => vec![*id],
+            Self::And(l, r) | Self::Or(l, r) => {
                 let mut ids = l.atom_ids();
                 ids.extend(r.atom_ids());
                 ids
@@ -90,8 +90,8 @@ impl PrunerExpr {
     /// Count the number of nodes in the expression tree.
     pub fn node_count(&self) -> usize {
         match self {
-            PrunerExpr::Atom(_) => 1,
-            PrunerExpr::And(l, r) | PrunerExpr::Or(l, r) => 1 + l.node_count() + r.node_count(),
+            Self::Atom(_) => 1,
+            Self::And(l, r) | Self::Or(l, r) => 1 + l.node_count() + r.node_count(),
         }
     }
 }

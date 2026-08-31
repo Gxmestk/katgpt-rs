@@ -74,10 +74,10 @@ impl WidthDecision {
     /// Otherwise `breakeven` is consulted. If both are `Neutral`, returns
     /// `Neutral` (caller falls back to the configured default).
     #[inline]
-    pub fn combine(collapse: WidthDecision, breakeven: WidthDecision) -> WidthDecision {
+    pub fn combine(collapse: Self, breakeven: Self) -> Self {
         match collapse {
-            WidthDecision::Contract | WidthDecision::Expand => collapse,
-            WidthDecision::Neutral => breakeven,
+            Self::Contract | Self::Expand => collapse,
+            Self::Neutral => breakeven,
         }
     }
 }

@@ -136,7 +136,7 @@ impl GameState for MockGridState {
 
 impl MockGridState {
     fn step(&self, new_pos: u8) -> Self {
-        MockGridState {
+        Self {
             player_pos: new_pos,
             open_exit: self.open_exit,
             tick: self.tick + 1,

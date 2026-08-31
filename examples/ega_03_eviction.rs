@@ -93,8 +93,8 @@ fn main() {
 
     // Build embeddings: content positions get magnitude CONTENT_MAG, noise get NOISE_MAG.
     let mut embeddings = vec![0.0f32; SEQ_LEN * HEAD_DIM];
-    let mut content_indices = Vec::new();
-    let mut noise_indices = Vec::new();
+    let mut content_indices = Vec::with_capacity(SEQ_LEN);
+    let mut noise_indices = Vec::with_capacity(SEQ_LEN);
 
     for pos in 0..SEQ_LEN {
         let mag = if is_content(pos) {

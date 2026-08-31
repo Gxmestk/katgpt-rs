@@ -234,17 +234,17 @@ enum GpuLoadSignal {
 impl GpuLoadSignal {
     fn is_loaded(&self, threshold: f32) -> bool {
         match self {
-            GpuLoadSignal::Unavailable => false,
-            GpuLoadSignal::Threshold(t) => *t >= threshold,
-            GpuLoadSignal::Dynamic(load) => *load >= threshold,
+            Self::Unavailable => false,
+            Self::Threshold(t) => *t >= threshold,
+            Self::Dynamic(load) => *load >= threshold,
         }
     }
 
     fn load_value(&self) -> f32 {
         match self {
-            GpuLoadSignal::Unavailable => 0.0,
-            GpuLoadSignal::Threshold(t) => *t,
-            GpuLoadSignal::Dynamic(load) => *load,
+            Self::Unavailable => 0.0,
+            Self::Threshold(t) => *t,
+            Self::Dynamic(load) => *load,
         }
     }
 }

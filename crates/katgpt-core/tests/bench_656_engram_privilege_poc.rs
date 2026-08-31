@@ -210,15 +210,15 @@ enum Regime {
 impl Regime {
     fn name(self) -> &'static str {
         match self {
-            Regime::SignOpposed => "A · sign-opposed drift",
-            Regime::SimilaritySeparable => "B · similarity-separable (control)",
-            Regime::Clean => "C · clean table (G1)",
-            Regime::ClassConditional => "D · class-conditional (scope limit)",
+            Self::SignOpposed => "A · sign-opposed drift",
+            Self::SimilaritySeparable => "B · similarity-separable (control)",
+            Self::Clean => "C · clean table (G1)",
+            Self::ClassConditional => "D · class-conditional (scope limit)",
         }
     }
     fn poison_count(self) -> usize {
         match self {
-            Regime::Clean => 0,
+            Self::Clean => 0,
             _ => (N_ACTIVE as f32 * POISON_FRAC).round() as usize,
         }
     }

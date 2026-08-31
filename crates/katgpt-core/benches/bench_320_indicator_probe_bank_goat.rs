@@ -56,14 +56,14 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        GateResult {
+        Self {
             name,
             passed: true,
             detail: detail.into(),
         }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        GateResult {
+        Self {
             name,
             passed: false,
             detail: detail.into(),

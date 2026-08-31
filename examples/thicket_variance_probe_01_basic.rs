@@ -45,9 +45,9 @@ impl Tier {
     #[allow(dead_code)]
     fn name(&self) -> &'static str {
         match self {
-            Tier::CpuOnly => "CPU",
-            Tier::CpuGpu => "CPU+GPU",
-            Tier::CpuGpuAne => "CPU+GPU+ANE",
+            Self::CpuOnly => "CPU",
+            Self::CpuGpu => "CPU+GPU",
+            Self::CpuGpuAne => "CPU+GPU+ANE",
         }
     }
 }
@@ -125,6 +125,7 @@ fn run_baseline(pop: &QueryPopulation) -> Vec<RoutingDecision> {
             correct: false,
         });
     }
+    out.shrink_to_fit();
     out
 }
 
@@ -177,6 +178,7 @@ fn run_tvp_routed(
         out.push(decision);
     }
 
+    out.shrink_to_fit();
     out
 }
 

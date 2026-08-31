@@ -318,7 +318,7 @@ fn near_any(tick: usize, ticks: &[usize], tol: i64) -> bool {
 fn run_poc(n_entities: usize, cfg: Option<(f32, f32, usize)>) -> PocMetrics {
     let w = gen_zone_weights();
     let mut fires_timeline = Vec::new();
-    let mut inst_bits = Vec::new();
+    let mut inst_bits = Vec::with_capacity(n_entities);
     let mut episodes = 0usize;
     let mut episodes_detected = 0usize;
     let mut raw_spiked = 0usize;
@@ -703,8 +703,8 @@ mod cousin {
         {
             let (ns, surp) = karc_arm::<64, 8, 4>(&streams64, 400, 400);
             println!(
-                "cousin │ KARC D=64 M=8 K=4 (d_h 2048): {:>10.1} ns/entity/tick (surprise Σ {surp:.1})"
-            , ns);
+                "cousin │ KARC D=64 M=8 K=4 (d_h 2048): {ns:>10.1} ns/entity/tick (surprise Σ {surp:.1})"
+            );
         }
 
         // Arm (c): KARC canonical HLA shape D=8/M=8/K=4 (d_h = 256) on the
@@ -712,8 +712,7 @@ mod cousin {
         {
             let (ns, surp) = karc_arm::<8, 8, 4>(&streams8, 400, 400);
             println!(
-                "cousin │ KARC D=8  M=8 K=4 (d_h 256) : {:>10.1} ns/entity/tick (8-dim slice; surprise Σ {surp:.1})",
-                ns
+                "cousin │ KARC D=8  M=8 K=4 (d_h 256) : {ns:>10.1} ns/entity/tick (8-dim slice; surprise Σ {surp:.1})"
             );
         }
 

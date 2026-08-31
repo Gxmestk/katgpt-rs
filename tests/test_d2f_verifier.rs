@@ -431,11 +431,11 @@ fn proof_5_g1_e2e_prefix_match_collapses_to_mode() {
 
 #[test]
 fn proof_6_g2_acceptance_and_latency_vs_prefix_match() {
-    let config = Config::micro_dllm();
+    const N: usize = 400;
+
+let config = Config::micro_dllm();
     let mut rng = Rng::new(42);
     let weights = TransformerWeights::new(&config, &mut rng);
-
-    const N: usize = 400;
     // Self-speculation regime (draft == target) — the design point where
     // acceptance is meaningful. Two-model untrained setup always rejects
     // at position 0 for every policy (measured 1.00 tokens/round across

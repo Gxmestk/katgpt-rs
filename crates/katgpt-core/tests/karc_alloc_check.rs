@@ -21,6 +21,8 @@ fn g3_forecast_into_zero_alloc_after_warmup() {
 
     // Build a deterministic synthetic trajectory and fit. Multi-frequency,
     // incommensurate components so basis-expanded features span the full space.
+    const N_CALLS: usize = 1000;
+
     let traj: Vec<f32> = (0..1000)
         .flat_map(|i| {
             let t = i as f32 * 0.073;
@@ -74,8 +76,6 @@ fn g3_forecast_into_zero_alloc_after_warmup() {
     // Measure: snapshot alloc/dealloc counts, run N forecasts, expect zero delta.
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut total: f32 = 0.0;
     for _ in 0..N_CALLS {
         let ok = forecaster.forecast_into(&delay_seed, &mut out);

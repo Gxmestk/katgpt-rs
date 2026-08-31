@@ -112,7 +112,9 @@ fn print_row(label: &str, us_sum: u128, n: f64, total_us: u128) {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 fn main() {
-    let model_p = format!("{}/model.safetensors", model_dir());
+    use std::io::Write;
+
+let model_p = format!("{}/model.safetensors", model_dir());
     let tiktoken_p = format!("{}/tiktoken.model", model_dir());
 
     if !Path::new(&model_p).exists() {
@@ -136,7 +138,6 @@ fn main() {
 
     // ── 1. Load tokenizer ──────────────────────────────────────────────────
     print!("   loading tiktoken.model ... ");
-    use std::io::Write;
     let _ = std::io::stdout().flush();
     let t_tok = Instant::now();
     let tiktoken_bytes = std::fs::read(&tiktoken_p).unwrap_or_else(|e| {

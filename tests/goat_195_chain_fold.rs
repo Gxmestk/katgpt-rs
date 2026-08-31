@@ -309,11 +309,11 @@ fn goat3_bandit_converges_to_optimal() {
     // Other budgets are suboptimal. We check convergence quality on the last 100 pulls
     // (after exploration phase) rather than the full run, since exploration inherently
     // pulls suboptimal arms.
-    let mut bandit = FoldBandit::new();
-    let mut rng = Rng::new(42);
-
     const TOTAL_EPISODES: usize = 300;
     const TAIL_WINDOW: usize = 100;
+
+    let mut bandit = FoldBandit::new();
+    let mut rng = Rng::new(42);
 
     let mut tail_passes = 0usize;
     let mut tail_total = 0usize;

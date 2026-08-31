@@ -58,7 +58,7 @@ impl MuxPatternStore {
     /// Thaw patterns: retrieve all patterns for a given key.
     #[inline]
     pub fn thaw(&self, key: u64) -> &[MuxTarget] {
-        self.patterns.get(&key).map(|v| v.as_slice()).unwrap_or(&[])
+        self.patterns.get(&key).map_or(&[], |v| v.as_slice())
     }
 
     /// Number of distinct keys stored.

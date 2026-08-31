@@ -492,7 +492,9 @@ pub fn simd_binary_matvec(w: &BinaryWeights, x: &[f32], y: &mut [f32]) {
 pub fn simd_binary_matmul_batch(w: &BinaryWeights, x: &[f32], batch: usize, y: &mut [f32]) {
     const PARALLEL_BATCH_MIN: usize = 4;
 
-    if batch < PARALLEL_BATCH_MIN {
+    use rayon::prelude::*;
+
+if batch < PARALLEL_BATCH_MIN {
         for b in 0..batch {
             let x_off = b * w.cols;
             let y_off = b * w.rows;
@@ -506,8 +508,6 @@ pub fn simd_binary_matmul_batch(w: &BinaryWeights, x: &[f32], batch: usize, y: &
         }
         return;
     }
-
-    use rayon::prelude::*;
     y.par_chunks_mut(w.rows)
         .zip(x.par_chunks(w.cols))
         .enumerate()

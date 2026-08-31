@@ -225,6 +225,7 @@ fn check_regression_filtered(cat_rows: &[&TsRow], _cat: &str) -> Vec<(String, f6
             regressions.push((method.to_string(), baseline, latest));
         }
     }
+    regressions.shrink_to_fit();
     regressions
 }
 

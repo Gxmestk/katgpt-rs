@@ -300,9 +300,8 @@ impl VortexFlow for MetaRouter {
         head_dim: usize,
     ) {
         // Delegate to ALL policies (maintain all caches)
-        let caches = match cache {
-            DynRoutingCache::Meta(caches) => caches,
-            _ => panic!("MetaRouter expects DynRoutingCache::Meta variant"),
+        let DynRoutingCache::Meta(caches) = cache else {
+            panic!("MetaRouter expects DynRoutingCache::Meta variant")
         };
 
         for (i, policy) in self.policies.iter().enumerate() {
@@ -320,9 +319,8 @@ impl VortexFlow for MetaRouter {
         top_k: usize,
         scratch: &mut VortexScratch,
     ) -> RoutingDecision {
-        let caches = match cache {
-            DynRoutingCache::Meta(caches) => caches,
-            _ => panic!("MetaRouter expects DynRoutingCache::Meta variant"),
+        let DynRoutingCache::Meta(caches) = cache else {
+            panic!("MetaRouter expects DynRoutingCache::Meta variant")
         };
 
         // Bandit selects policy arm

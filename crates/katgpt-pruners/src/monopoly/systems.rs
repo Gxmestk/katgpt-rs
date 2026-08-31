@@ -361,9 +361,8 @@ pub fn count_utilities(world: &World, entity: Entity) -> u8 {
 pub fn calculate_rent(world: &World, square: u8, dice: (u8, u8), owner: Entity) -> u32 {
     let squares = world.resource::<Board>().squares;
     let sq_entity = squares[square as usize];
-    let owned = match world.get::<Owned>(sq_entity) {
-        Some(o) => o,
-        None => return 0,
+    let Some(o) = world.get::<Owned>(sq_entity) else {
+        return 0;
     };
     if owned.is_mortgaged {
         return 0;
@@ -382,9 +381,8 @@ pub fn calculate_rent(world: &World, square: u8, dice: (u8, u8), owner: Entity) 
             (dice.0 as u32 + dice.1 as u32) * if count >= 2 { 10 } else { 4 }
         }
         SquareKind::Property(group) => {
-            let prop = match world.get::<Property>(sq_entity) {
-                Some(p) => p,
-                None => return 0,
+            let Some(p) = world.get::<Property>(sq_entity) else {
+                return 0;
             };
             if owned.houses > 0 {
                 let idx = (owned.houses.saturating_sub(1) as usize).min(4);
@@ -426,9 +424,9 @@ pub fn calculate_net_worth(world: &World, entity: Entity) -> u32 {
 pub fn can_build_house(world: &World, entity: Entity, square: u8) -> bool {
     let squares = world.resource::<Board>().squares;
     let sq_entity = squares[square as usize];
-    let group = match world.get::<BoardSquare>(sq_entity).map(|bs| bs.kind) {
-        Some(SquareKind::Property(g)) => g,
-        _ => return false,
+    let Some(SquareKind::Property(g)) = world.get::<BoardSquare>(sq_entity).map(|bs| bs.kind)
+    else {
+        return false;
     };
     let owned = match world.get::<Owned>(sq_entity) {
         Some(o) if o.owner == entity && !o.is_mortgaged => o,

@@ -480,8 +480,6 @@ mod tests {
 
     #[test]
     fn cache_multiple_goals() {
-        let mut cache = ProofGoalCache::new();
-
         fn counting_verifier(bytes: &[u8]) -> GoalResult {
             match bytes[0] % 3 {
                 0 => GoalResult::Proved,
@@ -489,6 +487,8 @@ mod tests {
                 _ => GoalResult::Unknown,
             }
         }
+
+        let mut cache = ProofGoalCache::new();
 
         // Three unique goals
         cache.get_or_verify(b"goal_A", counting_verifier);

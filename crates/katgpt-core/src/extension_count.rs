@@ -135,8 +135,8 @@ impl LossGate {
     #[inline]
     pub fn admits(&self, loss: f32, best_loss: f32) -> bool {
         match self {
-            LossGate::Absolute(tol) => loss <= best_loss + tol,
-            LossGate::Relative(tol) => loss <= best_loss * (1.0 + tol),
+            Self::Absolute(tol) => loss <= best_loss + tol,
+            Self::Relative(tol) => loss <= best_loss * (1.0 + tol),
         }
     }
 }

@@ -257,8 +257,8 @@ impl StructureConstants {
     /// milliseconds, paid once. Not on any hot path.
     pub fn new<const D: usize>(basis: &GellMannBasis<D>) -> Self {
         let n = GellMannBasis::<D>::BLOCH_DIM;
-        let mut f = Vec::new();
-        let mut d_sym = Vec::new();
+        let mut f = Vec::with_capacity(n);
+        let mut d_sym = Vec::with_capacity(n);
 
         let dense: Vec<[[C32; D]; D]> = (0..n).map(|a| basis.generator_dense(a)).collect();
 

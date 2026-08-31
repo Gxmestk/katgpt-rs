@@ -297,8 +297,6 @@ fn g2_exit_floor_dual_wins_or_ties_both_floors() {
     const ACC_TOL: f32 = EPS + 0.02;
 
     // (label, stuck fraction): 3:1 / 1:1 / 1:3 trivial:stuck.
-    let compositions: [(&str, f64); 3] = [("3:1", 0.25), ("1:1", 0.50), ("1:3", 0.75)];
-
     struct Row {
         label: &'static str,
         dual: [f32; 2],   // [accuracy, compute]
@@ -308,6 +306,15 @@ fn g2_exit_floor_dual_wins_or_ties_both_floors() {
         single_risk: f32,
         lambda_plus: f32,
     }
+fn r_select(r: &Row, k: usize) -> [f32; 2] {
+        match k {
+            0 => r.dual,
+            1 => r.single,
+            _ => r.fixed,
+        }
+    }
+
+let compositions: [(&str, f64); 3] = [("3:1", 0.25), ("1:1", 0.50), ("1:3", 0.75)];
     let mut rows: Vec<Row> = Vec::new();
 
     for (label, stuck_frac) in compositions {
@@ -381,13 +388,6 @@ fn g2_exit_floor_dual_wins_or_ties_both_floors() {
     let mean = |rows: &Vec<Row>, k: usize, j: usize| {
         rows.iter().map(|r| r_select(r, k)[j]).sum::<f32>() / rows.len() as f32
     };
-    fn r_select(r: &Row, k: usize) -> [f32; 2] {
-        match k {
-            0 => r.dual,
-            1 => r.single,
-            _ => r.fixed,
-        }
-    }
 
     for r in &rows {
         // Risk accounting: the calibrated arms hold their budgets.
@@ -464,9 +464,10 @@ fn g2_exit_floor_dual_wins_or_ties_both_floors() {
 #[test]
 #[cfg_attr(debug_assertions, ignore)]
 fn perf_report_per_exit_call() {
-    let policy = DualExitPolicy::new(0.85, 16.0 / T as f32, 0.5, 0.0, 0.65);
-    let s: Vec<f32> = (0..T).map(|t| 0.3 + 0.02 * t as f32).collect();
     const ITERS: usize = 1_000_000;
+
+let policy = DualExitPolicy::new(0.85, 16.0 / T as f32, 0.5, 0.0, 0.65);
+    let s: Vec<f32> = (0..T).map(|t| 0.3 + 0.02 * t as f32).collect();
     let mut sink = 0u64;
     let start = Instant::now();
     for i in 0..ITERS {

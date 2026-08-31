@@ -177,6 +177,7 @@ where
         }
     }
 
+    edges.shrink_to_fit();
     edges
 }
 
@@ -248,6 +249,7 @@ where
         }
     }
 
+    edges.shrink_to_fit();
     edges
 }
 
@@ -299,7 +301,7 @@ where
     }
 
     let n_edges = edges.len();
-    let mut faces = Vec::new();
+    let mut faces = Vec::with_capacity(n_edges);
     let mut seen: HashSet<[ZoneId; 4]> = HashSet::with_capacity(n_edges);
 
     for i in 0..n_edges {

@@ -356,6 +356,8 @@ fn bench_player_scaling() {
 // ════════════════════════════════════════════════════════════════
 
 fn bench_go_api() {
+    use katgpt_rs::pruners::go::AutoGoClient;
+
     println!("═══════════════════════════════════════════════════════════════");
     println!("  T45: API Benchmark (AutoGo Server)");
     println!("═══════════════════════════════════════════════════════════════");
@@ -369,8 +371,6 @@ fn bench_go_api() {
         println!();
         return;
     };
-
-    use katgpt_rs::pruners::go::AutoGoClient;
 
     let client = AutoGoClient::new(&api_url);
 

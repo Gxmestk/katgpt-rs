@@ -869,6 +869,9 @@ mod tests {
         // Boring centroid: first 4 dims active. Novel centroids: distinct
         // one-hot directions in the last 4 dims (well-separated from bg and
         // from each other — near-orthogonal for clean recall probing).
+        const BORING_BLOCK: usize = 280;
+        const NOVEL_BLOCK: usize = 120;
+
         let mut centroid_bg = [0.0f32; RANK];
         centroid_bg[..4].fill(1.0);
         l2_normalize(&mut centroid_bg);
@@ -891,8 +894,6 @@ mod tests {
         // Novel block i: identical centroid_evt_(i%4) key+value — the first
         //   write stores a new association; subsequent writes are redundant.
         const N_PAIRS: usize = 5;
-        const BORING_BLOCK: usize = 280;
-        const NOVEL_BLOCK: usize = 120;
 
         let mut stream: Vec<Sample> = Vec::with_capacity(N_PAIRS * (BORING_BLOCK + NOVEL_BLOCK));
         for pair in 0..N_PAIRS {

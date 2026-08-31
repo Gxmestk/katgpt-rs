@@ -17,11 +17,11 @@ pub struct C64 {
 
 impl C64 {
     /// Zero.
-    pub const ZERO: C64 = C64 { re: 0.0, im: 0.0 };
+    pub const ZERO: Self = Self { re: 0.0, im: 0.0 };
     /// One.
-    pub const ONE: C64 = C64 { re: 1.0, im: 0.0 };
+    pub const ONE: Self = Self { re: 1.0, im: 0.0 };
     /// Imaginary unit i.
-    pub const I: C64 = C64 { re: 0.0, im: 1.0 };
+    pub const I: Self = Self { re: 0.0, im: 1.0 };
 
     #[inline]
     pub const fn new(re: f64, im: f64) -> Self {

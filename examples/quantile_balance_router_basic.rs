@@ -39,6 +39,7 @@ fn seeded_scores(seed: u32, m: usize, n: usize) -> Vec<f32> {
         s ^= s << 5;
         v.push((s as f32) / (u32::MAX as f32));
     }
+    v.shrink_to_fit();
     v
 }
 

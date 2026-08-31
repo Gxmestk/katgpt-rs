@@ -75,9 +75,9 @@ fn bench_dirty_check() {
     println!("│  Per-call: {per_call_ns:.3} ns");
     println!("│  Target: < 1 ns");
     if per_call_ns < 1.0 {
-        println!("│  ✅ PASS")
+        println!("│  ✅ PASS");
     } else {
-        println!("│  ⚠️  SLOW (but functional)")
+        println!("│  ⚠️  SLOW (but functional)");
     }
     println!("└──────────────────────────────────────────────────────────────");
 }

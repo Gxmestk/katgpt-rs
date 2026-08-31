@@ -91,7 +91,13 @@ fn build_test_log(n: usize) -> EventLog<u64> {
 // ─── G1: Correctness — 12 predicate combinations ────────────────────────────
 
 fn g1_correctness() -> bool {
-    println!("── G1: Correctness (12 predicate combinations) ──");
+    impl EventPredicate<u64> for PayloadAbove {
+        fn matches(&self, event: &katgpt_pruners::event_log::Event<u64>) -> bool {
+            event.payload > self.0
+        }
+    }
+
+println!("── G1: Correctness (12 predicate combinations) ──");
     let log = build_test_log(100);
     let mut pass = true;
     let mut checked = 0;
@@ -187,11 +193,6 @@ fn g1_correctness() -> bool {
     // 13. Custom predicate (escape hatch): payload > 500
     #[derive(Debug)]
     struct PayloadAbove(u64);
-    impl EventPredicate<u64> for PayloadAbove {
-        fn matches(&self, event: &katgpt_pruners::event_log::Event<u64>) -> bool {
-            event.payload > self.0
-        }
-    }
     let custom = Predicate::custom(PayloadAbove(500));
     // Evaluations have payload = id*100, so payload > 500 means id*100 > 500 → id > 5
     // Among Evals (ids 3,6,9,...): id > 5 → ids 6,9,...,96 = 31 events

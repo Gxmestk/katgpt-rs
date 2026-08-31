@@ -147,6 +147,7 @@ pub fn bench_elf_sde(_config: &Config) -> Vec<BenchResult> {
         );
     }
 
+    results.shrink_to_fit();
     results
 }
 

@@ -54,7 +54,7 @@ pub enum PropertyGroup {
 
 impl PropertyGroup {
     /// Returns all property groups in board order.
-    pub fn all() -> [PropertyGroup; 8] {
+    pub fn all() -> [Self; 8] {
         [
             Self::Brown,
             Self::LightBlue,

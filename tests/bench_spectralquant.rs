@@ -87,8 +87,8 @@ fn bench_spectralquant_cosine_vs_turboquant() {
         tq_cache.store_value(0, pos, val);
     }
 
-    let mut tq_key_cosines = Vec::new();
-    let mut tq_val_cosines = Vec::new();
+    let mut tq_key_cosines = Vec::with_capacity(n_positions);
+    let mut tq_val_cosines = Vec::with_capacity(n_positions);
     for pos in 0..n_positions {
         let recon = tq_cache.dequantize_key(0, pos);
         tq_key_cosines.push(cosine_sim(&keys[pos], &recon));
@@ -126,8 +126,8 @@ fn bench_spectralquant_cosine_vs_turboquant() {
         sq_cache.store_value(0, pos, val);
     }
 
-    let mut sq_key_cosines = Vec::new();
-    let mut sq_val_cosines = Vec::new();
+    let mut sq_key_cosines = Vec::with_capacity(n_positions);
+    let mut sq_val_cosines = Vec::with_capacity(n_positions);
     for pos in 0..n_positions {
         let mut recon = vec![0.0f32; kd];
         sq_cache.dequantize_key_into(0, pos, &mut recon);

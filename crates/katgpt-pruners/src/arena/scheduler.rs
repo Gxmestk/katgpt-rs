@@ -18,6 +18,7 @@ pub fn round_robin_pairs(n: usize) -> Vec<Matchup> {
             });
         }
     }
+    matchups.shrink_to_fit();
     matchups
 }
 

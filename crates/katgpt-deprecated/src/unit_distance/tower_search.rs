@@ -429,6 +429,7 @@ impl TowerSearch {
             }
         }
 
+        arms.shrink_to_fit();
         arms
     }
 

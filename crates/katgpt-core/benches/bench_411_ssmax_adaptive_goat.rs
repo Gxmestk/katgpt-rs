@@ -108,7 +108,9 @@ fn attention_output_cosine_sim(logits: &[f32], gold_index: usize, d_model: usize
 // ── main ──────────────────────────────────────────────────────────────────
 
 fn main() {
-    println!("══════════════════════════════════════════════════════════════════");
+    use std::sync::atomic::Ordering;
+
+println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 411 S2 — SSMax Rolling-Δ Estimator GOAT gate");
     println!("  Δ (true gold-distractor gap) = {DELTA}");
     println!("══════════════════════════════════════════════════════════════════\n");
@@ -245,7 +247,6 @@ fn main() {
 
     // ── G4: Alloc-free — 0 allocations over 1000 observe_row calls ────────
     println!("── G4 (alloc-free): 0 allocations over 1000 calls ──────────────");
-    use std::sync::atomic::Ordering;
     let before = ALLOC_COUNT.load(Ordering::Relaxed);
     let est2 = RollingDeltaEstimator::default();
     for _ in 0..1000 {

@@ -96,6 +96,8 @@ fn g4_zero_alloc() {
 
 #[test]
 fn g5_latency_under_5us_p50() {
+    const N_SAMPLES: usize = 1000;
+
     let f0 = LinearField::new(2.0, 0);
     let f1 = LinearField::new(5.0, 1);
     let f2 = LinearField::new(1.0, 2);
@@ -103,8 +105,6 @@ fn g5_latency_under_5us_p50() {
     let blend = make_blend([1.0, -1.0, 0.5]);
     let z = [0.5f32; 32];
     let mut rng = fastrand::Rng::with_seed(999);
-
-    const N_SAMPLES: usize = 1000;
     let mut latencies_ns = [0u64; N_SAMPLES];
 
     for latency in latencies_ns.iter_mut() {

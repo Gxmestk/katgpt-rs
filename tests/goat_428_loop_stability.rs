@@ -146,6 +146,8 @@ fn g2_logits_finite_with_inter_loop_norm() {
 /// Each call is O(n) with a SIMD-accelerated kernel. The overhead should be
 /// negligible compared to the per-layer QKV + attention + MLP work.
 fn g3_latency_overhead() {
+    const RUNS: usize = 20;
+
     let mut config = Config::micro();
     config.n_layer = 4;
     config.loop_mode = LoopMode::WeightShared { loop_count: 12 };
@@ -169,7 +171,6 @@ fn g3_latency_overhead() {
 
     // Measure baseline.
     let mut baseline_us = 0u64;
-    const RUNS: usize = 20;
     for _ in 0..RUNS {
         let (_, _, us) =
             run_forward_looped(&config_baseline, &weights, &residual_gate, &sdpa_gate, 0, 0);

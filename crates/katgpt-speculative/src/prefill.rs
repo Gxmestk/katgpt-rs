@@ -220,6 +220,7 @@ pub fn block_select(block_scores: &[f32], cfg: &FlashPrefillConfig) -> Vec<usize
 
     // Iteration is monotonically increasing in k_block, so `selected` is
     // already sorted and unique — no sort/dedup needed.
+    selected.shrink_to_fit();
     selected
 }
 
@@ -382,6 +383,7 @@ pub fn compress_prompt_blocks(
     selected_tokens.sort();
     selected_tokens.dedup();
 
+    selected_tokens.shrink_to_fit();
     selected_tokens
 }
 

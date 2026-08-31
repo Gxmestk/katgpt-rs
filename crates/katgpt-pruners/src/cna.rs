@@ -284,6 +284,7 @@ pub fn detect_universal_neurons(
         }
     }
 
+    universal.shrink_to_fit();
     universal
 }
 

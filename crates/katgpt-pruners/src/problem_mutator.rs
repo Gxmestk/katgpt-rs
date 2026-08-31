@@ -118,6 +118,7 @@ impl ProblemMutator for GoConfigMutator {
             });
         }
 
+        mutants.shrink_to_fit();
         mutants
     }
 }

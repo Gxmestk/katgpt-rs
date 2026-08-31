@@ -53,6 +53,7 @@ pub fn score_mux_trajectory(
         });
     }
 
+    scores.shrink_to_fit();
     scores
 }
 

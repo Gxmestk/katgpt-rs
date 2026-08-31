@@ -335,6 +335,8 @@ pub fn denoise_loop_rcd(
     rcd_config: Option<&mut katgpt_core::dllm_solver::RcdConfig>,
 ) -> (Vec<usize>, usize) {
     // If RCD is disabled at runtime, fall back to the standard loop with zero overhead.
+    use katgpt_core::dllm_solver::{compute_residual, interpolate_residual, normalized_entropy};
+
     let rcd_enabled = rcd_config.as_ref().is_some_and(|c| c.enabled);
     if !rcd_enabled {
         return denoise_loop(
@@ -347,8 +349,6 @@ pub fn denoise_loop_rcd(
             rng,
         );
     }
-
-    use katgpt_core::dllm_solver::{compute_residual, interpolate_residual, normalized_entropy};
 
     let seq_len = target_tokens.len().min(config.block_size);
     let mask = config.mask_token;
@@ -523,6 +523,11 @@ pub fn denoise_loop_rcd_3sr(
     tsr_config: Option<&katgpt_core::dllm_solver::ThreeStateReuseConfig>,
 ) -> (Vec<usize>, usize) {
     // Zero-overhead runtime gate: if 3SR is disabled at runtime, delegate to RCD.
+    use katgpt_core::dllm_solver::{
+        ThreeStateReuseConfig, classify_transitions, compute_gammas, compute_residual,
+        interpolate_residual, normalized_entropy, warm_start_lerp,
+    };
+
     let tsr_enabled = tsr_config.is_some_and(|c| c.enabled);
     if !tsr_enabled {
         return denoise_loop_rcd(
@@ -546,11 +551,6 @@ pub fn denoise_loop_rcd_3sr(
         // embedding for every still-masked position. This is the
         // modelless-3SR-on-bare-D2F mode (no RCD composition).
     }
-
-    use katgpt_core::dllm_solver::{
-        ThreeStateReuseConfig, classify_transitions, compute_gammas, compute_residual,
-        interpolate_residual, normalized_entropy, warm_start_lerp,
-    };
     let tsr_cfg: &ThreeStateReuseConfig = tsr_config.expect("checked tsr_enabled above");
 
     let seq_len = target_tokens.len().min(config.block_size);

@@ -66,7 +66,7 @@ impl HullMeta {
 
     /// Merge another `HullMeta` into this one.
     #[inline]
-    pub fn merge(&mut self, other: &HullMeta) {
+    pub fn merge(&mut self, other: &Self) {
         self.vsum[0] += other.vsum[0];
         self.vsum[1] += other.vsum[1];
         self.count += other.count;

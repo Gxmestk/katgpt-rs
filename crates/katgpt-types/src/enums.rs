@@ -33,10 +33,10 @@ impl DepthTier {
     /// Returns the maximum number of transformer layers to execute for this tier.
     pub fn max_layers(&self, total_layers: usize) -> usize {
         match self {
-            DepthTier::Plasma => 1.min(total_layers),
-            DepthTier::Hot => 2.min(total_layers),
-            DepthTier::Warm => total_layers,
-            DepthTier::Cold => total_layers,
+            Self::Plasma => 1.min(total_layers),
+            Self::Hot => 2.min(total_layers),
+            Self::Warm => total_layers,
+            Self::Cold => total_layers,
         }
     }
 }

@@ -160,6 +160,7 @@ pub fn build_dd_tree_adaptive(
         });
     }
 
+    transitions.shrink_to_fit();
     transitions
 }
 

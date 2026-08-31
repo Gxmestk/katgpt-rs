@@ -320,7 +320,9 @@ fn make_a_shared(seed: u64) -> AShared {
 }
 
 fn run_a_arm(arm: Arm, seed: u64, sh: &AShared) -> ArmOutcome {
-    let started = Instant::now();
+    const DA_SWITCH: usize = DA_T / 2;
+
+let started = Instant::now();
     let mut rng = SplitMix64::new(seed ^ arm_salt(&arm) ^ 0xA11CE);
     let budget = Scorer::new();
     let score_a = {
@@ -407,7 +409,6 @@ fn run_a_arm(arm: Arm, seed: u64, sh: &AShared) -> ArmOutcome {
     };
     let mut marg = vec![0.0f32; DA_K];
     let mut vals = vec![0.0f32; DA_N];
-    const DA_SWITCH: usize = DA_T / 2;
 
     for t in 0..DA_T {
         match arm {
@@ -701,7 +702,9 @@ fn distinct_frac(rows: &[f32], n: usize) -> f32 {
 }
 
 fn run_b_arm(arm: Arm, seed: u64, sh: &BShared) -> ArmOutcome {
-    let started = Instant::now();
+    const DB_SWITCH: usize = DB_L / 2;
+
+let started = Instant::now();
     let mut rng = SplitMix64::new(seed ^ arm_salt(&arm) ^ 0xB00B);
     let budget = Scorer::new();
     let cdf = unigram_cdf();
@@ -760,7 +763,6 @@ fn run_b_arm(arm: Arm, seed: u64, sh: &BShared) -> ArmOutcome {
     let mut marg = vec![0.0f32; DB_K];
     let mut vals = vec![0.0f32; DB_N];
     let mut cands: Vec<f32> = Vec::with_capacity(DB_K * DB_L);
-    const DB_SWITCH: usize = DB_L / 2;
 
     for t in 0..DB_L {
         match arm {
@@ -1070,7 +1072,9 @@ fn collect_b() -> BTable {
 
 #[test]
 fn g2_g3_steering_uplift_and_promotion() {
-    let a = collect_a();
+    const PINNED_PROMOTE_B: bool = true;
+
+let a = collect_a();
     eprintln!(
         "[Bench 692 · A] downstream ({} seeds):\\n  (e) no-steer   {:.4}\\n  (a1) BoM@{:<5} {:.4}\\n  (a2) BoM@{:<5} {:.4}\\n  (b) full-M     {:.4}\\n  (c) proxy      {:.4}\\n  (c+memo)       {:.4}\\n  (d) memo+ridge {:.4}",
         DA_SEEDS,
@@ -1204,7 +1208,6 @@ fn g2_g3_steering_uplift_and_promotion() {
     // the distributional_steering / Bench 682 precedent), and the trained
     // head (riir-train Plan 361) must still beat arm (d) at matched budget.
     const PINNED_PROMOTE_A: bool = true;
-    const PINNED_PROMOTE_B: bool = true;
     assert_eq!(
         promote_a, PINNED_PROMOTE_A,
         "domain A promotion verdict flipped (measured {promote_a}, pinned {PINNED_PROMOTE_A})"

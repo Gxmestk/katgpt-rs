@@ -197,7 +197,10 @@ struct BenchResult {
 }
 
 fn bench_size(size: usize) -> BenchResult {
-    let a_f32: Vec<f32> = (0..size)
+    const ITERS: usize = 2_000_000;
+const WARMUP: usize = 50_000;
+
+let a_f32: Vec<f32> = (0..size)
         .map(|i| (i as f32).sin() * 1.7 + (i as f32 * 0.3).cos() * 0.8)
         .collect();
     let b_f32: Vec<f32> = (0..size)
@@ -217,9 +220,6 @@ fn bench_size(size: usize) -> BenchResult {
     } else {
         0.0
     };
-
-    const ITERS: usize = 2_000_000;
-    const WARMUP: usize = 50_000;
 
     // f32 baseline
     let mut sink = 0.0f32;

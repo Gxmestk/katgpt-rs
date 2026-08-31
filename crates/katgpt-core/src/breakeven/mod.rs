@@ -43,11 +43,11 @@ pub enum BreakevenTierPair {
 
 impl BreakevenTierPair {
     /// All tier pairs as a slice.
-    pub const ALL: [BreakevenTierPair; 4] = [
-        BreakevenTierPair::CpuToGpu,
-        BreakevenTierPair::GpuToAne,
-        BreakevenTierPair::CpuToSpeculative,
-        BreakevenTierPair::GpuToSpeculative,
+    pub const ALL: [Self; 4] = [
+        Self::CpuToGpu,
+        Self::GpuToAne,
+        Self::CpuToSpeculative,
+        Self::GpuToSpeculative,
     ];
 
     /// Source (lower) tier.

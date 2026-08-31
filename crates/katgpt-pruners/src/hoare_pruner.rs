@@ -80,10 +80,10 @@ impl Predicate {
     /// Evaluate predicate against current semantic state.
     pub fn evaluate(&self, state: &SemanticState) -> bool {
         match self {
-            Predicate::BracketDepthLe(max) => state.bracket_depth <= *max,
-            Predicate::KeywordSeen(idx) => *idx < 32 && (state.keyword_mask & (1 << *idx)) != 0,
-            Predicate::And(l, r) => l.evaluate(state) && r.evaluate(state),
-            Predicate::Or(l, r) => l.evaluate(state) || r.evaluate(state),
+            Self::BracketDepthLe(max) => state.bracket_depth <= *max,
+            Self::KeywordSeen(idx) => *idx < 32 && (state.keyword_mask & (1 << *idx)) != 0,
+            Self::And(l, r) => l.evaluate(state) && r.evaluate(state),
+            Self::Or(l, r) => l.evaluate(state) || r.evaluate(state),
         }
     }
 }

@@ -142,7 +142,7 @@ fn print_q_values(label: &str, stats: &BanditStats, compressed: &[usize]) {
         })
         .collect();
     let v: Vec<String> = (0..stats.num_arms())
-        .map(|i| format!("{}", stats.visit_count(i)))
+        .map(|i| stats.visit_count(i).to_string())
         .collect();
     println!("   {label} Q-values: [{}]", q.join(", "));
     println!("   {label} Visits:   [{}]", v.join(", "));

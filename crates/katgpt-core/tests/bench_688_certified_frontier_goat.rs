@@ -147,10 +147,7 @@ fn arm_adjacency_floor(seed: u64, truth: &[f32]) -> ArmResult {
     let mut rng = Lcg::new(seed);
     for _ in 1..=ROUNDS {
         let i = rng.below(CELLS);
-        match rng.next_f32() < truth[i] {
-            true => valid[i] += 1,
-            false => invalid[i] += 1,
-        }
+        if rng.next_f32() < truth[i] { valid[i] += 1 } else { invalid[i] += 1 }
     }
     let leans_valid = |i: usize| valid[i] > invalid[i] && valid[i] + invalid[i] > 0;
     let mut certified = vec![false; CELLS];
@@ -199,7 +196,7 @@ fn t3_4_report_the_floor_adjacency_only_expansion() {
     );
 
     let mut prim_wins = 0usize;
-    let mut ratios = Vec::new();
+    let mut ratios = Vec::with_capacity(SEEDS);
     let (mut prim_viol, mut floor_viol) = (0usize, 0usize);
     let (mut prim_cert, mut floor_cert) = (0usize, 0usize);
 
@@ -254,14 +251,8 @@ fn t3_4_report_the_floor_adjacency_only_expansion() {
     // against both numbers; see the file for the scope call.
     println!(
         "\nverdict inputs: product-metric {} | calibration {}",
-        match mean_ratio > 1.0 {
-            true => "primitive DOMINATES floor",
-            false => "floor DOMINATES primitive",
-        },
-        match floor_rate <= DELTA as f64 {
-            true => "floor is ALSO calibrated",
-            false => "floor BREACHES delta (primitive is the only deployable arm)",
-        }
+        if mean_ratio > 1.0 { "primitive DOMINATES floor" } else { "floor DOMINATES primitive" },
+        if floor_rate <= DELTA as f64 { "floor is ALSO calibrated" } else { "floor BREACHES delta (primitive is the only deployable arm)" }
     );
 }
 
@@ -327,10 +318,7 @@ fn t3_4b_where_delta_actually_binds() {
             cert / SEEDS as usize,
             viol,
             rate,
-            match rate <= DELTA as f64 {
-                true => "yes",
-                false => "NO",
-            }
+            if rate <= DELTA as f64 { "yes" } else { "NO" }
         );
     }
     println!(
@@ -357,10 +345,7 @@ fn t3_4b_where_delta_actually_binds() {
          (= scale {:.2}) -> {} certified, {viol} violations, rate {rate:.5} [{}]",
         union / paper,
         cert / SEEDS as usize,
-        match rate <= DELTA as f64 {
-            true => "calibrated",
-            false => "BREACHES delta",
-        }
+        if rate <= DELTA as f64 { "calibrated" } else { "BREACHES delta" }
     );
 }
 

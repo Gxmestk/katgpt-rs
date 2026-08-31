@@ -239,19 +239,19 @@ enum EncoderKind {
 impl EncoderKind {
     fn name(self) -> &'static str {
         match self {
-            EncoderKind::DispNorms => "DispNorms",
-            EncoderKind::DispStats => "DispStats",
-            EncoderKind::StateNorms => "StateNorms",
-            EncoderKind::DispRatios => "DispRatios",
+            Self::DispNorms => "DispNorms",
+            Self::DispStats => "DispStats",
+            Self::StateNorms => "StateNorms",
+            Self::DispRatios => "DispRatios",
         }
     }
 
     fn dim(self) -> usize {
         match self {
-            EncoderKind::DispNorms => 8,
-            EncoderKind::DispStats => 32, // 8 layers × 4 stats
-            EncoderKind::StateNorms => 9,
-            EncoderKind::DispRatios => 8,
+            Self::DispNorms => 8,
+            Self::DispStats => 32, // 8 layers × 4 stats
+            Self::StateNorms => 9,
+            Self::DispRatios => 8,
         }
     }
 }

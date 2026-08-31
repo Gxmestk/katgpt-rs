@@ -337,7 +337,7 @@ impl DatrieTreeIndex {
 
         // Sort by pretoken bytes for better insertion order (fewer collisions).
         let mut entries: Vec<_> = trees.into_iter().collect();
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries.sort_by_key(|a| a.0);
 
         let mut trie = Datrie::with_capacity(cap);
         let mut tree_vec = Vec::with_capacity(entries.len());

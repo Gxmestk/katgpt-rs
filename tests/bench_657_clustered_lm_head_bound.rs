@@ -688,10 +688,7 @@ fn goat_657_clustered_lm_head_bound() {
         println!(
             "  {spread:>7.2}  {:>8.2}%  {ratio:>7.2}x  {:>9}",
             active * 100.0,
-            match ratio > 1.0 {
-                true => "win",
-                false => "LOSS",
-            }
+            if ratio > 1.0 { "win" } else { "LOSS" }
         );
         // Bracket the sign change on the previous winning point.
         if let Some((p_active, p_ratio)) = prev
@@ -720,25 +717,20 @@ fn goat_657_clustered_lm_head_bound() {
     println!("\n══ VERDICT ══");
     println!(
         "G2b absolute (best TopK recall >= {RECALL_TARGET}): {best:.4} → {}",
-        match best >= RECALL_TARGET {
-            true => "PASS",
-            false => "FAIL",
+        if best >= RECALL_TARGET {
+            "PASS"
+        } else {
+            "FAIL"
         }
     );
     println!("Admissible stop: recall 1.0 asserted above — quality is exact by construction.");
     println!(
         "G3 perf structured (admissible < standard): {} ({g3_structured:.2}x)",
-        match g3_structured > 1.0 {
-            true => "PASS",
-            false => "FAIL",
-        }
+        if g3_structured > 1.0 { "PASS" } else { "FAIL" }
     );
     println!(
         "G3 perf random control: {} ({g3_random:.2}x) — the scope limit, not a bug",
-        match g3_random > 1.0 {
-            true => "PASS",
-            false => "LOSS",
-        }
+        if g3_random > 1.0 { "PASS" } else { "LOSS" }
     );
 
     // Asserted, not merely reported: admissibility is a *proof obligation*, not

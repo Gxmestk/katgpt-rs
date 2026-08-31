@@ -99,7 +99,7 @@ fn main() {
     let compute = ComputeUnits::CpuAndNeuralEngine;
 
     eprintln!("Compiling 4 CoreML models (CpuAndNeuralEngine)...");
-    eprintln!("  Conv shape: {}×{}×{} (CHW), 3×3 SAME, F32", C, H, W);
+    eprintln!("  Conv shape: {C}×{H}×{W} (CHW), 3×3 SAME, F32");
     eprintln!(
         "  Weight per layer: {} floats ({} KB)",
         WEIGHT_ELEMS,

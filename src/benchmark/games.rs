@@ -42,10 +42,10 @@ enum CacheState {
 impl CacheState {
     fn label(self) -> &'static str {
         match self {
-            CacheState::Plasma => "plasma",
-            CacheState::Hot => "hot",
-            CacheState::Warm => "warm",
-            CacheState::Cold => "cold",
+            Self::Plasma => "plasma",
+            Self::Hot => "hot",
+            Self::Warm => "warm",
+            Self::Cold => "cold",
         }
     }
 }
@@ -245,5 +245,6 @@ pub fn bench_e2e_game_timing(_config: &Config) -> Vec<BenchResult> {
         );
     }
 
+    results.shrink_to_fit();
     results
 }

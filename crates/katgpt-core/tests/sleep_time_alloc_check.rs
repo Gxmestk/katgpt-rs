@@ -113,6 +113,8 @@ fn g5_zero_alloc_after_warmup_both_paths() {
     {
         // Warmup.
         const N_WARMUP: usize = 200;
+        const N_CALLS: usize = 1000;
+
         let mut warmup_sink = 0usize;
         for _ in 0..N_WARMUP {
             let (best_i, _gate) = consume_gate(&q, &artifact, 0.5, 4.0);
@@ -122,8 +124,6 @@ fn g5_zero_alloc_after_warmup_both_paths() {
 
         let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
         let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-        const N_CALLS: usize = 1000;
         let mut sink = 0usize;
         for _ in 0..N_CALLS {
             let (best_i, _gate) = consume_gate(&q, &artifact, 0.5, 4.0);

@@ -41,9 +41,10 @@ pub fn forward_training_free_loop<'a>(
     config: &Config,
     tf_config: &TrainingFreeLoopConfig,
 ) -> &'a mut [f32] {
-    cache.advance_pos(pos);
     use crate::tf_loop::{anchor_blend, sub_step_damped_euler};
     use katgpt_core::types::{CacheStrategy, IterationMode, SubStepStrategy};
+
+    cache.advance_pos(pos);
 
     let n = config.n_embd;
     let hd = config.head_dim;

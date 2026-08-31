@@ -289,6 +289,7 @@ fn g2_run_proxy<K: ComplexityProxy>(
         );
         rows.push((alpha, med, mn, speedup, pass, stretch));
     }
+    rows.shrink_to_fit();
     rows
 }
 

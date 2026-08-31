@@ -951,6 +951,7 @@ fn null_space(a: &mut [Vec<f32>], n_cols: usize) -> Vec<Vec<f32>> {
         }
         basis.push(v);
     }
+    basis.shrink_to_fit();
     basis
 }
 

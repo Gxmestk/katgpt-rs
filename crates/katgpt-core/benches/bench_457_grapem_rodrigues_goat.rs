@@ -323,6 +323,8 @@ fn g3_feature_is_opt_in_additive() -> bool {
 /// allocations / deallocations after construction. Returns (alloc_delta,
 /// dealloc_delta) over 1000 calls.
 fn g4_apply_into_zero_alloc() -> (bool, usize, usize) {
+    const N_CALLS: usize = 1000;
+
     let a: Vec<f32> = (0..8).map(|i| (i as f32) * 0.1).collect();
     let b: Vec<f32> = (0..8).map(|i| (i as f32) * -0.1 + 0.5).collect();
     let x: Vec<f32> = (0..8).map(|i| (i as f32) * 0.3 - 1.0).collect();
@@ -338,8 +340,6 @@ fn g4_apply_into_zero_alloc() -> (bool, usize, usize) {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     for _ in 0..N_CALLS {
         plane.apply_into(&x, 1.3, 0.7, &mut out).unwrap();
     }
@@ -356,6 +356,8 @@ fn g4_apply_into_zero_alloc() -> (bool, usize, usize) {
 
 /// Same gate as G4 but for the un-pre-computed entry point.
 fn g4_grapem_apply_into_zero_alloc() -> (bool, usize, usize) {
+    const N_CALLS: usize = 1000;
+
     let a: Vec<f32> = (0..8).map(|i| (i as f32) * 0.1).collect();
     let b: Vec<f32> = (0..8).map(|i| (i as f32) * -0.1 + 0.5).collect();
     let x: Vec<f32> = (0..8).map(|i| (i as f32) * 0.3 - 1.0).collect();
@@ -369,8 +371,6 @@ fn g4_grapem_apply_into_zero_alloc() -> (bool, usize, usize) {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     for _ in 0..N_CALLS {
         grapem_apply_into(&a, &b, &x, 1.3, 0.7, &mut out).unwrap();
     }

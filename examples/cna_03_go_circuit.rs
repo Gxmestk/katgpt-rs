@@ -97,7 +97,7 @@ fn encode_board(state: &GoState, player_id: u8) -> LayerActivations {
 /// Play a random game and return (state, player_id, action) triples.
 fn play_random_game(rng: &mut fastrand::Rng) -> Vec<(GoState, u8, GoAction)> {
     let mut state = GoState::new(BOARD_SIZE);
-    let mut moves = Vec::new();
+    let mut moves = Vec::with_capacity(MAX_MOVES);
 
     for _ in 0..MAX_MOVES {
         if state.is_terminal() {

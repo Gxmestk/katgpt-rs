@@ -88,6 +88,9 @@ fn build_field(id: u64, native_dim: usize, scale: f32) -> LinearNativeField {
 fn g3_eval_and_fit_zero_alloc_after_warmup() {
     // Three fields with different native dims (4, 6, 8) — exercises the
     // per-field transport with varying k values.
+    const N_CALLS: usize = 1000;
+    const N_FITS: usize = 10;
+
     let f0 = build_field(0, 4, 0.5);
     let f1 = build_field(1, 6, 0.3);
     let f2 = build_field(2, 8, 0.2);
@@ -124,8 +127,6 @@ fn g3_eval_and_fit_zero_alloc_after_warmup() {
     // ── Part 1: eval_into zero-alloc ────────────────────────────────────────
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut total: f32 = 0.0;
     for i in 0..N_CALLS {
         let x = &xs[i % N_PAIRS];
@@ -149,8 +150,6 @@ fn g3_eval_and_fit_zero_alloc_after_warmup() {
     // ── Part 2: fit_into zero-alloc ─────────────────────────────────────────
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_FITS: usize = 10;
     for _ in 0..N_FITS {
         ens.fit_into(&x_refs, &y_refs, 1e-4, &mut scratch);
     }

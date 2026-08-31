@@ -155,8 +155,8 @@ enum Regime {
 impl Regime {
     fn label(&self) -> &'static str {
         match self {
-            Regime::Organic => "organic (untrained table — no-harm control)",
-            Regime::NormRamp => "norm-ramp (trained-analog — hot-slot pathology)",
+            Self::Organic => "organic (untrained table — no-harm control)",
+            Self::NormRamp => "norm-ramp (trained-analog — hot-slot pathology)",
         }
     }
 }
@@ -214,9 +214,9 @@ enum Arm {
 impl Arm {
     fn label(&self) -> &'static str {
         match self {
-            Arm::Idf => "IDF   ",
-            Arm::Tf => "TF    ",
-            Arm::Random => "Random",
+            Self::Idf => "IDF   ",
+            Self::Tf => "TF    ",
+            Self::Random => "Random",
         }
     }
 }

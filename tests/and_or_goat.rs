@@ -282,6 +282,12 @@ fn test_goat_4_blueprint_overhead() {
 /// 3. Verify hit rate >= 30%
 #[test]
 fn test_goat_5_cache_hit_rate() {
+    impl GoalVerifier for ProvedVerifier {
+        fn verify(&self, _canonical_bytes: &[u8]) -> GoalResult {
+            GoalResult::Proved
+        }
+    }
+
     let config = Config::draft();
     let vocab = config.vocab_size;
     let depths = config.draft_lookahead;
@@ -338,11 +344,6 @@ fn test_goat_5_cache_hit_rate() {
     // Trivial verifier for cache testing — always returns Proved
     #[derive(Clone, Copy)]
     struct ProvedVerifier;
-    impl GoalVerifier for ProvedVerifier {
-        fn verify(&self, _canonical_bytes: &[u8]) -> GoalResult {
-            GoalResult::Proved
-        }
-    }
     let verifier = ProvedVerifier;
 
     // First pass: get_or_verify on all subgoal ranges (updates counters)

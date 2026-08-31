@@ -101,7 +101,7 @@ impl GoEventLog {
     }
 
     /// Compute structural diff between this log and another.
-    pub fn diff(&self, other: &GoEventLog) -> GoForkDiff {
+    pub fn diff(&self, other: &Self) -> GoForkDiff {
         GoForkDiff {
             inner: self.log.diff(&other.log),
         }
@@ -253,17 +253,17 @@ mod tests {
 
     #[test]
     fn test_go_event_log_replay() {
-        let mut log = GoEventLog::new();
-        log.record_game_start(9);
-        log.record_place_stone(0, 3, 3, 1);
-        log.record_place_stone(1, 15, 15, 2);
-        log.record_pass(0, 3);
-
         #[derive(Clone, PartialEq)]
         struct Board {
             moves: Vec<(usize, usize)>,
             passes: usize,
         }
+
+        let mut log = GoEventLog::new();
+        log.record_game_start(9);
+        log.record_place_stone(0, 3, 3, 1);
+        log.record_place_stone(1, 15, 15, 2);
+        log.record_pass(0, 3);
 
         let start = Board {
             moves: Vec::new(),

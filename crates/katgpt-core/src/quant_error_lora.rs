@@ -166,7 +166,7 @@ impl QuantErrorLora {
                     b[o * r + k] = u_k[o];
                 }
             }
-            QuantErrorLora {
+            Self {
                 a,
                 b,
                 alpha,
@@ -201,7 +201,7 @@ impl QuantErrorLora {
                     b[o * r + k] = v_k[o];
                 }
             }
-            QuantErrorLora {
+            Self {
                 a,
                 b,
                 alpha,
@@ -336,7 +336,7 @@ impl QuantErrorLora {
             }
         }
 
-        QuantErrorLora {
+        Self {
             a,
             b,
             alpha,
@@ -476,7 +476,7 @@ impl SparseErrorBypass {
             vals.push(w_ref[flat] - w_quant_dequant[flat]);
         }
 
-        SparseErrorBypass {
+        Self {
             rows,
             cols,
             vals,

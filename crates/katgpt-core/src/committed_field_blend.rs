@@ -934,6 +934,9 @@ mod tests {
     #[test]
     fn g2_sampling_invariance() {
         // Construct K=3 archetype fields (linear/rotation/constant).
+        const DC: f32 = 0.1;
+        const AMP: f32 = 0.05;
+
         let f0 = LinearField::new(0.9, 0);
         let f1 = RotationField::new(0, 1, 0.5, 1);
         let f2 = ConstantField::new([0.1f32; 32], 2);
@@ -955,8 +958,6 @@ mod tests {
         // pi ≈ 0.1 * 11 = 1.1 (well within ±pi_max=10, so no clamping hides
         // the comparison — the test is meaningful).
         const PERIOD: usize = 100;
-        const DC: f32 = 0.1;
-        const AMP: f32 = 0.05;
         let mut traj: Vec<[f32; 32]> = Vec::with_capacity(1000);
         for t in 0..1000 {
             let mut state = [0.0f32; 32];
@@ -1205,6 +1206,8 @@ mod tests {
         /// by construction; a violation = numerics bug.
         #[test]
         fn g1_lipschitz_bound_holds() {
+            const N_CONFIGS: u32 = 1000;
+
             let f0 = LinearField::new(2.0, 0);
             let f1 = LinearField::new(5.0, 1);
             let f2 = LinearField::new(1.0, 2);
@@ -1212,7 +1215,6 @@ mod tests {
 
             let mut rng = Rng::with_seed(0x4141_4141);
             let mut violations = 0u32;
-            const N_CONFIGS: u32 = 1000;
 
             for _ in 0..N_CONFIGS {
                 // Random pi ∈ [-10, 10], random z ∈ [-1, 1].

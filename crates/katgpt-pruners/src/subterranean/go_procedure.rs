@@ -209,6 +209,7 @@ impl GoProcedure {
                 });
             }
         }
+        edges.shrink_to_fit();
         edges
     }
 

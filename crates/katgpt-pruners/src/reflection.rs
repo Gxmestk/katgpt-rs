@@ -168,6 +168,7 @@ pub fn extract_facts(states: &[GameStateSnapshot], domain: ReflectionDomain) -> 
         }
     }
 
+    pairs.shrink_to_fit();
     pairs
 }
 
@@ -220,6 +221,7 @@ pub fn consolidate_facts(pairs: &[ReflectionQA]) -> Vec<ReflectionQA> {
         });
     }
 
+    consolidated.shrink_to_fit();
     consolidated
 }
 
@@ -386,6 +388,7 @@ pub fn synthesize_cross_game(
         });
     }
 
+    cross.shrink_to_fit();
     cross
 }
 

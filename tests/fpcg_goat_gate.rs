@@ -352,6 +352,7 @@ fn make_candidate_pool(prompt_idx: usize, n_refuse: usize, n_comply: usize) -> V
     for i in 0..n_comply {
         pool.push(format!("COMPLY: p{prompt_idx} c{i}"));
     }
+    pool.shrink_to_fit();
     pool
 }
 
@@ -373,6 +374,7 @@ fn build_calibration_set() -> Vec<(Vec<f32>, bool)> {
         candidate_activation(&format!("COMPLY: cal{i}"), &mut act);
         out.push((act, false));
     }
+    out.shrink_to_fit();
     out
 }
 

@@ -45,14 +45,14 @@ enum Mode {
 impl Mode {
     fn label(self) -> &'static str {
         match self {
-            Mode::NineByNine => "9×9",
-            Mode::Speculative => "Speculative",
+            Self::NineByNine => "9×9",
+            Self::Speculative => "Speculative",
         }
     }
     fn toggled(self) -> Self {
         match self {
-            Mode::NineByNine => Mode::Speculative,
-            Mode::Speculative => Mode::NineByNine,
+            Self::NineByNine => Self::Speculative,
+            Self::Speculative => Self::NineByNine,
         }
     }
 }

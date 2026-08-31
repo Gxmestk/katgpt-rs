@@ -147,6 +147,7 @@ impl CoincidenceGate {
                 hits.push(k);
             }
         }
+        hits.shrink_to_fit();
         hits
     }
 }

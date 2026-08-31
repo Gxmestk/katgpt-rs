@@ -199,13 +199,14 @@ fn main() {
     println!("═══ G2 — latency (release) ═══");
     {
         // GS @ d=64/K=14 — the drive-direction shape. Target < 5µs.
+        const REPS: usize = 1000;
+
         let (planted, _) = planted_and_healthy();
         let mut out = [[0.0_f32; D]; K14];
         let mut defect = 0.0_f32;
         for _ in 0..100 {
             orthonormalize_into(&planted, &mut out, &mut defect);
         }
-        const REPS: usize = 1000;
         let t0 = std::time::Instant::now();
         for _ in 0..REPS {
             orthonormalize_into(&planted, &mut out, &mut defect);
@@ -303,8 +304,7 @@ fn main() {
         let cos = max_abs_pair_cos(&out);
         let survivor: f64 = out[13].iter().map(|x| f64::from(*x) * f64::from(*x)).sum();
         println!(
-            "    GS decorrelation: max |cos| = {:.2e} (gate < 1e-6), survivor ‖b‖² = {survivor:.6}",
-            cos
+            "    GS decorrelation: max |cos| = {cos:.2e} (gate < 1e-6), survivor ‖b‖² = {survivor:.6}"
         );
         if cos >= 1e-6 || (survivor - 1.0).abs() > 1e-6 {
             failures += 1;

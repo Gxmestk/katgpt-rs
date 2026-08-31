@@ -611,14 +611,7 @@ fn verdict(pass: bool) -> &'static str {
 fn main() {
     println!("╔═════════════════════════════════════════════════════════════════════╗");
     println!("║  Plan 454 T7 — 3D NCA GOAT Gate (G1a/G1b/G2/G3/G4/G5/G6)           ║");
-    println!(
-        "║  Grid: {W}×{H}×{D} = {N_VOXELS} voxels, {STEPS} steps                       ║",
-        W = W,
-        H = H,
-        D = D,
-        N_VOXELS = N_VOXELS,
-        STEPS = STEPS
-    );
+    println!("║  Grid: {W}×{H}×{D} = {N_VOXELS} voxels, {STEPS} steps                       ║");
     println!("╚═════════════════════════════════════════════════════════════════════╝");
     println!();
 

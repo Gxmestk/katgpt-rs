@@ -334,10 +334,11 @@ impl<const SQRT_N: usize, const D_K: usize, const D_V: usize> ProductKeyMemory<S
 /// (Cephes polynomial) instead of libm `exp` for consistency with the rest of
 /// the codebase's exp floor (~1.7× faster on aarch64).
 fn softmax_normalize_into(entries: &mut [(usize, f32)]) {
+    use crate::simd::fast_exp;
+
     if entries.is_empty() {
         return;
     }
-    use crate::simd::fast_exp;
     let max = entries
         .iter()
         .fold(f32::NEG_INFINITY, |m, &(_, s)| m.max(s));
@@ -385,6 +386,7 @@ mod tests {
         // Sort descending by score, tiebreak by lower flat_index.
         all.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
         all.truncate(k);
+        all.shrink_to_fit();
         all
     }
 

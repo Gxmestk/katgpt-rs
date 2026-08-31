@@ -302,6 +302,7 @@ pub fn bt_pair_random(
         }
     }
 
+    pairs.shrink_to_fit();
     pairs
 }
 

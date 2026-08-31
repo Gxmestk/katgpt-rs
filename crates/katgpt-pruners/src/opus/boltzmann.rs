@@ -106,6 +106,8 @@ pub fn boltzmann_sample_batch(
     k: usize,
     rng: &mut Rng,
 ) -> Vec<usize> {
+    use katgpt_core::simd::fast_exp;
+
     assert!(!utilities.is_empty(), "cannot sample from empty utilities");
 
     let n = utilities.len();
@@ -124,7 +126,6 @@ pub fn boltzmann_sample_batch(
     // Compute initial Boltzmann probabilities
     let max_u = max_safe(utilities);
     let inv_temp = 1.0 / temperature;
-    use katgpt_core::simd::fast_exp;
     let mut probs: Vec<f32> = utilities
         .iter()
         .map(|&u| {
@@ -180,6 +181,8 @@ pub fn boltzmann_sample_batch(
 ///
 /// Panics if `utilities` is empty.
 pub fn boltzmann_probabilities(utilities: &[f32], temperature: f32) -> Vec<f32> {
+    use katgpt_core::simd::fast_exp;
+
     assert!(
         !utilities.is_empty(),
         "cannot compute probs for empty utilities"
@@ -194,7 +197,6 @@ pub fn boltzmann_probabilities(utilities: &[f32], temperature: f32) -> Vec<f32> 
 
     let max_u = max_safe(utilities);
     let inv_temp = 1.0 / temperature;
-    use katgpt_core::simd::fast_exp;
     let mut probs: Vec<f32> = utilities
         .iter()
         .map(|&u| {

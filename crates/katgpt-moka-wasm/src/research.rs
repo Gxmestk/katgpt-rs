@@ -109,6 +109,7 @@ impl MokaWeights {
         out.push(("value.output", LayerWeightRef {
             w: vo_w, b: vo_b, out_dim: 1, in_dim: value_hidden_out, k: 1,
         }));
+        out.shrink_to_fit();
         out
     }
 

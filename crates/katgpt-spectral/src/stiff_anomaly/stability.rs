@@ -61,7 +61,7 @@ impl EigenvalueTracker {
             }
         }
 
-        EigenvalueTracker {
+        Self {
             baseline_mean: mean.iter().map(|&x| x as f32).collect(),
             baseline_std: std.iter().map(|&x| x as f32).collect(),
             history: windows.to_vec(),
@@ -195,10 +195,11 @@ impl EigenvalueTracker {
     ///
     /// Returns `true` if all baseline windows produce the same k.
     pub fn k_invariant(&self, trace_mass: f32) -> bool {
+        use crate::stiff_anomaly::subspace::stiff_subspace_k;
+
         if self.history.len() < 2 {
             return true;
         }
-        use crate::stiff_anomaly::subspace::stiff_subspace_k;
         let k0 = stiff_subspace_k(&self.history[0], trace_mass);
         self.history
             .iter()
@@ -272,7 +273,7 @@ impl StiffAnomalyGate {
         }
         energy_std = (energy_std / n as f64).sqrt().max(1e-8);
 
-        StiffAnomalyGate {
+        Self {
             z_threshold: -2.0,
             alpha_threshold: 0.8,
             baseline_mean: total_energy,

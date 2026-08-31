@@ -96,10 +96,11 @@ fn dense_matrix(rows: usize, cols: usize, seed: u64) -> Vec<f32> {
 /// Median of `reps` timed runs, ns per call. Median over mean: one scheduling
 /// stall on a shared box would dominate a mean.
 fn median_ns(reps: usize, inner: usize, mut f: impl FnMut()) -> f64 {
-    for _ in 0..inner {
+    const MAX_REPS: usize = 32;
+
+for _ in 0..inner {
         f();
     }
-    const MAX_REPS: usize = 32;
     assert!(reps <= MAX_REPS, "reps={reps} exceeds MAX_REPS={MAX_REPS}");
     let mut samples = [0.0f64; MAX_REPS];
     for slot in samples.iter_mut().take(reps) {
@@ -170,10 +171,7 @@ fn g2_footprint_beats_bit_planes_by_at_least_17_percent() {
             plane.encoded_bytes(),
             ratio,
             bpw,
-            match pass {
-                true => "PASS",
-                false => "FAIL",
-            }
+            if pass { "PASS" } else { "FAIL" }
         );
     }
 

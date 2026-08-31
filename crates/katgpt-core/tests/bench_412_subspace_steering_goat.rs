@@ -158,6 +158,8 @@ fn g1_k1_parity_with_plan_309_100_pairs() {
 #[test]
 fn g3_apply_zero_alloc_after_warmup() {
     // Build fields at K=1, K=2, K=4.
+    const N_CALLS: usize = 1000;
+
     let mut rng = Lcg::new(2026);
 
     let block1 = rng.next_orthonormal_block::<8, 1>();
@@ -184,8 +186,6 @@ fn g3_apply_zero_alloc_after_warmup() {
     // have the same constraint.
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     for _ in 0..N_CALLS {
         apply_subspace_steering(&mut state, &field1);
         apply_subspace_steering(&mut state, &field2);

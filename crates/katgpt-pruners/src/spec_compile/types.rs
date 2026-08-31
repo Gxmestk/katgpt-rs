@@ -79,15 +79,15 @@ impl CompactBitmap {
     /// Create an empty bitmap.
     #[inline]
     pub const fn empty() -> Self {
-        CompactBitmap::Empty
+        Self::Empty
     }
 
     /// Create a bitmap from a sorted list of u16 indices.
     pub fn from_sorted_indices(indices: Vec<u16>) -> Self {
         if indices.is_empty() {
-            CompactBitmap::Empty
+            Self::Empty
         } else if indices.len() <= SPARSE_MAX_CARDINALITY {
-            CompactBitmap::Sparse(indices)
+            Self::Sparse(indices)
         } else {
             let mut bits = Box::new([0u64; 1024]);
             for &idx in &indices {
@@ -95,7 +95,7 @@ impl CompactBitmap {
                 let bit = idx as usize % 64;
                 bits[word] |= 1u64 << bit;
             }
-            CompactBitmap::Dense(bits)
+            Self::Dense(bits)
         }
     }
 
@@ -114,10 +114,10 @@ impl CompactBitmap {
     /// Create a dense bitmap with all bits set in range [0, count).
     pub fn all_set(count: usize) -> Self {
         if count == 0 {
-            return CompactBitmap::Empty;
+            return Self::Empty;
         }
         if count <= SPARSE_MAX_CARDINALITY {
-            return CompactBitmap::Sparse((0..count as u16).collect());
+            return Self::Sparse((0..count as u16).collect());
         }
         let mut bits = Box::new([0u64; 1024]);
         let full_words = count / 64;
@@ -128,21 +128,21 @@ impl CompactBitmap {
         if remainder > 0 && full_words < 1024 {
             bits[full_words] = (1u64 << remainder) - 1;
         }
-        CompactBitmap::Dense(bits)
+        Self::Dense(bits)
     }
 
     /// Check if a given index is set.
     #[inline]
     pub fn contains(&self, idx: usize) -> bool {
         match self {
-            CompactBitmap::Empty => false,
-            CompactBitmap::Sparse(a) => {
+            Self::Empty => false,
+            Self::Sparse(a) => {
                 if idx > u16::MAX as usize {
                     return false;
                 }
                 a.binary_search(&(idx as u16)).is_ok()
             }
-            CompactBitmap::Dense(bits) => {
+            Self::Dense(bits) => {
                 let word = idx / 64;
                 let bit = idx % 64;
                 if word >= 1024 {
@@ -156,9 +156,9 @@ impl CompactBitmap {
     /// Number of set bits (cardinality).
     pub fn len(&self) -> usize {
         match self {
-            CompactBitmap::Empty => 0,
-            CompactBitmap::Sparse(a) => a.len(),
-            CompactBitmap::Dense(bits) => bits.iter().map(|w| w.count_ones() as usize).sum(),
+            Self::Empty => 0,
+            Self::Sparse(a) => a.len(),
+            Self::Dense(bits) => bits.iter().map(|w| w.count_ones() as usize).sum(),
         }
     }
 
@@ -166,9 +166,9 @@ impl CompactBitmap {
     #[inline]
     pub fn is_empty(&self) -> bool {
         match self {
-            CompactBitmap::Empty => true,
-            CompactBitmap::Sparse(a) => a.is_empty(),
-            CompactBitmap::Dense(_) => false,
+            Self::Empty => true,
+            Self::Sparse(a) => a.is_empty(),
+            Self::Dense(_) => false,
         }
     }
 
@@ -179,10 +179,10 @@ impl CompactBitmap {
         }
         let lo = idx as u16;
         match self {
-            CompactBitmap::Empty => {
-                *self = CompactBitmap::Sparse(vec![lo]);
+            Self::Empty => {
+                *self = Self::Sparse(vec![lo]);
             }
-            CompactBitmap::Sparse(a) => {
+            Self::Sparse(a) => {
                 if let Err(pos) = a.binary_search(&lo) {
                     a.insert(pos, lo);
                     if a.len() > SPARSE_MAX_CARDINALITY {
@@ -191,7 +191,7 @@ impl CompactBitmap {
                     }
                 }
             }
-            CompactBitmap::Dense(bits) => {
+            Self::Dense(bits) => {
                 let word = idx / 64;
                 let bit = idx % 64;
                 if word < 1024 {
@@ -202,18 +202,18 @@ impl CompactBitmap {
     }
 
     /// Merge another bitmap into this one (union).
-    pub fn union_with(&mut self, other: &CompactBitmap) {
+    pub fn union_with(&mut self, other: &Self) {
         match (&mut *self, other) {
-            (CompactBitmap::Empty, _) => {
+            (Self::Empty, _) => {
                 *self = other.clone();
             }
-            (_, CompactBitmap::Empty) => {}
-            (CompactBitmap::Dense(a), CompactBitmap::Dense(b)) => {
+            (_, Self::Empty) => {}
+            (Self::Dense(a), Self::Dense(b)) => {
                 for i in 0..1024 {
                     a[i] |= b[i];
                 }
             }
-            (CompactBitmap::Dense(a), CompactBitmap::Sparse(b)) => {
+            (Self::Dense(a), Self::Sparse(b)) => {
                 for &lo in b {
                     let word = lo as usize / 64;
                     let bit = lo as usize % 64;
@@ -222,7 +222,7 @@ impl CompactBitmap {
                     }
                 }
             }
-            (CompactBitmap::Sparse(a), CompactBitmap::Dense(b)) => {
+            (Self::Sparse(a), Self::Dense(b)) => {
                 let mut bits = Box::new([0u64; 1024]);
                 for &lo in a.iter() {
                     let word = lo as usize / 64;
@@ -232,9 +232,9 @@ impl CompactBitmap {
                 for i in 0..1024 {
                     bits[i] |= b[i];
                 }
-                *self = CompactBitmap::Dense(bits);
+                *self = Self::Dense(bits);
             }
-            (CompactBitmap::Sparse(a), CompactBitmap::Sparse(b)) => {
+            (Self::Sparse(a), Self::Sparse(b)) => {
                 for &lo in b {
                     if let Err(pos) = a.binary_search(&lo) {
                         a.insert(pos, lo);

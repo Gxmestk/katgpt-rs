@@ -668,6 +668,7 @@ pub fn manifold_random_walk(
         m + 1,
         "random walk should return exactly m+1 nodes"
     );
+    path.shrink_to_fit();
     path
 }
 
@@ -734,6 +735,7 @@ where
         path.push(pick);
         cur = pick;
     }
+    path.shrink_to_fit();
     path
 }
 
@@ -818,6 +820,7 @@ mod tests {
                 v.push(rng.f32());
             }
         }
+        v.shrink_to_fit();
         v
     }
 

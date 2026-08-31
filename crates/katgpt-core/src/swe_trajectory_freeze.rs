@@ -1281,6 +1281,7 @@ mod tests {
             }
             traj.push(state.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 
@@ -1295,6 +1296,7 @@ mod tests {
             let target = if i % 2 == 0 { &attractor_a } else { &attractor_b };
             traj.push(target.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 
@@ -1311,6 +1313,7 @@ mod tests {
             }
             traj.push(state.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 

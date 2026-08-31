@@ -93,7 +93,7 @@ impl Phase {
     }
 
     /// All four phases in order.
-    pub const ALL: [Phase; 4] = [Self::Attention, Self::Persist1, Self::Ffn, Self::Persist2];
+    pub const ALL: [Self; 4] = [Self::Attention, Self::Persist1, Self::Ffn, Self::Persist2];
 }
 
 // ── Standard Layer ────────────────────────────────────────────
@@ -363,6 +363,7 @@ fn all_result_dims(graph: &DepGraph) -> Vec<DimId> {
             }
         }
     }
+    dims.shrink_to_fit();
     dims
 }
 

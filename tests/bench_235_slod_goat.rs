@@ -390,6 +390,8 @@ fn g6_frechet_convergence() {
 
 #[test]
 fn g1_pruner_overhead_under_100ns() {
+    const ITERS: usize = 100_000;
+
     let config = SlodConfig::default();
     let operator = SlodOperator {
         eigenvalues: vec![3.0, 2.0, 1.5, 1.0, 0.5],
@@ -411,8 +413,6 @@ fn g1_pruner_overhead_under_100ns() {
     for _ in 0..1000 {
         std::hint::black_box(pruner.is_valid(0, 0, &[]));
     }
-
-    const ITERS: usize = 100_000;
     let start = Instant::now();
     for i in 0..ITERS {
         std::hint::black_box(pruner.is_valid(i % 5, i, &[0, 1]));

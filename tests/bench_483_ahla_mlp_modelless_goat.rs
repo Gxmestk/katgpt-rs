@@ -436,6 +436,7 @@ fn teacher_forward(
         let out = forward(&mut ctx, weights, &mut cache, token, pos, config);
         logits.push(out.to_vec());
     }
+    logits.shrink_to_fit();
     logits
 }
 
@@ -452,6 +453,7 @@ fn student_ahla_baseline(
         let out = forward_ahla(&mut ctx, weights, &mut cache, token, pos, config);
         logits.push(out.to_vec());
     }
+    logits.shrink_to_fit();
     logits
 }
 
@@ -474,6 +476,7 @@ fn student_ahla_with_lora(
         let out = forward_ahla(&mut ctx, weights, &mut cache, token, pos, config);
         logits.push(out.to_vec());
     }
+    logits.shrink_to_fit();
     logits
 }
 

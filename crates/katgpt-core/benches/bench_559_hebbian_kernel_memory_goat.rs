@@ -276,7 +276,9 @@ fn gate_g4_alloc_free() -> GateResult {
     use std::sync::atomic::Ordering;
 
     const D: usize = 64;
-    let f = 128;
+    const CALLS: usize = 100;
+
+let f = 128;
     let v = 128;
     let m = 512;
     let (keys, values, fact_map) = synthetic_fact_set::<D>(f, v, 0x1234);
@@ -291,8 +293,6 @@ fn gate_g4_alloc_free() -> GateResult {
     let mut fwd = [0.0_f32; D];
     let mut scores = vec![0.0_f32; v];
     let z = &keys[0];
-
-    const CALLS: usize = 100;
     let mut reports: Vec<(&'static str, usize)> = Vec::new();
 
     macro_rules! alloc_gate {

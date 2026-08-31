@@ -479,6 +479,7 @@ fn make_eval_samples(seqs: &[Vec<usize>]) -> Vec<(Vec<usize>, usize, usize)> {
             out.push((masked, mp, true_tok));
         }
     }
+    out.shrink_to_fit();
     out
 }
 

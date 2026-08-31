@@ -246,6 +246,7 @@ pub fn build_dd_tree_lodestar(
     // A* offset is left in the scores: downstream consumers use relative
     // comparisons (heap ordering), so the offset is harmless and consistent
     // with build_dd_tree_pruned's score convention. When λ = 0 this is a no-op.
+    tree.shrink_to_fit();
     tree
 }
 

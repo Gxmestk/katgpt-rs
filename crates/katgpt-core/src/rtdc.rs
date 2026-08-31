@@ -1258,14 +1258,14 @@ mod tests {
         #[test]
         #[ignore = "CG6.1 cost PASSES in release (4.60× per .benchmarks/303 criterion bench). This inline timing test flakes under parallel test load in debug mode. Canonical measurement: cargo bench -p katgpt-core --features rtdc_subtree_inclusion --bench rtdc_subtree_bench. Run: cargo test --release --features rtdc_subtree_inclusion --lib -- --ignored cg6_verify_cost_within_5x_of_depth_2 --nocapture"]
         fn cg6_verify_cost_within_5x_of_depth_2() {
+            const ITERS: u32 = 20_000;
+
             let t = tree();
             let roots = *t.roots();
             let subtree_proof = t
                 .prove_subtree_inclusion(0, 2, 12345, RTDC_SUBTREE_DEFAULT_K)
                 .unwrap();
             let depth2_proof = t.prove_at_depth(0, 2).unwrap();
-
-            const ITERS: u32 = 20_000;
 
             // Warm up.
             for _ in 0..100 {

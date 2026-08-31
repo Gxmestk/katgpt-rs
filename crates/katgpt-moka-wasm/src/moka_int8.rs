@@ -800,7 +800,9 @@ mod tests {
         use std::hint::black_box;
         use std::time::Instant;
 
-        let weights_f32 = MokaWeights::load();
+        const ITERS: usize = 2000;
+
+let weights_f32 = MokaWeights::load();
         let weights_i8 = MokaWeightsInt8::load();
         let mut scratch_f32 = MokaScratch::new();
         let mut scratch_i8 = MokaScratchInt8::new();
@@ -811,8 +813,6 @@ mod tests {
             let _ = black_box(forward_with_scratch(&weights_f32, &features, &mut scratch_f32));
             let _ = black_box(forward_int8_with_scratch(&weights_i8, &features, &mut scratch_i8));
         }
-
-        const ITERS: usize = 2000;
 
         let t0 = Instant::now();
         for _ in 0..ITERS {

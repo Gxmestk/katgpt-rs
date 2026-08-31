@@ -137,12 +137,12 @@ fn enumerate_bfs(
     let mut combo: Vec<usize> = (0..n_cons).collect();
     loop {
         if let Some(x_basic) = solve_square_system(mat, rhs, &combo) {
+            const NEG_TOL: f64 = -1e-7;
+
             x.fill(0.0);
             for (i, &col) in combo.iter().enumerate() {
                 x[col] = x_basic[i];
             }
-
-            const NEG_TOL: f64 = -1e-7;
             if x.iter().all(|&v| v >= NEG_TOL) {
                 for xi in x.iter_mut() {
                     if *xi < 0.0 {

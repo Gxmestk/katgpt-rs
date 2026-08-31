@@ -180,6 +180,7 @@ fn valid_intervals_from_slice(mask: &[bool]) -> Vec<(usize, usize)> {
         intervals.push((start, i));
     }
 
+    intervals.shrink_to_fit();
     intervals
 }
 

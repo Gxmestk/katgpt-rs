@@ -726,13 +726,8 @@ mod tests {
         use std::alloc::{GlobalAlloc, Layout, System};
         use std::cell::Cell;
 
-        thread_local! {
-            static TRACK: Cell<bool> = const { Cell::new(false) };
-            static COUNT: Cell<usize> = const { Cell::new(0) };
-        }
-
         struct Counting;
-        unsafe impl GlobalAlloc for Counting {
+unsafe impl GlobalAlloc for Counting {
             unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
                 if TRACK.with(|t| t.get()) {
                     COUNT.with(|c| c.set(c.get() + 1));
@@ -743,8 +738,13 @@ mod tests {
                 unsafe { System.dealloc(ptr, layout) }
             }
         }
-        #[global_allocator]
+#[global_allocator]
         static A: Counting = Counting;
+
+thread_local! {
+            static TRACK: Cell<bool> = const { Cell::new(false) };
+            static COUNT: Cell<usize> = const { Cell::new(0) };
+        }
 
         let t = build_toy(8, 4);
         let mut buf = BigramMarginalBuffer::new(4, 8);
@@ -1075,6 +1075,7 @@ and in what order the agents took their turns upon the ground.";
             }
             println!();
         }
+        results.shrink_to_fit();
         results
     }
 

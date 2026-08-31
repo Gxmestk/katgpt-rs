@@ -354,6 +354,8 @@ fn goat_169_t6_advantage_functions() {
     use katgpt_rs::speculative::{build_dd_tree_screened, extract_best_path};
     use katgpt_rs::types::Config;
 
+    type AdvFn = fn(f32) -> f32;
+
     println!("\n🧪 GOAT 169 — T6: Advantage Functions");
     println!("{}", "═".repeat(70));
 
@@ -364,8 +366,6 @@ fn goat_169_t6_advantage_functions() {
         .map(|_| vec![1.0 / vocab as f32; vocab])
         .collect();
     let slices: Vec<&[f32]> = marginals.iter().map(|m| m.as_slice()).collect();
-
-    type AdvFn = fn(f32) -> f32;
     let adv_fns: &[(&str, AdvFn)] = &[
         ("identity", identity_advantage),
         ("sigmoid", sigmoid_advantage),

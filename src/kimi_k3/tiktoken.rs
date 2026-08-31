@@ -367,6 +367,7 @@ impl TiktokenTokenizer {
                 }
             }
         }
+        result.shrink_to_fit();
         result
     }
 

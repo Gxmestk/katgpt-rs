@@ -189,7 +189,7 @@ fn record_game(
     black_player.reset();
     white_player.reset();
 
-    let mut snapshots = Vec::new();
+    let mut snapshots = Vec::with_capacity(MAX_MOVES);
 
     // Initial empty board snapshot
     snapshots.push(capture_snapshot(&state, None));

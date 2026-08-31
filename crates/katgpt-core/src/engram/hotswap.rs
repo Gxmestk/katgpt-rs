@@ -383,7 +383,7 @@ mod tests {
         let hs = EngramHotSwap::new(t1);
         // Swap in t2 (same contents). id1_pre should still verify.
         assert!(hs.swap(t2).is_ok(), "swap");
-        let id_post = hs.with_table(|t| EngramTableId::from_table(t));
+        let id_post = hs.with_table(EngramTableId::from_table);
         assert_eq!(t1_id, id_post, "same contents → same EngramTableId");
     }
 
@@ -428,14 +428,14 @@ mod tests {
         use std::thread;
         use std::time::Duration;
 
+        const N_READERS: usize = 4;
+
         let t0 = make_table(128, 8, 4);
         let hs = Arc::new(EngramHotSwap::new(t0));
         let stop = Arc::new(AtomicBool::new(false));
         let panic_count = Arc::new(AtomicUsize::new(0));
         let lookup_count = Arc::new(AtomicUsize::new(0));
-
-        const N_READERS: usize = 4;
-        let mut handles = Vec::new();
+        let mut handles = Vec::with_capacity(N_READERS);
 
         // Spawn readers.
         for _ in 0..N_READERS {

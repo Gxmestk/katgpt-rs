@@ -86,8 +86,6 @@ pub fn bench_asymmetric_cross_method(
 ) -> Vec<AsymmetricBenchResult> {
     use fastrand::Rng as FastrandRng;
 
-    let mut rng = FastrandRng::with_seed(12345);
-
     /// Test configs: (key_bits, val_bits, label)
     const CONFIGS: &[(u8, u8, &str)] = &[
         (3, 3, "symmetric_3_3"),
@@ -96,6 +94,8 @@ pub fn bench_asymmetric_cross_method(
         (8, 3, "recommended_8_3"),
         (2, 8, "inverted_2_8"),
     ];
+
+    let mut rng = FastrandRng::with_seed(12345);
 
     let mut results = Vec::with_capacity(CONFIGS.len());
 

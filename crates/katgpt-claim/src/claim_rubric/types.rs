@@ -46,10 +46,10 @@ impl EvidenceLevel {
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
-            EvidenceLevel::L0 => "L0",
-            EvidenceLevel::L1 => "L1",
-            EvidenceLevel::L2 => "L2",
-            EvidenceLevel::L3 => "L3",
+            Self::L0 => "L0",
+            Self::L1 => "L1",
+            Self::L2 => "L2",
+            Self::L3 => "L3",
         }
     }
 
@@ -58,10 +58,10 @@ impl EvidenceLevel {
     #[must_use]
     pub const fn description(self) -> &'static str {
         match self {
-            EvidenceLevel::L0 => "no supporting evidence",
-            EvidenceLevel::L1 => "Behavioral — reads/detects/projects a signal",
-            EvidenceLevel::L2 => "Functional — induces a downstream effect",
-            EvidenceLevel::L3 => "Causal-mechanistic — causally controls behavior",
+            Self::L0 => "no supporting evidence",
+            Self::L1 => "Behavioral — reads/detects/projects a signal",
+            Self::L2 => "Functional — induces a downstream effect",
+            Self::L3 => "Causal-mechanistic — causally controls behavior",
         }
     }
 }

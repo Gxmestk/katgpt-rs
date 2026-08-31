@@ -110,6 +110,7 @@ fn build_skewed_scores(seed: u64, m: usize, n: usize, k: usize) -> Vec<f32> {
     }
     // `k` is unused in the fixture itself — the caller decides `k` at QB time.
     let _ = k;
+    s.shrink_to_fit();
     s
 }
 

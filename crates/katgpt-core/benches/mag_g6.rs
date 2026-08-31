@@ -37,6 +37,8 @@ fn gaussian(rng: &mut fastrand::Rng) -> f32 {
 }
 
 fn main() {
+    const WARMUP: usize = 200;
+
     let mut rng = fastrand::Rng::with_seed(0xA600_0001);
 
     println!("══════════════════════════════════════════════════════════════════");
@@ -99,7 +101,6 @@ fn main() {
 
     // ── Latency measurements ──────────────────────────────────────────
     const ITERS: usize = 5_000;
-    const WARMUP: usize = 200;
 
     // Warmup all paths.
     for _ in 0..WARMUP {

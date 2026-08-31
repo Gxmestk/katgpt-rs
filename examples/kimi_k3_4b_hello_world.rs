@@ -124,7 +124,9 @@ fn print_row(label: &str, us_sum: u128, n: f64, total_us: u128) {
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 fn main() {
-    if std::env::var("KIMI_K3_4B_SKIP").ok().as_deref() == Some("1") {
+    use std::io::Write;
+
+if std::env::var("KIMI_K3_4B_SKIP").ok().as_deref() == Some("1") {
         eprintln!("skipping: KIMI_K3_4B_SKIP=1");
         return;
     }
@@ -185,7 +187,6 @@ fn main() {
 
     // ── 2. Load tokenizer ─────────────────────────────────────────────────
     print!("   loading tiktoken.model ... ");
-    use std::io::Write;
     let _ = std::io::stdout().flush();
     let t_tok = Instant::now();
     let tiktoken_bytes = std::fs::read(&tiktoken_p).unwrap_or_else(|e| {

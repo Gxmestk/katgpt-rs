@@ -152,7 +152,7 @@ impl SpecMarginals {
 
         let default_bias = if is_restrictive { BLOCKED_BIAS } else { 0.0 };
 
-        SpecMarginals {
+        Self {
             biases,
             default_bias,
             vocab_size: spec.vocab_size,
@@ -281,6 +281,7 @@ fn dedup_sum(sorted: Vec<(usize, f32)>) -> Vec<(usize, f32)> {
         }
     }
     out.push(cur);
+    out.shrink_to_fit();
     out
 }
 

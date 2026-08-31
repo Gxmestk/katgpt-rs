@@ -195,7 +195,7 @@ impl GridMap {
             return None;
         }
 
-        let mut map = GridMap::empty(w, h);
+        let mut map = Self::empty(w, h);
         for (y, row) in lines.take(h).enumerate() {
             for (x, c) in row.chars().take(w).enumerate() {
                 // Only `.` is passable in the MAPF benchmark convention.

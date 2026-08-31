@@ -724,13 +724,6 @@ fn enumerate_output_law(dz: &dyn UgcDenoiser, d: usize, grid: &[f32]) -> Vec<f64
     // Completion: sequential exact fill of remaining masked coords.
     let mut full: HashMap<State, f64> = HashMap::new();
     for (&s, &p) in dist.iter() {
-        let masked: Vec<usize> = (0..d).filter(|&i| state_get(s, i) == 0).collect();
-        let mut obs: Vec<usize> = (0..d)
-            .map(|i| match state_get(s, i) {
-                0 => UGC_MASK,
-                v => (v - 1) as usize,
-            })
-            .collect();
         #[allow(clippy::too_many_arguments)]
     fn comp_rec(
             dz: &dyn UgcDenoiser,
@@ -760,6 +753,14 @@ fn enumerate_output_law(dz: &dyn UgcDenoiser, d: usize, grid: &[f32]) -> Vec<f64
                 }
             }
         }
+
+let masked: Vec<usize> = (0..d).filter(|&i| state_get(s, i) == 0).collect();
+        let mut obs: Vec<usize> = (0..d)
+            .map(|i| match state_get(s, i) {
+                0 => UGC_MASK,
+                v => (v - 1) as usize,
+            })
+            .collect();
         let mut post2 = vec![0.0f32; 2];
         let mut outs = Vec::new();
         let mut s2 = s;

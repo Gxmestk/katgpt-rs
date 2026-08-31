@@ -719,6 +719,7 @@ fn path_to_root(mut node: usize, parent: &[usize]) -> Vec<usize> {
         }
         node = p;
     }
+    path.shrink_to_fit();
     path
 }
 
@@ -879,7 +880,7 @@ struct CycleBounds {
 }
 
 impl CycleBounds {
-    fn compute(cycle: &[usize], points: &[[f32; 3]]) -> CycleBounds {
+    fn compute(cycle: &[usize], points: &[[f32; 3]]) -> Self {
         let n = cycle.len();
         debug_assert!(n > 0, "empty cycle has no bounds");
         // Centroid.
@@ -926,7 +927,7 @@ impl CycleBounds {
         // (last → first) is what we just added. But the loop above set
         // prev=first initially and advanced it, so the first iteration added
         // |first-first|=0 and we never added |last→first| until now. Correct.
-        CycleBounds {
+        Self {
             center: [cx, cy, cz],
             r_sq,
             perimeter,
@@ -938,7 +939,7 @@ impl CycleBounds {
     /// pair that actually links. May return true for a non-linking pair (the
     /// quadrature still runs and returns 0) — it's a conservative pre-filter.
     #[inline]
-    fn may_link(&self, other: &CycleBounds) -> bool {
+    fn may_link(&self, other: &Self) -> bool {
         // Lower bound on gap²: center-distance² − (r_x + r_y)² (could be < 0
         // if spheres overlap → gap_min² clamps to 0, no skip).
         let ddx = self.center[0] - other.center[0];

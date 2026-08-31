@@ -64,6 +64,7 @@ impl LeoHead for BenchLeoHead {
                 }
             }
         }
+        q.shrink_to_fit();
         q
     }
 

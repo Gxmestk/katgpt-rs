@@ -561,8 +561,9 @@ fn streaming_softmax_acc_dyn(
     max_logit: &mut f32,
     sum_exp: &mut f32,
 ) {
-    let d = val.len();
     use crate::simd::fast_exp;
+
+    let d = val.len();
     if logit > *max_logit {
         let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;

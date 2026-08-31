@@ -600,9 +600,10 @@ fn cusum_detects_sustained_drift_that_spikes_do_not() {
     // gate (|r−μ|/σ ≤ ~3.4 with the drift absorbed by the lagging mean), but
     // the one-sided accumulation crosses the CUSUM threshold — a sustained
     // drift the spike gate cannot see.
-    let mut mon = ResidualMonitor::new(ResidualConfig::default());
-    let mut rng = fixture::SplitMix64::new(0xC0FFEE);
     const VEL: [f32; 1] = [1.0];
+
+let mut mon = ResidualMonitor::new(ResidualConfig::default());
+    let mut rng = fixture::SplitMix64::new(0xC0FFEE);
     let mut drift_tick = None;
     let mut spike_seen = false;
     for t in 0..400u32 {

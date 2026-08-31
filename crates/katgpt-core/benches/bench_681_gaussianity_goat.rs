@@ -215,7 +215,9 @@ fn main() {
 
     // ── G2: latency vs effective_rank (d=64, n=1024) ─────────────────────
     {
-        let states = gaussian_population(42);
+        const REPS: usize = 50;
+
+let states = gaussian_population(42);
         let mut scratch = GaussianityScratch::new(N, D, 7);
 
         // Warmup.
@@ -223,8 +225,6 @@ fn main() {
             let _ = sketched_gaussianity(&states, &mut scratch);
             let _ = erank_of(&states, D);
         }
-
-        const REPS: usize = 50;
         let t0 = std::time::Instant::now();
         for _ in 0..REPS {
             let _ = sketched_gaussianity(&states, &mut scratch);

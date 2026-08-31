@@ -231,7 +231,7 @@ impl SenseModule {
     /// Zeros TernaryDir padding bytes before comparing to match commit() behavior.
     pub fn verify(&self) -> bool {
         let size_before_commit = std::mem::offset_of!(SenseModule, commitment);
-        let mut buf = [0u8; std::mem::size_of::<SenseModule>()];
+        let mut buf = [0u8; std::mem::size_of::<Self>()];
         // Copy raw bytes to stack buffer
         unsafe {
             std::ptr::copy_nonoverlapping(

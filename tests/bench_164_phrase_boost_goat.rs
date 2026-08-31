@@ -142,6 +142,7 @@ fn simulate_ddtree_walk<P: ScreeningPruner>(
         }
     }
 
+    explored.shrink_to_fit();
     explored
 }
 
@@ -152,6 +153,8 @@ fn goat_164_phrase_boost_proof() {
     // ──────────────────────────────────────────────────────────────
     // Header
     // ──────────────────────────────────────────────────────────────
+    const PERF_VOCAB: usize = 16;
+
     println!("\n{}", "═".repeat(72));
     println!("🐐 GOAT PROOF: PhraseBoost — Context Trie Phrase Boosting (Plan 164)");
     println!("   Research 147: parakeet.cpp phrase_boost.hpp");
@@ -315,7 +318,6 @@ fn goat_164_phrase_boost_proof() {
     perf_trie.insert(&[2, 3]);
     perf_trie.insert(&[4, 5]);
     perf_trie.insert(&[6, 7]);
-    const PERF_VOCAB: usize = 16;
 
     // Baseline: time NoScreeningPruner
     let base_pruner = NoScreeningPruner;

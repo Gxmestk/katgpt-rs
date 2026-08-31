@@ -30,8 +30,7 @@ fn main() {
                 outcome_description: match i {
                     99 => Some("game_over: black_wins_by_2.5".to_string()),
                     _ if captured > 0 => Some(format!(
-                        "captured_{n}_stones_at({row},{col})",
-                        n = captured
+                        "captured_{captured}_stones_at({row},{col})"
                     )),
                     _ => None,
                 },

@@ -55,6 +55,7 @@ impl AttentionImportance {
             step_scores.push(sigmoid(mean));
         }
 
+        step_scores.shrink_to_fit();
         step_scores
     }
 }

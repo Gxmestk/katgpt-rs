@@ -446,8 +446,8 @@ fn test_goat_flow_score_entropy_discrimination() {
     let (base_b, det_b) = flow_components(&uniform, &selected_b);
 
     // Entropy comparison
-    let entropy_peaked: Vec<f32> = peaked.iter().map(|d| categorical_entropy(d)).collect();
-    let entropy_uniform: Vec<f32> = uniform.iter().map(|d| categorical_entropy(d)).collect();
+    let entropy_peaked: Vec<f32> = peaked.iter().map(categorical_entropy).collect();
+    let entropy_uniform: Vec<f32> = uniform.iter().map(categorical_entropy).collect();
 
     eprintln!("═══ GOAT T5.6: Entropy Discrimination (Core NF-CoT Insight) ═══");
     eprintln!(

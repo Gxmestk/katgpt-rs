@@ -453,19 +453,19 @@ enum EncoderKind {
 impl EncoderKind {
     fn name(self) -> &'static str {
         match self {
-            EncoderKind::SeqDispStats => "SeqDispStats",
-            EncoderKind::SeqStateStats => "SeqStateStats",
-            EncoderKind::SeqFullProfile => "SeqFullProfile",
-            EncoderKind::Geometry => "SeqGeometry",
+            Self::SeqDispStats => "SeqDispStats",
+            Self::SeqStateStats => "SeqStateStats",
+            Self::SeqFullProfile => "SeqFullProfile",
+            Self::Geometry => "SeqGeometry",
         }
     }
 
     fn dim(self) -> usize {
         match self {
-            EncoderKind::SeqDispStats => 8,
-            EncoderKind::SeqStateStats => 8,
-            EncoderKind::SeqFullProfile => 16,
-            EncoderKind::Geometry => 8,
+            Self::SeqDispStats => 8,
+            Self::SeqStateStats => 8,
+            Self::SeqFullProfile => 16,
+            Self::Geometry => 8,
         }
     }
 }

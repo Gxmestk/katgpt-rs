@@ -91,6 +91,7 @@ impl CounterfactualEstimator {
             utilities.push(utility_sum / self.mc_samples.max(1) as f32);
         }
 
+        utilities.shrink_to_fit();
         utilities
     }
 }

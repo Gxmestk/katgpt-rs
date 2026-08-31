@@ -1448,10 +1448,7 @@ pub fn best_buddies(corr_rows: &[&[f32]], k: usize) -> Vec<(usize, usize)> {
     // Mutual agreement: i→j AND j→i
     let mut buddies: Vec<(usize, usize)> = Vec::with_capacity(n);
     for i in 0..n {
-        let j = match best_for[i] {
-            Some(j) => j,
-            None => continue,
-        };
+        let Some(j) = best_for[i] else { continue };
         // j must be within bounds and point back to i
         if j >= n {
             continue;

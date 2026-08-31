@@ -69,7 +69,7 @@ pub struct RedirectTable {
 impl RedirectTable {
     /// Construct an empty redirect table.
     pub fn new() -> Self {
-        RedirectTable {
+        Self {
             map: HashMap::new(),
         }
     }
@@ -143,6 +143,7 @@ impl RedirectTable {
                 _ => break,
             }
         }
+        chain.shrink_to_fit();
         chain
     }
 

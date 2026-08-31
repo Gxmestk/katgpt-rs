@@ -188,9 +188,10 @@ fn gate_g2_perf() -> bool {
 // ─── G4: zero-alloc hot path ───────────────────────────────────────────────
 
 fn gate_g4_zero_alloc() -> bool {
-    println!();
-    println!("── G4: zero-alloc hot path ───────────────────────────────────");
     use std::sync::atomic::Ordering;
+
+println!();
+    println!("── G4: zero-alloc hot path ───────────────────────────────────");
 
     let space = EuclideanLatentSpace::<DIM>;
     let mut rng = FixtureRng::new(7);

@@ -315,7 +315,7 @@ impl SparseTaskVector {
     /// # Panics
     ///
     /// - If `self.shape != other.shape`.
-    pub fn compose_gauge_invariant(&self, other: &SparseTaskVector, eta: f32) -> SparseTaskVector {
+    pub fn compose_gauge_invariant(&self, other: &Self, eta: f32) -> Self {
         assert_eq!(
             self.shape, other.shape,
             "shape mismatch in gauge-invariant compose: {:?} vs {:?}",
@@ -385,7 +385,7 @@ impl SparseTaskVector {
         // so the prune step rarely removes more than a handful of entries.
         // The realloc-on-shrink costs more than the memory saved.
 
-        SparseTaskVector {
+        Self {
             shape: self.shape,
             mask: merged_mask,
             deltas: merged_deltas,

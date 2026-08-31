@@ -94,11 +94,11 @@ impl ConstraintPruner for SynPruner {
         });
 
         PARSER.with(|p| {
+            const MAX_BRACKET_DEPTH: i32 = 32;
+
             let mut parser = p.borrow_mut();
             parser.reset();
             let valid = parser.is_valid(&code);
-
-            const MAX_BRACKET_DEPTH: i32 = 32;
             valid && parser.total_depth() <= MAX_BRACKET_DEPTH
         })
     }

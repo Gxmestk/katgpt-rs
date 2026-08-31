@@ -139,6 +139,7 @@ fn run_bare_gdn2(tokens: &[TokenTriple], needles: &[Needle]) -> Vec<(usize, f32)
         }
     }
 
+    results.shrink_to_fit();
     results
 }
 
@@ -212,6 +213,7 @@ fn run_gdn2_with_cache(tokens: &[TokenTriple], needles: &[Needle]) -> Vec<(usize
         }
     }
 
+    results.shrink_to_fit();
     results
 }
 

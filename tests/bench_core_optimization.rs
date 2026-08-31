@@ -76,9 +76,7 @@ fn bench_01_simd_detection() {
     println!("  os:    {}", std::env::consts::OS);
     println!(
         "  cores: {}",
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(0)
+        std::thread::available_parallelism().map_or(0, |n| n.get())
     );
 }
 

@@ -165,9 +165,9 @@ impl StateHeuristic<RaceState> for RaceHeuristic {
 impl RaceHeuristic {
     fn name(&self) -> &'static str {
         match self {
-            RaceHeuristic::Constant(_) => "Constant",
-            RaceHeuristic::Advance(_) => "Advance",
-            RaceHeuristic::Stall(_) => "Stall",
+            Self::Constant(_) => "Constant",
+            Self::Advance(_) => "Advance",
+            Self::Stall(_) => "Stall",
         }
     }
 }

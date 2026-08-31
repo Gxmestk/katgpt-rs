@@ -236,6 +236,7 @@ impl FogState {
                 }
             }
         }
+        frontiers.shrink_to_fit();
         frontiers
     }
 }
@@ -1371,6 +1372,7 @@ impl HybridExplorer {
             }
             clusters.push(cluster);
         }
+        clusters.shrink_to_fit();
         clusters
     }
 }

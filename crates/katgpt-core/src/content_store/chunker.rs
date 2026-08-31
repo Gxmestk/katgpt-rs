@@ -72,6 +72,7 @@ impl ChunkingStrategy for FixedSizeChunker {
             out.push(&bytes[start..end]);
             start = end;
         }
+        out.shrink_to_fit();
         out
     }
 }
@@ -312,6 +313,7 @@ impl FastCdcChunker {
             out.push(bytes[offset..end].to_vec());
             offset = end;
         }
+        out.shrink_to_fit();
         out
     }
 }
@@ -338,6 +340,7 @@ impl ChunkingStrategy for FastCdcChunker {
             out.push(&bytes[offset..end]);
             offset = end;
         }
+        out.shrink_to_fit();
         out
     }
 }

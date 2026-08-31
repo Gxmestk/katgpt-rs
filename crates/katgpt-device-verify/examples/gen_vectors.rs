@@ -226,17 +226,11 @@ fn proof_for(leaves: &[Hash], index: usize) -> (Vec<Hash>, Hash) {
 
     while level.len() > 1 {
         let sibling_idx = idx ^ 1;
-        siblings.push(match sibling_idx < level.len() {
-            true => level[sibling_idx],
-            false => EMPTY_HASH,
-        });
+        siblings.push(if sibling_idx < level.len() { level[sibling_idx] } else { EMPTY_HASH });
         let mut next = Vec::with_capacity(level.len().div_ceil(2));
         let mut i = 0;
         while i < level.len() {
-            next.push(match i + 1 < level.len() {
-                true => hash_pair(&level[i], &level[i + 1]),
-                false => hash_pair(&level[i], &EMPTY_HASH),
-            });
+            next.push(if i + 1 < level.len() { hash_pair(&level[i], &level[i + 1]) } else { hash_pair(&level[i], &EMPTY_HASH) });
             i += 2;
         }
         level = next;

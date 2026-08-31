@@ -194,7 +194,7 @@ impl SpectralBudgetConfig {
             })
             .collect();
 
-        SpectralBudgetConfig {
+        Self {
             layers,
             model_size_m,
         }
@@ -280,13 +280,13 @@ impl SpectralLod {
     pub fn from_exponent(alpha: f32) -> Self {
         let abs_alpha = alpha.abs();
         if abs_alpha < 0.30 {
-            SpectralLod::Lod0
+            Self::Lod0
         } else if abs_alpha < 0.45 {
-            SpectralLod::Lod1
+            Self::Lod1
         } else if abs_alpha < 0.70 {
-            SpectralLod::Lod2
+            Self::Lod2
         } else {
-            SpectralLod::Lod3
+            Self::Lod3
         }
     }
 
@@ -294,13 +294,13 @@ impl SpectralLod {
     #[inline]
     pub fn from_depth(depth_fraction: f32) -> Self {
         if depth_fraction < 0.50 {
-            SpectralLod::Lod0
+            Self::Lod0
         } else if depth_fraction < 0.75 {
-            SpectralLod::Lod1
+            Self::Lod1
         } else if depth_fraction < 0.875 {
-            SpectralLod::Lod2
+            Self::Lod2
         } else {
-            SpectralLod::Lod3
+            Self::Lod3
         }
     }
 
@@ -308,10 +308,10 @@ impl SpectralLod {
     #[inline]
     pub fn ns_iterations(self) -> u8 {
         match self {
-            SpectralLod::Lod0 => 5,
-            SpectralLod::Lod1 => 5,
-            SpectralLod::Lod2 => 7,
-            SpectralLod::Lod3 => 10,
+            Self::Lod0 => 5,
+            Self::Lod1 => 5,
+            Self::Lod2 => 7,
+            Self::Lod3 => 10,
         }
     }
 
@@ -319,10 +319,10 @@ impl SpectralLod {
     #[inline]
     pub fn retention(self) -> f32 {
         match self {
-            SpectralLod::Lod0 => 0.50,
-            SpectralLod::Lod1 => 0.50,
-            SpectralLod::Lod2 => 0.60,
-            SpectralLod::Lod3 => 0.75,
+            Self::Lod0 => 0.50,
+            Self::Lod1 => 0.50,
+            Self::Lod2 => 0.60,
+            Self::Lod3 => 0.75,
         }
     }
 }

@@ -77,6 +77,7 @@ fn generate_lorenz(n_transient: usize, n: usize, dt: f64) -> Vec<f32> {
         out.push(state[1] as f32);
         out.push(state[2] as f32);
     }
+    out.shrink_to_fit();
     out
 }
 

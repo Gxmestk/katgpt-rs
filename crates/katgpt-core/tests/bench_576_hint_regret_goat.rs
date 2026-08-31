@@ -350,13 +350,13 @@ fn g2_crn_variance_ratio_at_least_2x() {
 #[test]
 fn g2_per_pair_cost_sub_microsecond() {
     // Warm up, then time 10^4 record_pair + estimate calls.
-    let mut est = HintRegretEstimator::new(ReturnBounds { lo: 0.0, hi: 1.0 });
+    const ITERS: usize = 10_000;
+
+let mut est = HintRegretEstimator::new(ReturnBounds { lo: 0.0, hi: 1.0 });
     for i in 0..256u32 {
         est.record_pair(0.5, 0.3 + (i % 5) as f32 * 0.02);
     }
     let _ = est.estimate(0.05);
-
-    const ITERS: usize = 10_000;
     let mut sink = 0.0f32;
     let t0 = Instant::now();
     for i in 0..ITERS {

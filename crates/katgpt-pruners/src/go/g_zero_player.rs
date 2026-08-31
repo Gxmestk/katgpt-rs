@@ -625,6 +625,7 @@ impl GoDeltaGatedAbsorbCompress {
             promotions += 1;
         }
 
+        newly_promoted.shrink_to_fit();
         newly_promoted
     }
 

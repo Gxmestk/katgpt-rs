@@ -286,10 +286,10 @@ impl SdpgPlayer {
 
     /// Create SdpgPlayer with oracle teacher Q-values from replay data.
     pub fn with_replay(id: u8, replay_path: &std::path::Path) -> std::io::Result<Self> {
-        let bandit_inner =
-            BanditPruner::new(NoScreeningPruner, BanditStrategy::Ucb1, NUM_TEMPLATES);
-
         use crate::pruners::sdpg::{BetaSchedule, KlAnchor};
+
+let bandit_inner =
+            BanditPruner::new(NoScreeningPruner, BanditStrategy::Ucb1, NUM_TEMPLATES);
         let sdpg_bandit = SdpgBanditPruner::from_replay(
             bandit_inner,
             replay_path,

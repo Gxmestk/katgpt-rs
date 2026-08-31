@@ -369,9 +369,9 @@ impl Target {
         goal: (usize, usize),
     ) -> (usize, usize) {
         match self {
-            Target::Monster(i) => monsters[*i],
-            Target::Treasure(j) => treasures[*j],
-            Target::Goal => goal,
+            Self::Monster(i) => monsters[*i],
+            Self::Treasure(j) => treasures[*j],
+            Self::Goal => goal,
         }
     }
 }
@@ -389,6 +389,7 @@ pub fn enumerate_targets(num_monsters: usize, num_treasures: usize) -> Vec<Targe
         targets.push(Target::Treasure(j));
     }
     targets.push(Target::Goal);
+    targets.shrink_to_fit();
     targets
 }
 

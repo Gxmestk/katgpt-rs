@@ -537,6 +537,7 @@ pub fn bench_ddtree_budget_sweep(
         });
     }
 
+    results.shrink_to_fit();
     results
 }
 

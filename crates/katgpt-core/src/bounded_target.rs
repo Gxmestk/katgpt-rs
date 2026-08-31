@@ -512,7 +512,9 @@ mod tests {
         // ambient box load; 2× margin for load variance). The scorer is
         // caller-owned; a trivial linear one bounds its share.
         const BUDGET_NS: f64 = 200.0;
-        let x = [0.1f32; 16];
+        const N: u64 = 10_000;
+
+let x = [0.1f32; 16];
         let q = |v: &[f32]| v.iter().sum::<f32>();
         let mut acc = 0.0f32;
         for seed in 0..256u64 {
@@ -521,7 +523,6 @@ mod tests {
             }
         }
         assert!(acc != 0.0, "warmup sanity");
-        const N: u64 = 10_000;
         let t0 = std::time::Instant::now();
         acc = 0.0;
         for seed in 0..N {

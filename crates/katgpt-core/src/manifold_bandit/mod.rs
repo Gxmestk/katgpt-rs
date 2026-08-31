@@ -140,12 +140,12 @@ impl TreeNode {
     /// - Leaf: the per-arm [`BayesianFilterArm`] posterior.
     fn beta_params(&self) -> (f32, f32) {
         match self {
-            TreeNode::Internal {
+            Self::Internal {
                 beta_alpha,
                 beta_beta,
                 ..
             } => (*beta_alpha, *beta_beta),
-            TreeNode::Leaf { filter, .. } => (filter.alpha, filter.beta),
+            Self::Leaf { filter, .. } => (filter.alpha, filter.beta),
         }
     }
 
@@ -159,14 +159,14 @@ impl TreeNode {
     /// phase_gate_min_obs` is skipped during Empirical Bayes aggregation.
     pub fn n_obs(&self) -> u32 {
         match self {
-            TreeNode::Internal { n_obs, .. } => *n_obs,
-            TreeNode::Leaf { .. } => 0,
+            Self::Internal { n_obs, .. } => *n_obs,
+            Self::Leaf { .. } => 0,
         }
     }
 
     /// Convenience: construct a leaf with a fresh uniform-prior filter.
     pub fn leaf(arm_id: usize, drift_rate: f32) -> Self {
-        TreeNode::Leaf {
+        Self::Leaf {
             arm_id,
             filter: BayesianFilterArm::new(drift_rate),
         }
@@ -183,14 +183,14 @@ impl TreeNode {
     /// SUM (Beta(N, N) — over-concentrated initially, signal diluted by
     /// pseudo-counts) or MEAN (never concentrates — too diffuse). See Plan 370
     /// Phase 2 GOAT gate.
-    pub fn internal(children: Vec<TreeNode>) -> Self {
+    pub fn internal(children: Vec<Self>) -> Self {
         let n = children.len() as f32;
         let (a, b) = children.iter().fold((0.0_f32, 0.0_f32), |(sa, sb), c| {
             let (ca, cb) = c.beta_params();
             (sa + ca, sb + cb)
         });
         // Evidence pooling: subtract per-child pseudocount, add back one.
-        TreeNode::Internal {
+        Self::Internal {
             children,
             beta_alpha: (a - n + 1.0).max(1.0),
             beta_beta: (b - n + 1.0).max(1.0),

@@ -147,8 +147,9 @@ mod auto_route_tests {
 
     #[test]
     fn test_select_policy_integration() {
-        let route = SegmentAutoRoute::default();
         use crate::segment_checkpoint::CheckpointPolicy;
+
+        let route = SegmentAutoRoute::default();
 
         // High QPS → Lazy
         assert_eq!(route.select_policy(50.0), CheckpointPolicy::Lazy);

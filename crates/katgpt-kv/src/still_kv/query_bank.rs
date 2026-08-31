@@ -507,6 +507,7 @@ impl QueryBank for MuxQueryBank {
             }
         }
 
+        out.shrink_to_fit();
         out
     }
 }

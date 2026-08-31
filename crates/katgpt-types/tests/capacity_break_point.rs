@@ -261,8 +261,9 @@ fn measured_vs_predicted_break_point_multiplier() {
     // Multiple seeds per d: break points are small integers, so a single random
     // corpus is noisy. The mean over seeds is the reportable statistic.
     const SEEDS: u64 = 8;
-    let mut rows = Vec::new();
-    for d in [2usize, 3, 4, 5, 6, 8] {
+    let cap_iter = [2usize, 3, 4, 5, 6, 8];
+    let mut rows = Vec::with_capacity(cap_iter.len());
+    for d in cap_iter {
         let predicted = dim_capacity_ceiling(d, 2, GAMMA);
         let floor = dim_capacity_floor(d, GAMMA);
         let n_cap = 64; // O(n^3 * iters) sweep; break points land far below this.

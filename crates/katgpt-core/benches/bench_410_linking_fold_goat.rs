@@ -370,7 +370,7 @@ fn bench_fold(d: usize, variant: FoldVariant) -> FoldResult {
         match variant {
             FoldVariant::Abs => fold_projection_into(black_box(&mut state), black_box(&center)),
             FoldVariant::Gelu => {
-                fold_gelu_into(black_box(&mut state), black_box(&center), black_box(alpha))
+                fold_gelu_into(black_box(&mut state), black_box(&center), black_box(alpha));
             }
         }
     }
@@ -392,7 +392,7 @@ fn bench_fold(d: usize, variant: FoldVariant) -> FoldResult {
         match variant {
             FoldVariant::Abs => fold_projection_into(black_box(&mut state), black_box(&center)),
             FoldVariant::Gelu => {
-                fold_gelu_into(black_box(&mut state), black_box(&center), black_box(alpha))
+                fold_gelu_into(black_box(&mut state), black_box(&center), black_box(alpha));
             }
         }
         samples_ns.push(t0.elapsed().as_nanos() as f64);

@@ -183,7 +183,9 @@ impl Arena {
 #[test]
 #[ignore = "slow: ~1 min/game at budget=50 under wasmi; build the wasm32 artifact first (see module doc)"]
 fn wasmi_puct_winrate_vs_greedy() {
-    let (mut store, instance) = setup_wasmi();
+    const NUM_GAMES: usize = 20;
+
+let (mut store, instance) = setup_wasmi();
 
     // budget=50, c_puct=1.5, top_k=8, batch_k=1 (sequential) — the native
     // 94% config (Bench 205). batch_k=1 preserves the wasmi parity guarantee
@@ -195,8 +197,6 @@ fn wasmi_puct_winrate_vs_greedy() {
     let c_puct_bits = 1.5f32.to_bits();
     let arena = Arena::new(&store, &instance);
     arena.init_f32.call(&mut store, (50, c_puct_bits, 8, 1)).expect("arena_init_f32");
-
-    const NUM_GAMES: usize = 20;
     let start = Instant::now();
     let mut puct_wins = 0usize;
     let mut games_summary: Vec<String> = Vec::with_capacity(NUM_GAMES);

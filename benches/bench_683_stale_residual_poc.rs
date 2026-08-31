@@ -720,7 +720,7 @@ fn run() {
             let (c, io) = m.layer_span(avg_params, *bits, 2.0);
             let sp_paper = OverlapLatency::overlap_speedup(c, io);
             let sp_pair = m.pair_speedup((c, io), (c, io), *shared);
-            println!("  {:>38} {:>17.2}x {:>13.2}x", label, sp_paper, sp_pair);
+            println!("  {label:>38} {sp_paper:>17.2}x {sp_pair:>13.2}x");
         }
     }
 

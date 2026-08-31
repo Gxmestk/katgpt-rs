@@ -21,8 +21,9 @@ impl<P: ScreeningPruner> ScreeningPruner for KernelScreeningPruner<P> {
         match self.kind {
             KernelKind::Linear => raw, // identity for linear
             KernelKind::Gaussian { sigma } => {
-                let diff = raw - 1.0;
                 use katgpt_core::simd::fast_exp;
+
+                let diff = raw - 1.0;
                 fast_exp(-diff * diff / (sigma * sigma))
             }
             KernelKind::Polynomial { degree, c: poly_c } => (raw + poly_c).powf(degree),

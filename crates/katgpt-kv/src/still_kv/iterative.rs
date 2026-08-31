@@ -172,6 +172,7 @@ impl IterativeChunkCompactor {
             pos += chunk_len;
         }
 
+        chunks.shrink_to_fit();
         chunks
     }
 

@@ -62,7 +62,7 @@ impl InfoKey {
     /// Construct a key from its parts.
     #[inline]
     pub const fn new(signature: LabelSignature, info_type: InfoType, scope: AccessScope) -> Self {
-        InfoKey {
+        Self {
             signature,
             info_type,
             scope,
@@ -125,7 +125,7 @@ impl InfoUnit {
         outcome: InfoOutcomeStatus,
         ts: u64,
     ) -> Self {
-        InfoUnit {
+        Self {
             key,
             payload_hash,
             c_info,
@@ -217,7 +217,7 @@ impl MatchScratch {
     /// Construct with a hint capacity.
     #[inline]
     pub fn with_capacity(n: usize) -> Self {
-        MatchScratch {
+        Self {
             grey: Vec::with_capacity(n),
         }
     }
@@ -241,7 +241,7 @@ pub struct InfoRegistry {
 impl InfoRegistry {
     /// Construct an empty registry.
     pub fn new() -> Self {
-        InfoRegistry {
+        Self {
             by_key: HashMap::new(),
             by_payload: HashMap::new(),
         }

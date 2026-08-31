@@ -131,6 +131,7 @@ fn random_matrix(rows: usize, cols: usize, seed: u64) -> Vec<f32> {
     for _ in 0..(rows * cols) {
         m.push(rng.normal() * scale);
     }
+    m.shrink_to_fit();
     m
 }
 

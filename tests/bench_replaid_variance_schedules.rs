@@ -237,10 +237,10 @@ fn bench_sdar_learned_beta_vs_fixed() {
     let fixed_beta = SDAR_BETA;
     let n_episodes = 200;
 
-    let mut fixed_variances = Vec::new();
-    let mut learned_variances = Vec::new();
-    let mut fixed_rewards = Vec::new();
-    let mut learned_rewards = Vec::new();
+    let mut fixed_variances = Vec::with_capacity(n_episodes);
+    let mut learned_variances = Vec::with_capacity(n_episodes);
+    let mut fixed_rewards = Vec::with_capacity(n_episodes);
+    let mut learned_rewards = Vec::with_capacity(n_episodes);
 
     for i in 0usize..n_episodes {
         let gap = ((i as f32 * 0.1).sin()) * 0.5;

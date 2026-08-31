@@ -1164,14 +1164,15 @@ mod tests {
                 &self.v
             }
         }
-        let d = TwoDevs {
+        use crate::cce::heterogeneous::PerPlayerGame;
+
+let d = TwoDevs {
             v: vec![
                 Deviation::<2, 2>::constant(0, 0),
                 Deviation::<2, 2>::constant(1, 1),
             ],
         };
         let p = Pd;
-        use crate::cce::heterogeneous::PerPlayerGame;
         let game = PerPlayerGame::new(vec![(&p, &d), (&p, &d)]);
 
         let rho_cg = CceLp::new()

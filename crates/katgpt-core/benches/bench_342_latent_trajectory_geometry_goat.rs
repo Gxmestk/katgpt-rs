@@ -75,6 +75,7 @@ fn build_trajectory(n_steps: usize, dim: usize, seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state);
     }
+    traj.shrink_to_fit();
     traj
 }
 

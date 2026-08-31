@@ -216,6 +216,7 @@ impl SonltPlayer {
         }
         // Pad/truncate to exactly BOARD_CELLS in case arena isn't 13×13.
         tokens.resize(BOARD_CELLS, 0);
+        tokens.shrink_to_fit();
         tokens
     }
 

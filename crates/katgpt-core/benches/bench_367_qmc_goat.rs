@@ -149,15 +149,15 @@ fn normal_cdf(x: f64) -> f64 {
 // ─── G1: Marginal exactness (chi-square goodness-of-fit) ────────────────────
 
 fn gate_g1_marginal_exactness() -> bool {
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    const VOCAB: usize = 32;
+const K: usize = 64;
+const T: usize = 4;
+const N_BATCHES: usize = 20_000;
+const ALPHA_PER_TEST: f64 = 0.01;
+
+println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("G1 — Marginal exactness (chi-square GoF per (rollout, position))");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-    const VOCAB: usize = 32;
-    const K: usize = 64;
-    const T: usize = 4;
-    const N_BATCHES: usize = 20_000;
-    const ALPHA_PER_TEST: f64 = 0.01;
 
     // Per-position marginals (different LM at each position for variety).
     let marginals: Vec<Vec<f32>> = (0..T)
@@ -262,7 +262,14 @@ fn gate_g1_marginal_exactness() -> bool {
 // ─── G2: Sample efficiency (pass@k reduction) ───────────────────────────────
 
 fn gate_g2_sample_efficiency() -> bool {
-    println!(
+    const T: usize = 4;
+const N_BATCHES: usize = 20_000;
+const TARGET: [usize; T] = [3, 5, 2, 7];
+const K_MAX: usize = 32;
+const PASS_THRESHOLD: f64 = 0.5;
+const TARGET_RATIO: f64 = 0.75;
+
+println!(
         "\n\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}"
     );
     println!("G2 \u{2014} Sample efficiency (K_qmc / K_iid at matched pass@k \u{2265} 0.5)");
@@ -283,12 +290,6 @@ fn gate_g2_sample_efficiency() -> bool {
     // size 0.0625 is hit by ~K*0.0625 points on average, with lower variance
     // than i.i.d. -> pass@k rises faster.
     const VOCAB: usize = 8;
-    const T: usize = 4;
-    const N_BATCHES: usize = 20_000;
-    const TARGET: [usize; T] = [3, 5, 2, 7];
-    const K_MAX: usize = 32;
-    const PASS_THRESHOLD: f64 = 0.5;
-    const TARGET_RATIO: f64 = 0.75;
 
     // LM: at each position, the target token gets boosted so that its marginal
     // probability is ~0.5. Other tokens share the remaining ~0.5.
@@ -377,7 +378,7 @@ fn gate_g2_sample_efficiency() -> bool {
         k_iid,
         iid_pak
             .iter()
-            .map(|(k, p)| format!("{}={:.4}", k, p))
+            .map(|(k, p)| format!("{k}={p:.4}"))
             .collect::<Vec<_>>(),
     );
 
@@ -409,7 +410,7 @@ fn gate_g2_sample_efficiency() -> bool {
             TARGET_RATIO,
             verdict,
             pak.iter()
-                .map(|(k, p)| format!("{}={:.4}", k, p))
+                .map(|(k, p)| format!("{k}={p:.4}"))
                 .collect::<Vec<_>>(),
         );
         all_pass |= pass; // ANY source passing means the primitive delivers
@@ -522,14 +523,14 @@ fn gate_g3_no_regression() -> bool {
 // ─── G4: Zero-allocation hot path ───────────────────────────────────────────
 
 fn gate_g4_zero_alloc() -> bool {
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    const VOCAB: usize = 32;
+const K: usize = 64;
+const T: usize = 4;
+const N_CALLS: usize = 100;
+
+println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("G4 — Zero-allocation hot path (100 steady-state calls)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-    const VOCAB: usize = 32;
-    const K: usize = 64;
-    const T: usize = 4;
-    const N_CALLS: usize = 100;
 
     let marginals: Vec<Vec<f32>> = (0..T)
         .map(|t| make_categorical(VOCAB, (t * 7 + 3) % VOCAB, 100 + t as u64))
@@ -585,13 +586,13 @@ fn gate_g4_zero_alloc() -> bool {
 // ─── G5: Sub-µs overhead (QMC source draw + rescale) ────────────────────────
 
 fn gate_g5_sub_us_overhead() -> bool {
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    const WARMUP: usize = 1_000;
+const ITERS: usize = 100_000;
+const TARGET_NS: f64 = 1000.0;
+
+println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("G5 — Sub-µs overhead (QMC draw + rescale per rollout, < 1000 ns)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-    const WARMUP: usize = 1_000;
-    const ITERS: usize = 100_000;
-    const TARGET_NS: f64 = 1000.0;
 
     let dim = 4usize;
     let sigma = 0.3f32;

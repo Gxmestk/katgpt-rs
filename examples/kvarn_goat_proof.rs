@@ -141,6 +141,8 @@ fn run_rtn_baseline(keys: &[Vec<f32>], values: &[Vec<f32>], bits: u8) -> RtnResu
 // ── Main ────────────────────────────────────────────────────────
 
 fn main() {
+    use std::time::Instant;
+
     let kv_dim: usize = 128;
     let seq_len: usize = 1024;
     let tile_size: usize = 128;
@@ -286,8 +288,6 @@ fn main() {
     // ── T5: Latency Benchmarks ────────────────────────────────────
     println!("── T5: Latency Benchmark — KVarN vs Plain RTN ──────────────");
     println!();
-
-    use std::time::Instant;
 
     let bench_seq_len = 1024;
     let bench_bits: u8 = 4;

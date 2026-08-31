@@ -163,6 +163,7 @@ impl PhraseTrie {
         if !seen[0] {
             next.push(0);
         }
+        next.shrink_to_fit();
         next
     }
 

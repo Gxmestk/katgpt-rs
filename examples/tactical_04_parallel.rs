@@ -222,6 +222,7 @@ fn generate_maps(n: u64) -> Vec<(u64, String)> {
             None => println!("   ⚠ Seed {seed} generated unsolvable map, skipping"),
         }
     }
+    maps.shrink_to_fit();
     maps
 }
 

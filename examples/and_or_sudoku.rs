@@ -20,6 +20,24 @@ fn main() {
         AndOrBuilder, BlueprintPass, DecompositionReviewer, ScreeningPruner,
     };
 
+    impl ScreeningPruner for SudokuRowPruner {
+        fn relevance(&self, _depth: usize, token_idx: usize, _parent_tokens: &[usize]) -> f32 {
+            // Padding token is never relevant
+            if token_idx == 0 {
+                return 0.0;
+            }
+            // Simulate: cells 1 and 3 are ambiguous → low relevance
+            // cells 0 and 2 are confident → high relevance
+            match _depth {
+                0 => 0.85, // Cell 0: confident
+                1 => 0.15, // Cell 1: ambiguous → triggers decomposition
+                2 => 0.90, // Cell 2: confident
+                3 => 0.20, // Cell 3: ambiguous → triggers decomposition
+                _ => 0.5,
+            }
+        }
+    }
+
     println!("🧩 Sudoku AND-OR Decomposition Demo (4×4 cells)");
     println!("{}", "═".repeat(55));
 
@@ -53,24 +71,6 @@ fn main() {
     // The builder uses this signal to decide WHERE to decompose.
 
     struct SudokuRowPruner;
-
-    impl ScreeningPruner for SudokuRowPruner {
-        fn relevance(&self, _depth: usize, token_idx: usize, _parent_tokens: &[usize]) -> f32 {
-            // Padding token is never relevant
-            if token_idx == 0 {
-                return 0.0;
-            }
-            // Simulate: cells 1 and 3 are ambiguous → low relevance
-            // cells 0 and 2 are confident → high relevance
-            match _depth {
-                0 => 0.85, // Cell 0: confident
-                1 => 0.15, // Cell 1: ambiguous → triggers decomposition
-                2 => 0.90, // Cell 2: confident
-                3 => 0.20, // Cell 3: ambiguous → triggers decomposition
-                _ => 0.5,
-            }
-        }
-    }
 
     let pruner = SudokuRowPruner;
 

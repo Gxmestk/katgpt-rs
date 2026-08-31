@@ -130,15 +130,16 @@ pub fn normal_cdf(x: f32) -> f32 {
 #[inline]
 fn erf_approx(x: f32) -> f32 {
     // Sign handling — the A&S formula is for x ≥ 0.
-    let sign = if x < 0.0 { -1.0_f32 } else { 1.0_f32 };
+    const A2: f32 = -0.2844_9636;
+const A3: f32 = 1.421_413_8;
+const A4: f32 = -1.453_152_1;
+const A5: f32 = 1.061_405_4;
+const P: f32 = 0.3275_911;
+
+let sign = if x < 0.0 { -1.0_f32 } else { 1.0_f32 };
     let z = x.abs();
     // A&S 7.1.26 constants
     const A1: f32 = 0.254_829_6;
-    const A2: f32 = -0.2844_9636;
-    const A3: f32 = 1.421_413_8;
-    const A4: f32 = -1.453_152_1;
-    const A5: f32 = 1.061_405_4;
-    const P: f32 = 0.3275_911;
     let t = 1.0 / (1.0 + P * z);
     let y = 1.0 - (((((A5 * t + A4) * t) + A3) * t + A2) * t + A1) * t * (-z * z).exp();
     sign * y

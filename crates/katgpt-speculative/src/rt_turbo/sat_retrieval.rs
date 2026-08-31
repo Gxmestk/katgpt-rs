@@ -115,6 +115,7 @@ pub fn identify_retrieval_heads_sat(scores: &[f32], retrieval_ratio: f32) -> Vec
     for &(idx, _) in &indexed[..n_retrieval] {
         result.push(idx);
     }
+    result.shrink_to_fit();
     result
 }
 

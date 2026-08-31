@@ -397,7 +397,7 @@ mod tests {
             [0.88, 0.06, 0.04, 0.02], // gap 0.86
             [0.95, 0.03, 0.01, 0.01], // gap 0.94
         ];
-        let mut widths = Vec::new();
+        let mut widths = Vec::with_capacity(frontiers.len());
         for f in &frontiers {
             widths.push(n.observe(f));
         }
@@ -591,9 +591,10 @@ mod tests {
     #[cfg_attr(debug_assertions, ignore)]
     #[test]
     fn g2_controller_latency_ns_scale() {
-        let mut n = GapTrendNarrower::new(4);
-        let gate = HeightGate::new(2);
         const N: usize = 100_000;
+
+let mut n = GapTrendNarrower::new(4);
+        let gate = HeightGate::new(2);
         // Warm up.
         for _ in 0..1_000 {
             n.observe_gap(0.5);

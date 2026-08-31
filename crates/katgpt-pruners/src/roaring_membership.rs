@@ -72,22 +72,22 @@ impl Iterator for BitmapContainerIter<'_> {
 
 impl BitmapContainer {
     fn new() -> Self {
-        BitmapContainer::Array(Vec::new())
+        Self::Array(Vec::new())
     }
 
     #[inline]
     fn len(&self) -> u64 {
         match self {
-            BitmapContainer::Array(a) => a.len() as u64,
-            BitmapContainer::Bits(_, count) => *count,
+            Self::Array(a) => a.len() as u64,
+            Self::Bits(_, count) => *count,
         }
     }
 
     #[inline]
     fn contains(&self, lo: u16) -> bool {
         match self {
-            BitmapContainer::Array(a) => a.binary_search(&lo).is_ok(),
-            BitmapContainer::Bits(b, _) => {
+            Self::Array(a) => a.binary_search(&lo).is_ok(),
+            Self::Bits(b, _) => {
                 let word = lo as usize / 64;
                 let bit = lo as usize % 64;
                 (b[word] >> bit) & 1 == 1
@@ -97,13 +97,13 @@ impl BitmapContainer {
 
     fn insert(&mut self, lo: u16) {
         match self {
-            BitmapContainer::Array(a) => {
+            Self::Array(a) => {
                 if let Err(pos) = a.binary_search(&lo) {
                     a.insert(pos, lo);
                     self.maybe_promote();
                 }
             }
-            BitmapContainer::Bits(b, count) => {
+            Self::Bits(b, count) => {
                 let word = lo as usize / 64;
                 let bit = lo as usize % 64;
                 let old = b[word];
@@ -118,11 +118,11 @@ impl BitmapContainer {
 
     fn iter(&self) -> BitmapContainerIter<'_> {
         match self {
-            BitmapContainer::Array(a) => BitmapContainerIter::Array(a.iter()),
+            Self::Array(a) => BitmapContainerIter::Array(a.iter()),
             // Start with current_word=0 and let the first `next()` call pull the
             // first word from `words`. word_index starts at 0 and increments on
             // each pull, so the emitted bit index is word_index * 64 + bit.
-            BitmapContainer::Bits(b, _) => BitmapContainerIter::Bits {
+            Self::Bits(b, _) => BitmapContainerIter::Bits {
                 words: b.iter(),
                 word_index: 0,
                 current_word: 0,
@@ -132,23 +132,23 @@ impl BitmapContainer {
 
     fn memory_bytes(&self) -> usize {
         match self {
-            BitmapContainer::Array(a) => {
+            Self::Array(a) => {
                 a.capacity() * std::mem::size_of::<u16>() + std::mem::size_of::<Vec<u16>>()
             }
-            BitmapContainer::Bits(b, _) => std::mem::size_of_val(b.as_ref()),
+            Self::Bits(b, _) => std::mem::size_of_val(b.as_ref()),
         }
     }
 
     /// Promote array → bits if cardinality exceeds threshold.
     fn maybe_promote(&mut self) {
-        if let BitmapContainer::Array(a) = self
+        if let Self::Array(a) = self
             && a.len() > ARRAY_MAX_CARDINALITY
         {
             let mut bits = Box::new([0u64; 1024]);
             for &lo in a.iter() {
                 bits[lo as usize / 64] |= 1u64 << (lo as usize % 64);
             }
-            *self = BitmapContainer::Bits(bits, a.len() as u64);
+            *self = Self::Bits(bits, a.len() as u64);
         }
     }
 
@@ -170,10 +170,10 @@ impl BitmapContainer {
             for lo in set_indices {
                 bits[lo as usize / 64] |= 1u64 << (lo as usize % 64);
             }
-            BitmapContainer::Bits(bits, count)
+            Self::Bits(bits, count)
         } else {
             // Already sorted by construction.
-            BitmapContainer::Array(set_indices)
+            Self::Array(set_indices)
         }
     }
 }
@@ -262,8 +262,8 @@ impl CompactBitmap {
     }
 
     /// Set difference: `self - other` (bits in self that are NOT in other).
-    pub fn difference(&self, other: &CompactBitmap) -> CompactBitmap {
-        let mut result = CompactBitmap::new();
+    pub fn difference(&self, other: &Self) -> Self {
+        let mut result = Self::new();
 
         for &(hi, ref container) in &self.containers {
             let other_container = other
@@ -294,7 +294,7 @@ impl CompactBitmap {
     }
 
     /// In-place union: merge all bits from `other` into `self`.
-    pub fn union_with(&mut self, other: &CompactBitmap) {
+    pub fn union_with(&mut self, other: &Self) {
         for &(hi, ref container) in &other.containers {
             let base = (hi as u32) << 16;
             for lo in container.iter() {
@@ -390,6 +390,7 @@ impl RoaringBatching for RoaringMembership {
                 tokens.push(idx);
             }
         }
+        tokens.shrink_to_fit();
         tokens
     }
 

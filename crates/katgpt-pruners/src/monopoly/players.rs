@@ -85,6 +85,7 @@ impl DecisionContext {
                 result.push(sq);
             }
         }
+        result.shrink_to_fit();
         result
     }
 
@@ -166,7 +167,7 @@ pub enum Strategy {
 impl Strategy {
     pub const COUNT: usize = 5;
 
-    pub fn all() -> [Strategy; Self::COUNT] {
+    pub fn all() -> [Self; Self::COUNT] {
         [
             Self::Expansion,
             Self::Development,

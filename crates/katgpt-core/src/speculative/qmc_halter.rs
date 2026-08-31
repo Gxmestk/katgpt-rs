@@ -951,10 +951,11 @@ mod tests {
     #[ignore]
     fn bench_union_bound_ceiling_latency() {
         // Warm up
+        const N: u32 = 1_000_000;
+
         for _ in 0..1000 {
             let _ = union_bound_ceiling(8, 0.1);
         }
-        const N: u32 = 1_000_000;
         let start = std::time::Instant::now();
         let mut sink = 0u64;
         for i in 0..N {

@@ -440,6 +440,8 @@ mod tests {
         // The pinned budget below is the regression floor at ~2× the
         // measured number (see .benchmarks/688 §G2 for the honest record vs
         // the issue's sub-µs ask) — NOT the sub-µs ask itself.
+        const RUNS: u32 = 2_000;
+
         let mut v: Vec<f32> = (0..950).map(|i| (i % 97) as f32).collect();
         v.extend((0..50).map(|i| 40.0 + i as f32 * 0.25));
         let mut warm = v.clone();
@@ -449,7 +451,6 @@ mod tests {
             std::hint::black_box(s);
             warm.copy_from_slice(&v);
         }
-        const RUNS: u32 = 2_000;
         let t0 = std::time::Instant::now();
         let mut acc = 0.0f32;
         for _ in 0..RUNS {

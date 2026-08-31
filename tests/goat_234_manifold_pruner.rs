@@ -649,12 +649,12 @@ impl ConstraintPruner for GapBoundaryPruner {
 
 #[test]
 fn g8_dtree_manifold_captures_boundary_tokens() {
-    println!("\n🧪 G8: DDTree Boundary Token Recovery — Manifold vs Binary");
-    println!("{}", "═".repeat(60));
-
     use katgpt_rs::speculative::build_dd_tree_manifold;
     use katgpt_rs::speculative::build_dd_tree_pruned;
     use katgpt_rs::types::Config;
+
+    println!("\n🧪 G8: DDTree Boundary Token Recovery — Manifold vs Binary");
+    println!("{}", "═".repeat(60));
 
     let mut config = Config::draft();
     let vocab = config.vocab_size;

@@ -782,7 +782,7 @@ fn expand_shl_from_stack(c: i64, local_a: u32) -> Vec<WasmInstr> {
         return out;
     }
     let a = local_a as i64;
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(c);
     for _ in 0..c {
         out.push(instr(OP_LOCAL_TEE, a));
         out.push(instr(OP_LOCAL_GET, a));

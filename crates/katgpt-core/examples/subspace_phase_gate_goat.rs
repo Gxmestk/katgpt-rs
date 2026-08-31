@@ -228,6 +228,13 @@ fn run_single(basis: &[f32], n: usize, rng: &mut Rng) -> RunResult {
 // ── Main: run the G1 GOAT gate ────────────────────────────────────────────
 
 fn main() {
+    struct NRow {
+        n: usize,
+        mean_err: f32,
+        pr_mean: f32,
+        nr_mean: f32,
+    }
+
     let mut rng = Rng::new(SEED);
 
     println!();
@@ -267,13 +274,6 @@ fn main() {
     // T2.3 + T2.4 — sweep N, run PCA per subspace, emit CSV.
     println!("── T2.3/T2.4: Recovery error vs N (mean over K subspaces) ──");
     println!("N,d,mean_err,min_err,max_err,gate(N,d),pr_mean,nr99_mean");
-
-    struct NRow {
-        n: usize,
-        mean_err: f32,
-        pr_mean: f32,
-        nr_mean: f32,
-    }
 
     let mut rows: Vec<NRow> = Vec::with_capacity(SAMPLE_SIZES.len());
     for &n in &SAMPLE_SIZES {

@@ -74,7 +74,7 @@ pub enum ScoreFn {
 impl ScoreFn {
     /// IDW mode with a sane default epsilon (1e-6).
     pub const fn idw_default() -> Self {
-        ScoreFn::Idw { epsilon: 1e-6 }
+        Self::Idw { epsilon: 1e-6 }
     }
 
     /// IDW mode with caller-supplied epsilon, clamped to a tiny positive floor.
@@ -85,7 +85,7 @@ impl ScoreFn {
         } else {
             epsilon
         };
-        ScoreFn::Idw { epsilon }
+        Self::Idw { epsilon }
     }
 }
 

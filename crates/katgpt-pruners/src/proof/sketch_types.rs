@@ -300,11 +300,7 @@ pub enum DiversityStrategy {
 
 impl DiversityStrategy {
     /// All strategy variants for iteration/sampling.
-    pub const ALL: [DiversityStrategy; 3] = [
-        DiversityStrategy::Decompose,
-        DiversityStrategy::Combine,
-        DiversityStrategy::NovelApproach,
-    ];
+    pub const ALL: [Self; 3] = [Self::Decompose, Self::Combine, Self::NovelApproach];
 
     /// Index for use in RNG-based selection.
     pub fn index(self) -> usize {

@@ -458,6 +458,7 @@ mod tests {
                 out.push(v);
             }
         }
+        out.shrink_to_fit();
         out
     }
 

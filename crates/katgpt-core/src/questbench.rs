@@ -501,6 +501,7 @@ pub fn find_sufficient_set(
             break; // found 1-sufficient
         }
     }
+    sufficient.shrink_to_fit();
     sufficient
 }
 
@@ -619,9 +620,9 @@ impl QuestBenchDecision {
     #[inline]
     pub fn from_score(score: f32, config: &UnderspecConfig) -> Self {
         match score {
-            s if s > config.plan_new_threshold => QuestBenchDecision::PlanNew,
-            s if s > config.plan_extend_threshold => QuestBenchDecision::PlanExtend,
-            _ => QuestBenchDecision::PlanSkip,
+            s if s > config.plan_new_threshold => Self::PlanNew,
+            s if s > config.plan_extend_threshold => Self::PlanExtend,
+            _ => Self::PlanSkip,
         }
     }
 }
@@ -723,9 +724,8 @@ impl crate::traits::ConstraintPruner for NarrowingPruner {
             return self.valid_at_depth.get(token_idx).copied().unwrap_or(false);
         }
         // depth > 0: validity depends on what was placed at depth-1
-        let last = match parent_tokens.last() {
-            Some(&t) => t,
-            None => return self.valid_at_depth.get(token_idx).copied().unwrap_or(false),
+        let Some(&t) = parent_tokens.last() else {
+            return self.valid_at_depth.get(token_idx).copied().unwrap_or(false);
         };
         if last < self.narrowing.len() && !self.narrowing[last].is_empty() {
             return self.narrowing[last]
@@ -875,5 +875,6 @@ pub fn generate_synthetic_csps(count_per_domain: usize) -> Vec<SyntheticCsp> {
         });
     }
 
+    csps.shrink_to_fit();
     csps
 }

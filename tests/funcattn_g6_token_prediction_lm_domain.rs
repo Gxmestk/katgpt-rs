@@ -347,23 +347,23 @@ enum FieldId {
 
 impl FieldId {
     /// All FUNCATTN-trainable fields, in the order they are updated.
-    const FUNCATTN_ALL: [FieldId; 7] = [
-        FieldId::WEmb,
-        FieldId::WPos,
-        FieldId::WBasis,
-        FieldId::WQ,
-        FieldId::WK,
-        FieldId::WV,
-        FieldId::WHead,
+    const FUNCATTN_ALL: [Self; 7] = [
+        Self::WEmb,
+        Self::WPos,
+        Self::WBasis,
+        Self::WQ,
+        Self::WK,
+        Self::WV,
+        Self::WHead,
     ];
     /// All SDPA-trainable fields (no W_basis).
-    const SDPA_ALL: [FieldId; 6] = [
-        FieldId::WEmb,
-        FieldId::WPos,
-        FieldId::WQ,
-        FieldId::WK,
-        FieldId::WV,
-        FieldId::WHead,
+    const SDPA_ALL: [Self; 6] = [
+        Self::WEmb,
+        Self::WPos,
+        Self::WQ,
+        Self::WK,
+        Self::WV,
+        Self::WHead,
     ];
 }
 
@@ -775,6 +775,7 @@ fn make_eval_samples(seqs: &[Vec<usize>]) -> Vec<(Vec<usize>, usize, usize)> {
             out.push((masked, mp, true_tok));
         }
     }
+    out.shrink_to_fit();
     out
 }
 

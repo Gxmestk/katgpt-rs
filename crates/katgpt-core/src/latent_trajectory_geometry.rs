@@ -707,6 +707,7 @@ mod tests {
             state[1] += gaussian(&mut rng, noise_sigma);
             traj.push(state.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 
@@ -729,6 +730,7 @@ mod tests {
             state[1] += gaussian(&mut rng, noise_sigma);
             traj.push(state.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 
@@ -755,6 +757,7 @@ mod tests {
             state[1] += step_mag * angle.sin() + gaussian(&mut rng, noise_sigma);
             traj.push(state.clone());
         }
+        traj.shrink_to_fit();
         traj
     }
 

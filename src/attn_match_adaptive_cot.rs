@@ -225,17 +225,11 @@ impl AdaptiveTraceCompactor {
             return Ok(None);
         }
 
-        let online_result = match self.online.maybe_compact(
-            kv_keys,
-            kv_values,
-            queries,
-            current_pos,
-            d,
-            n,
-            config,
-        )? {
-            Some(r) => r,
-            None => return Ok(None),
+        let Some(r) =
+            self.online
+                .maybe_compact(kv_keys, kv_values, queries, current_pos, d, n, config)?
+        else {
+            return Ok(None);
         };
 
         self.compacts_done += 1;

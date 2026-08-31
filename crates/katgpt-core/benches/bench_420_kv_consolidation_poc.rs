@@ -264,9 +264,9 @@ enum ConsolidationMode {
 impl ConsolidationMode {
     fn label(self) -> &'static str {
         match self {
-            ConsolidationMode::Baseline => "Baseline (no consolidation)",
-            ConsolidationMode::Consolidation => "Modelless consolidation",
-            ConsolidationMode::RandomRewrite => "Random-rewrite control",
+            Self::Baseline => "Baseline (no consolidation)",
+            Self::Consolidation => "Modelless consolidation",
+            Self::RandomRewrite => "Random-rewrite control",
         }
     }
 }
@@ -443,6 +443,7 @@ fn tokenize_number(n: u32) -> Vec<u32> {
         m /= 10;
     }
     digits.reverse();
+    digits.shrink_to_fit();
     digits
 }
 

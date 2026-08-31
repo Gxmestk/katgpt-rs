@@ -300,7 +300,7 @@ fn g1_5_snapshot_atomicity() {
     // built) MUST use proper epoch-based reclamation or `arc_swap`-style
     // hazard pointers to make this safe in production. For the test, the
     // swapper keeps a Vec of old boxes alive until the end, so no UB.
-    let mut reader_handles = Vec::new();
+    let mut reader_handles = Vec::with_capacity(NUM_READERS);
     for _ in 0..NUM_READERS {
         let current_clone = Arc::clone(&current);
         reader_handles.push(std::thread::spawn(move || {

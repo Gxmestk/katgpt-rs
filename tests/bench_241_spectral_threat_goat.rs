@@ -24,6 +24,8 @@ fn elapsed_ns<F: FnOnce() -> R, R>(f: F) -> (R, u64) {
 
 #[test]
 fn g1_ingest_damage_latency() {
+    const N: usize = 10_000;
+
     let mut tracker = CombatRhythmTracker::with_combat_frequencies(0.016);
     tracker.register(1);
 
@@ -31,8 +33,6 @@ fn g1_ingest_damage_latency() {
     for tick in 0..1000 {
         tracker.ingest_damage(1, 30.0, tick);
     }
-
-    const N: usize = 10_000;
     let mut total_ns = 0u64;
     for tick in 0..N {
         let (_, ns) = elapsed_ns(|| tracker.ingest_damage(1, 30.0, tick as u32));
@@ -54,6 +54,8 @@ fn g1_ingest_damage_latency() {
 
 #[test]
 fn g2_extract_features_latency() {
+    const N: usize = 10_000;
+
     let mut tracker = CombatRhythmTracker::with_combat_frequencies(0.016);
     tracker.register(1);
     // Seed with 5 damage events so features are non-trivial
@@ -65,8 +67,6 @@ fn g2_extract_features_latency() {
     for _ in 0..1000 {
         std::hint::black_box(tracker.extract_features(1));
     }
-
-    const N: usize = 10_000;
     let mut total_ns = 0u64;
     for _ in 0..N {
         let (features, ns) = elapsed_ns(|| tracker.extract_features(1));
@@ -88,6 +88,8 @@ fn g2_extract_features_latency() {
 
 #[test]
 fn g3_end_to_end_ingest_extract() {
+    const N: usize = 10_000;
+
     let mut tracker = CombatRhythmTracker::with_combat_frequencies(0.016);
     tracker.register(1);
 
@@ -96,8 +98,6 @@ fn g3_end_to_end_ingest_extract() {
         tracker.ingest_damage(1, 30.0, tick);
         std::hint::black_box(tracker.extract_features(1));
     }
-
-    const N: usize = 10_000;
     let mut total_ns = 0u64;
     for tick in 0..N {
         let (features, ns) = elapsed_ns(|| {
@@ -124,10 +124,10 @@ fn g3_end_to_end_ingest_extract() {
 
 #[test]
 fn g4_throughput_sustained() {
+    const N: usize = 100_000;
+
     let mut tracker = CombatRhythmTracker::with_combat_frequencies(0.016);
     tracker.register(1);
-
-    const N: usize = 100_000;
     let start = std::time::Instant::now();
     for tick in 0..N {
         tracker.ingest_damage(1, 30.0, tick as u32);

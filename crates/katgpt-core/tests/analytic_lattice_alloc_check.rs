@@ -34,6 +34,8 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
         const K: usize = 8;
         const N_OPS: usize = 3;
 
+        const N_CALLS: usize = 1000;
+
         let mut seed: u64 = 999;
         let mut rng = || {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
@@ -56,8 +58,6 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
         let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-        const N_CALLS: usize = 1000;
         let mut sink = 0.0f32;
         for _ in 0..N_CALLS {
             compose_chain_into(&ops, &mut scratch, &mut out).unwrap();
@@ -85,6 +85,8 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
         const K: usize = 8;
         const N: usize = 16;
 
+        const N_CALLS: usize = 1000;
+
         let mut seed: u64 = 777;
         let mut rng = || {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
@@ -101,8 +103,6 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
         let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-        const N_CALLS: usize = 1000;
         let mut sink = 0.0f32;
         for _ in 0..N_CALLS {
             batch_compose_chain_into(&prefix, &suffixes, &mut out, K, N);
@@ -129,6 +129,8 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
     {
         const N: usize = 8;
 
+        const N_CALLS: usize = 1000;
+
         let mut seed: u64 = 555;
         let mut rng = || {
             seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
@@ -146,8 +148,6 @@ fn g5_zero_alloc_after_warmup_all_primitives() {
 
         let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
         let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-        const N_CALLS: usize = 1000;
         let mut sink = 0.0f32;
         for _ in 0..N_CALLS {
             sink += direction_vector_decode(&state, &direction, 1.0);

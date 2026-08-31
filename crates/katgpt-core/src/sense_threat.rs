@@ -201,9 +201,8 @@ impl CombatRhythmTracker {
     /// do not increment event_count (only real impulses build confidence).
     #[inline(always)]
     pub fn ingest_damage(&mut self, source_id: u8, amount: f32, _tick: u32) {
-        let slot = match self.slot_for(source_id) {
-            Some(s) => s,
-            None => return,
+        let Some(s) = self.slot_for(source_id) else {
+            return;
         };
         let Some(Some(rhythm)) = self.cells.get_mut(slot) else {
             return;
@@ -310,9 +309,8 @@ impl CombatRhythmTracker {
     /// Requires at least 3 timestamps (2 intervals) to produce valid calibration.
     #[inline]
     pub fn auto_calibrate(&mut self, entity_id: u8) {
-        let rhythm = match self.slot_for(entity_id) {
-            Some(i) => i,
-            None => return,
+        let Some(i) = self.slot_for(entity_id) else {
+            return;
         };
         let Some(Some(rhythm)) = self.cells.get_mut(rhythm) else {
             return;

@@ -124,6 +124,7 @@ fn brute_force_top_k_dot(
     }
     all.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
     all.truncate(k);
+    all.shrink_to_fit();
     all
 }
 
@@ -138,7 +139,12 @@ fn jaccard(a: &[usize], b: &[usize]) -> f64 {
 // ── main ───────────────────────────────────────────────────────────────────
 
 fn main() {
-    println!("══════════════════════════════════════════════════════════════════");
+    const D_K_C: usize = 64;
+const D_V_C: usize = 4;
+const K_C: usize = 8;
+const N_CLUSTERS: usize = 10;
+
+println!("══════════════════════════════════════════════════════════════════");
     println!("  Plan 408 Phase 3 — Product Key Memory GOAT gate");
     println!(
         "  SQRT_N={} (N={} slots), D_K={}, D_V={}, K={}",
@@ -266,10 +272,6 @@ fn main() {
     // This mirrors the Phase 2 unit test fixture that discriminates the two
     // modes; the bench re-confirms at SQRT_N=1000 scale.
     const SQRT_N_C: usize = 1000;
-    const D_K_C: usize = 64;
-    const D_V_C: usize = 4;
-    const K_C: usize = 8;
-    const N_CLUSTERS: usize = 10;
     const CLUSTER_SIZE: usize = SQRT_N_C / N_CLUSTERS; // 100
     const HALF_C: usize = D_K_C / 2;
 

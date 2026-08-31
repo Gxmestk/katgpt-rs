@@ -251,7 +251,9 @@ fn run_one_scale(ctx: &ScaleCtx<'_>, seq_len: usize) -> ScaleResult {
 }
 
 fn main() {
-    let config = katgpt_rs::kimi_k3::model::KimiK3ModelConfig::kimi_k3_0_40b();
+    use katgpt_rs::kimi_k3::decoder_layer::KimiAttentionWeights;
+
+let config = katgpt_rs::kimi_k3::model::KimiK3ModelConfig::kimi_k3_0_40b();
     let d = config.hidden_size;
     println!("Config: D_model={d}, vocab={vocab}, layers={n_layers}",
         vocab = config.vocab_size, n_layers = config.num_layers);
@@ -274,8 +276,6 @@ fn main() {
         std::process::exit(1);
     });
     println!("done");
-
-    use katgpt_rs::kimi_k3::decoder_layer::KimiAttentionWeights;
     let KimiAttentionWeights::Mla(mla_weights) = &weights.layers[MLA_LAYER_IDX].attention else {
         eprintln!("ERROR: layer {MLA_LAYER_IDX} is not an MLA layer");
         std::process::exit(1);

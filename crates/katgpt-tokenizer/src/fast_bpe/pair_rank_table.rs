@@ -152,7 +152,7 @@ impl PairRankTable {
             slots[idx] = (key << PAIR_ID_BITS) | m.0 as u64;
         }
 
-        Ok(PairRankTable { dense, dense_log2, slots, mask, shift })
+        Ok(Self { dense, dense_log2, slots, mask, shift })
     }
 
     /// Merged token ID of the pair `(a, b)`, or `u32::MAX` when it does
@@ -563,9 +563,10 @@ pub fn bpe_merge_symbols_short_neon(
     n: usize,
 ) -> usize {
     use core::arch::aarch64::{vld1q_u32, vminq_u32, vminvq_u32};
-    debug_assert!((2..=SHORT_MERGE_MAX - 1).contains(&n));
     /// Every packed value at or above this has rank u32::MAX (no merge).
     const NO_MERGE_FLOOR: u32 = u32::MAX << 8;
+
+debug_assert!((2..=SHORT_MERGE_MAX - 1).contains(&n));
     let pack = |rank: u32, i: usize| (rank << 8) | i as u32;
     // Stack-resident doubly-linked list; see `bpe_merge_symbols_small`.
     let mut next = [0u8; SHORT_MERGE_MAX];

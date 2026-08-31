@@ -124,8 +124,8 @@ impl SsmaxMode {
     #[inline]
     pub fn resolve_s_l(&self) -> f32 {
         match self {
-            SsmaxMode::Fixed { s_l } => *s_l,
-            SsmaxMode::Adaptive { rolling_delta } => {
+            Self::Fixed { s_l } => *s_l,
+            Self::Adaptive { rolling_delta } => {
                 (1.0_f32 / rolling_delta.max(1e-3)).clamp(0.1, 10.0)
             }
         }
@@ -363,10 +363,11 @@ impl RollingDeltaEstimator {
     /// from ill-formed logits don't pollute the estimate).
     #[inline]
     fn update_ema(&self, observed: f64) {
+        use std::sync::atomic::Ordering;
+
         if !observed.is_finite() || observed < 0.0 {
             return;
         }
-        use std::sync::atomic::Ordering;
         loop {
             let old_bits = self.ema_bits.load(Ordering::Relaxed);
             let old_ema = f64::from_bits(old_bits);

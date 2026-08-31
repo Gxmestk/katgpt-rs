@@ -85,6 +85,8 @@ fn parse_args() -> (Option<&'static str>, u64, Option<String>) {
 
 #[cfg(feature = "bomber-wasm")]
 fn main() {
+    const TICK_LIMIT: u32 = 200;
+
     let (map_preset, default_seed, wasm_path_str) = parse_args();
     let wasm_path = wasm_path_str.as_deref();
 
@@ -117,7 +119,6 @@ fn main() {
     // ── Player Setup ───────────────────────────────────────────
 
     const ROUNDS: usize = 20;
-    const TICK_LIMIT: u32 = 200;
 
     let mut players: Vec<Box<dyn BomberPlayer>> = vec![
         Box::new(RandomPlayer::new(0)),

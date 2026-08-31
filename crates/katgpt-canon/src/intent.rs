@@ -92,7 +92,7 @@ impl CanonicalIntent {
     /// direction is empty or zero-norm (zero-norm can happen if the caller
     /// abused [`CanonicalIntent::from_parts`]).
     #[inline]
-    pub fn dot(&self, other: &CanonicalIntent) -> f32 {
+    pub fn dot(&self, other: &Self) -> f32 {
         debug_assert_eq!(
             self.dim(),
             other.dim(),

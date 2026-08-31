@@ -134,12 +134,13 @@ fn bench_infer_operators(n_states: usize, seed: u64) -> (Duration, BisimulationQ
 
 /// Measure `class_of` lookup throughput. Target: ≥ 100M lookups/sec.
 fn bench_class_of_throughput(quotient: &BisimulationQuotient) -> f64 {
+    const BATCH: usize = 100_000;
+    const OUTER: usize = 50;
+
     let n = quotient.n_states();
     if n == 0 {
         return f64::INFINITY;
     }
-    const BATCH: usize = 100_000;
-    const OUTER: usize = 50;
 
     // Warmup.
     let mut sink: u64 = 0;

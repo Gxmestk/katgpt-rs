@@ -600,7 +600,7 @@ mod tests {
         let via_fn = reliability_gate(mean, 5);
         assert!((unrolled - via_fn).abs() < 1e-7);
         // And match powf within f32 precision.
-        let general = mean.powf(5.0);
+        let general = mean.powi(5);
         assert!((general - via_fn).abs() < 1e-6);
     }
 

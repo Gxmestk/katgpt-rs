@@ -295,7 +295,7 @@ mod tests {
         for step in 0..10_000 {
             let mut x = [0.0f32; D];
             for v in &mut x {
-                *v = if (step + *v as usize) % 2 == 0 { next() } else { -next() };
+                *v = if (step + *v as usize).is_multiple_of(2) { next() } else { -next() };
             }
             acc.push(&x);
         }

@@ -1064,14 +1064,15 @@ mod tests {
 
     #[test]
     fn test_ppot_rescue_all_rejected() {
-        let mut rng = Rng::new(42);
-        // All paths will have at least one token, and RejectAllPruner rejects everything
-        struct RejectAllPruner;
         impl ScreeningPruner for RejectAllPruner {
             fn relevance(&self, _: usize, _: usize, _: &[usize]) -> f32 {
                 0.0
             }
         }
+
+let mut rng = Rng::new(42);
+        // All paths will have at least one token, and RejectAllPruner rejects everything
+        struct RejectAllPruner;
 
         let base_path = vec![0, 1, 2];
         let marginals: Vec<&[f32]> = vec![

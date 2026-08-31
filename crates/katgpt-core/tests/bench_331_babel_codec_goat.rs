@@ -484,6 +484,8 @@ fn gate_g4_alloc_free_hot_path() -> GateResult {
     // GATE is the latent codec.
     const D: usize = 8;
     const K: usize = 4;
+    const ITERS: usize = 1000;
+
     let dirs: Vec<[f32; D]> = (0..D)
         .map(|i| {
             let mut d = [0.0f32; D];
@@ -497,8 +499,6 @@ fn gate_g4_alloc_free_hot_path() -> GateResult {
     // Warmup once (first call may allocate if scratch needs to grow — but here
     // the scratch is pre-sized at construction, so even the first call is 0-alloc).
     let _ = latent_codec.compress(&input);
-
-    const ITERS: usize = 1000;
     let (_, latent_allocs) = alloc_delta(|| {
         for _ in 0..ITERS {
             let _ = black_box(latent_codec.compress(black_box(&input)));

@@ -1386,13 +1386,14 @@ mod tests {
     #[cfg(feature = "qgf_adaptive")]
     fn test_qgf_variance_signal_reads_reasoning_disagreement() {
         // The bridge MUST surface `reasoning_disagreement`, not format or KL.
+        use katgpt_core::qgf::QgfVarianceSignal;
+
         let s = TvpSignal {
             reasoning_disagreement: 0.3,
             format_disagreement: 0.9, // must be ignored
             logit_kl: 5.0,            // must be ignored
             probe_count_used: 4,
         };
-        use katgpt_core::qgf::QgfVarianceSignal;
         assert!((s.normalized_disagreement() - 0.3).abs() < 1e-6);
     }
 

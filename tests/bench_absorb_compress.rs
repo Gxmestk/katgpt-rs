@@ -216,6 +216,23 @@ fn bench_hot_swap_reload() {
     use katgpt_rs::pruners::HotSwapPruner;
     use katgpt_rs::speculative::types::ScreeningPruner;
 
+    /// Minimal pruner for benchmarking reload cost.
+    struct BenchPruner {
+        value: f32,
+    }
+    impl BenchPruner {
+        fn load(path: &Path) -> std::io::Result<Self> {
+            let content = fs::read_to_string(path)?;
+            let value = content.trim().parse::<f32>().unwrap_or(1.0);
+            Ok(Self { value })
+        }
+    }
+    impl ScreeningPruner for BenchPruner {
+        fn relevance(&self, _depth: usize, _token_idx: usize, _parent_tokens: &[usize]) -> f32 {
+            self.value
+        }
+    }
+
     let iters = 100;
     let path = std::env::temp_dir().join(format!(
         "microgpt_bench_hotswap_{pid}.txt",
@@ -224,25 +241,6 @@ fn bench_hot_swap_reload() {
 
     println!("\n🧪 HotSwapPruner Reload Benchmark ({iters} reloads)");
     println!("{}", "═".repeat(70));
-
-    /// Minimal pruner for benchmarking reload cost.
-    struct BenchPruner {
-        value: f32,
-    }
-
-    impl BenchPruner {
-        fn load(path: &Path) -> std::io::Result<Self> {
-            let content = fs::read_to_string(path)?;
-            let value = content.trim().parse::<f32>().unwrap_or(1.0);
-            Ok(Self { value })
-        }
-    }
-
-    impl ScreeningPruner for BenchPruner {
-        fn relevance(&self, _depth: usize, _token_idx: usize, _parent_tokens: &[usize]) -> f32 {
-            self.value
-        }
-    }
 
     // Create initial file
     fs::write(&path, "0.5").expect("Failed to write pruner file");

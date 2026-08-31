@@ -152,7 +152,7 @@ impl AuditInputs {
             diff_action_pairs.push(((a, b1), (a, b2)));
         }
 
-        AuditInputs {
+        Self {
             zero_pairs,
             shift_pairs,
             ordinary_pairs,

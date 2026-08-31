@@ -209,6 +209,7 @@ impl<'a, P: ScreeningPruner> AndOrBuilder<'a, P> {
             }
             out.push(min_rel);
         }
+        out.shrink_to_fit();
         out
     }
 
@@ -238,6 +239,7 @@ impl<'a, P: ScreeningPruner> AndOrBuilder<'a, P> {
             regions.push((start, profile.len()));
         }
 
+        regions.shrink_to_fit();
         regions
     }
 

@@ -435,6 +435,7 @@ fn chunk_starts(t_len: usize, chunk_size: usize, stride: usize) -> Vec<usize> {
         }
         start += stride;
     }
+    starts.shrink_to_fit();
     starts
 }
 
@@ -458,7 +459,7 @@ fn infer_d(chunks: &[TextChunk]) -> Result<usize, CompactError> {
         if c.chunk_len == 0 {
             continue;
         }
-        if c.keys.len() % c.chunk_len != 0 {
+        if !c.keys.len().is_multiple_of(c.chunk_len) {
             return Err(CompactError::DimensionMismatch(format!(
                 "chunk: keys.len()={} not divisible by chunk_len={}",
                 c.keys.len(),

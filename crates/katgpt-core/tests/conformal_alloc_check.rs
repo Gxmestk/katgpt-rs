@@ -16,6 +16,8 @@ counting_allocator!();
 
 #[test]
 fn g3_interval_into_zero_alloc_after_warmup() {
+    const N_CALLS: usize = 1000;
+
     let forecaster = SeasonalPoolForecaster::new(64, 12, 0.0, 0.0);
     let mut cal = ConformalIntervalCalibrator::new(
         forecaster,
@@ -54,8 +56,6 @@ fn g3_interval_into_zero_alloc_after_warmup() {
     // Measure.
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut sink = 0.0_f32;
     for _ in 0..N_CALLS {
         for ch in 0..8 {
@@ -80,6 +80,8 @@ fn g3_interval_into_zero_alloc_after_warmup() {
 
 #[test]
 fn g3_update_residual_zero_alloc_after_warmup() {
+    const N_CALLS: usize = 1000;
+
     let forecaster = SeasonalPoolForecaster::new(64, 12, 0.0, 0.0);
     let mut cal = ConformalIntervalCalibrator::new(
         forecaster,
@@ -104,8 +106,6 @@ fn g3_update_residual_zero_alloc_after_warmup() {
     // Measure update_residual at steady state (pool full → eviction path).
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut sink = 0.0_f32;
     for i in 0..N_CALLS {
         let r = (i as f32) * 0.001;

@@ -740,9 +740,8 @@ fn detect_swap_backers<P: Position>(
             continue;
         }
         let current_i = config.pos(AgentId(i as u32));
-        let preferred_i = match guidance.get(i).and_then(|g| g.first()) {
-            Some(p) => p,
-            None => continue,
+        let Some(p) = guidance.get(i).and_then(|g| g.first()) else {
+            continue;
         };
 
         // Scan for agent j at preferred_i whose preferred cell is current_i.

@@ -385,6 +385,7 @@ pub fn detect_region_transitions(
             });
         }
     }
+    transitions.shrink_to_fit();
     transitions
 }
 

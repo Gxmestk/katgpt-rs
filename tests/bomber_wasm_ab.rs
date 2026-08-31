@@ -85,6 +85,7 @@ fn find_walkable_positions(grid: &ArenaGrid) -> Vec<(i32, i32)> {
             }
         }
     }
+    positions.shrink_to_fit();
     positions
 }
 
@@ -118,6 +119,7 @@ fn generate_bomb_configs(grid: &ArenaGrid, seed: u64) -> Vec<Vec<((i32, i32), u3
         configs.push(bombs);
     }
 
+    configs.shrink_to_fit();
     configs
 }
 

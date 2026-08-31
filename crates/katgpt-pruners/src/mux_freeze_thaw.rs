@@ -32,7 +32,7 @@ pub struct MuxTarget {
 impl MuxTarget {
     /// Returns whether two targets share the same structural parameters
     /// (span_k, decay, tier), ignoring kl_reward.
-    fn matches_structure(&self, other: &MuxTarget) -> bool {
+    fn matches_structure(&self, other: &Self) -> bool {
         self.span_k == other.span_k && self.decay == other.decay && self.tier == other.tier
     }
 }

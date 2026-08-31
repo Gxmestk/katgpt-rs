@@ -344,6 +344,7 @@ pub fn build_hop_dd_tree(marginals: &[HopMarginal], config: &HopTreeConfig) -> V
         }
     }
 
+    tree.shrink_to_fit();
     tree
 }
 
@@ -534,6 +535,7 @@ pub fn build_hop_dd_tree_with_schedule(
         }
     }
 
+    tree.shrink_to_fit();
     tree
 }
 
@@ -616,6 +618,7 @@ fn reconstruct_path(tree: &[HopTreeNode], leaf: &HopTreeNode) -> Vec<(String, St
 
     // Reverse to get root-to-leaf order
     stack.reverse();
+    stack.shrink_to_fit();
     stack
 }
 

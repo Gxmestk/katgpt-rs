@@ -81,6 +81,7 @@ impl BpeTokenizerImpl {
             std::mem::swap(&mut tokens, &mut new_tokens);
         }
 
+        tokens.shrink_to_fit();
         tokens
     }
 

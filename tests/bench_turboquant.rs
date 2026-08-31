@@ -111,10 +111,7 @@ fn bench_turboquant_compression_ratio() {
         let elapsed = start.elapsed();
         let per_seq = elapsed / iterations as u32;
 
-        println!(
-            "  {bits}-bit store+dequant {n_positions} pos: {per_seq:?} ({its} iters)",
-            its = iterations
-        );
+        println!("  {bits}-bit store+dequant {n_positions} pos: {per_seq:?} ({iterations} iters)");
     }
 }
 

@@ -110,6 +110,7 @@ fn reconstruct_plan(
         cur = pred;
     }
     plan_rev.reverse();
+    plan_rev.shrink_to_fit();
     plan_rev
 }
 

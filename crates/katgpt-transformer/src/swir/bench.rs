@@ -460,6 +460,7 @@ pub fn run_pareto_sweep(
         });
     }
 
+    points.shrink_to_fit();
     points
 }
 

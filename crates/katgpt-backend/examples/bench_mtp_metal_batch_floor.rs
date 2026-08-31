@@ -348,18 +348,15 @@ fn paired_ratio(
     let mut wide_all = Vec::with_capacity(PAIR_MEASURE as usize);
 
     for pair in 0..PAIR_WARMUP + PAIR_MEASURE {
-        let (b_ms, w_ms) = match pair % 2 {
-            0 => {
+        let (b_ms, w_ms) = if (pair % 2) == 0 {
                 let b = base.time(queue, w, 1, PAIR_ITERS, samples);
                 let x = wide.time(queue, w, 1, PAIR_ITERS, samples);
                 (b, x)
-            }
-            _ => {
+            } else {
                 let x = wide.time(queue, w, 1, PAIR_ITERS, samples);
                 let b = base.time(queue, w, 1, PAIR_ITERS, samples);
                 (b, x)
-            }
-        };
+            };
         if pair >= PAIR_WARMUP {
             ratios.push(w_ms / b_ms);
             base_all.push(b_ms);
@@ -516,20 +513,17 @@ fn main() {
     let overall_band = bands.iter().map(|(_, b)| *b).min().unwrap_or(1);
     println!("  {:<10} N <= {overall_band}   <- binding constraint", "OVERALL");
 
-    match worst_n3_int < BREAKEVEN_E {
-        true => {
+    if worst_n3_int < BREAKEVEN_E {
             println!(
                 "\nARTIFACT — batched verify is affordable on this device, so the llama.cpp\n\
                  Metal penalty is an implementation issue, not a hardware limit.\n\
                  => mtp+ddtree is viable on M3; MTP can be gated on Metal, not CUDA-only."
             );
-        }
-        false => {
+        } else {
             println!(
                 "\nFUNDAMENTAL — batched verify costs more than the tokens it can win back.\n\
                  Speculative decoding cannot pay on this device at any acceptance rate.\n\
                  => MTP is a CUDA/4090-only opt-in; do not gate it on Metal."
             );
         }
-    }
 }

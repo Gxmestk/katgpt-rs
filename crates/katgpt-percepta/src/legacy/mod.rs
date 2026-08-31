@@ -112,7 +112,7 @@ impl KVCache2D {
     /// Standard O(N) attention: linear scan over all keys.
     /// Baseline for correctness verification.
     pub fn linear_attention(&self, query: &Vec2) -> (f32, usize) {
-        if self.keys.len() == 0 { (f32::NEG_INFINITY, 0) } else {
+        if self.keys.is_empty() { (f32::NEG_INFINITY, 0) } else {
                 let mut max_score = f32::NEG_INFINITY;
                 let mut best_idx = 0;
                 for (i, key) in self.keys.iter().enumerate() {

@@ -31,14 +31,14 @@ fn elapsed_ns<F: FnOnce() -> R, R>(f: F) -> (R, u64) {
 
 #[test]
 fn g1_single_patch_encode_latency() {
+    const N: usize = 10_000;
+
     let weights = [0.1f32, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
 
     // Warmup
     for _ in 0..1000 {
         let _ = LatentPatch::new(0, weights);
     }
-
-    const N: usize = 10_000;
     let mut total_ns = 0u64;
     for i in 0..N {
         let (patch, ns) = elapsed_ns(|| LatentPatch::new(i as u32, weights));
@@ -60,6 +60,8 @@ fn g1_single_patch_encode_latency() {
 
 #[test]
 fn g2_batch_256_patches_latency() {
+    const N: usize = 1000;
+
     let patches: Vec<LatentPatch> = (0..256)
         .map(|i| LatentPatch::new(i, [0.1f32 * i as f32; 8]))
         .collect();
@@ -70,8 +72,6 @@ fn g2_batch_256_patches_latency() {
     for _ in 0..100 {
         let _ = batch.verify_all_commitments();
     }
-
-    const N: usize = 1000;
     let mut total_ns = 0u64;
     for _ in 0..N {
         let (receipt, ns) = elapsed_ns(|| batch.verify_all_commitments());
@@ -97,6 +97,8 @@ fn g2_batch_256_patches_latency() {
 #[test]
 fn g3_end_to_end_round_trip() {
     // Small encode: 32 tokens → 4 latent slots at X8
+    const N: usize = 50;
+
     let config = MuxLatentConfig {
         window_size: 1024,
         compression_ratio: CompressionRatio::X8,
@@ -121,8 +123,6 @@ fn g3_end_to_end_round_trip() {
         let _ = batch.verify_all_commitments();
         let _ = LatentPatcher::patch_batch(&mut context, &batch);
     }
-
-    const N: usize = 50;
     let mut total_ns = 0u64;
     for _ in 0..N {
         let (_receipt, ns) = elapsed_ns(|| {
@@ -152,12 +152,12 @@ fn g3_end_to_end_round_trip() {
 
 #[test]
 fn g4_throughput_sustained() {
+    const N: usize = 1000;
+
     let patches: Vec<LatentPatch> = (0..256)
         .map(|i| LatentPatch::new(i, [0.1f32 * i as f32; 8]))
         .collect();
     let batch = LatentPatchBatch::new(patches, 256, CompressionRatio::X8, 0);
-
-    const N: usize = 1000;
     let start = std::time::Instant::now();
     for _ in 0..N {
         let receipt = batch.verify_all_commitments();

@@ -304,7 +304,6 @@ impl TrialLog {
     /// Binary payload: blake3 hash of summary + postcard-encoded explanation fields.
     #[cfg(feature = "decision_explain")]
     pub fn log_decision(&mut self, explanation: &DecisionExplanation) -> Result<()> {
-        let hash = blake3::hash(explanation.summary.as_bytes());
         #[derive(serde::Serialize, serde::Deserialize)]
         struct DecisionRecord<'a> {
             hash: [u8; 32],
@@ -312,6 +311,8 @@ impl TrialLog {
             num_alternatives: usize,
             summary: &'a str,
         }
+
+        let hash = blake3::hash(explanation.summary.as_bytes());
         let record = DecisionRecord {
             hash: *hash.as_bytes(),
             num_choices: explanation.choices.len(),

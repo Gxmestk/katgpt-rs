@@ -161,11 +161,7 @@ pub enum SketchSelectionStrategy {
 
 impl SketchSelectionStrategy {
     /// All strategy variants for iteration.
-    pub const ALL: [SketchSelectionStrategy; 3] = [
-        SketchSelectionStrategy::PopulationPucb,
-        SketchSelectionStrategy::BasicUcb,
-        SketchSelectionStrategy::EpsilonGreedy,
-    ];
+    pub const ALL: [Self; 3] = [Self::PopulationPucb, Self::BasicUcb, Self::EpsilonGreedy];
 
     /// Index for use in RNG-based selection.
     pub fn index(self) -> usize {

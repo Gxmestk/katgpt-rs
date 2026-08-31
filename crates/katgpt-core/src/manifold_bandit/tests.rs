@@ -75,10 +75,7 @@ fn test_observe_updates_leaf_filter() {
 
     // Find arm 2's leaf and check its filter.
     let leaf = find_leaf(&tree.root, 2).expect("arm 2 should exist");
-    let filter = match leaf {
-        TreeNode::Leaf { filter, .. } => filter,
-        _ => panic!("expected leaf"),
-    };
+    let TreeNode::Leaf { filter, .. } = leaf else { panic!("expected leaf") };
     // 10 successes: alpha = 1 + 10 = 11, beta = 1 + 0 = 1.
     assert!(
         (filter.alpha - 11.0).abs() < 1e-5,
@@ -594,6 +591,7 @@ fn gen_clustered_embeddings(
             embeddings.push(point);
         }
     }
+    embeddings.shrink_to_fit();
     embeddings
 }
 

@@ -31,9 +31,9 @@ fn test_planning_decision_variants() {
     for (i, a) in decisions.iter().enumerate() {
         for (j, b) in decisions.iter().enumerate() {
             if i == j {
-                assert_eq!(a, b)
+                assert_eq!(a, b);
             } else {
-                assert_ne!(a, b)
+                assert_ne!(a, b);
             }
         }
     }

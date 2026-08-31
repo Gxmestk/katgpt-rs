@@ -224,19 +224,16 @@ fn g10_h2_forecast_beats_h1_on_long_tail() {
     let mut h2_longtail_ys: Vec<f32> = Vec::new();
     for (s, (&h1, &h2)) in test.iter().zip(h1_test.iter().zip(h2_test.iter())) {
         let y = s.alpha_true;
-        match s.regime {
-            "decisive" => {
-                h1_decisive_xs.push(h1);
-                h1_decisive_ys.push(y);
-                h2_decisive_xs.push(h2);
-                h2_decisive_ys.push(y);
-            }
-            _ => {
-                h1_longtail_xs.push(h1);
-                h1_longtail_ys.push(y);
-                h2_longtail_xs.push(h2);
-                h2_longtail_ys.push(y);
-            }
+        if s.regime == "decisive" {
+            h1_decisive_xs.push(h1);
+            h1_decisive_ys.push(y);
+            h2_decisive_xs.push(h2);
+            h2_decisive_ys.push(y);
+        } else {
+            h1_longtail_xs.push(h1);
+            h1_longtail_ys.push(y);
+            h2_longtail_xs.push(h2);
+            h2_longtail_ys.push(y);
         }
     }
     let mae_h1_dec = forecast_mae(&h1_decisive_xs, &h1_decisive_ys, a1, -b1);

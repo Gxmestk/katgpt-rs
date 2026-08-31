@@ -322,6 +322,7 @@ fn walk_steps(from: u8, to: u8, passed_go: bool) -> Vec<u8> {
             }
         }
     }
+    steps.shrink_to_fit();
     steps
 }
 

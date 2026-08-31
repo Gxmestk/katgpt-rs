@@ -572,6 +572,7 @@ fn prefold_prefix(prefix: &[usize]) -> Vec<usize> {
         }
     }
 
+    compacted.shrink_to_fit();
     compacted
 }
 

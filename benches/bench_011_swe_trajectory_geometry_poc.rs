@@ -107,6 +107,7 @@ fn build_committed_wrong(seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -123,6 +124,7 @@ fn build_oscillation(seed: u64) -> Vec<Vec<f32>> {
         let target = if i % 2 == 0 { &attractor_a } else { &attractor_b };
         traj.push(target.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -163,6 +165,7 @@ fn build_drift(seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -174,6 +177,7 @@ fn build_stuck(seed: u64) -> Vec<Vec<f32>> {
     for _ in 0..=N_STEPS {
         traj.push(fixed.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -193,6 +197,7 @@ fn build_converged_correct(seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 

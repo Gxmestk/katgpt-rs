@@ -283,8 +283,9 @@ impl KvOuterPrefill {
                             .copy_from_slice(&local_out[..actual_hd]);
                     }
                     lse_prev => {
-                        let lse_new = logaddexp(lse_prev, lse_local);
                         use katgpt_core::simd::fast_exp;
+
+                        let lse_new = logaddexp(lse_prev, lse_local);
                         let old_scale = fast_exp(lse_prev - lse_new);
                         let new_scale = fast_exp(lse_local - lse_new);
 

@@ -377,8 +377,9 @@ pub fn max_abs_diff_f64(a: &[f64], b: &[f64]) -> f64 {
 /// for the multi-tile f64 golden bound (absolute diffs under-state at small
 /// magnitudes; the relative form is the honest one for a scale-free bound).
 pub fn max_rel_diff_f64(a: &[f64], b: &[f64]) -> f64 {
-    assert_eq!(a.len(), b.len(), "max_rel_diff_f64 length mismatch");
     const TINY: f64 = 1e-300;
+
+    assert_eq!(a.len(), b.len(), "max_rel_diff_f64 length mismatch");
     a.iter()
         .zip(b.iter())
         .map(|(x, y)| (x - y).abs() / y.abs().max(TINY))
@@ -498,7 +499,7 @@ pub fn tol_fit_inputs_hash(fit: &TolFitInputs) -> String {
     bytes.extend_from_slice(&(fit.bits as u64).to_le_bytes());
     bytes.extend_from_slice(&(fit.head_dim as u64).to_le_bytes());
     bytes.extend_from_slice(&fit.seed.to_le_bytes());
-    format!("{}", blake3::hash(&bytes))
+    blake3::hash(&bytes).to_string()
 }
 
 /// The pinned `tol(S)` table: `(seq_len, max_diff_band, wasserstein_band)`,

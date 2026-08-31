@@ -1715,7 +1715,7 @@ mod tests {
         let mut output = vec![0.0; n];
         clr_reliability_scores(&states, &directions, m_exp, n, d, &mut output);
         // mean_v = 0.5, ^3 = 0.125.
-        let expected = 0.5f32.powf(3.0);
+        let expected = 0.5f32.powi(3);
         for &r in &output {
             assert!((r - expected).abs() < 1e-6, "expected {expected}, got {r}");
         }

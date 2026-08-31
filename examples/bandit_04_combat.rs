@@ -494,8 +494,7 @@ fn section1() -> Vec<(PlayerType, BanditStats)> {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════════════╗");
     println!(
-        "║  Section 1: Monster vs 4 Player Types (UCB1, {n:>3} combats each)       ║",
-        n = COMBATS_PER_TYPE
+        "║  Section 1: Monster vs 4 Player Types (UCB1, {COMBATS_PER_TYPE:>3} combats each)       ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════════════╝");
     println!();
@@ -545,6 +544,7 @@ fn section1() -> Vec<(PlayerType, BanditStats)> {
         );
     }
     println!();
+    all_stats.shrink_to_fit();
     all_stats
 }
 
@@ -553,8 +553,7 @@ fn section1() -> Vec<(PlayerType, BanditStats)> {
 fn section2() {
     println!("╔══════════════════════════════════════════════════════════════════════════╗");
     println!(
-        "║  Section 2: Strategy Comparison vs Aggressive ({n:>3} combats each)      ║",
-        n = COMBATS_STRATEGY_TEST
+        "║  Section 2: Strategy Comparison vs Aggressive ({COMBATS_STRATEGY_TEST:>3} combats each)      ║"
     );
     println!("╚══════════════════════════════════════════════════════════════════════════╝");
     println!();

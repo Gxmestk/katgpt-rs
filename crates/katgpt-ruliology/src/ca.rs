@@ -103,9 +103,9 @@ impl CaStrategy {
     }
 
     /// Enumerate all 256 elementary CA rules.
-    pub fn enumerate_all() -> Vec<CaStrategy> {
+    pub fn enumerate_all() -> Vec<Self> {
         (0u8..=255)
-            .map(|rule| CaStrategy::new(rule, DEFAULT_TAPE_WIDTH))
+            .map(|rule| Self::new(rule, DEFAULT_TAPE_WIDTH))
             .collect()
     }
 
@@ -119,10 +119,10 @@ impl CaStrategy {
     /// Wolfram identified ~88 distinct rules from the 256 elementary CAs.
     /// We use behavioral fingerprinting via blake3 hash of outputs over all
     /// possible input sequences, similar to FsmEnumerator's dedup.
-    pub fn enumerate_distinct() -> Vec<CaStrategy> {
+    pub fn enumerate_distinct() -> Vec<Self> {
         let all = Self::enumerate_all();
         let mut seen: HashSet<[u8; 32]> = HashSet::with_capacity(all.len());
-        let mut distinct: Vec<CaStrategy> = Vec::with_capacity(128);
+        let mut distinct: Vec<Self> = Vec::with_capacity(128);
 
         // Test all possible tape configurations up to tape_width.
         // For each tape config, run the CA and collect outputs.
@@ -156,6 +156,7 @@ impl CaStrategy {
             }
         }
 
+        distinct.shrink_to_fit();
         distinct
     }
 

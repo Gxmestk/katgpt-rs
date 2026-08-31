@@ -367,13 +367,13 @@ impl Sched {
     #[inline]
     fn jerk_for(&self, vel_ch: f32, measured_jerk: f32) -> Option<f32> {
         match *self {
-            Sched::ZeroJerk => Some(0.0),
-            Sched::ConstJerk { j } => Some(j),
-            Sched::Measured => Some(measured_jerk),
-            Sched::ClampedCorrection { j_max, lambda } => {
+            Self::ZeroJerk => Some(0.0),
+            Self::ConstJerk { j } => Some(j),
+            Self::Measured => Some(measured_jerk),
+            Self::ClampedCorrection { j_max, lambda } => {
                 Some(j_max * (lambda * vel_ch.abs()).tanh())
             }
-            Sched::GeometricDrag { .. } => None,
+            Self::GeometricDrag { .. } => None,
         }
     }
 }

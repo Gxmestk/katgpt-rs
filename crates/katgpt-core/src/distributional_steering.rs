@@ -207,17 +207,17 @@ impl MomentGain {
     #[inline]
     fn derivative(self, m: f32) -> f32 {
         match self {
-            MomentGain::NegativeSquare => -2.0 * m,
-            MomentGain::Square => 2.0 * m,
-            MomentGain::Identity => 1.0,
+            Self::NegativeSquare => -2.0 * m,
+            Self::Square => 2.0 * m,
+            Self::Identity => 1.0,
         }
     }
     #[inline]
     fn value(self, m: f32) -> f32 {
         match self {
-            MomentGain::NegativeSquare => -m * m,
-            MomentGain::Square => m * m,
-            MomentGain::Identity => m,
+            Self::NegativeSquare => -m * m,
+            Self::Square => m * m,
+            Self::Identity => m,
         }
     }
 }

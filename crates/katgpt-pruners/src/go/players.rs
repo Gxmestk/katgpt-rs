@@ -528,7 +528,7 @@ impl GoMoveCategory {
     }
 
     /// All categories in enum order.
-    pub const fn all() -> &'static [GoMoveCategory; NUM_CATEGORIES] {
+    pub const fn all() -> &'static [Self; NUM_CATEGORIES] {
         &[
             Self::CornerStar,
             Self::SideApproach,
@@ -770,7 +770,7 @@ impl GoTemplate {
     }
 
     /// All templates in enum order.
-    pub const fn all() -> &'static [GoTemplate; NUM_TEMPLATES] {
+    pub const fn all() -> &'static [Self; NUM_TEMPLATES] {
         &[Self::CornerStar, Self::Capture, Self::Defend, Self::Tenuki]
     }
 }

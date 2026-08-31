@@ -853,9 +853,10 @@ mod tests {
         // is scored under the ρ published BEFORE it was folded (the lag law
         // holds in the fixture too); warmup windows' contributions are
         // discarded so the cold start is not the mechanism under test.
+        const WARMUP_WINDOWS: u32 = 8;
+
         let mut rng = Rng::new(6757);
         let mut t = TetherBlend::with_params(0.0, 0.9, 64);
-        const WARMUP_WINDOWS: u32 = 8;
         let mut sse_blend = 0.0f64;
         let mut sse_p1 = 0.0f64;
         let mut sse_p2 = 0.0f64;

@@ -195,6 +195,7 @@ fn gen_dataset(
         out.push((features(&u, &v, dim, shifts), Class::D));
     }
 
+    out.shrink_to_fit();
     out
 }
 

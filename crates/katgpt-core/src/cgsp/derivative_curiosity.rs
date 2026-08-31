@@ -751,6 +751,8 @@ mod tests {
     /// the block comment above for the full rationale and reproduction notes.
     #[test]
     fn g5_goat_gate() {
+        const ITERS: usize = 10_000;
+
         let tau_low = CgspConfig::default().tau_low; // 0.30 nats
         let max_cycles = 50;
 
@@ -777,8 +779,6 @@ mod tests {
         for _ in 0..100 {
             let _ = dc.cycle_curiosity(&target, &mut bandit, &mut scratch, &mut collapse, &config);
         }
-
-        const ITERS: usize = 10_000;
         let start = std::time::Instant::now();
         for _ in 0..ITERS {
             std::hint::black_box(dc.cycle_curiosity(

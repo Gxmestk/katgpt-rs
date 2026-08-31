@@ -160,10 +160,11 @@ fn g1_clone_preserves_state() {
 fn g8_cooperates_iff_omega_above_half_pd() {
     // G8: for canonical PD (R=2, S=0, T=3, P=1) with uniform partner marginal,
     // embedded_best_response returns Cooperate (0) iff ω > 0.5, else Defect (1).
-    let payoff = canonical_pd();
-    let marginal = [0.5_f32, 0.5];
     const COOPERATE: u8 = 0;
-    const DEFECT: u8 = 1;
+const DEFECT: u8 = 1;
+
+let payoff = canonical_pd();
+    let marginal = [0.5_f32, 0.5];
 
     // Below threshold → Defect
     for omega in [0.0_f32, 0.1, 0.25, 0.49, 0.4999] {

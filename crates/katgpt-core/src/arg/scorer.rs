@@ -88,7 +88,7 @@ impl Evidence {
     /// Construct evidence with a non-negative weight.
     #[inline]
     pub fn new(outcome: InfoOutcomeStatus, weight: f32) -> Self {
-        Evidence { outcome, weight }
+        Self { outcome, weight }
     }
 }
 
@@ -173,7 +173,7 @@ impl OfflineCandidateScorer {
     /// Construct with a specific lambda. Clamps to `[0, 1]`.
     #[inline]
     pub fn new(lambda: f32) -> Self {
-        OfflineCandidateScorer {
+        Self {
             lambda: lambda.clamp(0.0, 1.0),
         }
     }

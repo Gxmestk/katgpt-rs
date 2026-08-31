@@ -167,9 +167,11 @@ fn g1_bit_identical_to_disabled() -> (bool, f32) {
 
 fn g2_latency_overhead_vs_qkv() -> (bool, f64, f64, f64, f64, f64, bool) {
     // Returns (scalar_pass, proj_ns, scalar_rove_ns, scalar_ratio, fast_rove_ns, fast_ratio, fast_pass)
-    let n: usize = 1024;
-    let d: usize = 768;
     const N_ITERS: usize = 20;
+const TARGET_RATIO: f64 = 0.05;
+
+let n: usize = 1024;
+    let d: usize = 768;
 
     let action = RoVeConfig::default().build_rope_action(d);
 
@@ -262,8 +264,6 @@ fn g2_latency_overhead_vs_qkv() -> (bool, f64, f64, f64, f64, f64, bool) {
     println!("   ratio scalar (rove/proj):   {scalar_ratio:.4}× ({:.2}%)", scalar_ratio * 100.0);
     println!("   ratio fast   (rove/proj):   {fast_ratio:.4}× ({:.2}%)", fast_ratio * 100.0);
     println!("   speedup fast/scalar:        {:.2}×", rove_scalar_ns / rove_fast_ns.max(1e-9));
-
-    const TARGET_RATIO: f64 = 0.05;
     println!("   target:                      ratio < {TARGET_RATIO} (5%)");
     let scalar_pass = scalar_ratio < TARGET_RATIO;
     let fast_pass = fast_ratio < TARGET_RATIO;
@@ -301,7 +301,9 @@ fn g3_feature_is_opt_in_additive() -> bool {
 // primitives are the production hot path (one call per layer in Phase 3).
 
 fn g4_batch_zero_alloc() -> (bool, usize, usize) {
-    let n: usize = 1024;
+    const N_CALLS: usize = 1000;
+
+let n: usize = 1024;
     let d: usize = 768;
     let action = RoVeConfig::default().build_rope_action(d);
     let positions: Vec<usize> = (0..n).collect();
@@ -319,8 +321,6 @@ fn g4_batch_zero_alloc() -> (bool, usize, usize) {
 
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     for _ in 0..N_CALLS {
         batch_rotate_values_into(&action, &positions, &values, &mut out, d);
         batch_inverse_rotate_output_into(&action, &positions, &out, &mut recovered, d);
@@ -364,7 +364,9 @@ fn g4_batch_zero_alloc() -> (bool, usize, usize) {
 // bit-identical claim, it's an algebraic-identity claim.
 
 fn g5_flashattention_output_equivalence() -> (bool, f32) {
-    let mut rng = Lcg::new(0x1234_5678);
+    const BUDGET: f32 = 1e-4;
+
+let mut rng = Lcg::new(0x1234_5678);
     let n: usize = 16; // small n so the n×n materialization is cheap
     let d: usize = 32;
     let action = RoVeConfig::default().build_rope_action(d);
@@ -435,7 +437,6 @@ fn g5_flashattention_output_equivalence() -> (bool, f32) {
     let rel = worst / norm_ref;
 
     println!("   n={n}, d={d}: worst abs err = {worst:.3e}, rel err = {rel:.3e}");
-    const BUDGET: f32 = 1e-4;
     println!("   budget: rel err < {BUDGET:.0e} (f32 accumulation-order tolerance)");
     (rel < BUDGET, rel)
 }

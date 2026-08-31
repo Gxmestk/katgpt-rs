@@ -409,6 +409,7 @@ impl RuliologyAbsorbCompress {
             }
         }
 
+        newly_promoted.shrink_to_fit();
         newly_promoted
     }
 

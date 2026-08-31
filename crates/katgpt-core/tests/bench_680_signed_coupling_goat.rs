@@ -61,20 +61,19 @@ fn next_unit(state: &mut u64) -> f32 {
 /// a `p_discordant` share of them negative. The paper's baseline family.
 fn random_signed(n: usize, degree: usize, p_discordant: f32, seed: u64) -> SignedGraph {
     let mut rng = seed;
-    let mut edges = Vec::new();
+    let mut edges = Vec::with_capacity(n);
     for i in 0..n {
         for _ in 0..degree.div_ceil(2) {
             let j = (splitmix64(&mut rng) % n as u64) as u32;
-            match j as usize == i {
-                true => continue,
-                false => {
-                    let sign = if next_unit(&mut rng) < p_discordant {
-                        -1
-                    } else {
-                        1
-                    };
-                    edges.push((i as u32, j, sign));
-                }
+            if j as usize == i {
+                continue;
+            } else {
+                let sign = if next_unit(&mut rng) < p_discordant {
+                    -1
+                } else {
+                    1
+                };
+                edges.push((i as u32, j, sign));
             }
         }
     }
@@ -85,7 +84,7 @@ fn random_signed(n: usize, degree: usize, p_discordant: f32, seed: u64) -> Signe
 /// generalization family (fitted on random graphs, evaluated on lattices).
 fn square_lattice(side: usize) -> SignedGraph {
     let n = side * side;
-    let mut edges = Vec::new();
+    let mut edges = Vec::with_capacity(side);
     for r in 0..side {
         for c in 0..side {
             let i = (r * side + c) as u32;
@@ -106,16 +105,15 @@ fn square_lattice(side: usize) -> SignedGraph {
 fn frustrated_blocks(n: usize, seed: u64) -> SignedGraph {
     let mut rng = seed;
     let half = n / 2;
-    let mut edges = Vec::new();
+    let mut edges = Vec::with_capacity(n);
     for i in 0..n {
         for _ in 0..4 {
             let j = (splitmix64(&mut rng) % n as u64) as usize;
-            match j == i {
-                true => continue,
-                false => {
-                    let same_block = (i < half) == (j < half);
-                    edges.push((i as u32, j as u32, if same_block { 1 } else { -1 }));
-                }
+            if j == i {
+                continue;
+            } else {
+                let same_block = (i < half) == (j < half);
+                edges.push((i as u32, j as u32, if same_block { 1 } else { -1 }));
             }
         }
     }
@@ -432,13 +430,11 @@ fn g1d_susceptibility_peaks_at_an_interior_temperature() {
         sweep.push((t, acc.susceptibility(N)));
     }
 
-    let (t_c, chi_max) = sweep
-        .iter()
-        .copied()
-        .fold((0.0, f32::MIN), |(bt, bc), (t, c)| match c > bc {
-            true => (t, c),
-            false => (bt, bc),
-        });
+    let (t_c, chi_max) =
+        sweep.iter().copied().fold(
+            (0.0, f32::MIN),
+            |(bt, bc), (t, c)| if c > bc { (t, c) } else { (bt, bc) },
+        );
     println!("G1d T_c = {t_c:.4}  chi_max = {chi_max:.4}");
     println!(
         "G1d edges: chi({:.3}) = {:.4}   chi({:.3}) = {:.4}",

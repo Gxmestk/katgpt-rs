@@ -94,6 +94,7 @@ fn build_full_deviations() -> Vec<Deviation<3, 3>> {
             }
         }
     }
+    devs.shrink_to_fit();
     devs
 }
 

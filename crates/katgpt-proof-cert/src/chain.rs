@@ -107,5 +107,6 @@ fn topological_sort(certificates: &[ProofCertificate]) -> Vec<&ProofCertificate>
         }
     }
 
+    result.shrink_to_fit();
     result
 }

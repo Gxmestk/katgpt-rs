@@ -44,6 +44,7 @@ fn make_block_keys(centroid: &[f32], block_idx: usize) -> Vec<f32> {
             keys.push(centroid[d] + noise[d] * 0.05);
         }
     }
+    keys.shrink_to_fit();
     keys
 }
 
@@ -249,8 +250,7 @@ fn bench_per_group_vs_shared() {
                 // O1 (Issue 015) — per-call partition spread, printed inline for --nocapture.
                 eprintln!(
                     "    [O1] n_blocks={n_blocks} n_groups={n_groups} top_k={top_k} \
-                     per-call Jaccard spread (pergrp vs shared) = {spread:.4}",
-                    spread = per_call_spread,
+                     per-call Jaccard spread (pergrp vs shared) = {per_call_spread:.4}",
                 );
 
                 // Verdict aggregation excludes n_groups=1 (identical to shared by construction).
@@ -296,10 +296,7 @@ fn bench_per_group_vs_shared() {
     println!("║  mean coverage ratio (per-group / shared): {mean_cov:>20.3}       ║");
     println!("║  mean latency ratio (per-group / shared): {mean_lat:>20.3}       ║");
     println!("║  threshold:  coverage ≥ 1.500  AND  latency ≤ 2.000              ║");
-    println!(
-        "║  (O1) mean per-call Jaccard spread (pgrp vs shared): {ms:>9.4}   ║",
-        ms = mean_spread
-    );
+    println!("║  (O1) mean per-call Jaccard spread (pgrp vs shared): {mean_spread:>9.4}   ║");
     println!("║       — informational only, design-goal evidence (not a gate)    ║");
     println!("╟──────────────────────────────────────────────────────────────────╢");
 

@@ -1250,6 +1250,15 @@ fn goat_three_way_matrix() {
 #[test]
 #[ignore = "pure measurement benchmark (no assertions), slow in debug; run with --release --ignored"]
 fn goat_production_stack_verdict() {
+    #[derive(Default)]
+    struct Summary {
+        mse: f64,
+        cos: f64,
+        fmas: usize,
+        params: usize,
+        available: bool,
+    }
+
     println!("\n🏆 GOAT 023: Production Stack Verdict");
     println!("{}", "═".repeat(80));
 
@@ -1263,15 +1272,6 @@ fn goat_production_stack_verdict() {
 
     // Collect all results at bits=3
     let bits = 3u8;
-
-    #[derive(Default)]
-    struct Summary {
-        mse: f64,
-        cos: f64,
-        fmas: usize,
-        params: usize,
-        available: bool,
-    }
 
     #[allow(unused_mut)]
     let mut tq = Summary::default();
@@ -1754,9 +1754,9 @@ fn goat_maxsim_late_interaction() {
         }
 
         if best_name.is_empty() {
-            println!("    (no backends available)")
+            println!("    (no backends available)");
         } else {
-            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})")
+            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})");
         }
         println!();
     }
@@ -2060,6 +2060,13 @@ fn goat_hybrid_oct_pq_quality_sweep() {
 fn goat_hybrid_maxsim_late_interaction() {
     use katgpt_core::simd::maxsim_score;
 
+    #[derive(Default)]
+    struct MaxSimResult {
+        name: String,
+        rel_errors: Vec<f64>,
+        available: bool,
+    }
+
     let dim = 128usize;
     let n_keys = 512usize;
     let n_queries = 4usize;
@@ -2088,13 +2095,6 @@ fn goat_hybrid_maxsim_late_interaction() {
     if truth.abs() < 1e-8 {
         println!("  ⚠ Truth too close to zero, skipping test.");
         return;
-    }
-
-    #[derive(Default)]
-    struct MaxSimResult {
-        name: String,
-        rel_errors: Vec<f64>,
-        available: bool,
     }
 
     println!(
@@ -2246,9 +2246,9 @@ fn goat_hybrid_maxsim_late_interaction() {
         }
 
         if best_name.is_empty() {
-            println!("    (no backends available)")
+            println!("    (no backends available)");
         } else {
-            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})")
+            println!("    🏆 bits={bits}: {best_name} wins (rel_err={best_err:.4})");
         }
         println!();
     }

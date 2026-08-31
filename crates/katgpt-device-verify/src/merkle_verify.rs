@@ -128,9 +128,10 @@ pub fn verify_proof_bounded(
     siblings: &[Hash],
     root: &Hash,
 ) -> bool {
-    match siblings.len() <= MAX_PROOF_SIZE {
-        true => verify_proof(leaf_hash, leaf_index, siblings, root),
-        false => false,
+    if siblings.len() <= MAX_PROOF_SIZE {
+        verify_proof(leaf_hash, leaf_index, siblings, root)
+    } else {
+        false
     }
 }
 

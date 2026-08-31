@@ -1032,8 +1032,9 @@ mod tests {
 
         // Build a 1D manifold embedded in 8D: all 8 coords equal.
         let mut rng = FixtureRng::new(7);
-        let mut points = Vec::new();
-        for cluster_t in [0.0f32, 0.5, 1.0, 1.5, 2.0] {
+        let cap_iter = [0.0f32, 0.5, 1.0, 1.5, 2.0];
+        let mut points = Vec::with_capacity(cap_iter.len());
+        for cluster_t in cap_iter {
             for _ in 0..10 {
                 let mut p = [0.0f32; 8];
                 for coord in &mut p {
@@ -1064,9 +1065,10 @@ mod tests {
         let space: EuclideanLatentSpace<64> = EuclideanLatentSpace;
 
         let mut rng = FixtureRng::new(99);
-        let mut points = Vec::new();
+        let cap_iter = [0.0f32, 0.1, 0.2, 0.3, 0.4];
+        let mut points = Vec::with_capacity(cap_iter.len());
         // 5 clusters at increasing mean; midpoints stay in-cluster range.
-        for cluster_mean in [0.0f32, 0.1, 0.2, 0.3, 0.4] {
+        for cluster_mean in cap_iter {
             for _ in 0..8 {
                 let mut p = [0.0f32; 64];
                 for coord in &mut p {

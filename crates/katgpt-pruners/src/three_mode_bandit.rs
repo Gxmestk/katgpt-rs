@@ -121,14 +121,14 @@ impl ModeFeatures {
     ///
     /// Low grounding quality (<0.3) → reduce `verif_success_rate` weight.
     /// High grounding quality (>0.7) → boost `verif_success_rate`.
-    pub fn with_grounding(&self, pruned: &[f32], unpruned: &[f32]) -> ModeFeatures {
+    pub fn with_grounding(&self, pruned: &[f32], unpruned: &[f32]) -> Self {
         let gq = grounding_quality(pruned, unpruned);
         let verif_adjustment = match gq {
             q if q < 0.3 => self.verif_success_rate * gq,
             q if q > 0.7 => (self.verif_success_rate * 1.0 + gq).min(1.0),
             _ => self.verif_success_rate,
         };
-        ModeFeatures {
+        Self {
             constraint_density: self.constraint_density,
             marginal_entropy: self.marginal_entropy,
             episode_hit_rate: self.episode_hit_rate,

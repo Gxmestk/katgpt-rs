@@ -360,14 +360,14 @@ enum Scorer {
 impl Scorer {
     fn label(self) -> &'static str {
         match self {
-            Scorer::FirstK1 => "first-K1 (no score)",
-            Scorer::MajorityVote => "majority vote (no score)",
-            Scorer::CostOnly => "cost-only (argmax)",
-            Scorer::AdvantageOnly => "advantage-only (argmax)",
-            Scorer::EntropyOnly => "entropy-only (argmax)",
-            Scorer::Composite => "composite (argmax)",
-            Scorer::WeightedVoteComposite => "weighted-vote (composite)",
-            Scorer::WeightedVoteAdvantage => "weighted-vote (advantage)",
+            Self::FirstK1 => "first-K1 (no score)",
+            Self::MajorityVote => "majority vote (no score)",
+            Self::CostOnly => "cost-only (argmax)",
+            Self::AdvantageOnly => "advantage-only (argmax)",
+            Self::EntropyOnly => "entropy-only (argmax)",
+            Self::Composite => "composite (argmax)",
+            Self::WeightedVoteComposite => "weighted-vote (composite)",
+            Self::WeightedVoteAdvantage => "weighted-vote (advantage)",
         }
     }
 }
@@ -740,6 +740,8 @@ fn run_g3(kernel: &LatentThoughtKernel, projection: &[f32]) {
     // Measure: per-trajectory scoring cost = run_trajectory + project + softmax
     // + self_advantage_margin + entropy_band_gate + multiply.
     // Excludes the kernel.step time itself (that's already in micro_belief_bench).
+    const ITERS: usize = 100_000;
+
     let mut pre_logits = vec![0.0f32; VOCAB];
     let mut post_logits = vec![0.0f32; VOCAB];
     let mut post_probs = vec![0.0f32; VOCAB];
@@ -748,8 +750,6 @@ fn run_g3(kernel: &LatentThoughtKernel, projection: &[f32]) {
     // Use a single fixed input/state to measure pure scoring overhead.
     let init_state: Vec<f32> = (0..DIM).map(|i| (i as f32) * 0.01 - 0.15).collect();
     let input: Vec<f32> = vec![0.5; DIM];
-
-    const ITERS: usize = 100_000;
     let k = 3u8;
 
     // Warmup.

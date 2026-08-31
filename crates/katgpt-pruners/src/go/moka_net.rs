@@ -110,6 +110,7 @@ fn load_dequantized(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &
             out.push((bytes[base + k] as i8) as f32 * scale);
         }
     }
+    out.shrink_to_fit();
     out
 }
 

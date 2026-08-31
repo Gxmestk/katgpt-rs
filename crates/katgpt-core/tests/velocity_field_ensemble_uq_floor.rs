@@ -121,6 +121,10 @@ struct VfeForecastAdapter {
 impl VfeForecastAdapter {
     fn new() -> Self {
         // Generate training corpus.
+        fn field_const(_x: &[f32], out: &mut [f32; 1]) {
+            out[0] = 1.0;
+        }
+
         let train = generate_ar1(N_TRAIN, PHI, SIGMA, SEED);
 
         // Build training pairs: (x_t, drift=x_{t+1}-x_t).
@@ -136,9 +140,6 @@ impl VfeForecastAdapter {
         // These span the AR(1) drift space: drift = (φ-1)·x + ε ≈ a·x + b.
         fn field_identity(x: &[f32], out: &mut [f32; 1]) {
             out[0] = x[0];
-        }
-        fn field_const(_x: &[f32], out: &mut [f32; 1]) {
-            out[0] = 1.0;
         }
         let fields = [
             ClosureField::<1, _>::new(0, field_identity as fn(&[f32], &mut [f32; 1])),

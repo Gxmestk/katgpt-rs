@@ -107,6 +107,7 @@ fn extract_constraints(feedback: &VrRoundFeedback) -> Vec<SynthesizedConstraint>
         });
     }
 
+    constraints.shrink_to_fit();
     constraints
 }
 

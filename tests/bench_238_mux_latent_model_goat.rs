@@ -518,6 +518,9 @@ fn g4_lora_quality_preservation() {
 #[test]
 fn g5_ttft_scaling_by_context_length() {
     // Custom config with block_size=1024 for longer contexts
+    const WARMUP: usize = 5;
+    const MEASURE: usize = 20;
+
     let config = Config {
         block_size: 1024,
         ..Config::small_target()
@@ -534,9 +537,6 @@ fn g5_ttft_scaling_by_context_length() {
     println!("┌──────────┬──────────────┬──────────────┬──────────┬──────────┐");
     println!("│ Length   │ Baseline(μs) │ Comp X8(μs)  │ Base/64  │ Comp/64  │");
     println!("├──────────┼──────────────┼──────────────┼──────────┼──────────┤");
-
-    const WARMUP: usize = 5;
-    const MEASURE: usize = 20;
 
     let mut baseline_per_len: Vec<(usize, f64)> = Vec::new();
     let mut comp_per_len: Vec<(usize, f64)> = Vec::new();

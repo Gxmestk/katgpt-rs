@@ -387,10 +387,7 @@ fn bench_b_memory_layout_comparison() {
         let fwd_p50 = latencies[250];
 
         println!("┌──────────────────────────────────────────────────────────┐");
-        println!(
-            "│ Bench B: D2 Memory Layout — {label:>15}            │",
-            label = label
-        );
+        println!("│ Bench B: D2 Memory Layout — {label:>15}            │");
         println!("├──────────────┬──────────────┬──────────────┬────────────┤");
         println!("│ Metric       │ BEFORE (Vec) │ AFTER (Cont) │ Delta      │");
         println!("├──────────────┼──────────────┼──────────────┼────────────┤");
@@ -714,8 +711,7 @@ fn summary_honest_before_after() {
     println!("║  ─────────────────────────────┼──────────────────────────────────    ║");
     println!("║  No latency distribution data │  StabilitySnapshot: P50/P99/CV/SS   ║");
     println!(
-        "║  {per_vec:>3} separate weight allocations  │  1 contiguous allocation             ║",
-        per_vec = per_vec_allocs,
+        "║  {per_vec_allocs:>3} separate weight allocations  │  1 contiguous allocation             ║",
     );
     println!("║  No alignment padding         │  64-byte aligned weight layout       ║");
     println!("║  One forward() for all stages │  DecodeStage dispatch (identity now) ║");

@@ -37,6 +37,7 @@ fn make_mixed_tokens() -> Vec<u32> {
             tokens.extend(std::iter::repeat_n(42, 128));
         }
     }
+    tokens.shrink_to_fit();
     tokens
 }
 

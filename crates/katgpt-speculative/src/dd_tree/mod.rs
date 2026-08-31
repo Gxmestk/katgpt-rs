@@ -1225,6 +1225,7 @@ pub fn build_dd_tree_dendritic(
         }
     }
 
+    tree.shrink_to_fit();
     tree
 }
 
@@ -1850,6 +1851,7 @@ fn path_to_tree_nodes(path: &[Vec<usize>]) -> Vec<TreeNode> {
         });
     }
 
+    nodes.shrink_to_fit();
     nodes
 }
 

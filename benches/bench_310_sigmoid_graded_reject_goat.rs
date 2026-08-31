@@ -233,6 +233,8 @@ fn gate_g2_latency_graded() -> (f64, f64, f64) {
 // ─── G3-T1: Batch throughput ────────────────────────────────────────────────
 
 fn gate_g3_batch_throughput() -> (f64, f64) {
+    const BATCH_ITERS: usize = 10_000;
+
     let binary = BinaryThresholdPruner { center: 128 };
     let graded = GradedThresholdPruner {
         center: 128.0,
@@ -248,8 +250,6 @@ fn gate_g3_batch_throughput() -> (f64, f64) {
     binary.batch_is_valid(0, &candidates, &parent, &mut results_bool);
     binary.batch_reject_confidence(0, &candidates, &parent, &mut results_f32);
     graded.batch_reject_confidence(0, &candidates, &parent, &mut results_f32);
-
-    const BATCH_ITERS: usize = 10_000;
 
     // batch_is_valid — black_box the results sum each iteration to prevent DCE.
     let mut sink = 0u64;
@@ -377,6 +377,9 @@ fn gate_g5_determinism() -> bool {
 // ─── GOAT verdict ───────────────────────────────────────────────────────────
 
 fn main() {
+    const GRADED_DELTA_BUDGET_NS: f64 = 5.0;
+    const PIPELINE_DELTA_BUDGET_NS: f64 = 8.0;
+
     println!();
     println!("┌─────────────────────────────────────────────────────────────┐");
     println!("│ Plan 310 T3.2 — Sigmoid-Graded Reject Confidence GOAT      │");
@@ -416,8 +419,6 @@ fn main() {
     // These are generous (the sigmoid + exp is ~2-4 cycles on modern HW); the
     // gate proves the overhead is negligible vs the false-reject-rate win (T3.1).
     const DEFAULT_DELTA_BUDGET_NS: f64 = 1.0;
-    const GRADED_DELTA_BUDGET_NS: f64 = 5.0;
-    const PIPELINE_DELTA_BUDGET_NS: f64 = 8.0;
     const BATCH_MPS_FLOOR: f64 = 200.0; // M candidates/sec
 
     let g2_default_pass = delta_default.abs() < DEFAULT_DELTA_BUDGET_NS;

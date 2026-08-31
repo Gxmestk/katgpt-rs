@@ -26,6 +26,16 @@ struct GameAction {
 }
 
 fn main() {
+    #[derive(Debug)]
+    struct HighScoreEval {
+        threshold: f32,
+    }
+    impl EventPredicate<GameAction> for HighScoreEval {
+        fn matches(&self, event: &katgpt_pruners::event_log::Event<GameAction>) -> bool {
+            event.event_type == EventType::Evaluation && event.payload.score > self.threshold
+        }
+    }
+
     let mut log: EventLog<GameAction> = EventLog::new();
 
     // Build a 100-event log with a deterministic mix.
@@ -150,15 +160,6 @@ fn main() {
 
     // 5. Custom predicate — consumer-defined escape hatch (score > threshold)
     println!("--- 5. Custom predicate: Evaluation events with score > 0.70 ---");
-    #[derive(Debug)]
-    struct HighScoreEval {
-        threshold: f32,
-    }
-    impl EventPredicate<GameAction> for HighScoreEval {
-        fn matches(&self, event: &katgpt_pruners::event_log::Event<GameAction>) -> bool {
-            event.event_type == EventType::Evaluation && event.payload.score > self.threshold
-        }
-    }
     let high_score = Predicate::custom(HighScoreEval { threshold: 0.70 });
     let high_count = log.count_where(&high_score);
     println!("  {high_count} evaluations scored above 0.70:");

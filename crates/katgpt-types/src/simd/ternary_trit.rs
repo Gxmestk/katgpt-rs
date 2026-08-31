@@ -349,11 +349,11 @@ pub fn simd_ternary_trit_matvec(w: &TernaryTritWeights, x: &[f32], y: &mut [f32]
 pub fn simd_ternary_trit_matvec_parallel(w: &TernaryTritWeights, x: &[f32], y: &mut [f32]) {
     use rayon::prelude::*;
 
-    assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
-    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
-
     /// Same value as the bit-plane tier's threshold — see the doc comment.
     const PARALLEL_ROW_MIN: usize = 256;
+
+assert_eq!(x.len(), w.cols, "x vector length must match weight cols");
+    assert_eq!(y.len(), w.rows, "y vector length must match weight rows");
 
     if w.rows < PARALLEL_ROW_MIN {
         simd_ternary_trit_matvec(w, x, y);

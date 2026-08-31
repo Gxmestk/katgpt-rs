@@ -39,6 +39,7 @@ fn seeded_random_matrix(seed: u64, rows: usize, cols: usize) -> Vec<f32> {
         let v = ((s & 0xFFFF) as f32 / 0x8000 as f32) - 1.0;
         mat.push(v);
     }
+    mat.shrink_to_fit();
     mat
 }
 

@@ -268,6 +268,7 @@ fn assign_diverse(
         order.push(best);
         used[best] = true;
     }
+    order.shrink_to_fit();
     order
 }
 
@@ -298,6 +299,7 @@ fn assign_similar(pool: &[Npc]) -> Vec<usize> {
         order.push(best);
         used[best] = true;
     }
+    order.shrink_to_fit();
     order
 }
 

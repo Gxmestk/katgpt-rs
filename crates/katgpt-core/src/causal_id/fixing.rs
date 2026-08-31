@@ -65,6 +65,7 @@ impl Admg {
                 out.push(*a);
             }
         }
+        out.shrink_to_fit();
         out
     }
 
@@ -122,6 +123,7 @@ impl Admg {
             visited.extend(d.iter().copied());
             out.push(d);
         }
+        out.shrink_to_fit();
         out
     }
 
@@ -299,8 +301,8 @@ impl Admg {
 impl Admg {
     /// Subgraph induced by `nodes` — keeps only nodes in the set and edges
     /// whose both endpoints are in the set.
-    pub fn subgraph(&self, nodes: &[NodeId]) -> Admg {
-        let mut g = Admg::new(
+    pub fn subgraph(&self, nodes: &[NodeId]) -> Self {
+        let mut g = Self::new(
             self.nodes
                 .iter()
                 .copied()
@@ -324,7 +326,7 @@ impl Admg {
     /// caller-supplied `out` Admg (all three Vec fields `clear`ed + refilled).
     /// Used by the inner loop of `identify_inner` (Issue 183 G4 refactor) to
     /// eliminate the per-call `Admg::new` + grow allocations.
-    pub fn subgraph_into(&self, nodes: &[NodeId], out: &mut Admg) {
+    pub fn subgraph_into(&self, nodes: &[NodeId], out: &mut Self) {
         out.nodes.clear();
         out.nodes
             .extend(self.nodes.iter().copied().filter(|n| nodes.contains(n)));
@@ -345,8 +347,8 @@ impl Admg {
     /// Apply the `Fix_v` operation: remove `v` and every edge touching `v`
     /// (both directed and bidirected). This is the syntactic combined
     /// `Control_v ∘ Hide_v` per Cakiqi-Little §2.4.
-    pub fn fix_node(&self, v: NodeId) -> Admg {
-        let mut g = Admg::new(self.nodes.iter().copied().filter(|n| *n != v).collect());
+    pub fn fix_node(&self, v: NodeId) -> Self {
+        let mut g = Self::new(self.nodes.iter().copied().filter(|n| *n != v).collect());
         for &(p, c) in &self.directed {
             if p != v && c != v {
                 g.directed.push((p, c));
@@ -363,7 +365,7 @@ impl Admg {
     /// Alloc-free variant of [`Self::fix_node`] — writes into the caller-
     /// supplied `out` Admg (all three Vec fields `clear`ed + refilled).
     /// Used by `try_fixseq_into` (P4 zero-alloc refactor).
-    pub fn fix_node_into(&self, v: NodeId, out: &mut Admg) {
+    pub fn fix_node_into(&self, v: NodeId, out: &mut Self) {
         out.nodes.clear();
         out.nodes
             .extend(self.nodes.iter().copied().filter(|n| *n != v));

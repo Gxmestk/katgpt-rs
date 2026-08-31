@@ -71,7 +71,9 @@ fn make_n_fitted_singles() -> (
 
 #[test]
 fn g4_batched_forecast_into_zero_alloc_after_warmup() {
-    let (singles, seeds) = make_n_fitted_singles();
+    const N_CALLS: usize = 1000;
+
+let (singles, seeds) = make_n_fitted_singles();
 
     let mut batch =
         KarcBatchForecaster::<FourierBasis<M>, D, M, K>::with_capacity(FourierBasis::new(4.0), N);
@@ -94,8 +96,6 @@ fn g4_batched_forecast_into_zero_alloc_after_warmup() {
     // expect zero delta.
     let alloc_before = ALLOC_COUNT.load(Ordering::Relaxed);
     let dealloc_before = DEALLOC_COUNT.load(Ordering::Relaxed);
-
-    const N_CALLS: usize = 1000;
     let mut total: f32 = 0.0;
     for _ in 0..N_CALLS {
         batch.forecast_into(&delay_states, &mut out);

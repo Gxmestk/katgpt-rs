@@ -295,10 +295,7 @@ fn perf_expand_certified_dirty_set_matches_the_full_rescan() {
             let valid = rng.next_f32() < truth[i];
             assert!(inc.observe(i, valid) && full.observe(i, valid));
 
-            let beta = match t % 7 == 0 {
-                true => confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2) * 0.5,
-                false => confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2),
-            };
+            let beta = if t % 7 == 0 { confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2) * 0.5 } else { confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2) };
             newly_inc_total += inc.expand_certified(&cfg, beta);
             newly_full_total += full.expand_certified_full(&cfg, beta);
         }
@@ -389,10 +386,7 @@ fn t2_3_certified_set_never_shrinks_under_arbitrary_query_sequences() {
             // Adversarial: with probability 1/4 feed the *opposite* label, so
             // the sequence is not even drawn from the planted world.
             let honest = rng.next_f32() < truth[i];
-            let valid = match rng.next_f32() < 0.25 {
-                true => !honest,
-                false => honest,
-            };
+            let valid = if rng.next_f32() < 0.25 { !honest } else { honest };
             f.observe(i, valid);
             let beta = confidence_schedule(t, cfg.delta, cfg.lambda, cfg.b_rkhs, 2);
             f.expand_certified(&cfg, beta);
@@ -879,10 +873,7 @@ fn cached_beta_sd_tracks_the_closed_form_exactly() {
     for _ in 0..500 {
         let ok = rng.next_f32() < 0.7;
         f.observe(0, ok);
-        match ok {
-            true => v += 1,
-            false => i += 1,
-        }
+        if ok { v += 1 } else { i += 1 }
         let expected = beta_mean_variance(v, i).1.sqrt();
         assert!(
             (f.sigma(0) - expected).abs() < 1e-7,

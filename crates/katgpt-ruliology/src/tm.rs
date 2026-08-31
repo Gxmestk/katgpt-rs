@@ -167,17 +167,18 @@ impl TmStrategy {
     /// - Each symbol has: write ∈ {0,1}, direction ∈ {0,1,2}, next_state ∈ {0}
     /// - So each symbol has 2 × 3 × 1 = 6 configs
     /// - Total: 6 × 6 = 36 machines
-    pub fn enumerate_1_state() -> Vec<TmStrategy> {
+    pub fn enumerate_1_state() -> Vec<Self> {
         let mut machines = Vec::with_capacity(36);
 
         for sym0_config in 0..6 {
             for sym1_config in 0..6 {
                 let t0 = Self::decode_transition(sym0_config, 1);
                 let t1 = Self::decode_transition(sym1_config, 1);
-                machines.push(TmStrategy::new([t0, t1], 1, DEFAULT_TAPE_WIDTH));
+                machines.push(Self::new([t0, t1], 1, DEFAULT_TAPE_WIDTH));
             }
         }
 
+        machines.shrink_to_fit();
         machines
     }
 

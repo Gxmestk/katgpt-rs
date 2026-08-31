@@ -247,6 +247,7 @@ fn free_gaussian_walk(z0: [f32; 2], sigma: f32, steps: usize, rng: &mut Lcg) -> 
         z = [z[0] + sigma * gx, z[1] + sigma * gy];
         traj.push(z);
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -284,6 +285,7 @@ fn manifold_random_walk(
         cur = nbrs[(rng.next_u64() % nbrs.len() as u64) as usize];
         traj.push(cur);
     }
+    traj.shrink_to_fit();
     traj
 }
 

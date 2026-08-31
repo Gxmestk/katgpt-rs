@@ -68,7 +68,7 @@ impl DenseHidden {
     ///
     /// Panics in debug if shapes differ. Use for aggregating multiple incoming
     /// edges at a single vertex.
-    pub fn add_assign(&mut self, other: &DenseHidden) {
+    pub fn add_assign(&mut self, other: &Self) {
         debug_assert_eq!(self.seq_len, other.seq_len);
         debug_assert_eq!(self.hidden_dim, other.hidden_dim);
         for (dst, src) in self.data.iter_mut().zip(other.data.iter()) {

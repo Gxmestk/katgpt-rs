@@ -64,7 +64,10 @@ fn f16_f16_correctness() {
 #[test]
 #[ignore]
 fn prof_f16_f16_kernel_speedup() {
-    println!();
+    const ITERS: usize = 10_000;
+const GATE: f64 = 1.5;
+
+println!();
     println!("═══ f16×f16 Kernel Microbenchmark (Issue 201 Phase 1) ═══");
     println!("CPU: Apple Silicon (fp16 + fhm target features)");
     println!();
@@ -83,8 +86,6 @@ fn prof_f16_f16_kernel_speedup() {
         (262144, "DRAM (256K elem, 1MB f32 / 512KB f16)"),
         (1048576, "DRAM (1M elem, 4MB f32 / 2MB f16)"),
     ];
-
-    const ITERS: usize = 10_000;
 
     println!(
         "{:<40} {:>10} {:>10} {:>10} {:>9} {:>9}",
@@ -151,7 +152,6 @@ fn prof_f16_f16_kernel_speedup() {
     println!(
         "  f16xf16 best speedup at L3+ sizes (>=65536): {large_f16f16_speedup:.3}x"
     );
-    const GATE: f64 = 1.5;
     if large_f16f16_speedup >= GATE {
         println!("  PASS — f16xf16 kernel is >={GATE}x faster at L3+ sizes");
         println!("  -> Proceed to Phase 2: implement ForwardContextF16 + full forward path");

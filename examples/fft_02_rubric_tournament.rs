@@ -60,14 +60,14 @@ impl Strategy {
         }
     }
 
-    fn all() -> &'static [Strategy] {
+    fn all() -> &'static [Self] {
         &[
-            Strategy::Random,
-            Strategy::Greedy,
-            Strategy::Validator,
-            Strategy::HL,
-            Strategy::GZero,
-            Strategy::Rubric,
+            Self::Random,
+            Self::Greedy,
+            Self::Validator,
+            Self::HL,
+            Self::GZero,
+            Self::Rubric,
         ]
     }
 }
@@ -347,7 +347,7 @@ fn main() {
     print!("| {:<14}|", "Party \\ Enemy ");
     for &s in strategies {
         let label = s.label();
-        print!(" {label:>width$} |", width = col_width);
+        print!(" {label:>col_width$} |");
     }
     println!();
 
@@ -375,7 +375,7 @@ fn main() {
                     format!("{pct:.0}%")
                 }
             };
-            print!(" {cell:>width$} |", width = col_width);
+            print!(" {cell:>col_width$} |");
         }
         println!();
     }

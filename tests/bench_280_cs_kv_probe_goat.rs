@@ -486,7 +486,9 @@ fn t3_4_feature_disabled_is_passthrough() {
 /// should be sub-millisecond — far below any per-call heap overhead).
 #[test]
 fn t3_5_apply_zero_alloc() {
-    println!("\n=== T3.5: apply zero-allocation ===");
+    const ITERS: usize = 10_000;
+
+println!("\n=== T3.5: apply zero-allocation ===");
     let n_groups = 64_usize;
     let scores: Vec<f32> = (0..n_groups)
         .map(|i| (i as f32).sin() * 0.5 + 0.5)
@@ -498,8 +500,6 @@ fn t3_5_apply_zero_alloc() {
     let mut idx_scratch = vec![0_usize; n_groups];
     let mut out_bias = vec![0.0_f32; n_groups];
     let kv_dummy = [0.0_f32; 0];
-
-    const ITERS: usize = 10_000;
 
     // Warmup once (first call is identical to subsequent calls, but it
     // absorbs any one-time JVM-style init the allocator might do).

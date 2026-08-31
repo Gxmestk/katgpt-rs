@@ -228,7 +228,7 @@ impl FutureBehaviorProbe {
     /// This is the freeze/thaw entry point: load the new probe via
     /// [`FutureBehaviorProbe::load_from_bytes`] (which verifies the manifest
     /// hash), then `swap_direction` it into place.
-    pub fn swap_direction(&self, new: FutureBehaviorProbe) {
+    pub fn swap_direction(&self, new: Self) {
         // Extract the new probe's data — it's the only `Arc` strong reference
         // after we created it via `new`, so try_unwrap should succeed. If it
         // doesn't (extremely rare: someone else cloned), fall back to clone.

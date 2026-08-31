@@ -385,6 +385,7 @@ impl TernaryGroupWeights {
                 blocks.push(blk);
             }
         }
+        blocks.shrink_to_fit();
         blocks
     }
 }

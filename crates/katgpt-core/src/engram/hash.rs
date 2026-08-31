@@ -377,7 +377,7 @@ mod tests {
         let expected = n_samples as f64 / n_buckets as f64;
 
         let mut chi_sq_per_head = [0.0f64; K_MAX];
-        let mut failures = Vec::new();
+        let mut failures = Vec::with_capacity(K_MAX);
         for k in 0..K_MAX {
             let mut chi = 0.0f64;
             for &c in &counts[k] {

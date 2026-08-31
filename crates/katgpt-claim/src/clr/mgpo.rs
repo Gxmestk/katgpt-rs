@@ -94,6 +94,7 @@ pub fn allocate_budget(weights: &[f32], total_budget: usize) -> Vec<usize> {
             allocated += c;
         }
     }
+    counts.shrink_to_fit();
     counts
 }
 

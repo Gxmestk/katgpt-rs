@@ -181,7 +181,7 @@ impl BomberAction {
         }
     }
 
-    pub fn all() -> [BomberAction; 7] {
+    pub fn all() -> [Self; 7] {
         [
             Self::Up,
             Self::Down,

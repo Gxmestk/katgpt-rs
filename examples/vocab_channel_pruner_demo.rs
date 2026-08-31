@@ -15,6 +15,8 @@ fn main() {
         decompose_layer_channels, householder_apply, skewness,
     };
 
+    use katgpt_rs::speculative::ConstraintPruner;
+
     println!("🔬 VocabChannel Pruner Demo — ROTATE Weight Decomposition");
     println!("{}", "═".repeat(60));
 
@@ -177,7 +179,6 @@ fn main() {
 
     // ── 6. ConstraintPruner trait demo ──────────────────────────
     println!("\n🎯 ConstraintPruner trait integration:");
-    use katgpt_rs::speculative::ConstraintPruner;
 
     // Set active context: layer 0, neurons [0, 1, 2]
     pruner.set_active_context(0, &[0, 1, 2]);

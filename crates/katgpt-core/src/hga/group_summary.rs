@@ -155,6 +155,7 @@ impl GroupSummaryCache {
                 .partial_cmp(&a.score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        scores.shrink_to_fit();
         scores
     }
 

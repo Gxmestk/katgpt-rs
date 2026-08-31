@@ -145,15 +145,15 @@ impl MoaActivation {
 
     /// All MoA activations in canonical order (matches weight layout).
     #[inline(always)]
-    pub const fn all() -> [MoaActivation; 7] {
+    pub const fn all() -> [Self; 7] {
         [
-            MoaActivation::Id,
-            MoaActivation::Relu,
-            MoaActivation::Relu2,
-            MoaActivation::LeakyRelu,
-            MoaActivation::Gelu,
-            MoaActivation::Silu,
-            MoaActivation::Tanh,
+            Self::Id,
+            Self::Relu,
+            Self::Relu2,
+            Self::LeakyRelu,
+            Self::Gelu,
+            Self::Silu,
+            Self::Tanh,
         ]
     }
 }

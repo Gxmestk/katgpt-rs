@@ -24,6 +24,7 @@ fn synthetic_trajectory(n: usize) -> Vec<f32> {
         out.push(a);
         out.push(b);
     }
+    out.shrink_to_fit();
     out
 }
 
@@ -132,12 +133,13 @@ fn g4_wout_dump_for_audit() {
     // Optional audit artifact: dump the bit patterns to a file so a second
     // machine can verify byte-identical reproduction. Disabled by default —
     // uncomment the KARC_G4_DUMP env check to enable.
-    if std::env::var("KARC_G4_DUMP").is_err() {
-        return;
-    }
     const D: usize = 2;
     const K: usize = 3;
     const M: usize = 8;
+
+    if std::env::var("KARC_G4_DUMP").is_err() {
+        return;
+    }
     let traj = synthetic_trajectory(200);
     let f = fit_on_trajectory::<FourierBasis<M>, D, M, K>(FourierBasis::new(4.0), &traj, 1e-6);
     let mut file = fs::File::create("karc_g4_wout_audit.bin").expect("create audit file");

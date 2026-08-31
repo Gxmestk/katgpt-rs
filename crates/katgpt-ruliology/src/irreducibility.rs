@@ -202,6 +202,7 @@ fn rle_compress(data: &[u8]) -> Vec<u8> {
     result.push(current);
     result.push(count);
 
+    result.shrink_to_fit();
     result
 }
 

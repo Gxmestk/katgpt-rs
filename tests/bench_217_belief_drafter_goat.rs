@@ -685,7 +685,7 @@ fn bench_217_cache_hit_rate() {
             let h = make_h(i);
             let emb = make_emb(i);
             if let Some(v) = cache.get(&h, &emb) {
-                drop(black_box(v))
+                drop(black_box(v));
             } else {
                 let h_next = (0..n_embd).map(|j| j as f32 * 0.5).collect();
                 cache.insert(&h, &emb, h_next);
@@ -734,7 +734,7 @@ fn bench_217_cache_hit_rate() {
             let idx = i % 4;
             let (h, emb) = &walk_states[idx];
             if let Some(v) = cache.get(h, emb) {
-                drop(black_box(v))
+                drop(black_box(v));
             } else {
                 let h_next = (0..n_embd).map(|j| j as f32 * 0.1).collect();
                 cache.insert(h, emb, h_next);
@@ -790,7 +790,7 @@ fn bench_217_cache_hit_rate() {
 
             if i % 10 < 7 {
                 if let Some(v) = cache.get(h, emb) {
-                    drop(black_box(v))
+                    drop(black_box(v));
                 } else {
                     let h_next = (0..n_embd).map(|j| j as f32 * 0.2).collect();
                     cache.insert(h, emb, h_next);
@@ -800,7 +800,7 @@ fn bench_217_cache_hit_rate() {
                 let h = make_h(500 + i);
                 let emb = make_emb(500 + i);
                 if let Some(v) = cache.get(&h, &emb) {
-                    drop(black_box(v))
+                    drop(black_box(v));
                 } else {
                     let h_next = (0..n_embd).map(|j| j as f32 * 0.3).collect();
                     cache.insert(&h, &emb, h_next);

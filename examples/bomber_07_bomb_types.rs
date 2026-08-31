@@ -190,9 +190,9 @@ fn demo_landmine() {
         other => println!("   Tick 2: {other:?}"),
     }
     if world.get::<Alive>(p).is_some() {
-        println!("   Player survived (unexpected)")
+        println!("   Player survived (unexpected)");
     } else {
-        println!("   Player killed by landmine (range=1, ignored BombRange=5)")
+        println!("   Player killed by landmine (range=1, ignored BombRange=5)");
     }
     println!();
 }

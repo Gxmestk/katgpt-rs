@@ -62,6 +62,7 @@ impl RollingHash {
             );
             h.push(prev);
         }
+        h.shrink_to_fit();
         h
     }
 
@@ -286,6 +287,7 @@ impl KvSegmentPool {
             }
         }
 
+        results.shrink_to_fit();
         results
     }
 }

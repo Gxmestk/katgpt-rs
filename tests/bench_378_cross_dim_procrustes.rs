@@ -221,6 +221,7 @@ fn random_matrix_f32(rows: usize, cols: usize, seed: u64) -> Vec<f32> {
     for _ in 0..(rows * cols) {
         m.push(rng.normal() * scale);
     }
+    m.shrink_to_fit();
     m
 }
 
@@ -757,16 +758,10 @@ fn bench_378_cross_dim_procrustes() {
         println!("  vs random control KL = {:.6}", random_result.kl_div);
         println!();
         println!(
-            "  Root cause (rank deficiency): draft_lm_head [{v}×{d}] @ P [{d}×{D}]",
-            v = vocab,
-            d = draft_n_embd,
-            D = target_n_embd
+            "  Root cause (rank deficiency): draft_lm_head [{vocab}×{draft_n_embd}] @ P [{draft_n_embd}×{target_n_embd}]"
         );
         println!(
-            "  has rank ≤ {d}, but target_lm_head [{v}×{D}] has rank up to {D}.",
-            d = draft_n_embd,
-            v = vocab,
-            D = target_n_embd
+            "  has rank ≤ {draft_n_embd}, but target_lm_head [{vocab}×{target_n_embd}] has rank up to {target_n_embd}."
         );
         println!("  KL=0 is mathematically impossible when target rank > draft rank.");
         println!("  This is fundamental for random-init models with dim mismatch.");
@@ -972,11 +967,7 @@ fn bench_378_synthetic_linear_fixture() {
 
     println!("  Target: n_embd={target_n_embd}, Draft: n_embd={draft_n_embd}, vocab={vocab}");
     println!("  Samples: {n_train} train + {n_test} test = {n_total}");
-    println!(
-        "  Ground-truth W: [{d}×{D}] (seed=77777)",
-        d = draft_n_embd,
-        D = target_n_embd
-    );
+    println!("  Ground-truth W: [{draft_n_embd}×{target_n_embd}] (seed=77777)");
     println!();
 
     // Sweep noise levels to show graceful degradation

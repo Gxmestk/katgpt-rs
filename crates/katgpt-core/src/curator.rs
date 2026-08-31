@@ -346,9 +346,9 @@ impl CuratorBandit {
     pub fn update(&mut self, curator_id: usize, correct: bool) {
         if let Some(arm) = self.arms.get_mut(curator_id) {
             if correct {
-                arm.alpha += 1.0
+                arm.alpha += 1.0;
             } else {
-                arm.beta += 1.0
+                arm.beta += 1.0;
             }
         }
     }

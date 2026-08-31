@@ -50,7 +50,7 @@ impl RubricCriterion {
     }
 
     /// All known criteria in canonical order.
-    pub fn all() -> &'static [RubricCriterion] {
+    pub fn all() -> &'static [Self] {
         &[
             Self::TaskFulfillment,
             Self::OutputStructure,

@@ -362,6 +362,8 @@ fn gate_g3_quality() -> (f64, bool) {
 // ─── G4 — Behavioral divergence ─────────────────────────────────────────────
 
 fn gate_g4_divergence() -> (f64, bool) {
+    const N_PAIRS: usize = 10000;
+
     gate_header("G4 Behavioral divergence", "> 50% of NPC pairs cos < 0.7");
     // Generate N_NPCS windows, each rank-3 with a random dominant direction
     // chosen from the D canonical axes. Recover k=1 principal direction per NPC.
@@ -414,7 +416,6 @@ fn gate_g4_divergence() -> (f64, bool) {
     // Sample random pairs (full pairwise on 1000 is ~500k — fine, but we sample
     // 10000 to keep the bench fast and the statistic robust).
     let mut rng = Lcg::new(12345);
-    const N_PAIRS: usize = 10000;
     let mut separated = 0usize;
     let mut cos_sum = 0.0_f64;
     for _ in 0..N_PAIRS {

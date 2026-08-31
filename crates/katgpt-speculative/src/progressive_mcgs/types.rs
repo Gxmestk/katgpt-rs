@@ -34,7 +34,7 @@ pub struct NodeId(pub u32);
 
 impl NodeId {
     /// Sentinel for "no node" — used as root's parent.
-    pub const NONE: NodeId = NodeId(u32::MAX);
+    pub const NONE: Self = NodeId(u32::MAX);
 
     #[inline]
     #[must_use]
@@ -60,7 +60,7 @@ pub struct BranchId(pub u32);
 
 impl BranchId {
     /// Sentinel for "no branch" — used for the root before assignment.
-    pub const NONE: BranchId = BranchId(u32::MAX);
+    pub const NONE: Self = BranchId(u32::MAX);
 
     #[inline]
     #[must_use]

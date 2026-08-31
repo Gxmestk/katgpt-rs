@@ -385,6 +385,7 @@ mod tests {
             out.push(v as f32 * t as f32);
             out.push(v as f32);
         }
+        out.shrink_to_fit();
         out
     }
 

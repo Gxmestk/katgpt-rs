@@ -74,6 +74,21 @@ fn blocking_components(
     positions: &[GridPos],
     neighbors_fn: &dyn Fn(&GridPos) -> Vec<GridPos>,
 ) -> Vec<usize> {
+    fn find(parent: &mut [usize], x: usize) -> usize {
+        let mut root = x;
+        while parent[root] != root {
+            root = parent[root];
+        }
+        // Path compression.
+        let mut cur = x;
+        while parent[cur] != root {
+            let next = parent[cur];
+            parent[cur] = root;
+            cur = next;
+        }
+        root
+    }
+
     if stuck_indices.is_empty() {
         return Vec::new();
     }
@@ -89,20 +104,6 @@ fn blocking_components(
     // Union-Find over stuck agents (indices 0..stuck_indices.len()).
     let n = stuck_indices.len();
     let mut parent: Vec<usize> = (0..n).collect();
-    fn find(parent: &mut [usize], x: usize) -> usize {
-        let mut root = x;
-        while parent[root] != root {
-            root = parent[root];
-        }
-        // Path compression.
-        let mut cur = x;
-        while parent[cur] != root {
-            let next = parent[cur];
-            parent[cur] = root;
-            cur = next;
-        }
-        root
-    }
     // `union` returns true if two distinct sets were merged.
     #[allow(clippy::needless_pass_by_value)]
     fn union(parent: &mut [usize], a: usize, b: usize) -> bool {
@@ -347,13 +348,13 @@ fn main() {
 
     match p95_k {
         Some(k) => {
-            println!("P95 max-cluster-size = {k} (depth ≥ {k} resolves ≥95% of stuck ticks)")
+            println!("P95 max-cluster-size = {k} (depth ≥ {k} resolves ≥95% of stuck ticks)");
         }
         None => println!("P95 max-cluster-size = N/A (insufficient data)"),
     }
     match p99_k {
         Some(k) => {
-            println!("P99 max-cluster-size = {k} (depth ≥ {k} resolves ≥99% of stuck ticks)")
+            println!("P99 max-cluster-size = {k} (depth ≥ {k} resolves ≥99% of stuck ticks)");
         }
         None => println!("P99 max-cluster-size = N/A (insufficient data)"),
     }

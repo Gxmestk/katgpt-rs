@@ -187,6 +187,7 @@ impl FairRollVerifier {
             }
         }
 
+        results.shrink_to_fit();
         results
     }
 }

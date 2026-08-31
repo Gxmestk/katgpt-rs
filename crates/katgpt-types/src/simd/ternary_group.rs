@@ -935,7 +935,9 @@ pub fn simd_ternary_group_matmul_batch(
     /// Below this, rayon's per-task overhead (~1-5µs) outweighs the work.
     const PARALLEL_BATCH_MIN: usize = 4;
 
-    if batch < PARALLEL_BATCH_MIN {
+    use rayon::prelude::*;
+
+if batch < PARALLEL_BATCH_MIN {
         for b in 0..batch {
             let x_off = b * w.cols;
             let y_off = b * w.rows;
@@ -945,8 +947,6 @@ pub fn simd_ternary_group_matmul_batch(
         }
         return;
     }
-
-    use rayon::prelude::*;
     y.par_chunks_mut(w.rows)
         .zip(x.par_chunks(w.cols))
         .enumerate()

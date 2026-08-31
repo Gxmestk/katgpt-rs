@@ -51,7 +51,7 @@ impl LabelSet {
     /// Empty set.
     #[inline]
     pub const fn new() -> Self {
-        LabelSet {
+        Self {
             ids: [LabelId::new(0); LABEL_SET_CAPACITY],
             len: 0,
         }
@@ -191,7 +191,7 @@ impl ValidationScratch {
     /// Pre-allocate capacity for `n` rejections, `n` visited ids, and `n`
     /// accepted candidates.
     pub fn with_capacity(n: usize) -> Self {
-        ValidationScratch {
+        Self {
             rejections: Vec::with_capacity(n),
             visited: Vec::with_capacity(n),
             accepted: Vec::with_capacity(n),

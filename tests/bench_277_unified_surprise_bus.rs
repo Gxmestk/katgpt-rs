@@ -172,6 +172,8 @@ fn l2_normalize(v: &mut [f32; F2_RANK]) {
 
 fn f2_build_stream() -> (Vec<F2Pair>, usize) {
     // Boring centroid: first 4 dims active.
+    const NOVEL_BLOCK: usize = 50;
+
     let mut centroid_bg = [0.0f32; F2_RANK];
     for c in centroid_bg.iter_mut().take(4) {
         *c = 1.0;
@@ -190,7 +192,6 @@ fn f2_build_stream() -> (Vec<F2Pair>, usize) {
 
     // Block structure: alternating boring (200) and novel (50) blocks.
     const BORING_BLOCK: usize = 200;
-    const NOVEL_BLOCK: usize = 50;
 
     let mut stream: Vec<F2Pair> = Vec::new();
     for pair in 0..5 {

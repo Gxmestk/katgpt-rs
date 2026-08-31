@@ -268,7 +268,7 @@ pub struct ParallelProbeController<A> {
 impl<A: Clone + Eq + Hash> ParallelProbeController<A> {
     /// Create a new controller for `n_branches` parallel branches.
     pub fn new(n_branches: usize, config: ParallelProbeConfig) -> Self {
-        let branches = (0..n_branches).map(|i| BranchProbeState::new(i)).collect();
+        let branches = (0..n_branches).map(BranchProbeState::new).collect();
         Self {
             branches,
             config,
@@ -477,6 +477,7 @@ impl<A: Clone + Eq + Hash> ParallelProbeController<A> {
         let max_prunable = active_count.saturating_sub(self.config.min_active_branches);
         to_prune.truncate(max_prunable);
 
+        to_prune.shrink_to_fit();
         to_prune
     }
 }

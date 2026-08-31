@@ -396,6 +396,7 @@ pub fn enumerate_subgraph_hashes(ptg: &PrimitiveTransitionGraph) -> Vec<[u8; 32]
             out.push(hash);
         }
     }
+    out.shrink_to_fit();
     out
 }
 

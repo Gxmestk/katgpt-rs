@@ -51,6 +51,7 @@ pub fn intra_branch_history<N: Clone>(
         out.push(p);
         current = graph.parent(p);
     }
+    out.shrink_to_fit();
     out
 }
 

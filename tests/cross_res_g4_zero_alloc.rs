@@ -92,6 +92,8 @@ fn g4_zero_alloc_steady_state() {
     #[cfg(debug_assertions)]
     {
         // Warmup — absorbs any one-time `ensure_capacity` resize.
+        const MEASURED_ITERS: usize = 1000;
+
         for _ in 0..50 {
             transport_cross_resolution_into(&src, &bases, &mut scratch, &mut dst);
         }
@@ -99,7 +101,6 @@ fn g4_zero_alloc_steady_state() {
 
         assert_alloc_tracking_live();
         katgpt_core::alloc::reset_alloc_stats();
-        const MEASURED_ITERS: usize = 1000;
         for _ in 0..MEASURED_ITERS {
             transport_cross_resolution_into(&src, &bases, &mut scratch, &mut dst);
         }
@@ -125,12 +126,12 @@ fn g4_zero_alloc_steady_state() {
     #[cfg(not(debug_assertions))]
     {
         use std::time::Instant;
+        const N: usize = 100_000;
+
         for _ in 0..50 {
             transport_cross_resolution_into(&src, &bases, &mut scratch, &mut dst);
         }
         std::hint::black_box(&dst);
-
-        const N: usize = 100_000;
         let t0 = Instant::now();
         for _ in 0..N {
             transport_cross_resolution_into(&src, &bases, &mut scratch, &mut dst);

@@ -104,7 +104,7 @@ impl BomberEventLog {
     }
 
     /// Compute structural diff between this log and another.
-    pub fn diff(&self, other: &BomberEventLog) -> BomberForkDiff {
+    pub fn diff(&self, other: &Self) -> BomberForkDiff {
         BomberForkDiff {
             inner: self.log.diff(&other.log),
         }
@@ -253,16 +253,16 @@ mod tests {
 
     #[test]
     fn test_bomber_event_log_replay() {
-        let mut log = BomberEventLog::new();
-        log.record_game_start(4);
-        log.record_move(0, BomberAction::Up, 1);
-        log.record_move(0, BomberAction::Right, 2);
-
         #[derive(Clone, PartialEq)]
         struct Pos {
             x: i32,
             y: i32,
         }
+
+        let mut log = BomberEventLog::new();
+        log.record_game_start(4);
+        log.record_move(0, BomberAction::Up, 1);
+        log.record_move(0, BomberAction::Right, 2);
 
         let start = Pos { x: 0, y: 0 };
         let final_pos = log.replay(start, |pos, event| match event.payload {

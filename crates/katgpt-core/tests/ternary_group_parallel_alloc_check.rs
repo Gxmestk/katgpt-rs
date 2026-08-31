@@ -57,6 +57,8 @@ fn fixture() -> TernaryGroupWeights {
 /// G4 — the parallel matvec allocates nothing per call in steady state.
 #[test]
 fn parallel_ternary_matvec_is_alloc_free() {
+    const N_CALLS: usize = 50;
+
     let w = fixture();
     let x = vec![0.01f32; COLS];
     let mut y = vec![0.0f32; ROWS];
@@ -66,8 +68,6 @@ fn parallel_ternary_matvec_is_alloc_free() {
     for _ in 0..4 {
         simd_ternary_group_matvec_parallel(&w, &x, &mut y);
     }
-
-    const N_CALLS: usize = 50;
     let (_, allocs) = alloc_delta(|| {
         for _ in 0..N_CALLS {
             simd_ternary_group_matvec_parallel(&w, &x, &mut y);

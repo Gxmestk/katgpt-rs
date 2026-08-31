@@ -298,10 +298,7 @@ pub fn mla_forward_token_with_saved(
                 // propagates. Callers needing the exact pre-gate activation
                 // should use the checkpoint path, which SAVES it instead of
                 // dividing it back out (`kimi_k3/checkpoint.rs`).
-                match g > 0.0 {
-                    true => attn_out_gated[i] / g,
-                    false => 0.0,
-                }
+                if g > 0.0 { attn_out_gated[i] / g } else { 0.0 }
             })
             .collect::<Vec<_>>()
     } else {

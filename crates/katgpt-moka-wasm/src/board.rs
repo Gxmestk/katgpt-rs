@@ -24,9 +24,9 @@ impl Cell {
     #[inline]
     pub fn opponent(self) -> Self {
         match self {
-            Cell::Black => Cell::White,
-            Cell::White => Cell::Black,
-            Cell::Empty => panic!("opponent() on Empty"),
+            Self::Black => Self::White,
+            Self::White => Self::Black,
+            Self::Empty => panic!("opponent() on Empty"),
         }
     }
 }

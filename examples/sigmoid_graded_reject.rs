@@ -58,6 +58,13 @@ impl RelaxationStrategy for WidenToleranceRelax {
 }
 
 fn main() {
+    struct BinaryPruner(usize);
+    impl ConstraintPruner for BinaryPruner {
+        fn is_valid(&self, _d: usize, tok: usize, _p: &[usize]) -> bool {
+            tok < self.0
+        }
+    }
+
     println!("═══════════════════════════════════════════════════════════════");
     println!("  Plan 310 T1.6 — Sigmoid-Graded Reject Confidence Demo");
     println!("  HarnessBridge Table 7: tolerant > strict rejection");
@@ -155,12 +162,6 @@ fn main() {
     // behave identically under soft_reject_with_relax — the SoftReject band is
     // unreachable because the default only emits 0.0 / 1.0.
     println!("── Backward-compat: binary pruner (default reject_confidence) ──");
-    struct BinaryPruner(usize);
-    impl ConstraintPruner for BinaryPruner {
-        fn is_valid(&self, _d: usize, tok: usize, _p: &[usize]) -> bool {
-            tok < self.0
-        }
-    }
     let bin = BinaryPruner(5);
     let mut no_relax = NoRelaxation;
     let mut bin_scratch = [0u8; 8];

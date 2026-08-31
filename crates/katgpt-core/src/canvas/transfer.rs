@@ -104,6 +104,7 @@ pub fn compatible_regions_in_layout(
             }
         }
     }
+    out.shrink_to_fit();
     out
 }
 

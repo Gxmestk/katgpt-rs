@@ -36,12 +36,12 @@ impl TokenRule {
     }
 
     /// All strategy rules in canonical cycle order.
-    pub const STRATEGIES: [TokenRule; 5] = [
-        TokenRule::Digit,
-        TokenRule::Arithmetic,
-        TokenRule::Compare,
-        TokenRule::Augment,
-        TokenRule::All,
+    pub const STRATEGIES: [Self; 5] = [
+        Self::Digit,
+        Self::Arithmetic,
+        Self::Compare,
+        Self::Augment,
+        Self::All,
     ];
 
     /// Returns the support set (allowed token IDs) for this rule.
@@ -50,8 +50,8 @@ impl TokenRule {
     /// For BPE tokenizers, use `PpotConfig::with_cached_support` to override.
     pub fn support(&self, vocab_size: usize) -> Vec<usize> {
         match self {
-            TokenRule::Digit => (0..10.min(vocab_size)).collect(),
-            TokenRule::Compare => {
+            Self::Digit => (0..10.min(vocab_size)).collect(),
+            Self::Compare => {
                 // '<' = 60, '>' = 62, '=' = 61, '!' = 33 in ASCII
                 // For character-level (vocab < 256): use ASCII codes
                 // For BPE (vocab >= 256): fall back to small range
@@ -65,7 +65,7 @@ impl TokenRule {
                     (0..vocab_size).collect()
                 }
             }
-            TokenRule::Arithmetic => {
+            Self::Arithmetic => {
                 // '+' = 43, '-' = 45, '*' = 42, '/' = 47
                 if vocab_size < 256 {
                     vec![42, 43, 45, 47]
@@ -76,7 +76,7 @@ impl TokenRule {
                     (0..vocab_size).collect()
                 }
             }
-            TokenRule::Augment => {
+            Self::Augment => {
                 // Augmented assignment operators: same as arithmetic + '='
                 if vocab_size < 256 {
                     vec![42, 43, 45, 47, 61]
@@ -87,7 +87,7 @@ impl TokenRule {
                     (0..vocab_size).collect()
                 }
             }
-            TokenRule::All => (0..vocab_size).collect(),
+            Self::All => (0..vocab_size).collect(),
         }
     }
 
@@ -95,22 +95,22 @@ impl TokenRule {
     /// For hot paths, prefer pre-computing support once via [`PpotConfig`].
     pub fn index(&self) -> usize {
         match self {
-            TokenRule::Digit => 0,
-            TokenRule::Compare => 1,
-            TokenRule::Arithmetic => 2,
-            TokenRule::Augment => 3,
-            TokenRule::All => 4,
+            Self::Digit => 0,
+            Self::Compare => 1,
+            Self::Arithmetic => 2,
+            Self::Augment => 3,
+            Self::All => 4,
         }
     }
 
     /// Parse from string (for config file compatibility).
     pub fn from_str_ignore_case(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {
-            "digit" => Some(TokenRule::Digit),
-            "compare" => Some(TokenRule::Compare),
-            "arithmetic" => Some(TokenRule::Arithmetic),
-            "augment" => Some(TokenRule::Augment),
-            "all" => Some(TokenRule::All),
+            "digit" => Some(Self::Digit),
+            "compare" => Some(Self::Compare),
+            "arithmetic" => Some(Self::Arithmetic),
+            "augment" => Some(Self::Augment),
+            "all" => Some(Self::All),
             _ => None,
         }
     }

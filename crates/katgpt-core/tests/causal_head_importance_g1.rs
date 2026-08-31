@@ -191,6 +191,8 @@ impl XorShiftRng {
 
 #[test]
 fn knockout_ie_ordered_collapses_random_stays_high() {
+    const N_TRIALS: usize = 2000;
+
     let harness = LinearHarness::new(N_HEADS, K_LOAD_BEARING);
     let ies = harness.ies();
     let m_baseline = harness.m_clean();
@@ -216,7 +218,6 @@ fn knockout_ie_ordered_collapses_random_stays_high() {
     // Random knockout control: mean ratio over many trials.
     // Expected mean ratio = (N − K) / N = 28/32 = 0.875 > 0.8.
     let mut rng = XorShiftRng::new(0xCAFE_BABE_DEAD_BEEF);
-    const N_TRIALS: usize = 2000;
     let mut ratio_sum = 0.0f64;
     for _ in 0..N_TRIALS {
         let random_knocked = rng.sample_k(N_HEADS, K_LOAD_BEARING);

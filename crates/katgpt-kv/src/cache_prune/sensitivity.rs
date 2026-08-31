@@ -90,7 +90,7 @@ impl MaskedSegment {
             let len = end - start;
             let is_reusable = len >= min_length;
 
-            segments.push(MaskedSegment {
+            segments.push(Self {
                 start,
                 end,
                 is_reusable,
@@ -99,6 +99,7 @@ impl MaskedSegment {
             });
         }
 
+        segments.shrink_to_fit();
         segments
     }
 

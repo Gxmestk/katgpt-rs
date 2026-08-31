@@ -27,7 +27,9 @@ const WASM_PATH: &str = "/tmp/moka-wasm-bench/pkg/katgpt_moka_wasm_bg.wasm";
 #[test]
 #[ignore = "depends on a wasm32 build artifact — see module doc"]
 fn wasmi_infer_latency() {
-    let wasm_bytes = std::fs::read(WASM_PATH)
+    const ITERS: usize = 50;
+
+let wasm_bytes = std::fs::read(WASM_PATH)
         .unwrap_or_else(|e| panic!("read {WASM_PATH}: {e} — build the wasm32 target first"));
 
     let mut config = Config::default();
@@ -95,8 +97,6 @@ fn wasmi_infer_latency() {
     for _ in 0..10 {
         wasmi_infer.call(&mut store, (features_ptr, out_ptr)).expect("infer");
     }
-
-    const ITERS: usize = 50;
     let start = Instant::now();
     for _ in 0..ITERS {
         wasmi_infer.call(&mut store, (features_ptr, out_ptr)).expect("infer");

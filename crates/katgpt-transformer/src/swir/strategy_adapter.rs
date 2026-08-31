@@ -104,6 +104,8 @@ impl SwiRStrategyAdapter {
     /// in without touching `on_step`.
     #[inline]
     fn softmax_into_scratch<'b>(probs_scratch: &'b mut Vec<f32>, logits: &[f32]) -> &'b mut [f32] {
+        use katgpt_core::simd::fast_exp;
+
         if logits.is_empty() {
             probs_scratch.clear();
             return probs_scratch;
@@ -133,7 +135,6 @@ impl SwiRStrategyAdapter {
             }
             return view;
         }
-        use katgpt_core::simd::fast_exp;
         let mut sum_exp = 0.0f32;
         for (i, &l) in logits.iter().enumerate() {
             let e = fast_exp(l - max_logit);

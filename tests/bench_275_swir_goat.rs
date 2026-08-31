@@ -683,6 +683,9 @@ fn g2p_efficiency_proxy_swir_terminates_earlier_than_fixed_budget() {
     // every Explicit step, causing a livelock that starved the mode-switch
     // logic and froze switch_count). With the one-shot trigger fix, the full
     // convergence→termination path is exercised correctly.
+    const HIGH: f32 = 5.0;
+    const LOW: f32 = 1.0;
+
     let swir_config = SwiRConfig {
         w_e_to_l: 1,
         w_l_to_e: 0,
@@ -702,8 +705,6 @@ fn g2p_efficiency_proxy_swir_terminates_earlier_than_fixed_budget() {
     //     after w_e_to_l=1 dwell (no count).
     // This produces one Latent→Explicit switch every ~2 steps.
     let mut ctrl = SwiRController::new(swir_config);
-    const HIGH: f32 = 5.0;
-    const LOW: f32 = 1.0;
     let mut swir_steps = 0u32;
     for i in 0..FIXED_BUDGET {
         // Step 0: HIGH (sets ref=HIGH, Latent). Steps after: alternate LOW/HIGH.

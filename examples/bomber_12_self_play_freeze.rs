@@ -237,6 +237,16 @@ fn accumulate_hl_stats(stats: &mut PhaseStats, result: &RoundResult) {
 // ── Main ───────────────────────────────────────────────────────
 
 fn main() {
+    fn indicator(delta: f64) -> &'static str {
+        if delta > 0.5 {
+            "✅"
+        } else if delta > -0.5 {
+            "➖"
+        } else {
+            "❌"
+        }
+    }
+
     let mut rng = Rng::with_seed(BASE_SEED);
     let output_path = Path::new(OUTPUT_PATH);
 
@@ -399,16 +409,6 @@ fn main() {
     let delta_survival = phase2_stats.survival_rate() - phase1_stats.survival_rate();
     let delta_score = phase2_stats.avg_score() - phase1_stats.avg_score();
     let delta_kills = phase2_stats.avg_kills() - phase1_stats.avg_kills();
-
-    fn indicator(delta: f64) -> &'static str {
-        if delta > 0.5 {
-            "✅"
-        } else if delta > -0.5 {
-            "➖"
-        } else {
-            "❌"
-        }
-    }
 
     println!();
     println!("━━━ COMPARISON ━━━");

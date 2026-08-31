@@ -79,10 +79,11 @@ fn dense_matrix(rows: usize, cols: usize, seed: u64) -> Vec<f32> {
 }
 
 fn median_ns(reps: usize, inner: usize, mut f: impl FnMut()) -> f64 {
-    for _ in 0..inner {
+    const MAX_REPS: usize = 32;
+
+for _ in 0..inner {
         f();
     }
-    const MAX_REPS: usize = 32;
     assert!(reps <= MAX_REPS, "reps={reps} exceeds MAX_REPS={MAX_REPS}");
     let mut samples = [0.0f64; MAX_REPS];
     for slot in samples.iter_mut().take(reps) {

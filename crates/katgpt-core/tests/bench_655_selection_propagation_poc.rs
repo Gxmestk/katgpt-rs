@@ -589,6 +589,7 @@ fn run_sweep() -> Vec<(Cell, [f64; 8])> {
             }
         }
     }
+    rows.shrink_to_fit();
     rows
 }
 

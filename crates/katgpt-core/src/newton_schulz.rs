@@ -190,11 +190,11 @@ fn grow_no_zero(v: &mut Vec<f32>, new_len: usize) {
 /// `out` must have `rows * cols` elements.
 #[cfg(feature = "newton_schulz")]
 pub fn newton_schulz_n(g: &[f32], rows: usize, cols: usize, out: &mut [f32], n_iters: u8) {
+    use std::cell::RefCell;
+
     assert_eq!(g.len(), rows * cols, "input matrix size mismatch");
     assert_eq!(out.len(), rows * cols, "output buffer size mismatch");
     assert!(n_iters >= 1, "n_iters must be >= 1, got {n_iters}");
-
-    use std::cell::RefCell;
     thread_local! {
         static SCRATCH: RefCell<NewtonSchulzScratch> = RefCell::new(NewtonSchulzScratch::new(0, 0));
     }
@@ -426,11 +426,11 @@ impl InvSqrtScratch {
 /// defensively; output is symmetric `r × r`.
 #[cfg(feature = "newton_schulz")]
 pub fn ns_inv_sqrt_psd(p: &[f32], r: usize, out: &mut [f32], n_iters: u8) {
+    use std::cell::RefCell;
+
     assert_eq!(p.len(), r * r, "input PSD matrix size mismatch");
     assert_eq!(out.len(), r * r, "output buffer size mismatch");
     assert!(n_iters >= 1, "n_iters must be >= 1, got {n_iters}");
-
-    use std::cell::RefCell;
     thread_local! {
         static INV_SQRT_SCRATCH: RefCell<InvSqrtScratch> =
             RefCell::new(InvSqrtScratch::new(0));
@@ -1070,6 +1070,7 @@ mod tests {
             let v = ((s & 0xFFFF) as f32 / 0x8000 as f32) - 1.0;
             mat.push(v);
         }
+        mat.shrink_to_fit();
         mat
     }
 

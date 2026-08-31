@@ -737,9 +737,9 @@ mod tests {
         let strategy = select_strategy(&guard);
 
         if guard.population_enabled() {
-            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb)
+            assert_eq!(strategy, SketchSelectionStrategy::PopulationPucb);
         } else {
-            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb)
+            assert_eq!(strategy, SketchSelectionStrategy::BasicUcb);
         }
     }
 
@@ -750,7 +750,7 @@ mod tests {
             assert!(
                 guard.fallback_reason().is_none(),
                 "population enabled → no fallback reason"
-            )
+            );
         } else {
             let reason = guard.fallback_reason().expect("must have reason");
             assert!(

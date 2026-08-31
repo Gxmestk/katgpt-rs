@@ -918,6 +918,7 @@ fn parse_prefix_tokens(prefix: &str) -> Vec<String> {
             tokens.push(part.to_string());
         }
     }
+    tokens.shrink_to_fit();
     tokens
 }
 

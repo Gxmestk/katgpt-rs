@@ -105,7 +105,9 @@ fn print_pool(label: &str, prios: &[f32]) {
 // within a bounded number of cycles — proving proactive non-trapping.
 
 fn demo_reachability() {
-    separator("Demo 1: Proactive reachability (G1)");
+    const TOTAL: u32 = 50_000;
+
+separator("Demo 1: Proactive reachability (G1)");
     println!("  Setup: 8-arm E-pool (one-hot on arm 0), 8-arm X-pool (uniform).");
     println!("  We force E-pool 'success' every cycle so w_E grows without bound.");
     println!("  The X-pool floor (α clamped to 1−ε) guarantees it is still selected.");
@@ -117,7 +119,6 @@ fn demo_reachability() {
 
     // Simulate extreme exploitation: E-pool "wins" every cycle.
     let mut x_selections = 0u32;
-    const TOTAL: u32 = 50_000;
     for _ in 0..TOTAL {
         dp.begin_cycle();
         // route_select returns (arm, pool) — we only care about pool here.

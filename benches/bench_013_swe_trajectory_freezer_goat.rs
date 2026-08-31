@@ -82,6 +82,7 @@ fn build_committed_wrong(seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -94,6 +95,7 @@ fn build_oscillation(seed: u64) -> Vec<Vec<f32>> {
         let target = if i % 2 == 0 { &attractor_a } else { &attractor_b };
         traj.push(target.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -109,6 +111,7 @@ fn build_converged_correct(seed: u64) -> Vec<Vec<f32>> {
         }
         traj.push(state.clone());
     }
+    traj.shrink_to_fit();
     traj
 }
 
@@ -296,12 +299,12 @@ fn run_g4_zero_alloc(directions: &[[f32; D]; N]) -> (G4Result, G4Result) {
     #[global_allocator]
     static A: CountingAllocator = CountingAllocator;
 
-    let freezer = SweTrajectoryFreezer::<N, D>::new(*directions);
+    const N_CALLS: usize = 100;
+
+let freezer = SweTrajectoryFreezer::<N, D>::new(*directions);
     let fields: [&dyn ArchetypeFieldSource<D>; N] = make_fields();
     let traj = build_trajectory_for_mode(0, 999);
     let refs = build_refs(&traj);
-
-    const N_CALLS: usize = 100;
 
     // Variant 1: freeze_attempt (allocating) — target ≤2 allocs/call.
     let before1 = ALLOC_COUNT.load(Ordering::Relaxed);
