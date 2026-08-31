@@ -144,6 +144,8 @@ fn g2_sigmoid_ranking_preserved() -> GateResult {
     let cfg = SigmoidFusionConfig {
         tau: (d as f32).sqrt(),
         rmsnorm_eps: 1e-6,
+        logit_bias: 0.0, // legacy-identity default (Plan 364 Phase 4); this
+                         // bench predates the field — behavior unchanged
     };
     let mut rng = Lcg::new(42);
 
