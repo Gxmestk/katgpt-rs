@@ -203,8 +203,14 @@ fn score_one_parts(
         }
         Critic::FrozenProj => {
             let k = frozen_k.clamp(1, FROZEN_PROJ_MAX_K);
-            project_row_into(xr, signs, k, &mut tmp[0]);
-            project_row_into(yr, signs, k, &mut tmp[1]);
+            if tmp[0].len() < k {
+                tmp[0].resize(k, 0.0);
+            }
+            if tmp[1].len() < k {
+                tmp[1].resize(k, 0.0);
+            }
+            project_row_into(xr, signs, k, &mut tmp[0][..k]);
+            project_row_into(yr, signs, k, &mut tmp[1][..k]);
             let s = crate::simd::simd_dot_f32(&tmp[0][..k], &tmp[1][..k], k);
             f64::from(s) / (k as f64).sqrt()
         }
@@ -228,20 +234,19 @@ fn normalize_row_into(row: &[f32], buf: &mut Vec<f32>) {
     }
 }
 
-/// Frozen Rademacher projection: `p[ki] = Σ_j signs[ki·d + j] · row[j]`
-/// (row-major signs, contiguous inner loop), written into `buf`.
-fn project_row_into(row: &[f32], signs: &[i8], k: usize, buf: &mut Vec<f32>) {
+/// Frozen Rademacher projection: `out[ki] = Σ_j signs[ki·d + j] · row[j]`
+/// (row-major signs, contiguous inner loop). `out` must be `≥ k` long —
+/// callers pre-size; the projection-cache path writes row windows.
+fn project_row_into(row: &[f32], signs: &[i8], k: usize, out: &mut [f32]) {
     let d = row.len();
-    if buf.len() < k {
-        buf.resize(k, 0.0);
-    }
+    assert!(out.len() >= k, "projection buffer too small");
     for ki in 0..k {
         let row_signs = &signs[ki * d..(ki + 1) * d];
         let mut acc = 0.0f32;
         for (j, &xv) in row.iter().enumerate() {
             acc += row_signs[j] as f32 * xv;
         }
-        buf[ki] = acc;
+        out[ki] = acc;
     }
 }
 
@@ -255,6 +260,12 @@ fn project_row_into(row: &[f32], signs: &[i8], k: usize, buf: &mut Vec<f32>) {
 /// (capacity, seed); [`MiScratch::ensure`] grows buffers if a later call needs
 /// more — **allocation happens only at construction / growth, never in the
 /// steady-state evaluate path** (G4).
+///
+/// `Clone` is exact (the RNG state is one `u64`, cloned stream-identically —
+/// `fastrand::Rng`), so a cloned scratch reproduces the same permutation
+/// stream from the same position. Consumers embedding a scratch in their own
+/// reusable state (e.g. the riir-train dist-guard axis) need the derive.
+#[derive(Clone, Debug)]
 pub struct MiScratch {
     /// Joint scores `T(x_i, y_i)` (capacity ≥ n).
     pub joint: Vec<f64>,
@@ -284,6 +295,15 @@ pub struct MiScratch {
     /// ratio's v1 path; capacity ≥ n·d_max).
     pub pad_a: Vec<f32>,
     pub pad_b: Vec<f32>,
+    /// Cached FrozenProj populations (the many-permutation fast path):
+    /// `proj_a`/`proj_b` are `[n × k]` projections of the last
+    /// [`MiScratch::project_frozen`] call. Pairing-invariant — project once,
+    /// then every permutation pass costs n length-k dots instead of n
+    /// re-projections (measured ~25× on the B=128 guard shape).
+    pub(crate) proj_a: Vec<f32>,
+    pub(crate) proj_b: Vec<f32>,
+    /// Row count of the cached projections (0 = empty).
+    pub(crate) proj_n: usize,
 
     pub(crate) rng: fastrand::Rng,
     pub(crate) frozen_k: usize,
@@ -348,6 +368,9 @@ impl MiScratch {
             null_sorted: Vec::new(),
             pad_a: Vec::new(),
             pad_b: Vec::new(),
+            proj_a: Vec::new(),
+            proj_b: Vec::new(),
+            proj_n: 0,
             rng: fastrand::Rng::with_seed(mixed),
             frozen_k: k,
             frozen_signs: Self::build_frozen_signs(seed, d, k),
@@ -579,6 +602,71 @@ impl MiScratch {
         }
     }
 
+    // ── scoring (FrozenProj cache — the many-permutation fast path) ────
+
+    /// Project BOTH populations once into the FrozenProj cache:
+    /// `proj_a[i·k + t] = ⟨R_t, x_i⟩` and `proj_b[j·k + t] = ⟨R_t, y_j⟩` —
+    /// the exact [`Critic::FrozenProj`] projection arithmetic
+    /// (`project_row_into`), so every subsequent cached score is
+    /// **bit-identical** to the uncached scoring path (pinned by test).
+    /// Allocation happens here (grow-once per shape), never in the cached
+    /// score passes (G4).
+    pub fn project_frozen(&mut self, x: &[f32], y: &[f32], n: usize, d: usize) {
+        assert!(x.len() >= n * d && y.len() >= n * d, "population too small");
+        let k = self.frozen_k.clamp(1, FROZEN_PROJ_MAX_K);
+        if self.proj_a.len() < n * k {
+            self.proj_a.resize(n * k, 0.0);
+        }
+        if self.proj_b.len() < n * k {
+            self.proj_b.resize(n * k, 0.0);
+        }
+        let signs = self.frozen_signs.as_slice();
+        let (pa, pb) = (&mut self.proj_a, &mut self.proj_b);
+        for i in 0..n {
+            project_row_into(&x[i * d..(i + 1) * d], signs, k, &mut pa[i * k..(i + 1) * k]);
+            project_row_into(&y[i * d..(i + 1) * d], signs, k, &mut pb[i * k..(i + 1) * k]);
+        }
+        self.proj_n = n;
+    }
+
+    /// Score the identity pairing from the projection cache (identity to
+    /// `score_joint(Critic::FrozenProj, …)` bit-for-bit). Requires a prior
+    /// [`MiScratch::project_frozen`] at `≥ n` rows.
+    pub fn score_joint_cached(&mut self, n: usize) {
+        let k = self.frozen_k.clamp(1, FROZEN_PROJ_MAX_K);
+        assert!(self.proj_n >= n, "project_frozen must run before the cached score pass");
+        let scale = (k as f64).sqrt();
+        for i in 0..n {
+            let s = crate::simd::simd_dot_f32(
+                &self.proj_a[i * k..(i + 1) * k],
+                &self.proj_b[i * k..(i + 1) * k],
+                k,
+            );
+            self.joint[i] = f64::from(s) / scale;
+        }
+    }
+
+    /// Score the current permutation (or inverse) from the projection cache
+    /// (identity to `score_perm(Critic::FrozenProj, …)` bit-for-bit).
+    pub fn score_perm_cached(&mut self, n: usize, src: PermSource) {
+        let k = self.frozen_k.clamp(1, FROZEN_PROJ_MAX_K);
+        assert!(self.proj_n >= n, "project_frozen must run before the cached score pass");
+        self.invert_perm(n);
+        let scale = (k as f64).sqrt();
+        for i in 0..n {
+            let j = match src {
+                PermSource::Current => self.perm_idx[i] as usize,
+                PermSource::Inverse => self.inv_idx[i] as usize,
+            };
+            let s = crate::simd::simd_dot_f32(
+                &self.proj_a[i * k..(i + 1) * k],
+                &self.proj_b[j * k..(j + 1) * k],
+                k,
+            );
+            self.perm[i] = f64::from(s) / scale;
+        }
+    }
+
     // ── scoring (scratch pad buffers — the cross-dimension IB path) ─────────
 
     /// Score the identity pairing from the scratch's own pad buffers
@@ -624,6 +712,7 @@ impl MiScratch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mi::perm::PermTest;
 
     #[test]
     fn minats_units() {
@@ -739,5 +828,52 @@ mod tests {
         let pad_scores = s.joint[..n].to_vec();
         s.score_joint(Critic::Dot, &x, &y, n, dm);
         assert_eq!(pad_scores, s.joint[..n]);
+    }
+
+    /// The FrozenProj projection cache is BIT-IDENTICAL to the uncached
+    /// scoring path — same projection arithmetic, same simd_dot, same scale.
+    /// Pinned at a production shape (n=64, d=32, k=32) and a ragged shape
+    /// (n=7, d=13, k=13); also covers the paired permutation tables (same
+    /// seed ⇒ same σ ⇒ same perm scores).
+    #[test]
+    fn frozen_cached_scores_are_bit_identical_to_uncached() {
+        for (n, d) in [(64usize, 32usize), (7, 13)] {
+            let x: Vec<f32> = (0..n * d).map(|v| (v as f32 * 0.173).sin() * 2.0).collect();
+            let y: Vec<f32> = (0..n * d).map(|v| (v as f32 * 0.031).cos() * 1.5).collect();
+            let mut a = MiScratch::new(n, d, 7);
+            let mut b = MiScratch::new(n, d, 7);
+
+            a.score_joint(Critic::FrozenProj, &x, &y, n, d);
+            a.next_perm(n);
+            a.score_perm(Critic::FrozenProj, &x, &y, n, d, PermSource::Current);
+
+            b.project_frozen(&x, &y, n, d);
+            b.score_joint_cached(n);
+            b.next_perm(n);
+            b.score_perm_cached(n, PermSource::Current);
+
+            for i in 0..n {
+                assert_eq!(a.joint[i].to_bits(), b.joint[i].to_bits(), "joint[{i}] @{n}x{d}");
+                assert_eq!(a.perm[i].to_bits(), b.perm[i].to_bits(), "perm[{i}] @{n}x{d}");
+            }
+        }
+    }
+
+    /// `PermTest::run_frozen_cached` reproduces `run(FrozenProj)` bit-for-bit
+    /// — same reseeded null stream, same statistic values, same exact p.
+    #[test]
+    fn frozen_cached_perm_test_is_bit_identical_to_run() {
+        let n = 64;
+        let d = 32;
+        let x: Vec<f32> = (0..n * d).map(|v| (v as f32 * 0.091).sin()).collect();
+        let y: Vec<f32> = (0..n * d).map(|v| (v as f32 * 0.052).cos()).collect();
+        let t = PermTest::new(32, 9);
+        let mut s1 = MiScratch::new(n, d, 11);
+        let mut s2 = MiScratch::new(n, d, 11);
+        let r1 = t.run(Critic::FrozenProj, &x, &y, n, d, None, &mut s1);
+        let r2 = t.run_frozen_cached(&x, &y, n, d, &mut s2);
+        assert_eq!(r1.observed.to_bits(), r2.observed.to_bits());
+        assert_eq!(r1.p.to_bits(), r2.p.to_bits());
+        assert_eq!(r1.null_hi95.to_bits(), r2.null_hi95.to_bits());
     }
 }

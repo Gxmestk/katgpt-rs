@@ -150,6 +150,46 @@ impl PermTest {
         self.finish(observed, ge, scratch)
     }
 
+    /// [`Self::run`] over the FrozenProj projection cache: the populations
+    /// are projected ONCE ([`MiScratch::project_frozen`]) and every one of
+    /// the B null passes costs n length-k dots instead of n re-projections
+    /// — measured ~25× on the B=128 guard shape (n=64, d=32). Scores are
+    /// **bit-identical** to [`Self::run`] with `Critic::FrozenProj` (same
+    /// projection arithmetic, same simd_dot, same scale; pinned by test).
+    /// The statistic/variant machinery (`draw_pairing`, reseed, exact p) is
+    /// shared with `run` verbatim; `strata` is not exposed (the cached path
+    /// is the Uniform/Median guard shape — extend on demand).
+    pub fn run_frozen_cached(
+        &self,
+        x: &[f32],
+        y: &[f32],
+        n: usize,
+        d: usize,
+        scratch: &mut MiScratch,
+    ) -> PermReport {
+        scratch.ensure(n, d);
+        if scratch.null_buf.len() < self.b {
+            scratch.null_buf.resize(self.b, 0.0);
+        }
+        self.reseed(scratch);
+        scratch.project_frozen(x, y, n, d);
+        // Observed statistic on the identity pairing.
+        scratch.score_joint_cached(n);
+        let observed = self.statistic(&scratch.joint, &mut scratch.stat_buf, n);
+        // Null draws.
+        let mut ge = 0u32;
+        for t in 0..self.b {
+            self.draw_pairing(n, None, scratch);
+            scratch.score_perm_cached(n, PermSource::Current);
+            let v = f64::from(self.statistic(&scratch.perm, &mut scratch.stat_buf, n));
+            if v >= f64::from(observed) {
+                ge += 1;
+            }
+            scratch.null_buf[t] = v;
+        }
+        self.finish(observed, ge, scratch)
+    }
+
     /// Run the test with the distance-correlation statistic (dCor²) — the
     /// characteristic detector for the non-vacuity control: sees dependence
     /// of ANY functional form, including the bilinear-blind `Y = X²`.

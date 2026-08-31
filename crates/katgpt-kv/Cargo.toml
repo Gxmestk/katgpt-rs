@@ -98,3 +98,14 @@ ssc_spec_draft = ["segment_checkpoint"]
 # forward (`async_qdq_overlap = ["katgpt-kv/async_qdq_overlap", "inference_router"]`)
 # because it gates the GPU backend test harness, not the module itself.
 async_qdq_overlap = []
+
+# Plan 583 T3.5 — offline MI quant-fidelity probe (audit-only): forwards
+# katgpt-core's `mi_est` so the I(W; Ŵ) probe measures retained information
+# through the shipped KVarN round-trip alongside the reconstruction metrics.
+# Implies `kvarn` (the probed surface). Test-support only — no production
+# consumer, never a default.
+mi_probe = ["kvarn", "katgpt-core/mi_est"]
+
+[[test]]
+name = "bench_694_mi_quant_fidelity_probe"
+required-features = ["mi_probe"]
