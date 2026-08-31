@@ -252,6 +252,12 @@ pub use ignition::{IgnitionSchedule, ignition_time, order_by_ignition_into};
 #[cfg(feature = "limit_fixture")]
 pub mod limit_fixture;
 pub mod conformal;
+// Issue 837 / riir-ai Research 359 — consumption-weight evidence tripwire
+// (D-SCAN transliteration): σ-gate metrics + Kendall τ + split-conformal
+// benign-quantile threshold. Measured verdict (riir-ai Bench 832): the rank-
+// inversion channel discriminates, entropy is composition-coupled telemetry.
+#[cfg(feature = "evidence_tripwire")]
+pub mod evidence_tripwire;
 #[cfg(feature = "conformal_predictive_intervals")]
 pub use conformal::metrics::{
     crps, crps_interval, empirical_coverage, mean_crps_interval, mean_winkler, winkler_score,
