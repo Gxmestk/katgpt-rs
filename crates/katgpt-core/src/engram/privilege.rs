@@ -673,6 +673,7 @@ mod tests {
         let cfg = super::super::SigmoidFusionConfig {
             tau: (d as f32).sqrt(),
             rmsnorm_eps: 1e-6,
+            logit_bias: 0.0,
         };
         let q: Vec<f32> = (0..d).map(|i| ((i as f32) * 0.37).sin()).collect();
         let k: Vec<f32> = (0..d).map(|i| ((i as f32) * 0.11).cos()).collect();
@@ -694,6 +695,7 @@ mod tests {
         let cfg = super::super::SigmoidFusionConfig {
             tau: (d as f32).sqrt(),
             rmsnorm_eps: 1e-6,
+            logit_bias: 0.0,
         };
         let q: Vec<f32> = (1..=d).map(|i| i as f32).collect();
         let v: Vec<f32> = (0..d).map(|i| (i as f32) * 0.1 + 1.0).collect();

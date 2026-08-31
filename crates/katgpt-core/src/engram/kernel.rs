@@ -160,6 +160,18 @@ pub struct SigmoidFusionConfig {
     pub tau: f32,
     /// RMSNorm epsilon (numerical guard against zero-RMS vectors).
     pub rmsnorm_eps: f32,
+    /// Additive bias on the gate logit: `gate = sigmoid(dot(q_norm,k_norm)/tau
+    /// + logit_bias)`. Default `0.0` — bit-identical to the legacy gate
+    /// (`x + 0.0` is an exact f32 identity, including the `-0.0` edge: both
+    /// branch sides of `fast_sigmoid` map ±0.0 to the same `0.5`).
+    ///
+    /// Plan 364 Phase 4 (arXiv:2608.15062 GRT recipe — "bias toward identity,
+    /// specialize gradually"): the xHC sparse-write gate inits CLOSED at
+    /// `logit_bias = -4` (`g ≈ 0.018`) so the model boots as the no-write
+    /// identity and the gated writes specialize gradually. Also the inject
+    /// point for per-step gate-logit noise (εg, train-only). The hot path
+    /// costs one f32 add; the default path stays bit-identical.
+    pub logit_bias: f32,
 }
 
 impl Default for SigmoidFusionConfig {
@@ -171,6 +183,7 @@ impl Default for SigmoidFusionConfig {
         Self {
             tau: (32.0f32).sqrt(),
             rmsnorm_eps: 1e-6,
+            logit_bias: 0.0,
         }
     }
 }
@@ -277,7 +290,10 @@ pub fn sigmoid_fuse_into(
     let normalized_dot = raw_dot * inv_rms_q * inv_rms_k;
 
     // CRITICAL: sigmoid, not softmax, per AGENTS.md.
-    let gate = fast_sigmoid(normalized_dot / config.tau);
+    // `logit_bias` (Plan 364 Phase 4) shifts the gate logit additively; the
+    // default `0.0` is an exact f32 identity — bit-identical to the
+    // pre-field kernel at every input.
+    let gate = fast_sigmoid(normalized_dot / config.tau + config.logit_bias);
 
     // Write gate * v[j] into out — SIMD-friendly stride-1 write. We use a
     // manual loop (not simd_scale_inplace) because src and dst are
@@ -366,7 +382,8 @@ pub fn sigmoid_fuse_scaled_into(
     let normalized_dot = raw_dot * inv_rms_q * inv_rms_k;
 
     // CRITICAL: sigmoid, not softmax, per AGENTS.md.
-    let gate = fast_sigmoid(normalized_dot / config.tau);
+    // Same logit_bias as [`sigmoid_fuse_into`] (default 0.0 = identity).
+    let gate = fast_sigmoid(normalized_dot / config.tau + config.logit_bias);
     // The scale rides on the scalar — one multiply, not D.
     let scaled = gate * gate_scale;
 
@@ -385,7 +402,91 @@ mod tests {
         SigmoidFusionConfig {
             tau: (d as f32).sqrt(),
             rmsnorm_eps: 1e-6,
+            logit_bias: 0.0,
         }
+    }
+
+    /// Plan 364 Phase 4 — the `logit_bias` field at its default `0.0` must be
+    /// bit-identical to the LEGACY gate math (`fast_sigmoid(ndot/tau)`, the
+    /// pre-field formula) at every input, including the `-0.0` edge
+    /// (`-0.0 + 0.0 = +0.0` in IEEE; both must map to the same gate bits).
+    #[test]
+    fn logit_bias_zero_is_bit_identical_at_every_input() {
+        let d = 32;
+        let cfg = cfg_for_dim(d);
+        // A corpus of adversarial inputs: zeros (exact ±0.0 normalized dot),
+        // subnormals, large magnitudes, mixed signs, deterministic variety.
+        let corpus: Vec<Vec<f32>> = vec![
+            vec![0.0; d],
+            vec![-0.0; d],
+            vec![f32::MIN_POSITIVE; d],
+            vec![1e-30; d],
+            vec![1e6; d],
+            vec![-1e6; d],
+            (0..d).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect(),
+            (0..d)
+                .map(|i| (((i * 37 + 11) % 23) as i32 - 11) as f32 / 7.0)
+                .collect(),
+        ];
+        for q in &corpus {
+            for k in &corpus {
+                let v = vec![1.5f32; d];
+                let mut out = vec![0.0f32; d];
+                sigmoid_fuse_into(q, k, &v, &mut out, &cfg);
+                // Inline LEGACY reference — the pre-field formula, computed
+                // from the same primitives the kernel uses.
+                let sum_sq_q = simd_sum_sq(q, d);
+                let sum_sq_k = simd_sum_sq(k, d);
+                let inv_q = 1.0 / ((sum_sq_q / d as f32) + cfg.rmsnorm_eps).sqrt();
+                let inv_k = 1.0 / ((sum_sq_k / d as f32) + cfg.rmsnorm_eps).sqrt();
+                let ndot = simd_dot_f32(q, k, d) * inv_q * inv_k;
+                let gate_ref = fast_sigmoid(ndot / cfg.tau);
+                // gate · v[0] is injective in gate for v[0] = 1.5 ≠ 0.
+                let got = out[0] / 1.5;
+                assert_eq!(got.to_bits(), gate_ref.to_bits(), "q[0]={} k[0]={}", q[0], k[0]);
+            }
+        }
+    }
+
+    /// Plan 364 Phase 4 — a non-zero `logit_bias` shifts the gate exactly as
+    /// `sigmoid(z + b)`: for orthogonal q/k (raw dot = 0) the gate is
+    /// σ(b), strictly monotone across the sweep set, with the −4 point
+    /// (the xHC "start CLOSED" init) at σ(−4) ≈ 0.018.
+    #[test]
+    fn logit_bias_shifts_gate_monotonically() {
+        let d = 16;
+        // Disjoint supports → raw dot exactly 0 → gate = σ(b) exactly.
+        let q: Vec<f32> = (0..d).map(|i| if i % 2 == 0 { 1.0 } else { 0.0 }).collect();
+        let k: Vec<f32> = (0..d).map(|i| if i % 2 == 1 { 1.0 } else { 0.0 }).collect();
+        let v = vec![1.0f32; d];
+        let mut prev = -1.0f32;
+        for &b in &[-4.0f32, -2.0, 0.0, 2.0, 4.0] {
+            let cfg = SigmoidFusionConfig {
+                tau: 1.0,
+                rmsnorm_eps: 1e-6,
+                logit_bias: b,
+            };
+            let mut out = vec![0.0f32; d];
+            sigmoid_fuse_into(&q, &k, &v, &mut out, &cfg);
+            let g = out[0]; // gate · 1.0
+            assert!(g > prev, "gate must be strictly monotone in logit_bias: b={b} g={g}");
+            let expect = 1.0 / (1.0 + (-b).exp());
+            assert!((g - expect).abs() < 1e-5, "b={b}: gate {g} vs σ(b) {expect}");
+            prev = g;
+        }
+        // The −4 closed-init value, pinned against the closed-form:
+        let cfg_closed = SigmoidFusionConfig {
+            tau: 1.0,
+            rmsnorm_eps: 1e-6,
+            logit_bias: -4.0,
+        };
+        let mut out = vec![0.0f32; d];
+        sigmoid_fuse_into(&q, &k, &v, &mut out, &cfg_closed);
+        assert!(
+            (out[0] - 0.017_986_21).abs() < 1e-4, // σ(-4) ≈ 0.01799
+            "closed-init gate must be σ(-4), got {}",
+            out[0]
+        );
     }
 
     #[test]
