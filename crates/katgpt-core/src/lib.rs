@@ -97,6 +97,12 @@ pub mod newton_schulz;
 // f64 canonical + f32 twins (riir-clippy's persisted ratings keep their
 // exact numerics). Zero-cost-unless-invoked.
 #[cfg(feature = "rating")]
+// float_order — NaN-safe total-order f32 comparators (generalizes riir-rag
+// score_cmp_desc; the workspace partial_cmp-unwrap_or(Equal) panic class):
+// NaN sinks under both directions, -0.0 ties +0.0, NaN-free ordering is
+// identical to the replaced idiom. Always compiled — sorts run everywhere.
+pub mod float_order;
+
 pub mod rating;
 
 // laprop — LaProp normalize-before-accumulate momentum (Issue 689, from
