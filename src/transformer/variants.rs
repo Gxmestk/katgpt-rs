@@ -280,9 +280,38 @@ cache.advance_pos(pos);
                 config.loop_stability_mode,
                 crate::types::LoopStabilityMode::InterLoopNorm
                     | crate::types::LoopStabilityMode::FixedAnchor
+                    | crate::types::LoopStabilityMode::StateNoise { .. }
             )
         {
             crate::types::rmsnorm(&mut ctx.x[..n]);
+        }
+
+        // Issue 698 T6 — per-step state noise (GRT arXiv:2608.15062, the
+        // paper's smallest ablation, modelless corollary): BLAKE3-seeded
+        // Gaussian per (pos, tau) added to the normed loop input. `scale`
+        // is RELATIVE to the state's own RMS. Applied BEFORE the `prev_h`
+        // save, so the perturbed state is what the layer pass consumes AND
+        // what the drifting gate injects ("state" noise, not input-only).
+        // `scale == 0.0` skips the branch entirely → bit-identical to
+        // InterLoopNorm (the flag-off pin). Zero cost when the mode is not
+        // StateNoise (data-driven branch, never taken in production configs).
+        #[cfg(feature = "loop_stability_fix")]
+        if tau > 0
+            && let crate::types::LoopStabilityMode::StateNoise { scale } =
+                config.loop_stability_mode
+            && scale != 0.0
+        {
+            add_blake3_state_noise(&mut ctx.x[..n], pos, tau, scale);
+        }
+
+        // Issue 698 T8 — roll h^(τ-2) into prev_prev_h BEFORE prev_h is
+        // overwritten, so the conditional gate can compute
+        // cos(S(τ−1), S(τ−2)). At gate time (post-pass): prev_h = h^(τ−1),
+        // prev_prev_h = h^(τ−2). One extra n_embd copy, paid only when the
+        // conditional gate is installed (zero cost otherwise).
+        #[cfg(feature = "loop_stability_fix")]
+        if residual_gate.conditional.is_some() {
+            ctx.prev_prev_h[..n].copy_from_slice(&ctx.prev_h[..n]);
         }
 
         // Save h^(τ-1) for residual gate
@@ -442,16 +471,33 @@ cache.advance_pos(pos);
             #[cfg(not(feature = "loop_stability_fix"))]
             let injected: &[f32] = &ctx.prev_h[..n];
 
-            // Issue 698 T3 — convex copy-late path (GRT arXiv:2608.15062
-            // C1a/C4): h^(τ) = g_τ ⊙ src + (1 − g_τ) ⊙ h̃^(τ). The scalar
-            // blend gives the free bound ‖h^(τ)‖ ≤ max(‖src‖, ‖h̃^(τ)‖)
-            // (norm convexity) and an update magnitude ∝ (1 − g_τ): a
-            // copy-late schedule (g_τ → 1) CONTRACTS the loop to a fixed
-            // point — the additive form's constant ρ⊙src injection never
-            // settles (T2: fixed-arm ref drift 2.404 at ρ=0.5). Schedule
-            // absent → the additive path below, byte-identical to pre-T3
-            // behavior (the branch check is data-driven, no cfg).
-            if let Some(g) = residual_gate.convex_gate_at(tau) {
+            // Issue 698 T3 + T8 — the convex blend path. The copy weight g
+            // comes EITHER from the pre-built schedule (T3:
+            // `convex_schedule`) OR, when that is absent and the conditional
+            // gate is installed, from the trajectory itself (T8:
+            // `σ(β·(cos(S(τ−1), S(τ−2)) − θ) + b)`, open on divergence).
+            // Both feed the same blend — the free bound and the contraction
+            // argument apply identically to any g ∈ [0, 1]. Schedule absent
+            // AND conditional absent → the additive path below, byte-
+            // identical to pre-T3 behavior (data-driven branches, no cfg).
+            let adaptive_g = match residual_gate.convex_gate_at(tau) {
+                Some(g) => Some(g),
+                None => {
+                    #[cfg(feature = "loop_stability_fix")]
+                    {
+                        residual_gate.conditional_gate_at(
+                            tau,
+                            &ctx.prev_h[..n],
+                            &ctx.prev_prev_h[..n],
+                        )
+                    }
+                    #[cfg(not(feature = "loop_stability_fix"))]
+                    {
+                        None
+                    }
+                }
+            };
+            if let Some(g) = adaptive_g {
                 // Two-pass scalar blend: h ← (1 − g)·h̃, hidden ← g·src,
                 // h += hidden. Op order pinned by the T3 spec test
                 // (g = 1 → h = src exactly; g = 0 → h unchanged exactly).
@@ -632,4 +678,130 @@ cache.advance_pos(pos);
     }
 
     &mut ctx.logits
+}
+
+/// Issue 698 T6 — BLAKE3-seeded Gaussian state noise (zero-allocation).
+///
+/// Deterministic per `(pos, tau, len)`: the seed hashes ONLY `(pos, tau)`,
+/// so the noise FIELD is identical across scales and calls; the amplitude
+/// is `scale × rms(x)` computed on entry (relative noise — config- and
+/// norm-independent). Box–Muller over BLAKE3-XOF uniform words, applied
+/// in ascending index order (sequential f32 — same-platform bit-exact;
+/// libm ulp drift off-platform, the T7 cross-platform caveat class).
+#[cfg(feature = "loop_stability_fix")]
+fn add_blake3_state_noise(x: &mut [f32], pos: usize, tau: usize, scale: f32) {
+    let n = x.len();
+    if n == 0 {
+        return;
+    }
+    // RMS before noise (post-norm RMS ≈ 1; computed for exactness).
+    let mut ssq = 0.0f32;
+    for &v in x.iter() {
+        ssq += v * v;
+    }
+    let amp = scale * (ssq / n as f32).sqrt();
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&pos.to_le_bytes());
+    hasher.update(&tau.to_le_bytes());
+    let mut xof = hasher.finalize_xof();
+    let mut bytes = [0u8; 4];
+    let mut next_u = || {
+        xof.fill(&mut bytes);
+        // 24-bit uniform in [0, 1): low 24 bits scaled by 2^-24 (exact in
+        // f32 — every value < 2^24 is exactly representable).
+        let bits = u32::from_le_bytes(bytes) & 0x00FF_FFFF;
+        let u = (bits as f32) * (1.0 / 16777216.0);
+        // Box–Muller takes ln(u1): clamp the measure-zero 0.0.
+        if u == 0.0 {
+            f32::EPSILON
+        } else {
+            u
+        }
+    };
+
+    let n2 = n & !1; // largest even ≤ n — full Box–Muller pairs
+    let mut i = 0;
+    while i < n2 {
+        let u1 = next_u();
+        let u2 = next_u();
+        let r = (-2.0 * u1.ln()).sqrt();
+        let ang = std::f32::consts::TAU * u2;
+        x[i] += amp * (r * ang.cos());
+        x[i + 1] += amp * (r * ang.sin());
+        i += 2;
+    }
+    if n2 < n {
+        // Odd tail: one extra Gaussian draw, cos branch only.
+        let u1 = next_u();
+        let u2 = next_u();
+        let r = (-2.0 * u1.ln()).sqrt();
+        x[n2] += amp * (r * (std::f32::consts::TAU * u2).cos());
+    }
+}
+
+#[cfg(all(test, feature = "loop_stability_fix"))]
+mod issue698_state_noise_tests {
+    use super::add_blake3_state_noise;
+
+    #[test]
+    fn deterministic_same_seed_same_field() {
+        let mut a = vec![0.5f32; 16];
+        let mut b = vec![0.5f32; 16];
+        add_blake3_state_noise(&mut a, 3, 7, 0.1);
+        add_blake3_state_noise(&mut b, 3, 7, 0.1);
+        assert_eq!(a, b);
+        // Same (pos, tau) at a DIFFERENT scale: same direction field, larger
+        // amplitude (the seed does not depend on scale — the relative-noise
+        // contract).
+        let mut c = vec![0.5f32; 16];
+        add_blake3_state_noise(&mut c, 3, 7, 0.2);
+        for i in 0..16 {
+            let da = a[i] - 0.5;
+            let dc = c[i] - 0.5;
+            assert!((dc - 2.0 * da).abs() < 1e-5 * dc.abs().max(1e-6));
+        }
+    }
+
+    #[test]
+    fn field_varies_with_pos_and_tau() {
+        // Nonzero base state (relative noise scales by rms(x) — an all-zero
+        // state legitimately receives zero noise).
+        let base = |v: f32| (0..16).map(|i| v + i as f32 * 0.125).collect::<Vec<_>>();
+        let mut a = base(1.0);
+        add_blake3_state_noise(&mut a, 0, 1, 0.5);
+        let mut b = base(1.0);
+        add_blake3_state_noise(&mut b, 1, 1, 0.5);
+        let mut c = base(1.0);
+        add_blake3_state_noise(&mut c, 0, 2, 0.5);
+        assert_ne!(a, b);
+        assert_ne!(a, c);
+        // The all-zero state stays exactly zero (amp = scale · rms = 0).
+        let mut z = vec![0.0f32; 16];
+        add_blake3_state_noise(&mut z, 5, 5, 1.0);
+        assert!(z.iter().all(|&v| v.to_bits() == 0u32));
+    }
+
+    #[test]
+    fn amplitude_tracks_rms_and_scale() {
+        // rms(x) = 2.0 for all-2 input; scale 0.1 → per-element noise is
+        // bounded by ~6σ = 0.1·2·6 (never asserted near the bound; here we
+        // assert the empirical rms of the ADDED field ≈ scale·rms within a
+        // wide Gaussian band at n=4096).
+        let n = 4096;
+        let mut x = vec![2.0f32; n];
+        add_blake3_state_noise(&mut x, 9, 4, 0.1);
+        let mut ssq = 0.0f64;
+        for &xi in x.iter() {
+            let d = (xi - 2.0) as f64;
+            ssq += d * d;
+        }
+        let noise_rms = (ssq / n as f64).sqrt();
+        // Gaussian sample rms concentrates near σ = 0.2 with n = 4096
+        // (relative sd of the rms estimate ≈ 1/√(2n) ≈ 1.1%).
+        assert!(
+            (noise_rms - 0.2).abs() < 0.2 * 0.1,
+            "noise rms {noise_rms} not near expected 0.2"
+        );
+    }
 }

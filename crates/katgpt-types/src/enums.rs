@@ -461,10 +461,14 @@ pub enum HybridPattern {
 /// < raw embedding 3.73 < zeros 8.08. On our prelude-less arch the tau==0
 /// pre-pass state IS the raw embedding — the paper's distinct, worse arm —
 /// so the anchor is hoisted once the FIRST iteration completes (h^(0) is
-/// the prelude-output interpretant). Random-weight caveat: the paper's
+/// (the prelude-output interpretant). Random-weight caveat: the paper's
 /// numbers are anchor-trained; the ORDERING is the structural claim under
 /// test (`tests/issue_698_t2_fixed_anchor.rs`). Zero cost when not selected.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+///
+/// Issue 698 T6 added `StateNoise { scale }` — an `f32` payload, so `Eq` is
+/// no longer derived (only `==`/PartialEq comparisons exist; the payload
+/// makes the enum 8 bytes, no `#[repr(u8)]` POD contract is relied on).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 #[repr(u8)]
 pub enum LoopStabilityMode {
     /// No inter-loop stabilization (byte-identical to pre-Plan-428 behavior).
@@ -480,6 +484,15 @@ pub enum LoopStabilityMode {
     /// of the drifting `ρ_τ ⊙ h^(τ-1)`. GRT Table 11: fixed prelude output
     /// beats drifting h(r−1) by +0.70 nats; zeros are catastrophic (8.08).
     FixedAnchor,
+    /// Issue 698 T6 — per-step state noise (GRT arXiv:2608.15062, the
+    /// paper's smallest ablation): the inter-loop norm PLUS a BLAKE3-seeded
+    /// Gaussian perturbation of the loop input at every iteration (tau > 0).
+    /// `scale` is RELATIVE to the state's own RMS (config-independent;
+    /// 0.05 = 5% noise). `scale == 0.0` skips the injection entirely → the
+    /// mode is bit-identical to `InterLoopNorm` (the flag-off pin). The seed
+    /// hashes only `(pos, tau)` so the noise field is call-independent;
+    /// Box–Muller over BLAKE3-XOF uniform words, zero allocation.
+    StateNoise { scale: f32 },
 }
 
 /// Head-specific sigmoid gate after SDPA, before Wo.
@@ -579,6 +592,50 @@ pub struct ResidualGate {
     /// path (all classic constructors). Values are clamped to [0, 1] at
     /// construction — the free bound requires g ∈ [0, 1].
     pub convex_schedule: Option<Vec<f32>>,
+    /// Issue 698 T8 — hand conditional gate (the paper's contrastive
+    /// projection finding, open on divergence): the per-loop copy weight is
+    /// computed AT RUNTIME from the trajectory itself,
+    /// `g_τ = σ(β·(cos(S(τ−1), S(τ−2)) − θ) + b)`, instead of a pre-built
+    /// schedule. Present → the adaptive path replaces both the convex
+    /// schedule and the additive form (the same convex blend, adaptive g).
+    /// Mechanism gate (T8 probe): divergence co-locates with marginal loop
+    /// gain at the pre-registered rank thresholds in the anchored context
+    /// (`tests/issue_698_t8_gate_probe.rs`, 13/15 per-r positive).
+    pub conditional: Option<ConditionalGate>,
+}
+
+/// Issue 698 T8 — the hand conditional gate constants.
+///
+/// `g = σ(β·(cos − θ) + b)`: OPEN (small g → take the new loop output) on
+/// DIVERGENCE (cos(S(τ−1), S(τ−2)) below θ), CLOSED (g → 1 → freeze/copy)
+/// once consecutive states align past θ. The mechanism gate probe showed
+/// the co-location grows with r (r=2 ≈ 0, r≥7 substantial) — the gate
+/// discriminates exactly where a copy-late schedule must decide when to
+/// close, per token.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConditionalGate {
+    /// Sigmoid steepness (nats per unit cos). 400 gives a sharp transition
+    /// (|Δcos| = 0.01 swings g by ~σ(4)−σ(−4)).
+    pub beta: f32,
+    /// Cosine threshold: the divergence→convergence decision point.
+    pub theta: f32,
+    /// Bias (nats) — shifts the transition; b = +2 puts g ≈ 0.88 AT θ.
+    pub bias: f32,
+    /// Hard-freeze clamp (Issue 698 T8 A/B finding): when the soft g exceeds
+    /// [`ConditionalGate::FREEZE_SOFT`], snap to EXACTLY 1.0. The bare
+    /// sigmoid never reaches 1, leaving a permanent (1−g) ≈ 0.25% update
+    /// kick — the T2 constant-ρ never-settles class in miniature (measured
+    /// ref drift 1.9 vs the static schedule's 1.7e-6). The clamp preserves
+    /// the adaptivity (the trigger is still the per-token cosine) while
+    /// restoring exact contraction: g = 1 is a bit-exact full copy (T3's
+    /// spec-test degenerate), the state freezes, cos ≡ 1, the gate stays
+    /// shut — contraction by construction.
+    pub hard_freeze: bool,
+}
+
+impl ConditionalGate {
+    /// Soft-g level above which the hard-freeze clamp snaps to 1.0.
+    pub const FREEZE_SOFT: f32 = 0.9;
 }
 
 impl ResidualGate {
@@ -587,6 +644,7 @@ impl ResidualGate {
         Self {
             gates: vec![0.0; loop_count * dim],
             convex_schedule: None,
+            conditional: None,
         }
     }
 
@@ -622,6 +680,7 @@ impl ResidualGate {
         Self {
             gates,
             convex_schedule: None,
+            conditional: None,
         }
     }
 
@@ -647,6 +706,7 @@ impl ResidualGate {
         Self {
             gates,
             convex_schedule: None,
+            conditional: None,
         }
     }
 
@@ -725,6 +785,74 @@ impl ResidualGate {
         Self {
             gates: Vec::new(),
             convex_schedule: Some(schedule),
+            conditional: None,
+        }
+    }
+
+    /// Issue 698 T8 — the hand conditional gate: an ADAPTIVE convex blend
+    /// whose copy weight is computed per loop from the trajectory itself,
+    /// `g_τ = σ(β·(cos(S(τ−1), S(τ−2)) − θ) + b)`, clamped to [0, 1] by the
+    /// sigmoid's range. Open on divergence (moving state → take the new
+    /// loop output), closed on convergence (aligned states → freeze on the
+    /// injected source) — the per-token interpretant of T3's copy-late
+    /// schedule, closing WHEN the state settles instead of on a fixed
+    /// timetable.
+    ///
+    /// The same convex-blend path as [`Self::copy_late_schedule_shaped`]
+    /// applies the value, so the free bound ‖h^(τ)‖ ≤ max(‖src‖, ‖h̃^(τ)‖)
+    /// holds for every g ∈ [0, 1] (T3's spec test covers the blend; the
+    /// conditional only changes WHERE g comes from).
+    ///
+    /// Modelless caveat (the issue's own "honest coin-flip" label, now
+    /// bounded by the mechanism-gate PASS): the constants (β, θ, b) are
+    /// hand-set — weights that never learned contrastive reading may prefer
+    /// different operating points; the A/B bench arbitrates the direction
+    /// (`tests/issue_698_t8_conditional_ab.rs`).
+    ///
+    /// The `gates` elementwise buffer is left EMPTY (the adaptive path is a
+    /// scalar gate — it never reads per-channel data), mirroring the convex
+    /// constructors. `loop_count`/`dim` are accepted for constructor
+    /// symmetry and ignored.
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn new_conditional(_loop_count: usize, _dim: usize, beta: f32, theta: f32, bias: f32) -> Self {
+        Self {
+            gates: Vec::new(),
+            convex_schedule: None,
+            conditional: Some(ConditionalGate {
+                beta,
+                theta,
+                bias,
+                hard_freeze: false,
+            }),
+        }
+    }
+
+    /// [`Self::new_conditional`] with the hard-freeze clamp: once the soft
+    /// copy weight exceeds `ConditionalGate::FREEZE_SOFT` (0.9), g snaps to
+    /// EXACTLY 1.0 — a bit-exact full copy that freezes the carried state
+    /// (cos ≡ 1 keeps it frozen). The A/B measured why: the bare sigmoid's
+    /// residual (1−g) kick never settles (ref drift 1.9 vs static 1.7e-6);
+    /// the clamp restores exact contraction while keeping the per-token
+    /// adaptive trigger (`tests/issue_698_t8_conditional_ab.rs`).
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn new_conditional_hard(
+        _loop_count: usize,
+        _dim: usize,
+        beta: f32,
+        theta: f32,
+        bias: f32,
+    ) -> Self {
+        Self {
+            gates: Vec::new(),
+            convex_schedule: None,
+            conditional: Some(ConditionalGate {
+                beta,
+                theta,
+                bias,
+                hard_freeze: true,
+            }),
         }
     }
 
@@ -737,6 +865,36 @@ impl ResidualGate {
     pub fn convex_gate_at(&self, tau: usize) -> Option<f32> {
         let s = self.convex_schedule.as_ref()?;
         Some(s.get(tau).copied().unwrap_or_else(|| *s.last().unwrap_or(&1.0)))
+    }
+
+    /// The adaptive copy weight at loop `tau` (Issue 698 T8):
+    /// `σ(β·(cos(prev, prev_prev) − θ) + b)` — `None` unless the conditional
+    /// gate is installed AND `tau ≥ 2` (the cosine needs TWO carried states;
+    /// τ ∈ {0, 1} have at most one — those loops stay write-open, the
+    /// paper's gate also starts open).
+    #[inline]
+    pub fn conditional_gate_at(&self, tau: usize, prev: &[f32], prev_prev: &[f32]) -> Option<f32> {
+        let c = self.conditional.as_ref()?;
+        if tau < 2 {
+            return None;
+        }
+        let (mut dot, mut na, mut nb) = (0.0f32, 0.0f32, 0.0f32);
+        for i in 0..prev.len() {
+            dot += prev[i] * prev_prev[i];
+            na += prev[i] * prev[i];
+            nb += prev_prev[i] * prev_prev[i];
+        }
+        if na == 0.0 || nb == 0.0 {
+            // Degenerate zero state: nothing has converged — stay open.
+            return Some(0.0);
+        }
+        let cos = dot / (na.sqrt() * nb.sqrt());
+        let g = crate::simd::fast_sigmoid(c.beta * (cos - c.theta) + c.bias).clamp(0.0, 1.0);
+        if c.hard_freeze && g > ConditionalGate::FREEZE_SOFT {
+            Some(1.0)
+        } else {
+            Some(g)
+        }
     }
 }
 
@@ -995,5 +1153,55 @@ impl Default for ThinkingBudget {
             collapse_threshold: 3,
             efficiency_gamma: 0.5,
         }
+    }
+}
+
+#[cfg(test)]
+mod issue698_conditional_gate_tests {
+    use super::ResidualGate;
+
+    #[test]
+    fn conditional_gate_contract() {
+        let g = ResidualGate::new_conditional(32, 8, 400.0, 0.99, 2.0);
+        let a = [0.5f32; 8];
+        let b = [0.25f32; 8];
+        // No conditional installed → None (plain gates stay additive).
+        assert!(ResidualGate::new(32, 8).conditional_gate_at(5, &a, &b).is_none());
+        // τ < 2 → None (the cosine needs two carried states).
+        assert!(g.conditional_gate_at(0, &a, &b).is_none());
+        assert!(g.conditional_gate_at(1, &a, &b).is_none());
+        // Identical states → cos 1 → σ(400·0.01 + 2) ≈ 0.9975 (closed).
+        let closed = g.conditional_gate_at(2, &a, &a).expect("some at τ=2");
+        assert!(closed > 0.99, "identical states must close: {closed}");
+        // Orthogonal states → cos 0 → σ(−396) = 0 (wide open).
+        let mut c = [0.0f32; 8];
+        c[0] = 1.0;
+        let open = g.conditional_gate_at(2, &a, &c).expect("some");
+        assert!(open < 1e-10, "orthogonal states must open: {open}");
+        // Zero-norm degenerate → open (nothing has converged).
+        let z = [0.0f32; 8];
+        let deg = g.conditional_gate_at(2, &z, &a).expect("some");
+        assert_eq!(deg, 0.0);
+    }
+
+    #[test]
+    fn hard_freeze_clamps_to_exactly_one() {
+        let soft = ResidualGate::new_conditional(32, 8, 400.0, 0.99, 2.0);
+        let hard = ResidualGate::new_conditional_hard(32, 8, 400.0, 0.99, 2.0);
+        let a = [0.5f32; 8];
+        let s = soft.conditional_gate_at(2, &a, &a).expect("some");
+        let h = hard.conditional_gate_at(2, &a, &a).expect("some");
+        // Same trigger region (identical states close), but the hard clamp
+        // snaps the blend weight to EXACTLY 1.0 — the bit-exact full-copy
+        // degenerate (frozen state ⇒ cos ≡ 1 ⇒ stays frozen).
+        assert!(s > 0.9);
+        assert_eq!(h, 1.0);
+        // Below the clamp threshold both arms agree (the soft value).
+        let mut lo = [0.0f32; 8];
+        lo[0] = 1.0;
+        let s2 = soft.conditional_gate_at(2, &a, &lo).expect("some");
+        let h2 = hard.conditional_gate_at(2, &a, &lo).expect("some");
+        assert_eq!(s2, h2);
+        assert!(s2 < 1e-10);
     }
 }

@@ -111,6 +111,12 @@ pub struct ForwardContext {
     pub topk_output_buf: Vec<usize>,  // [topk] output indices buffer
     // Loop residual: saves h^(τ-1) for residual gating across weight-shared loops
     pub prev_h: Vec<f32>, // [n_embd]
+    // Issue 698 T8 — hand conditional gate state: saves h^(τ-2) so the
+    // adaptive copy weight can compute cos(S(τ−1), S(τ−2)). Rolled at the
+    // top of each loop iteration ONLY when the conditional gate is installed
+    // (one extra n_embd copy — zero cost otherwise). Pre-allocated.
+    #[cfg(feature = "loop_stability_fix")]
+    pub prev_prev_h: Vec<f32>, // [n_embd]
     // GRT fixed loop anchor (Issue 698 T2): frozen h^(0), hoisted ONCE at the
     // end of the first loop iteration under `LoopStabilityMode::FixedAnchor`
     // and re-injected by the residual gate at every gated iteration instead
@@ -239,6 +245,8 @@ impl ForwardContext {
                 config.vocab_size.div_ceil(config.mtp_cluster_size.max(1)),
             ),
             prev_h: vec![0.0; config.n_embd],
+            #[cfg(feature = "loop_stability_fix")]
+            prev_prev_h: vec![0.0; config.n_embd],
             #[cfg(feature = "loop_stability_fix")]
             loop_anchor: vec![0.0; config.n_embd],
             #[cfg(feature = "delta_routing")]

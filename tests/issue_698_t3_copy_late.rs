@@ -69,7 +69,9 @@ const N_PROMPTS: usize = 27;
 const SEED: u64 = 42;
 
 /// T1's pinned fixture hash — this bench re-uses the exact same weights.
-const T1_FIXTURE_HASH: &str = "fab06e3f4ba65977";
+/// TWO platform pins (aarch64 M3 + x86_64-windows; the T7-recorded weight-
+/// byte drift — see the T2 bench note).
+const T1_FIXTURE_HASH: [&str; 2] = ["fab06e3f4ba65977", "c894478d3febdb00"];
 
 /// Additive baseline gate (τ > 0 constant) — T2's known non-settler.
 const GATE_DECAY: f32 = 0.5;
@@ -546,9 +548,9 @@ fn t698_t3_copy_late_fixture_ab_and_contraction() {
     let sdpa_gate = SdpaOutputGate::new(config.n_head, config.head_dim, config.n_embd);
     let hash = fixture_hash(&config, &weights);
     println!("fixture hash (blake3[16]): {hash}");
-    assert_eq!(
-        hash, T1_FIXTURE_HASH,
-        "fixture must match T1's pinned weights (mode is not part of the hash)"
+    assert!(
+        T1_FIXTURE_HASH.contains(&hash.as_str()),
+        "fixture must match a known platform pin of T1's weights (mode is not part of the hash)"
     );
 
     let arms = [
@@ -761,29 +763,46 @@ fn t698_t3_copy_late_fixture_ab_and_contraction() {
     );
 
     // ── Pinned tables ────────────────────────────────────────────
+    // CROSS-PLATFORM RECORD (2026-08-31, x86_64-windows): exact-bit pins
+    // trip off-aarch64 by platform libm ulp drift (see the T2 note —
+    // verified pre-existing at clean HEAD in a detached worktree). Value
+    // pins relax to the hybrid band |Δ| ≤ 1e-5·|pinned| + 1e-6 (the 1e-6
+    // floor keeps the settling CLASSES separated: e.g. ConvStep 1.2e-12 vs
+    // AddConst 2.404 stay ≥ 9 orders apart); the contraction ORDERING
+    // asserts above remain exact.
+    let band = |pinned: f32| 1e-5 * pinned.abs() + 1e-6;
+    let assert_close = |v: f32, pinned_bits: u32, what: String| {
+        let pinned = f32::from_bits(pinned_bits);
+        assert!(
+            (v - pinned).abs() <= band(pinned),
+            "pinned value drifted ({what}): measured {v:.6e} vs pinned {pinned:.6e}"
+        );
+    };
     for (idx, (arm, ..)) in gates.iter().enumerate() {
         for (j, &r) in R_ARMS.iter().enumerate() {
-            assert_eq!(
-                table[idx][j].to_bits(),
+            assert_close(
+                table[idx][j],
                 PINNED_TABLE[idx][j],
-                "pinned loss drifted: arm {arm:?} r={r}: measured 0x{:08x}",
-                table[idx][j].to_bits()
+                format!("arm {arm:?} r={r}"),
             );
         }
-        assert_eq!(
-            ref_drifts[idx].to_bits(),
+        assert_close(
+            ref_drifts[idx],
             PINNED_REF_DRIFTS[idx],
-            "pinned ref drift drifted: arm {arm:?}: measured 0x{:08x}",
-            ref_drifts[idx].to_bits()
+            format!("ref drift arm {arm:?}"),
         );
     }
     for k in 0..SWEEP_ENDPOINTS.len() {
-        assert_eq!(sweep_drift[k].to_bits(), PINNED_SWEEP[k]);
-        assert_eq!(sweep_loss2[k].to_bits(), PINNED_SWEEP_LOSS2[k]);
+        assert_close(sweep_drift[k], PINNED_SWEEP[k], format!("sweep drift {k}"));
+        assert_close(
+            sweep_loss2[k],
+            PINNED_SWEEP_LOSS2[k],
+            format!("sweep loss2 {k}"),
+        );
     }
-    assert_eq!(dest_conv_nat.to_bits(), PINNED_DEST_CONV_NAT);
-    assert_eq!(dest_nat_conv.to_bits(), PINNED_DEST_NAT_CONV);
-    assert_eq!(dest_add_nat.to_bits(), PINNED_DEST_ADD_NAT);
+    assert_close(dest_conv_nat, PINNED_DEST_CONV_NAT, "dest conv‖nat".into());
+    assert_close(dest_nat_conv, PINNED_DEST_NAT_CONV, "dest nat‖conv".into());
+    assert_close(dest_add_nat, PINNED_DEST_ADD_NAT, "dest add‖nat".into());
 
     println!();
     println!("  VERDICT (measured 2026-08-30): CONTRACTION CONFIRMED — T2's open complement closes.");

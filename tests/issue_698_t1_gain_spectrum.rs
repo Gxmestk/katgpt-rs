@@ -320,13 +320,30 @@ fn t698_t1_gain_spectrum_modelless() {
     );
 
     // ── Pinned table (same-platform exact bits) ──────────────
-    for (i, (measured, &pinned)) in a.table.iter().zip(PINNED_SPECTRUM.iter()).enumerate() {
-        assert_eq!(
-            measured.to_bits(),
-            pinned,
-            "pinned spectrum drifted at r={}: measured 0x{:08x}",
+    // CROSS-PLATFORM RECORD (2026-08-31, x86_64-windows 4090 box): the
+    // exact-bit pin TRIPS off-aarch64 — measured 0x40b6a83b vs the pinned
+    // 0x40b6a83e at r=2 (3 ulp), and at the tail the SAME ~3e-8 ABSOLUTE
+    // drift is 7.8e-4 RELATIVE against the 3.4e-5 value at r=14 (the
+    // Bench-773 small-denominator lesson: a pure relative band cannot
+    // certify a spectrum that decays 6 orders). Verified IDENTICAL at clean
+    // HEAD in a detached worktree — pre-existing platform libm ulp drift,
+    // not a code change (T7 measured the same class at ~2.5e-7 rel).
+    // Per this test's own documented escape hatch the pin is now a
+    // hybrid band: |Δ| ≤ 1e-5·|pinned| + 5e-8 (relative + absolute floor;
+    // the plateau values below the drift floor stay governed by the
+    // plateau assert), + the same-platform double-run bit-identity assert
+    // above (which still pins determinism exactly).
+    for (i, (measured, &pinned_bits)) in a.table.iter().zip(PINNED_SPECTRUM.iter()).enumerate() {
+        let pinned = f32::from_bits(pinned_bits);
+        let band = 1e-5 * pinned.abs() + 5e-8;
+        assert!(
+            (measured - pinned).abs() <= band,
+            "pinned spectrum drifted at r={}: measured {:.6e} vs pinned {:.6e} (|Δ| {:.2e} > band {:.2e})",
             i + 1,
-            measured.to_bits()
+            measured,
+            pinned,
+            (measured - pinned).abs(),
+            band
         );
     }
 

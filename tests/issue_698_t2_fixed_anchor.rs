@@ -48,7 +48,8 @@
 //!   growth).
 //! - **Fixture identity (asserted):** the blake3[16] fixture hash equals
 //!   T1's pinned `fab06e3f4ba65977` (same weights; the mode is not part of
-//!   the hash).
+//!   the hash; the x86_64-windows weight-byte drift T7 recorded yields the
+//!   second pin `c894478d3febdb00`).
 //! - **Ordering (measured, then pinned):** loss(r) = mean over all 27
 //!   prompts of KL(softmax(arm@r) ‖ softmax(arm@32)) per arm; the measured
 //!   fixed-vs-drift-vs-zeros ordering is pinned as raw bits.
@@ -84,7 +85,10 @@ const N_PROMPTS: usize = 27;
 const SEED: u64 = 42;
 
 /// T1's pinned fixture hash — this bench re-uses the exact same weights.
-const T1_FIXTURE_HASH: &str = "fab06e3f4ba65977";
+/// TWO platform pins: the aarch64 (M3) value T1 measured, and the
+/// x86_64-windows value (weight-init libm ulp → different weight BYTES,
+/// recorded by T7's off-aarch64 run + re-verified 2026-08-31).
+const T1_FIXTURE_HASH: [&str; 2] = ["fab06e3f4ba65977", "c894478d3febdb00"];
 
 /// Armed constant gate for τ > 0 (the `new_loop_stable` decay). 0.5 = strong
 /// enough to make the anchor visible, in the stable band the constructor's
@@ -304,9 +308,9 @@ fn t698_t2_fixed_anchor_ab_ordering() {
     let sdpa_gate = SdpaOutputGate::new(config.n_head, config.head_dim, config.n_embd);
     let hash = fixture_hash(&config, &weights);
     println!("fixture hash (blake3[16]): {hash}");
-    assert_eq!(
-        hash, T1_FIXTURE_HASH,
-        "fixture must match T1's pinned weights (mode is not part of the hash)"
+    assert!(
+        T1_FIXTURE_HASH.contains(&hash.as_str()),
+        "fixture must match a known platform pin of T1's weights (mode is not part of the hash)"
     );
 
     let gates: Vec<(Arm, Config, ResidualGate)> = [
@@ -556,26 +560,52 @@ fn t698_t2_fixed_anchor_ab_ordering() {
         [drift_rho01.to_bits(), drift_rho025.to_bits()]
     );
 
-    // ── Pinned table (same-platform exact bits) ──────────────
+    // ── Pinned table ─────────────────────────────────────
+    // CROSS-PLATFORM RECORD (2026-08-31, x86_64-windows 4090 box): the
+    // exact-bit pins trip off-aarch64 by platform libm ulp drift in the
+    // trajectory (T1's r=2 pin drifts 3 ulp; T7 recorded the class at
+    // ~2.5e-7 rel; verified pre-existing at clean HEAD in a detached
+    // worktree). Per T1's documented escape hatch the VALUE pins are now a
+    // hybrid band — |Δ| ≤ 1e-5·|pinned| + 1e-6 (the 1e-6 absolute floor
+    // keeps the SETTLING CLASSES separated: zeros ≈ 3e-8 vs drift 3.9e-3
+    // stay 3 orders apart) — while the ORDERING asserts above (the actual
+    // Table-11 claim) remain exact.
+    let band = |pinned: f32| 1e-5 * pinned.abs() + 1e-6;
     for (idx, (arm, ..)) in gates.iter().enumerate() {
         for (j, &r) in R_ARMS.iter().enumerate() {
-            assert_eq!(
-                table[idx][j].to_bits(),
-                PINNED_TABLE[idx][j],
-                "pinned loss drifted: arm {arm:?} r={r}: measured 0x{:08x}",
-                table[idx][j].to_bits()
+            let pinned = f32::from_bits(PINNED_TABLE[idx][j]);
+            assert!(
+                (table[idx][j] - pinned).abs() <= band(pinned),
+                "pinned loss drifted: arm {arm:?} r={r}: measured {:.6e} vs pinned {:.6e}",
+                table[idx][j],
+                pinned
             );
         }
-        assert_eq!(
-            ref_drifts[idx].to_bits(),
-            PINNED_REF_DRIFTS[idx],
-            "pinned ref drift drifted: arm {arm:?}"
+        let pd = f32::from_bits(PINNED_REF_DRIFTS[idx]);
+        assert!(
+            (ref_drifts[idx] - pd).abs() <= band(pd),
+            "pinned ref drift drifted: arm {arm:?}: measured {:.6e} vs pinned {:.6e}",
+            ref_drifts[idx],
+            pd
         );
     }
-    assert_eq!(dest_fd.to_bits(), PINNED_DEST_FD);
-    assert_eq!(dest_df.to_bits(), PINNED_DEST_DF);
-    assert_eq!(drift_rho01.to_bits(), PINNED_SWEEP[0]);
-    assert_eq!(drift_rho025.to_bits(), PINNED_SWEEP[1]);
+    let pfd = f32::from_bits(PINNED_DEST_FD);
+    assert!(
+        (dest_fd - pfd).abs() <= band(pfd),
+        "pinned dest FD drifted: measured {dest_fd:.6e} vs pinned {pfd:.6e}"
+    );
+    let pdf = f32::from_bits(PINNED_DEST_DF);
+    assert!(
+        (dest_df - pdf).abs() <= band(pdf),
+        "pinned dest DF drifted: measured {dest_df:.6e} vs pinned {pdf:.6e}"
+    );
+    for (k, &v) in [drift_rho01, drift_rho025].iter().enumerate() {
+        let ps = f32::from_bits(PINNED_SWEEP[k]);
+        assert!(
+            (v - ps).abs() <= band(ps),
+            "pinned sweep[{k}] drifted: measured {v:.6e} vs pinned {ps:.6e}"
+        );
+    }
 
     println!();
     println!("  VERDICT (measured 2026-08-30): PARTIAL TRANSFER, with the mechanism found.");

@@ -72,9 +72,10 @@ const N_PROMPTS: usize = 27;
 /// Fixture seed (matches the 407 / T1 convention).
 const SEED: u64 = 42;
 
-/// The pinned fixture identity — must equal T1's committed hash, proving
-/// this bench measures the exact spectrum T1 recorded.
-const EXPECTED_FIXTURE_HASH: &str = "fab06e3f4ba65977";
+/// The pinned fixture identity — must equal one of T1's committed platform
+/// hashes (aarch64 M3 + x86_64-windows; the T7-recorded weight-byte drift),
+/// proving this bench measures the exact spectrum T1 recorded.
+const EXPECTED_FIXTURE_HASH: [&str; 2] = ["fab06e3f4ba65977", "c894478d3febdb00"];
 
 /// The measured per-token armed-halt distribution on this fixture:
 /// every token halts in [4, 6] — 21 at loop 4, 6 at loop 6 — the ramp's
@@ -226,8 +227,8 @@ fn t698_t4_halter_floors_e2e() {
     println!("fixture hash (blake3[16]): {hash}");
 
     // Cross-bench identity: this IS T1's fixture.
-    assert_eq!(
-        hash, EXPECTED_FIXTURE_HASH,
+    assert!(
+        EXPECTED_FIXTURE_HASH.contains(&hash.as_str()),
         "fixture drifted from T1's committed spectrum fixture"
     );
 

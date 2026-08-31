@@ -1339,6 +1339,37 @@ name = "issue_698_t7_gate_probe"
 path = "tests/issue_698_t7_gate_probe.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
 
+# Issue 698 T6 — per-step state noise (GRT's smallest ablation, modelless
+# corollary): BLAKE3-seeded Gaussian per (pos, tau) on the normed loop
+# input, amplitude = scale × state RMS. Expected wash — the bench measures
+# the convergence/contraction/destination effect at three scales and pins
+# the scale=0 ≡ InterLoopNorm bit-identity (the flag-off mechanism pin).
+[[test]]
+name = "issue_698_t6_state_noise"
+path = "tests/issue_698_t6_state_noise.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
+# Issue 698 T8 — hand conditional gate σ(β·(cos(h, h_pre)−θ)+b) MECHANISM
+# GATE PROBE (the issue's own precondition: gate-open events must co-locate
+# with high marginal loop gain at a rank-correlation threshold). Reconstructs
+# the per-loop carried state S(r) through production forward_looped (elastic
+# override + the post-loop hidden-state snapshot — no src hook), measures
+# cos(S(r), S(r−1)) vs the marginal gain kl(r)−kl(r+1) in BOTH the shipped
+# InterLoopNorm context and the T8-prerequisite FixedAnchor+armed context.
+[[test]]
+name = "issue_698_t8_gate_probe"
+path = "tests/issue_698_t8_gate_probe.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
+# Issue 698 T8 — the conditional gate A/B: the adaptive convex blend
+# g_τ = σ(β·(cos(S(τ−1), S(τ−2))−θ)+b) (open on divergence) vs the static
+# copy-late schedule and the natural trajectory — contraction, destination
+# bias, and the per-token freeze-loop spread (the adaptivity evidence).
+[[test]]
+name = "issue_698_t8_conditional_ab"
+path = "tests/issue_698_t8_conditional_ab.rs"
+required-features = ["lt2_looped", "loop_stability_fix"]
+
 [[example]]
 name = "bomber_19_sdpg_replay_gen"
 required-features = ["sdpg_bandit", "bomber"]
