@@ -225,7 +225,7 @@ impl AdaptiveTraceCompactor {
             return Ok(None);
         }
 
-        let Some(r) =
+        let Some(online_result) =
             self.online
                 .maybe_compact(kv_keys, kv_values, queries, current_pos, d, n, config)?
         else {

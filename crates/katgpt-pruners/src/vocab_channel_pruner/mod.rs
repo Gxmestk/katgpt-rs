@@ -339,7 +339,7 @@ impl VocabChannelDecomposer {
         let mut mask = vec![false; vocab_size];
 
         for _ in 0..self.config.max_channels {
-            let Some(ch) = self.discover_channel(neuron_weight, lm_head, vocab_size, n_embd, &mask)
+            let Some(channel) = self.discover_channel(neuron_weight, lm_head, vocab_size, n_embd, &mask)
             else {
                 break;
             };

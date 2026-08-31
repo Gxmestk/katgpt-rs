@@ -76,7 +76,7 @@ impl NerveFlowField {
     ///
     /// O(1) — single HashMap lookup + index increment.
     pub fn next_zone(&self, current: ZoneId) -> Option<ZoneId> {
-        let Some(&i) = self.zone_index.get(&current) else {
+        let Some(&idx) = self.zone_index.get(&current) else {
             return None;
         };
 
@@ -90,7 +90,7 @@ impl NerveFlowField {
     /// Indicates whether the NPC is at the goal, en route, or off the path.
     /// O(1) — no allocation.
     pub fn direction_to_goal(&self, current: ZoneId) -> NavigationHint {
-        let Some(&i) = self.zone_index.get(&current) else {
+        let Some(&idx) = self.zone_index.get(&current) else {
             return NavigationHint::OffPath;
         };
 

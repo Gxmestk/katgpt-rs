@@ -173,7 +173,7 @@ impl OperatorSchema {
     /// the first uncovered edge. Used by the G2 soundness tests.
     pub fn verify_covers(&self, quotient: &BisimulationQuotient) -> Result<(), QuotientEdge> {
         for edge in &quotient.quotient_edges {
-            let Some(d) = self.find(edge.op) else {
+            let Some(op_def) = self.find(edge.op) else {
                 return Err(*edge);
             };
             if !op_def.effects.contains(&(edge.from, edge.to)) {

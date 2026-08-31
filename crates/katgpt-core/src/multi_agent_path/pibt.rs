@@ -740,7 +740,7 @@ fn detect_swap_backers<P: Position>(
             continue;
         }
         let current_i = config.pos(AgentId(i as u32));
-        let Some(p) = guidance.get(i).and_then(|g| g.first()) else {
+        let Some(preferred_i) = guidance.get(i).and_then(|g| g.first()) else {
             continue;
         };
 

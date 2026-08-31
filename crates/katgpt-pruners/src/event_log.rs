@@ -174,7 +174,7 @@ impl<A: Clone + Debug> EventLog<A> {
 
     /// Compute structural diff between this log and another.
     /// Returns divergence information starting from the first different event.
-    pub fn diff(&self, other: &Self<A>) -> ForkDiff<A>
+    pub fn diff(&self, other: &Self) -> ForkDiff<A>
     where
         A: PartialEq,
     {

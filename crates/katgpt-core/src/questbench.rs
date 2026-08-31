@@ -724,7 +724,7 @@ impl crate::traits::ConstraintPruner for NarrowingPruner {
             return self.valid_at_depth.get(token_idx).copied().unwrap_or(false);
         }
         // depth > 0: validity depends on what was placed at depth-1
-        let Some(&t) = parent_tokens.last() else {
+        let Some(&last) = parent_tokens.last() else {
             return self.valid_at_depth.get(token_idx).copied().unwrap_or(false);
         };
         if last < self.narrowing.len() && !self.narrowing[last].is_empty() {

@@ -255,7 +255,7 @@ pub fn set_diffusion_decode<F: SetCausalForwardFn>(
     let max_gen_step = gen_steps.iter().copied().max().unwrap_or(0);
 
     let mut forward_passes = 0usize;
-    let mut confidence_history = Vec::with_capacity(max_gen_step + 1);
+    let mut confidence_history = Vec::with_capacity(max_gen_step as usize + 1);
     let mut all_committed = false;
 
     // Hoisted out of both loops: gen_steps doesn't change between iterations,

@@ -496,7 +496,7 @@ fn apply_movement(world: &mut World, actions: [Option<BomberAction>; 4]) {
         // Resource lookup hoisted out of the per-player loop.
         let grid = world.resource::<ArenaGrid>();
         for (entity, player, pos) in q.iter(world) {
-            let Some(a) = actions.get(player.id as usize).copied().flatten() else { continue };
+            let Some(action) = actions.get(player.id as usize).copied().flatten() else { continue };
             let (dx, dy) = match action {
                 BomberAction::Up => (0, -1),
                 BomberAction::Down => (0, 1),
