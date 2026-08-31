@@ -418,6 +418,7 @@ fn forward_single_layer(
 /// forward rewrites its window rows before the write-back, so no state can
 /// leak across forwards). Zero alloc; the row is kvd-wide, negligible next
 /// to the matmuls it amortises (one deleted window-forward per token).
+#[cfg(feature = "tf_loop")]
 #[inline]
 fn fold_kv_mean(
     layer_cache: &KVCache,
