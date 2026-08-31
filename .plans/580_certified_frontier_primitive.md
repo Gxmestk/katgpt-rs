@@ -134,6 +134,50 @@ growth among admissible arms only — for the re-gate once a consumer exists.
 - [ ] **T5.1** If G1–G4 + floor PASS → add to `default = [...]` (both Cargo.tomls) + README showcase row + `.docs/01_orientation/overview.md` Feature Flags row.
 - [x] **T5.2** If floor FAILS → keep opt-in, document the regime where adjacency-only wins (dense-frontier worlds), demote honestly in R510 footer.
 
+### First external consumer landed — 2026-08-31 (unblocks the re-gate precondition)
+
+Bench 688 deferred promotion to "the corrected two-stage metric **once a
+consumer exists**." One now does: **riir-train Plan 357 T1.2**
+(`crates/riir-train-gpu/src/dllm/actflow_gp.rs`,
+[Bench 563](../../riir-train/.benchmarks/563_plan357_t1_2_gp_uncertainty.md))
+consumes `certified_frontier` as the **reference oracle** for its own GP
+posterior variance, on both `posterior_variance_linear` and `ridge_mean`, at
+every observation count 0..48 across λ ∈ {1, 1e-1, 1e-2}. Two independently
+written implementations agreeing to f32 tolerance is external correctness
+evidence this plan did not previously have.
+
+**It does NOT consume `PosteriorBuffer` as its production path, and the reason
+is a regime inversion worth a follow-up here.** `PosteriorBuffer` factorises the
+`n × n` Gram matrix `K + λI`, which is right for this plan's own setting
+(`n < D` — observations scarce, latent wide). ActFlow inverts it: a 4096-sample
+warm-up against a 32-D projected feature. Measured on the consumer's side:
+
+| | primal (`PosteriorBuffer`) | exact dual |
+|---|---|---|
+| variance @ n = 256, D = 32 | 158.7 µs/query | 1.99 µs/query (**79.6×**) |
+| scaling in `n` | `O(n²)` | **`O(1)`** (1.007× from n=16 to n=4096) |
+| state | 291 KiB @ `MAX_OBS=256`; **64 MiB @ 4096** | **4368 B at any n** |
+
+For a **linear** kernel the two are the same number by Woodbury, exactly:
+
+```text
+k(x,x) − k(x,X)(XXᵀ + λI)⁻¹k(X,x)  ==  λ · xᵀ(XᵀX + λI)⁻¹x
+```
+
+`A = XᵀX + λI` is `D × D`, held as a lower Cholesky factor with a rank-1
+`cholupdate` per observation — and its pivots are bounded below by `√λ` for every
+observation sequence, so the near-duplicate-feature floor the primal needs
+(`chol[n][n] = rem.max(lambda * 1e-6).sqrt()`) has no analogue.
+
+- [ ] **T5.3 (ADDED)** Add a regime-conditional dual path beside
+      `PosteriorBuffer` — `DualPosteriorBuffer<D>` with the same
+      `append_observation` / `posterior_variance_linear` / `ridge_mean` surface,
+      selected when `n > D`. The primal stays: it is the correct factorisation
+      for this plan's own `n < D` cells, and it is now also the *oracle* the dual
+      is gated against (riir-train's gate can be mirrored in-tree). Cheap —
+      ~80 LOC, std-only, and the consumer's implementation is already written and
+      equivalence-tested.
+
 ## Risk register
 
 | Risk | Mitigation |
