@@ -11,6 +11,8 @@
 
 ---
 
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2510.07880 "Do LLMs Really Need 10+ Thoughts for 'Find the Time 1000 Days Later'? Towards Structural Understanding of LLM Overthinking"] — TRACE's utility curves empirically validate the gain/cost convergence point at the explicit-CoT granularity; its two structural halting heuristics (self-loop-K, backtrack-revisit) distilled in Research 525 → Issue 699.
+
 ## TL;DR
 
 LoopCoder-v2 trains 7B Parallel Loop Transformer (PLT) coders with R ∈ {1,2,3,4} loops from scratch on 18T tokens and discovers a **strongly non-monotonic loop-count effect**: R=2 improves SWE-bench Verified from 43.0→64.4, but R=3 *regresses* to 27.6 and R=4 to 22.4. The paper explains this via a **gain–cost scissors**: each additional loop provides marginal representational refinement (gain, measured by output-distribution shift Δp(r), attention re-routing D_KL(r), and effective-rank trajectory) that **shrinks monotonically**, while the CLP-induced positional-mismatch cost Ω(r) stays **roughly flat** across loops. Beyond R=2, the flat cost increasingly dominates the shrinking gain — at every extra loop the cost exceeds the gain by 30–45×. The crossover is the principled halt point.
