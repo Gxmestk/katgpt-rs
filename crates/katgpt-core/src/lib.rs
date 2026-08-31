@@ -1645,6 +1645,18 @@ pub use data_probe::{
     stable_rank_update_into_flat,
 };
 
+// mi_est — Modelless Mutual-Information Estimator over fixed critics
+// (Plan 583, Research 521 — MINE arXiv:1801.04062 modelless extraction).
+// DV/NWJ/InfoNCE/JS bound VALUES in nats + LOO bias control + K-ladder
+// tightness + permutation calibration (uniform/circular/block/stratified,
+// dCor non-vacuity control) + a Gaussian closed-form arm gated by the shipped
+// `sketched_gaussianity` + the frozen-representation IB ratio. Opt-in
+// feature `mi_est` — diagnostic surface with no default consumer yet
+// (no-default-consumer rule); consumers: riir-train dist-guard third audit
+// axis (T3.4), quant-fidelity probes (T3.5), riir-train plan 365 DV core.
+#[cfg(feature = "mi_est")]
+pub mod mi;
+
 // ICT Distributional Branching-Point Detector — open generic math (Plan 294,
 // Research 270, arxiv 2606.19771). Collision purity β(π) = Σ π² (proven
 // unconditionally monotone, ICT §A.2.5 — H₁ is wrong below π > e⁻¹ ≈ 0.37),
@@ -1983,7 +1995,8 @@ pub use katgpt_types::depth_invariance::{
     feature = "geometric_product",
     feature = "tucker_factorization",
     feature = "svd_cca",
-    feature = "twist_smc"
+    feature = "twist_smc",
+    feature = "mi_est"
 ))]
 pub mod linalg;
 

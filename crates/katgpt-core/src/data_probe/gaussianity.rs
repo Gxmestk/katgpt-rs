@@ -663,7 +663,11 @@ mod tests {
     /// G4: zero allocations in steady state (the latent_confounder_audit
     /// pattern — the lib test binary installs `alloc::TrackingAllocator`
     /// under cfg(test, debug_assertions); skip with a message if absent).
+    /// The accessors are debug_assertions-gated in alloc.rs — gate the test
+    /// to match (pre-existing release-build break found by the mi_est
+    /// release lib run, Plan 583; the alloc.rs module-docs convention).
     #[test]
+    #[cfg(debug_assertions)]
     fn g4_zero_alloc_steady_state() {
         use crate::alloc::{get_alloc_stats, reset_alloc_stats};
 
