@@ -97,5 +97,9 @@ jobs:
       # Strict: no --allow-missing-lean. If Lean is unavailable, CI fails
       # rather than passing with the proofs unchecked — a skipped gate that
       # looks green is the exact failure this workflow exists to prevent.
-      - name: Proof gate (type-check + no sorry + no native_decide + axiom budget, 17 theorems)
+      # The audited theorem count is deliberately NOT in this name. It read
+      # "17 theorems" while the script pinned 39 — a step name is a second
+      # place for the count to live, so it drifts. The script prints the real
+      # number and hard-fails on a mismatch; that is the single source.
+      - name: Proof gate (type-check + no sorry + no native_decide + axiom budget)
         run: ./scripts/proof_gate.sh

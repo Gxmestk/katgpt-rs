@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -73,11 +74,34 @@ def main() -> int:
     print(f"  total flags (unique): {len(grand_total)}")
     print(f"  opt-in (unique)     : {len(grand_total - grand_default)}")
 
-    # README claim check
+    # ── README claim check ──────────────────────────────────────────────────
+    # This used to print a HARDCODED claim string ("140+ default-on, 320+ total
+    # flags") next to the measured numbers and leave the comparison to whoever
+    # read the output. That check could never fire: the literal drifted out of
+    # step with the README independently of the code, and by 2026-09-01 it
+    # matched neither the README (378/152) nor reality (537/189). A check that
+    # compares a measurement against a constant it also owns is not a check.
+    # Now it parses the README and asserts.
     print("\n## README claim check")
-    print('  current README claim: "140+ default-on, 320+ total flags"')
-    print(f"  actual default-on   : {len(grand_default)}")
-    print(f"  actual total flags  : {len(grand_total)}")
+    readme = Path(__file__).resolve().parent.parent / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    m = re.search(r"(\d+)\s+feature flags\s*\((\d+)\s+default-on", text)
+    if not m:
+        print(f"  ✗ no parseable feature-flag claim found in {readme.name}")
+        print("    expected the form: '<N> feature flags (<M> default-on'")
+        print(f"    measured: {len(grand_total)} total, {len(grand_default)} default-on")
+        return 1
+
+    claim_total, claim_default = int(m.group(1)), int(m.group(2))
+    actual_total, actual_default = len(grand_total), len(grand_default)
+    print(f"  README claims : {claim_total} total, {claim_default} default-on")
+    print(f"  measured      : {actual_total} total, {actual_default} default-on")
+    if (claim_total, claim_default) != (actual_total, actual_default):
+        print("  ✗ README feature counts have drifted from the manifests")
+        print(f"    update README.md to: {actual_total} feature flags "
+              f"({actual_default} default-on, ...)")
+        return 1
+    print("  ✓ README matches the manifests")
     return 0
 
 

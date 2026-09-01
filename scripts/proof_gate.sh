@@ -56,6 +56,10 @@ ALLOWED_AXIOMS=("propext" "Classical.choice" "Quot.sound")
 #   38 → Pencil ladder closeout (Issue 678): diagonal eigenvalue pinning
 #        (eigval_diagonal_antitone, the singles/CF substrate), the ladder
 #        unit gap, and the T4 final assembly (eigengap_ladder_ge_half).
+#   39 → HintRegret (Plan 576, 1b73fbf1): band-gate openness over ℝ
+#        (bandGate_mem_Ioo) — the ideal (0,1) contract the f32 gate
+#        approximates. Added with the pin bumped but the ladder not extended;
+#        recorded here so the pin's justification matches the pin.
 EXPECTED_THEOREMS=39
 
 # Bare `axiom` declarations that are allowed to exist, by name. Empty here:
