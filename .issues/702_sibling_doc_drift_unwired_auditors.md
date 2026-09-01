@@ -271,7 +271,12 @@ number from a sibling's `.issues/.highwater` is the documented collision path.
 - [ ] riir-ai: correct the `osc_emotion` label (or demote the feature, if the
       doc reflects the intended state and the manifest is what drifted — check
       which is wrong before editing the doc).
-- [ ] riir-clippy: same for `rustc_errors` in both benchmark docs.
+- [x] riir-clippy: same for `rustc_errors` in both benchmark docs. **DONE
+      2026-09-01, riir-clippy `7736e30`** — both labels now read "default-ON
+      since 2026-08-29 by owner call" with the driver-shaped inertness note;
+      the manifest was confirmed right before editing (`Cargo.toml:120` lists
+      `rustc_errors` in `default`), and `bench_doc_audit.py` re-run over the
+      repo: 9 labels / **0 mismatches**.
 - [ ] riir-neuron-db: correct the `merkle_freeze` label, or drop it from
       `experience_graph` if default-on was not intended.
 - [ ] Each sibling either runs the two auditors on some cadence or records why
