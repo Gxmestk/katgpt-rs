@@ -105,6 +105,13 @@ target and under-reports. This gate was **red on `develop` from at least
 the block above was green. Treat a green gate as a claim about its literal
 command, not about the code.
 
+Don't run it by hand — `scripts/full_gate.sh` is the assertion (it also refuses
+to report a pass off macOS, where the `target_os = "macos"` device backends
+compile to nothing even with `--all-features`, and checks that this document
+still quotes the command it runs). `.github/workflows/full_gate.yml` runs it
+weekly and on demand; per-push is deliberately not enabled — see that file's
+preamble for the measured cost and the promotion criterion.
+
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
 Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,

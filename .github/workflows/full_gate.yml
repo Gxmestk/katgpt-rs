@@ -1,0 +1,99 @@
+# Full gate — the whole-surface compile + lint claim, run by CI rather than by habit.
+#
+# Before this workflow, nothing ran `--workspace --all-targets --all-features`.
+# Every gate the repo documented was narrow on at least one of three
+# independent axes (see scripts/full_gate.sh for the full account), so this
+# surface was RED on `develop` from at least 2cb97410 until 3e58e821 — five
+# broken targets — with every documented gate green the whole time.
+# `scripts/full_gate.sh` is the assertion; this runs it strictly.
+#
+# ── Why macos-latest, and not the cheaper ubuntu-latest ──────────────────────
+# This is the one platform choice that cannot be traded for cost. The device
+# backends are gated `#[cfg(all(target_os = "macos", feature = "gpu_inference"))]`
+# and their deps (metal, coreml-native, coreml-proto, prost) are optional
+# entries under `[target.'cfg(target_os = "macos")'.dependencies]`. On Linux,
+# `--all-features` switches the feature ON and still compiles the file to
+# NOTHING, because the cfg is an `all(...)` over target_os AND feature.
+# An ubuntu runner would therefore reproduce the exact vacuous green this gate
+# exists to catch — it would have reported success on the E0425 pair in
+# katgpt-backend/src/gpu.rs that motivated the gate. A cheap green here is
+# worse than no gate.
+#
+# ── Why not on every push ────────────────────────────────────────────────────
+# Measured: a cold `--all-targets --all-features` clippy run takes >13 min on a
+# 16-core M3 Max. A GitHub macOS runner has far fewer cores, and macOS minutes
+# bill at a multiple of Linux. Per-push is not worth it, and it is not what the
+# gate is FOR: the failure mode it catches is slow rot (weeks red, unnoticed),
+# not a per-commit regression. So it runs weekly, on demand, and whenever the
+# gate's own definition changes — that last trigger matters, because a gate
+# nobody validates after editing is a gate nobody is running.
+#
+# Promotion criterion, if per-push is ever wanted: land one green scheduled run
+# with a warm cache and read its wall-clock off the summary first. Do not guess.
+name: Full gate
+
+on:
+  schedule:
+    # Mondays 04:17 UTC. Off-the-hour to avoid the top-of-hour runner queue.
+    - cron: '17 4 * * 1'
+  push:
+    branches: [main, develop]
+    # Only the gate's own definition. Broadening this to '**/*.rs' is the
+    # per-push cost this file's preamble argues against.
+    # NOTE: duplicated rather than shared via a YAML anchor — GitHub Actions
+    # does not support anchors. Keep the two lists in sync.
+    paths:
+      - 'scripts/full_gate.sh'
+      - '.github/workflows/full_gate.yml'
+  pull_request:
+    paths:
+      - 'scripts/full_gate.sh'
+      - '.github/workflows/full_gate.yml'
+  workflow_dispatch:
+
+# A queued rerun of a slow gate on the same ref is waste, but never cancel a
+# scheduled run mid-flight in favour of a push — the schedule is the rot check.
+concurrency:
+  group: full-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-gate:
+    runs-on: macos-latest
+    # Generous: the local cold run exceeded 13 min on much better hardware, and
+    # a cache miss here means a full cold build of every target at every feature.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+
+      # Same action + channel as `release-plz.yml`, the repo's only other Rust
+      # workflow — one way to install a toolchain, not two.
+      #
+      # The repo pins no toolchain (no rust-toolchain.toml, no rust-version), so
+      # `@stable` is what a developer here actually gets. That is deliberate for
+      # a rot gate: clippy gains deny-level lints between releases, and one of
+      # the five breaks this gate first caught was exactly that
+      # (`approx_constant`, deny-by-default). A weekly run that reds on a
+      # toolchain bump is the gate working, not flaking — read the diagnostic
+      # before assuming the code changed.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # Keyed on the lockfile; falls back to any prior cache for this OS so a
+      # dep bump warms from the previous build instead of starting cold.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: full-gate
+          # The gate compiles every target at every feature — a much larger
+          # artifact set than a default build. Saving on failure too means a
+          # timed-out cold run still leaves a warm cache for the next attempt,
+          # which is how a 180-minute ceiling stays survivable.
+          cache-on-failure: true
+
+      # Strict: no --allow-partial-platform. On a non-macOS runner the script
+      # refuses to report a pass, so this step cannot silently degrade into the
+      # partial gate the preamble warns about.
+      - name: Full gate (workspace, all targets, all features, keep-going)
+        run: ./scripts/full_gate.sh
