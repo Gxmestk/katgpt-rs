@@ -241,6 +241,13 @@ echo_env_predictor = ["katgpt-core/echo_env_predictor"]
 # Gates the thinking_controller module. Root forwards via katgpt-speculative/thinking_cot.
 thinking_cot = []
 
+# Structural CoT halting — answer-space cycle detection (Issue 699 T1-T3,
+# TRACE arXiv:2510.07880). Forwards to katgpt-core so the monitor + the two
+# plug-point seams here compile: the fold/thinking_ext.rs observer + the
+# dd_tree TreeBuilder patience seam. Opt-in — flag-off behavior is
+# bit-identical (the seams are `Option`-shaped and whole blocks cfg-gated).
+structural_cot_halt = ["katgpt-core/structural_cot_halt"]
+
 # RV-Gated Thinking — ThinkingController RV bias (Plan 202 GOAT, default-ON
 # via rv_gated_routing in root). Tracking flag for thinking_controller's
 # rv_gated_thinking cfg block.

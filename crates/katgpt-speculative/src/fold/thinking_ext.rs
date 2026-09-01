@@ -46,6 +46,62 @@ pub fn step_reduction_ratio(stats: &FoldStats) -> f32 {
     stats.total_steps_folded as f32 / stats.queries_folded as f32
 }
 
+// ── Issue 699 T2: structural CoT halt observer (opt-in) ────────────────
+
+/// Opt-in answer-stream observer for the thinking trace (Issue 699 T2;
+/// TRACE, arXiv:2510.07880).
+///
+/// `ThinkingController` decides WHETHER to think and has no answer-text
+/// stream of its own (verified at Issue 699 T2 — it consumes confidences
+/// and rewards, never step answers), so per the issue's plug-point rule the
+/// structural monitor rides ALONGSIDE as an explicit observer: the caller
+/// feeds each answer-bearing reasoning step and maps the returned halt
+/// decision onto its own loop control. Reshaping the controller is
+/// explicitly out of scope; wiring this into the controller's mode
+/// selection is the T4 PoC's job.
+///
+/// Note: this file is `chain_fold`-gated (the fold module's own gate), so
+/// the observer additionally requires `chain_fold` — an artifact of the
+/// hook's sanctioned location, recorded here for feature-matrix honesty.
+/// The monitor itself lives in `katgpt-core/structural_cot_halt` with no
+/// chain_fold coupling.
+#[cfg(feature = "structural_cot_halt")]
+pub struct ThinkingTraceHaltObserver {
+    monitor: katgpt_core::structural_cot_halt::StructuralTraceMonitor,
+}
+
+#[cfg(feature = "structural_cot_halt")]
+impl ThinkingTraceHaltObserver {
+    /// Construct with an explicit halting policy.
+    pub fn new(policy: katgpt_core::structural_cot_halt::HaltPolicy) -> Self {
+        Self {
+            monitor: katgpt_core::structural_cot_halt::StructuralTraceMonitor::new(policy),
+        }
+    }
+
+    /// Construct with the pattern-conditional fusion ([`HaltPolicy::Auto`]).
+    pub fn auto() -> Self {
+        Self {
+            monitor: katgpt_core::structural_cot_halt::StructuralTraceMonitor::auto(),
+        }
+    }
+
+    /// Feed one answer-bearing reasoning step; returns the halt decision.
+    /// Zero-alloc, deterministic (see the monitor's contract).
+    pub fn observe(
+        &mut self,
+        answer: &str,
+    ) -> katgpt_core::structural_cot_halt::StructuralHaltDecision {
+        self.monitor.step(answer)
+    }
+
+    /// Shared monitor access for composition (classify_prefix, counters,
+    /// compose_votes against the numeric family).
+    pub fn monitor(&mut self) -> &mut katgpt_core::structural_cot_halt::StructuralTraceMonitor {
+        &mut self.monitor
+    }
+}
+
 // ── Tests ───────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -117,5 +173,44 @@ mod tests {
         };
         let ratio = step_reduction_ratio(&stats);
         assert!((ratio - 5.0).abs() < f32::EPSILON); // 15 / 3
+    }
+
+    // ── Issue 699 T2: structural halt observer ────────────────────
+
+    #[cfg(feature = "structural_cot_halt")]
+    #[test]
+    fn test_thinking_trace_halt_observer_backtrack() {
+        use katgpt_core::structural_cot_halt::StructuralHaltDecision;
+        let mut obs = ThinkingTraceHaltObserver::auto();
+        assert_eq!(obs.observe("42"), StructuralHaltDecision::Continue);
+        assert_eq!(obs.observe("43"), StructuralHaltDecision::Continue);
+        assert_eq!(
+            obs.observe("42"),
+            StructuralHaltDecision::Halt {
+                reason: katgpt_core::structural_cot_halt::StructuralHaltReason::BacktrackRevisit,
+                step: 3
+            },
+            "Auto resolves the explorer cycle → backtrack halt"
+        );
+        // Frozen episode.
+        assert_eq!(
+            obs.observe("44"),
+            StructuralHaltDecision::Halt {
+                reason: katgpt_core::structural_cot_halt::StructuralHaltReason::BacktrackRevisit,
+                step: 3
+            }
+        );
+    }
+
+    #[cfg(feature = "structural_cot_halt")]
+    #[test]
+    fn test_thinking_trace_halt_observer_monitor_access() {
+        use katgpt_core::structural_cot_halt::HaltPolicy;
+        let mut obs = ThinkingTraceHaltObserver::new(HaltPolicy::Never);
+        for answer in ["a", "b", "c", "a"] {
+            assert!(!obs.observe(answer).is_halt());
+        }
+        assert_eq!(obs.monitor().revisit_count(), 1);
+        assert_eq!(obs.monitor().step_count(), 4);
     }
 }

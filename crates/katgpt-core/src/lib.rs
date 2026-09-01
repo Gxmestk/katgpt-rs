@@ -1936,6 +1936,21 @@ pub mod gain_cost_halt;
 pub use gain_cost_halt::{
     GainCostLoopHalter, HaltDecision, HaltReason, angular_change, hidden_erank, step_size,
 };
+// Issue 699 T1-T3 — structural CoT halting (TRACE, arXiv:2510.07880):
+// answer-space cycle detection on reasoning traces — the black-box halt
+// family (no logits/hidden states/LLM rater). A third independent halt-vote
+// family beside the numeric arbiter above; the two compose via
+// structural_cot_halt::vote_from_numeric when BOTH features are on.
+// Opt-in (not default-on) — T4 defend-wrong PoC (riir-poc) + T5 GOAT gate
+// (≥30% token savings at ≤1% accuracy delta) are pending.
+#[cfg(feature = "structural_cot_halt")]
+pub mod structural_cot_halt;
+#[cfg(feature = "structural_cot_halt")]
+pub use structural_cot_halt::{
+    BacktrackRevisitHalt, ClassifiedPattern, HaltPolicy, HaltVote, Pattern, SelfLoopHalt,
+    StructuralHaltDecision, StructuralHaltReason, StructuralTransition, StructuralTraceMonitor,
+    compose_votes, normalized_answer_hash,
+};
 
 // Cross-Datapoint Set Attention — sigmoid-gated, permutation-equivariant
 // cross-entity refinement kernel (Plan 354, Research 354, arXiv:2106.02584

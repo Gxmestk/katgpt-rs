@@ -15,6 +15,11 @@
 //! Budget is measured in `advance()` calls during expansion + rollout.
 //! Selection state tracking (tree walk) is not counted — it's overhead, not search.
 //!
+//! Issue 699 T2: the budget loop carries an OPTIONAL answer-space halt seam
+//! ([`BudgetHaltCheck`]) — `None` in every stock entry point, so default
+//! behavior is bit-identical; the structural monitor rides a new wrapper
+//! ([`mcts_search_structural_halted`], `structural_cot_halt` feature).
+//!
 //! # Traits
 //! Operates on [`GameState`], [`RolloutPolicy`], and [`StateHeuristic`] from
 //! [`crate::traits`]. Any crate can `cargo add katgpt-core` and run MCTS over
@@ -113,12 +118,44 @@ impl MCTSNode {
 
 // ── MCTS Search — Core Implementation ─────────────────────────
 
+/// Issue 699 T2 — answer-space halt check for the budget loop.
+///
+/// `None` (every stock entry point) = bit-identical legacy behavior — the
+/// per-iteration cost is one `Option` test. When armed, the loop feeds the
+/// root's currently-best action identity (most visits; `max_by_key` tie →
+/// last child in push order, matching the final selection exactly) to the
+/// check each iteration; `true` cuts the search immediately. This is the
+/// structural CoT monitor's token-space seam (see
+/// `crate::structural_cot_halt`, `structural_cot_halt` feature).
+pub(crate) type BudgetHaltCheck<'a> = Option<&'a mut dyn FnMut(u64) -> bool>;
+
+/// Most-visited root child's action index, as a raw monitor key — see
+/// [`BudgetHaltCheck`]. Same selection the search returns at loop end
+/// (max visits; `max_by_key` tie → last child in push order, matching the
+/// final selection exactly). No children yet (iteration 0) → key 0
+/// (deterministic; the first expansion exists by the next check).
+fn root_best_child_key(nodes: &[MCTSNode]) -> u64 {
+    let root = &nodes[0];
+    match root
+        .children
+        .iter()
+        .copied()
+        .max_by_key(|&ci| nodes[ci].visits)
+    {
+        Some(best) => nodes[best].action_index.unwrap_or(0) as u64,
+        None => 0,
+    }
+}
+
 /// Core MCTS implementation with pluggable rollout policy.
 ///
 /// Shared by [`mcts_search`] (backward-compatible) and [`mcts_search_informed`].
 /// The heuristic is passed as a closure for flexibility — callers can wrap
 /// [`StateHeuristic`] or use a plain function.
 #[allow(clippy::too_many_arguments)]
+/// # Arguments
+/// - `halt_check` — Issue 699 T2 answer-space halt seam ([`BudgetHaltCheck`]);
+///   `None` in every stock entry point (bit-identical legacy behavior).
 fn mcts_search_impl<S: GameState>(
     state: &S,
     player_id: u8,
@@ -127,6 +164,7 @@ fn mcts_search_impl<S: GameState>(
     heuristic: &dyn Fn(&S, u8) -> f32,
     policy: &mut dyn RolloutPolicy<S>,
     rng: &mut Rng,
+    mut halt_check: BudgetHaltCheck<'_>,
 ) -> S::Action {
     // Pre-allocate action buffers — reused across all MCTS iterations to avoid
     // per-call Vec allocation. Capacity 8 covers most board-game action spaces.
@@ -192,8 +230,20 @@ fn mcts_search_impl<S: GameState>(
             (leaf_idx, reward)
         };
 
-        // ── 3. Backpropagate ────────────────────────────────────
+        // ── 3. Backpropagate ────────────────────────────────
         backpropagate(&mut nodes, eval_idx, reward);
+
+        // ── Issue 699 T2: answer-space halt (structural CoT). The check is
+        // `None` in every stock entry point — a single `Option` test per
+        // iteration, default behavior bit-identical. When armed, the root's
+        // currently-best action identity feeds the monitor each iteration;
+        // a Halt vote cuts the search (the T4 PoC measures the savings).
+        if let Some(check) = halt_check.as_mut() {
+            let key = root_best_child_key(&nodes);
+            if check(key) {
+                break;
+            }
+        }
     }
 
     // ── 4. Select best action by visit count ────────────────────
@@ -373,6 +423,7 @@ pub fn mcts_search<S: GameState>(
         heuristic,
         &mut policy,
         rng,
+        None,
     )
 }
 
@@ -417,7 +468,62 @@ pub fn mcts_search_informed<S: GameState>(
     rng: &mut Rng,
 ) -> S::Action {
     let h = |s: &S, pid: u8| heuristic.evaluate(s, pid);
-    mcts_search_impl(state, player_id, budget, rollout_depth, &h, policy, rng)
+    mcts_search_impl(
+        state,
+        player_id,
+        budget,
+        rollout_depth,
+        &h,
+        policy,
+        rng,
+        None,
+    )
+}
+
+/// Run MCTS with an armed structural CoT halt monitor (Issue 699 T2,
+/// `structural_cot_halt` feature).
+///
+/// The monitor observes the root's currently-best action identity each
+/// iteration (via [`StructuralTraceMonitor::step_key`] — token-space, no
+/// allocation) and cuts the search on the first `Halt` vote: long runs
+/// where the best action oscillates A,B,A,B… fire `BacktrackRevisit`;
+/// long stable-best runs fire `SelfLoop` at the configured K. Search
+/// mechanics (UCB1, rollouts, RNG consumption) are UNCHANGED — the RNG
+/// stream is identical to the unarmed search, so a monitor that never
+/// votes Halt returns the same action as [`mcts_search`] with the same
+/// seed (pinned by the integration target).
+///
+/// Honest scope: the seam EXISTS for the T4 defend-wrong PoC to measure;
+/// whether MCTS visit patterns actually trigger the structural policies
+/// productively is exactly what T4 measures — this wrapper makes no claim.
+#[cfg(feature = "structural_cot_halt")]
+#[allow(clippy::too_many_arguments)]
+pub fn mcts_search_structural_halted<S: GameState>(
+    state: &S,
+    player_id: u8,
+    budget: usize,
+    rollout_depth: usize,
+    heuristic: &dyn Fn(&S, u8) -> f32,
+    policy: &mut dyn RolloutPolicy<S>,
+    rng: &mut Rng,
+    halt: &mut crate::structural_cot_halt::StructuralTraceMonitor,
+) -> S::Action {
+    let mut check = |key: u64| {
+        matches!(
+            halt.step_key(key),
+            crate::structural_cot_halt::StructuralHaltDecision::Halt { .. }
+        )
+    };
+    mcts_search_impl(
+        state,
+        player_id,
+        budget,
+        rollout_depth,
+        heuristic,
+        policy,
+        rng,
+        Some(&mut check),
+    )
 }
 
 // ── Selection ──────────────────────────────────────────────────

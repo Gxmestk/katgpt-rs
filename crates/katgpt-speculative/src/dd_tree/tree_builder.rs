@@ -37,6 +37,14 @@ pub struct TreeBuilder {
     /// The paper observes a draft-length crossover (~2–4) past which argmax
     /// beats full-marginal on mean acceptance length.
     deep_argmax_threshold: Option<usize>,
+    /// Issue 699 T2 — optional answer-space halt monitor (structural CoT,
+    /// TRACE arXiv:2510.07880, `structural_cot_halt` feature). When `Some`,
+    /// the `build()` expansion loop feeds each popped node's dominant token
+    /// to the monitor and cuts the build on the first `Halt` vote — the
+    /// answer-space analog of the score-based early-exit patience. `None`
+    /// (default) = bit-identical legacy behavior.
+    #[cfg(feature = "structural_cot_halt")]
+    structural_halt: Option<katgpt_core::structural_cot_halt::StructuralTraceMonitor>,
 }
 
 impl TreeBuilder {
@@ -58,7 +66,23 @@ impl TreeBuilder {
             depth_used_buf: Vec::new(),
             log_marginals: Vec::new(),
             deep_argmax_threshold: None,
+            #[cfg(feature = "structural_cot_halt")]
+            structural_halt: None,
         }
+    }
+
+    /// Issue 699 T2 — install/remove the answer-space halt monitor (opt-in
+    /// `structural_cot_halt`). `None` restores the legacy behavior exactly.
+    /// The monitor is episode-shaped: call
+    /// `monitor.reset()` between builds (or install a fresh one) when one
+    /// builder serves many queries.
+    #[cfg(feature = "structural_cot_halt")]
+    pub fn set_structural_halt_monitor(
+        &mut self,
+        monitor: Option<katgpt_core::structural_cot_halt::StructuralTraceMonitor>,
+    ) -> &mut Self {
+        self.structural_halt = monitor;
+        self
     }
 
     /// Set the deep-argmax threshold (Plan 424 Phase 6, paper §3.5).
@@ -374,6 +398,22 @@ impl TreeBuilder {
                     > config.early_exit_gap
             {
                 break;
+            }
+
+            // ── Issue 699 T2: answer-space halt (structural CoT, TRACE
+            // arXiv:2510.07880). Optional monitor keyed on the popped node's
+            // dominant token — cycles in the best-first token stream (the
+            // answer-space analog of score patience) cut the expansion
+            // early. `None` (default) = bit-identical legacy behavior; the
+            // whole block is feature-gated and the call allocates nothing.
+            #[cfg(feature = "structural_cot_halt")]
+            if let Some(monitor) = self.structural_halt.as_mut() {
+                match monitor.step_key(best.token_idx as u64) {
+                    katgpt_core::structural_cot_halt::StructuralHaltDecision::Halt { .. } => {
+                        break;
+                    }
+                    katgpt_core::structural_cot_halt::StructuralHaltDecision::Continue => {}
+                }
             }
 
             if best.depth + 1 < marginals.len() {
@@ -1517,6 +1557,7 @@ impl TreeBuilder {
                 }
 
                 cumulative_score +=
+
                     self.log_marginals[depth][token_idx] + relevance.ln();
                 let node_path = parent_path.push(token_idx as u32, depth);
 
