@@ -44,7 +44,13 @@ def load_features(path: Path) -> tuple[set[str], set[str], dict[str, list[str]]]
 
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
-    tomls = [root / "Cargo.toml", root / "crates" / "katgpt-core" / "Cargo.toml"]
+    # EVERY workspace manifest, which is what the module docstring has always
+    # claimed. It used to hardcode two (root + katgpt-core) and so measured a
+    # SUBSET while reporting it as the workspace: 537/189 against an actual
+    # 568/197 across 29 manifests. The gap is small because most crate features
+    # are passthrough duplicates of root/core names, which is exactly why the
+    # under-scope survived — it looked right.
+    tomls = [root / "Cargo.toml"] + sorted((root / "crates").glob("*/Cargo.toml"))
 
     print("=" * 72)
     print("katgpt-rs feature-flag audit")
@@ -75,31 +81,130 @@ def main() -> int:
     print(f"  opt-in (unique)     : {len(grand_total - grand_default)}")
 
     # ── README claim check ──────────────────────────────────────────────────
-    # This used to print a HARDCODED claim string ("140+ default-on, 320+ total
-    # flags") next to the measured numbers and leave the comparison to whoever
-    # read the output. That check could never fire: the literal drifted out of
-    # step with the README independently of the code, and by 2026-09-01 it
-    # matched neither the README (378/152) nor reality (537/189). A check that
-    # compares a measurement against a constant it also owns is not a check.
-    # Now it parses the README and asserts.
+    # Two generations of blind spot, both green:
+    #
+    # 1. It printed a HARDCODED claim string ("140+ default-on, 320+ total
+    #    flags") beside the measured numbers and left the comparison to a human.
+    #    A check comparing a measurement against a constant it also owns is not
+    #    a check; by 2026-09-01 the literal matched neither the README nor
+    #    reality.
+    # 2. The replacement parsed the README but used re.search — the FIRST match
+    #    only. README states its counts in FOUR places in THREE phrasings, so
+    #    the headline was validated and three sites (378/152, 373/155, 373) were
+    #    structurally unreachable. Fixing one number and asserting it pinned the
+    #    other three in place.
+    #
+    # So: every known phrasing is checked at every occurrence, AND any
+    # claim-shaped number that no pattern recognises is a hard failure rather
+    # than a silent skip. An unknown phrasing must not be able to pass.
     print("\n## README claim check")
-    readme = Path(__file__).resolve().parent.parent / "README.md"
+    readme = root / "README.md"
     text = readme.read_text(encoding="utf-8")
-    m = re.search(r"(\d+)\s+feature flags\s*\((\d+)\s+default-on", text)
-    if not m:
-        print(f"  ✗ no parseable feature-flag claim found in {readme.name}")
-        print("    expected the form: '<N> feature flags (<M> default-on'")
-        print(f"    measured: {len(grand_total)} total, {len(grand_default)} default-on")
-        return 1
-
-    claim_total, claim_default = int(m.group(1)), int(m.group(2))
     actual_total, actual_default = len(grand_total), len(grand_default)
-    print(f"  README claims : {claim_total} total, {claim_default} default-on")
-    print(f"  measured      : {actual_total} total, {actual_default} default-on")
-    if (claim_total, claim_default) != (actual_total, actual_default):
-        print("  ✗ README feature counts have drifted from the manifests")
-        print(f"    update README.md to: {actual_total} feature flags "
-              f"({actual_default} default-on, ...)")
+    expect = {"total": actual_total, "default": actual_default}
+
+    claims = [
+        (r"(\d+)\s+feature flags\s*\((\d+)\s+default-on", ("total", "default")),
+        (r"\*\*(\d+)\s+GOAT-proved default-on features\*\*\s*\((\d+)\s+total flags\)",
+         ("default", "total")),
+        (r"\*\*(\d+)\s+feature flags\*\*\s+with\s+\*\*(\d+)\s+default-on",
+         ("total", "default")),
+        (r"feature flag table\s*\((\d+)\s+flags\)", ("total",)),
+    ]
+
+    def line_of(idx: int) -> int:
+        return text.count("\n", 0, idx) + 1
+
+    covered: list[tuple[int, int]] = []
+    failures: list[str] = []
+    sites = 0
+    for rx, fields in claims:
+        for m in re.finditer(rx, text):
+            sites += 1
+            covered.append(m.span())
+            ln = line_of(m.start())
+            for field, raw in zip(fields, m.groups()):
+                got = int(raw)
+                mark = "✓" if got == expect[field] else "✗"
+                print(f"  {mark} L{ln}: {field} = {got} (measured {expect[field]})")
+                if got != expect[field]:
+                    failures.append(
+                        f"README.md:{ln} claims {field}={got}, measured {expect[field]}")
+
+    if sites == 0:
+        print(f"  ✗ no parseable feature-flag claim found in {readme.name}")
+        print(f"    measured: {actual_total} total, {actual_default} default-on")
+        return 1
+    print(f"  … {sites} claim site(s) recognised")
+
+    # Deliberately permissive: up to three intervening words, and "default
+    # features" as well as "default-on". Canaried at each widening — the first
+    # version required a literal "N flags" / "N total flags" / "N feature
+    # flags", so "999 tunable flags" and "999 default features" both sailed
+    # past a sweep whose whole job was catching phrasings nobody predicted.
+    # A sweep that only recognises the shapes already in `claims` is decoration.
+    sweep = (r"\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}flags?\b"
+             r"|\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}default(?:-on|\s+features)\b")
+    for m in re.finditer(sweep, text):
+        if any(a <= m.start() < b for a, b in covered):
+            continue
+        failures.append(
+            f"README.md:{line_of(m.start())} unrecognised flag-count phrasing "
+            f"{m.group(0)!r} — add it to `claims` or reword it; it is NOT checked")
+
+    # ── "Default features include: …" list contents ─────────────────────────
+    # Two independent things go stale here. The names: README listed nine
+    # OPT-IN flags (bandit, ppot, bt_rank, elf_sde, cna_steering, dash_attn,
+    # bfcf_lfu_shard, rcd_residual, slod) under "Default features include:",
+    # none of which appears in ANY default array — the stale-flag-state class,
+    # in README rather than a plan header. And the tail: "and N more" was 58,
+    # internally consistent with that line's own stale 155 and with nothing
+    # else. N is defined here as "default-on flags not named on this line", so
+    # it is computable and therefore assertable.
+    dm = re.search(r"Default features include:(.*)", text)
+    if not dm:
+        failures.append("README.md: 'Default features include:' block not found "
+                        "— the list check silently covers nothing")
+    else:
+        line, ln = dm.group(1), line_of(dm.start())
+        # Only names OUTSIDE parentheses are list entries. Inside them is
+        # commentary that legitimately backticks non-default identifiers —
+        # "implies `engram`", "alias for `sense_composition`", function names
+        # like `poincare_navigate_into`. Counting those made the check demand
+        # that prose mentions be default-on, which is not the rule.
+        depth, outside = 0, []
+        for ch in line:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth = max(0, depth - 1)
+            elif depth == 0:
+                outside.append(ch)
+        toks = set(re.findall(r"`([a-z0-9_]+)`", "".join(outside)))
+        listed_default = toks & grand_default
+        listed_optin = (toks & grand_total) - grand_default
+        if listed_optin:
+            failures.append(
+                f"README.md:{ln} lists {len(listed_optin)} OPT-IN flag(s) as "
+                f"default-on: {', '.join(sorted(listed_optin))}")
+        else:
+            print(f"  ✓ L{ln}: all {len(listed_default)} listed flags are default-on")
+        nm = re.search(r"and (\d+) more", line)
+        want_more = actual_default - len(listed_default)
+        if not nm:
+            failures.append(f"README.md:{ln} has no 'and N more' tail to check")
+        elif int(nm.group(1)) != want_more:
+            failures.append(
+                f"README.md:{ln} says 'and {nm.group(1)} more'; "
+                f"{len(listed_default)} named + measured {actual_default} default-on "
+                f"=> 'and {want_more} more'")
+        else:
+            print(f"  ✓ L{ln}: 'and {want_more} more' closes the default-on count")
+
+    if failures:
+        print("  ✗ README has drifted from the manifests")
+        for f in failures:
+            print(f"    - {f}")
         return 1
     print("  ✓ README matches the manifests")
     return 0
