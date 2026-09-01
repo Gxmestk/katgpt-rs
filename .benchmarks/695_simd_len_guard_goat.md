@@ -109,6 +109,23 @@ too, so this is not a regression, but it is not coverage either.
 `cargo test --workspace --lib` was NOT used as the gate because it does not
 compile on `develop` — see Issue 700 (pre-existing, reproduced at clean HEAD).
 
+**Resolved in `c284dbb2`** (Issue 700 closed). The workspace gate compiles and
+runs green: 32 binaries, 0 failed. Two consequences for this benchmark:
+
+1. The per-crate assembly above is no longer forced. `cargo test --workspace
+   --lib` is available as the no-regression gate, and `cargo test --workspace
+   --lib --all-features --no-run` compiles clean on top of it.
+2. **The coverage caveat is retired.** Those four crates are cfg-gated on
+   features the root crate's defaults enable, so `--workspace` unification
+   turns their suites on — `katgpt-attn` 255, `katgpt-attn-match` 122,
+   `katgpt-kv` 177, `katgpt-quant` 150 (704 tests that the per-crate run
+   reported as 0). The SIMD guard is now genuinely exercised by them.
+
+The generalisable lesson, and the reason R1 outlived a compile-gated heal
+sweep: **a per-crate green says nothing about code behind a non-default
+feature** — that code compiles to nothing, and its `#[cfg(test)]` module with
+it. The invocation is the claim.
+
 ## G4 — alloc-free
 
 The guard introduces no allocation: reslicing is a bounds check plus a fat-pointer
