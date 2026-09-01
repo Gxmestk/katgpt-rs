@@ -1,6 +1,13 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN — drift CLOSED, cadence BLOCKED on `.issues/704`. (All 4 original drift rows CLOSED — riir-neuron-db `c06133e`,
+Status: **RESOLVED 2026-09-01 — drift CLOSED, cadence CLOSED and verified by
+real runs.** `.issues/704` unblocked it the same day: with the default branch
+moved to `develop`, `riir-ai`, `riir-chain` and `riir-neuron-db` each carry a
+weekly `docs_drift.yml` calling katgpt-rs's reusable workflow, and all three
+were **dispatched and inspected**, not merely committed. The label-bearing
+repos with no CI at all record why not (below). Kept rather than removed under
+the noise-reduction rule: it is the canonical record of the auditors' design
+decisions and AGENTS.md cites it. (All 4 original drift rows CLOSED — riir-neuron-db `c06133e`,
 riir-clippy `7736e30` (+ weekly docs-drift CI in `1df3599`), riir-ai
 `osc_emotion` + `band_edge_trigger` in riir-ai `95354cd62`. Reopened in scope,
 not in status: replacing the per-manifest closure with a `(package, feature)`
@@ -370,7 +377,55 @@ number from a sibling's `.issues/.highwater` is the documented collision path.
       not. `.github/workflows/docs_gate.yml` is portable: pure Python, ~3s,
       ubuntu-latest, no cfg surface — the only katgpt-rs-specific part is the
       `count_features.py` step and its README claim table.
-      **BLOCKED for the remaining siblings, 2026-09-01 — `.issues/704`.**
+      **DONE 2026-09-01 for every sibling with CI, and VERIFIED BY RUNNING IT.**
+      `riir-ai` `2b14457cb`, `riir-chain` `08eb27d9`, `riir-neuron-db` `b9f87b4`
+      — a weekly `docs_drift.yml` whose entire body is a three-line call to
+      katgpt-rs's `sibling_docs_drift.yml`. Dispatched each and read the logs:
+      riir-neuron-db 11 labels / 0 comments, riir-ai 78 / 10, riir-chain 2 / 2 —
+      every figure matching the local sweep. A private `gist-rs` repo calling a
+      public `katopz` reusable workflow works with the default token, which had
+      been an assumption until it was run.
+
+      **Running it is what caught the bug review had not.** The first run
+      reported riir-neuron-db at **396** inline Cargo comments; that repo has
+      **zero**, and 396 is exactly katgpt-rs's count. The auditors' own checkout
+      sat in `.auditors/` INSIDE the audited tree, so the manifest walk descended
+      into it. The tree-name guard passed throughout, because the top-level
+      directory genuinely was the caller — the contamination came in through a
+      different door than the one guarded. Fixed structurally (sibling
+      checkouts, `7bb438e3`) and re-verified: 396 -> 0.
+
+      That in turn exposed the mirror defect on the workstation side: the
+      auditors read manifests **git has never seen**. riir-chain's
+      `cloudflare/edge-wallet-container/.container-src/` is an untracked copy of
+      the repo, which is why local said 4 comments and CI said 2. Untracked
+      manifests feed the DEFAULT CLOSURE, so they can flip a verdict — and only
+      locally, where it is then reported as the repo's state. `ed5f4865` reads
+      `git ls-files` with a walk fallback; local and CI now agree exactly.
+
+      **These two are the same bug pointed in opposite directions:** one folded
+      a foreign repo's files IN, the other folded local-only files in. Neither
+      was visible from one side alone. Two instruments that must agree is what
+      found both.
+
+      **The remaining label-bearing repos have no CI at all** — `riir-train` (5
+      labels), `riir-mmorpg-examples` (2), `riir-dapps` (1) ship no
+      `.github/workflows/` whatsoever. Recorded as the "or records why not"
+      branch rather than fixed: standing up a repo's FIRST workflow to run a
+      ~1-minute docs audit is an Actions-budget decision for its owner, and
+      those owners are on record constraining that budget (the main-only push
+      triggers). `riir-dapps` additionally still defaults to `main` while its
+      work lands on `develop`, so a workflow there would be inert — the
+      `.issues/704` shape, outside that issue's approved set. All three are
+      covered by `scripts/docs_drift_sweep.py`, which is not a cadence and does
+      not pretend to be one, but does make them measured rather than unknown.
+
+      **Superseded note (kept for the reasoning):** before 704 landed, wiring
+      these three would have shipped **three inert files** — default branch
+      `main`, no `.github/workflows/` on it, and `schedule`/`workflow_dispatch`
+      firing only from the default branch. Adding a fourth decoration to each
+      would have ticked this checkbox while changing nothing, which is the exact
+      failure this issue is about.
       Wiring a `docs-drift` job into riir-ai / riir-chain / riir-neuron-db was
       the obvious next step and would have shipped **three inert files**: all
       three have default branch `main`, `main` carries no `.github/workflows/`
@@ -402,7 +457,11 @@ number from a sibling's `.issues/.highwater` is the documented collision path.
       are katgpt-rs-rooted by construction (`count_features.py` takes no repo
       argument; `skill_repo_set_gate.py` gates katgpt-rs's own SKILL set) and
       would be a vacuous green here.
-- [ ] Remove this file in the closing commit per the noise-reduction rule.
+- [x] Cadence wired AND verified by dispatch for every sibling with CI;
+      why-not recorded for the three with none.
+- [-] Remove this file — DEFERRED. AGENTS.md and both auditors cite it as the
+      canonical record of their design decisions; removing it would leave
+      dangling refs, which is worse noise than the file.
 
 Refs: `a90dd631` (docs gate + auditor fixes + 185x walk speedup),
 `scripts/docs_gate.sh`, `.issues/701` R2 (the same one-repo-of-twelve shape for

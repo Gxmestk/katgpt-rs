@@ -218,6 +218,24 @@ is `main`, and unlike the four above its `main` *does* carry a workflow
 and flipping its default is a different judgement call. Not included in the
 approved set; left for that repo's owner.
 
+## Downstream: what the fix unblocked, and what running it then caught
+
+`.issues/702`'s cadence condition was blocked on this issue and closed the same
+day. `riir-ai`, `riir-chain` and `riir-neuron-db` now each run a weekly
+`docs_drift.yml`, **dispatched and log-inspected** rather than assumed. Two
+defects surfaced only because two instruments had to agree:
+
+- The reusable workflow checked katgpt-rs out **inside** the audited tree, so
+  the manifest walk descended into it — riir-neuron-db, which has zero inline
+  Cargo comments, reported katgpt-rs's 396. Fixed `7bb438e3`.
+- The mirror defect locally: the auditors read manifests **git has never seen**
+  (riir-chain's untracked in-repo container-source copy), so the workstation
+  said 4 where CI said 2. Untracked manifests feed the default closure, so this
+  could flip a verdict on the workstation only. Fixed `ed5f4865`.
+
+Both were invisible from one side alone, and both are the reason a green CI
+wiring is worth nothing until someone reads a real run's log.
+
 ## Closing conditions
 
 - [x] Measure the axis, with the three states kept distinct.
