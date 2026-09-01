@@ -1,7 +1,8 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (0/4 fixes; auditor coverage closed in 3 more layers, 2 new
-findings, 2 self-inflicted false positives caught before they shipped)** —
+Status: **OPEN (1/4 drift fixes done — riir-neuron-db closed in `c06133e`;
+auditor coverage closed in 3 more layers, 2 new findings, 2 self-inflicted
+false positives caught before they shipped)** —
 filed from katgpt-rs because the tooling lives here; the fixes belong in the
 owning repos. Re-measured 2026-09-01 across all **18** contract repos (the
 original table covered 8), which turned up something the wiring gap was hiding:
@@ -113,6 +114,15 @@ Both were re-checked by walking every `Cargo.toml` and grepping the actual
    (`experience_graph -> merkle_freeze`, one hop), so it ships enabled. Surfaced
    only by the tokenizer fix above, then verified by walking `default[]` and
    computing the closure by hand rather than trusting the auditor's verdict.
+
+   **FIXED 2026-09-01 in riir-neuron-db `c06133e`** (repo was clean and idle, so
+   editing it collided with nobody). The README was drifted the same way and in
+   the more telling manner: it filed `merkle_freeze` under §"Opt-in" while the
+   repo *already has* a §"Transitive default" section built for exactly this
+   case, holding one row. Row moved there and the `\*` footnote generalised to
+   cover both. Five other features also imply `merkle_freeze`; only
+   `experience_graph` is itself default-on. riir-neuron-db now audits 11 labels
+   / **0 mismatches**.
 
 This is the stale-flag-state class: the feature was promoted and the benchmark
 doc that gated the promotion never got updated. It matters because those docs
