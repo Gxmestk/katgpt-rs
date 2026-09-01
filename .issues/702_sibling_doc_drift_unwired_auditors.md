@@ -1,6 +1,6 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (all 4 original drift rows CLOSED — riir-neuron-db `c06133e`,
+Status: **OPEN — drift CLOSED, cadence BLOCKED on `.issues/704`. (All 4 original drift rows CLOSED — riir-neuron-db `c06133e`,
 riir-clippy `7736e30` (+ weekly docs-drift CI in `1df3599`), riir-ai
 `osc_emotion` + `band_edge_trigger` in riir-ai `95354cd62`. Reopened in scope,
 not in status: replacing the per-manifest closure with a `(package, feature)`
@@ -349,21 +349,51 @@ number from a sibling's `.issues/.highwater` is the documented collision path.
 
 ## Closing conditions
 
-- [ ] riir-ai: correct the `osc_emotion` label (or demote the feature, if the
+- [x] riir-ai: correct the `osc_emotion` label (or demote the feature, if the
       doc reflects the intended state and the manifest is what drifted — check
-      which is wrong before editing the doc).
+      which is wrong before editing the doc). **DONE 2026-09-01, riir-ai
+      `95354cd62`** — the manifest was right; the doc was corrected via the
+      transition form so the promotion history survives. Correcting it is what
+      made the audit go RED against the corrected doc and exposed the
+      per-manifest-closure bug (see §"The closure was wrong in BOTH directions").
 - [x] riir-clippy: same for `rustc_errors` in both benchmark docs. **DONE
       2026-09-01, riir-clippy `7736e30`** — both labels now read "default-ON
       since 2026-08-29 by owner call" with the driver-shaped inertness note;
       the manifest was confirmed right before editing (`Cargo.toml:120` lists
       `rustc_errors` in `default`), and `bench_doc_audit.py` re-run over the
       repo: 9 labels / **0 mismatches**.
-- [ ] riir-neuron-db: correct the `merkle_freeze` label, or drop it from
-      `experience_graph` if default-on was not intended.
+- [x] riir-neuron-db: correct the `merkle_freeze` label, or drop it from
+      `experience_graph` if default-on was not intended. **DONE 2026-09-01,
+      riir-neuron-db `c06133e`** — recorded in full in item 3 above; the row
+      moved into that README's existing §"Transitive default" section.
 - [x] Each sibling either runs the two auditors on some cadence or records why
       not. `.github/workflows/docs_gate.yml` is portable: pure Python, ~3s,
       ubuntu-latest, no cfg surface — the only katgpt-rs-specific part is the
       `count_features.py` step and its README claim table.
+      **BLOCKED for the remaining siblings, 2026-09-01 — `.issues/704`.**
+      Wiring a `docs-drift` job into riir-ai / riir-chain / riir-neuron-db was
+      the obvious next step and would have shipped **three inert files**: all
+      three have default branch `main`, `main` carries no `.github/workflows/`
+      at all, and `schedule` + `workflow_dispatch` fire only from the default
+      branch. Their existing CI has not run since 2026-07-31 for exactly this
+      reason. Adding a fourth decoration to each would have satisfied this
+      checkbox while changing nothing — the precise failure this issue is about.
+      Blocked on 704's owner decision (default branch vs promote-to-main).
+
+      **Covered in the meantime by `scripts/docs_drift_sweep.py` (`d2228161`),**
+      the workstation tier: both auditors over every derived contract repo in
+      one command, population derived and expectations committed. It is not a
+      CI cadence and does not pretend to be one; it is what makes the blocked
+      repos measured rather than unknown. Measured on landing: 18 repos,
+      0 mismatches, 8 label-bearing.
+
+      **The reusable caller is ready for the moment 704 unblocks:**
+      `.github/workflows/sibling_docs_drift.yml` (`workflow_call`), so a sibling
+      writes three lines instead of copying riir-clippy's job — the auditors
+      default to auditing *katgpt-rs*, so a copy that omits the path argument
+      passes forever against the wrong repo. That is now structurally
+      unreachable, and the workflow asserts the audited tree is the caller's.
+
       **riir-clippy DONE 2026-09-01 (`1df3599`):** a `docs-drift` job in its
       existing weekly `rust.yml` (the repo's small-trigger Actions-budget
       decision forbids a per-push develop trigger — the recorded "why not"

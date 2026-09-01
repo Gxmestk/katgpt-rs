@@ -59,10 +59,18 @@ on:
           which is indistinguishable from nobody having looked.
         type: number
         default: 0
-  # Not only workflow_call. An entry point nothing can invoke standalone cannot
-  # be smoke-tested, and this repo's own rule is that an uninvoked assertion is
-  # unknown rather than passing. Dispatching this from katgpt-rs audits
-  # katgpt-rs, which is a real exercise of every step below.
+  # Declared so this has a standalone entry point — an assertion nothing can
+  # invoke cannot be smoke-tested, and this repo's rule is that an uninvoked
+  # assertion is unknown rather than passing.
+  #
+  # HONEST CAVEAT, measured 2026-09-01: it does not fire yet. workflow_dispatch
+  # runs ONLY from a repository's DEFAULT branch, and katgpt-rs's default is
+  # `main`, which carries no .github/workflows/ (frozen at the v0.1.1 promote).
+  # So this line is currently aspirational, not live — the same trap that leaves
+  # full_gate.yml's advertised weekly run dead. Tracked in .issues/704; it goes
+  # live the moment this file reaches `main` or the default branch moves.
+  # Until then the ONLY live path here is workflow_call from a sibling, which is
+  # branch-pinned by the caller and therefore unaffected.
   workflow_dispatch:
 
 jobs:

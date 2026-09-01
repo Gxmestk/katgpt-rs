@@ -108,9 +108,18 @@ command, not about the code.
 Don't run it by hand — `scripts/full_gate.sh` is the assertion (it also refuses
 to report a pass off macOS, where the `target_os = "macos"` device backends
 compile to nothing even with `--all-features`, and checks that this document
-still quotes the command it runs). `.github/workflows/full_gate.yml` runs it
-weekly and on demand; per-push is deliberately not enabled — see that file's
-preamble for the measured cost and the promotion criterion.
+still quotes the command it runs). `.github/workflows/full_gate.yml` **declares** a
+weekly cron and a manual dispatch; per-push is deliberately not enabled — see
+that file's preamble for the measured cost and the promotion criterion.
+
+Read that as a declaration, not as a schedule that runs. Measured 2026-09-01,
+**neither trigger has ever fired**: `schedule` and `workflow_dispatch` run only
+from a repository's DEFAULT branch, and this repo's default is `main`, frozen
+at the v0.1.1 promote with no `.github/workflows/` at all. The file's own
+comment calls the schedule "the rot check"; the rot check had rotted. Only its
+paths-limited `push` trigger is live. `scripts/ci_gate_coverage.py` now
+measures this axis (`.issues/704`) — six workflows across the workspace declare
+a trigger that cannot fire, and seven sibling workflows cannot fire at all.
 
 ### The docs gate — same discipline, opposite cadence
 
