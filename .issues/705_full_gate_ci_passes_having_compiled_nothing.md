@@ -1,9 +1,14 @@
 # Issue 705 — the full gate's first two CI runs passed having compiled zero units
 
-Status: **FIXED, verification run in flight.** Liveness sentinel added to
-`scripts/full_gate.sh` (Layer 3b) and the cache split in
-`.github/workflows/full_gate.yml` (`ad0b7b19`). Awaiting the first conclusive
-CI run to confirm the numbers converge with the workstation's.
+Status: **ROOT CAUSE FOUND AND FIXED — and it was not what the first fix
+assumed.** The vacuous pass was never about the build cache. Every counter in
+`scripts/full_gate.sh` is `^`-anchored, and the workflow sets
+`CARGO_TERM_COLOR: always`, so every line began with an escape sequence and
+**every count matched zero — including the error count**. The gate was
+structurally incapable of FAILING in CI. Proven by revert probe: the original
+script reports `✓ full gate PASSED — 0 errors` on a log containing a colourised
+`error[E0425]`. Fixed by stripping ANSI before any counting (`ad0b7b19` added
+the sentinel that caught it; the strip lands in this commit).
 
 ## What happened
 
@@ -29,6 +34,50 @@ pass this gate exists to catch, arrived at by the gate itself.
 This is the sharpest instance yet of the rule this repo keeps restating: *treat
 an uninvoked assertion as unknown, not as passing.* Here the assertion was
 invoked, exited 0, printed a checkmark, and still verified nothing.
+
+## The real root cause — the first hypothesis was wrong, and how it was caught
+
+The initial fix assumed a restored build cache made cargo consider everything
+fresh. That was **wrong**, and the thing that disproved it was the second half
+of the fix: uploading the gate log on `always()`. With the log finally
+retrievable from a green-turned-red run, the artifact from `33530563741` shows
+
+```
+    Checking katgpt-types v0.2.1 (/Users/runner/work/katgpt-rs/...)
+warning: using `chunks_exact` with a constant chunk size
+```
+
+— 3,471 lines of real output. The build was never the problem. Measured on that
+exact artifact:
+
+| counter | as the gate read it | ANSI stripped |
+|---|---|---|
+| units compiled | **0** | **32** |
+| warning lines | **0** | 369 (297 findings across 72 targets) |
+| error diagnostics | **0** | 0 |
+
+`CARGO_TERM_COLOR: always` is set in the workflow env, so a line arrives as
+`ESC[1m ESC[92m    Checking ESC[0m katgpt-types …` — it does not start with
+whitespace, `warning`, or `error`, and every `^`-anchored grep in the script
+misses it. Locally the same script works *by accident*: cargo suppresses colour
+when stdout is not a TTY, and there it is redirected to `$LOG`.
+
+**The serious half is the error counter.** `DIAGS` was defeated identically, so
+`✗ full gate FAILED` was unreachable in CI. A completely broken workspace would
+have produced the same green checkmark. Revert-probed against the pre-fix
+script to make sure this is a fact and not an inference:
+
+```
+ORIGINAL gate, colourised error: exit=0 :: ✓ full gate PASSED — 0 errors, 0 unbuildable targets
+```
+
+**The sentinel was right for the wrong reason, and that is the argument for it.**
+Layer 3b refused to certify a census it could not perform, so the run went
+INCONCLUSIVE rather than green — while its printed *diagnosis* blamed the cache.
+A guard that fails closed on "I cannot measure this" beats one that has to
+predict the cause correctly. Its message now names both causes and tells the
+reader how to tell them apart: check whether the log HAS `Checking`/`warning`
+lines.
 
 ## Why it was invisible
 
@@ -84,9 +133,19 @@ crate (`.issues/703`'s shape). 32 members at time of writing.
 - [x] Liveness sentinel, canaried in place across three run shapes.
 - [x] Workspace artifacts dropped so the gate re-lints its actual subject.
 - [x] Gate log uploaded on success as well as failure.
-- [ ] One conclusive CI run: `UNITS > 0`, and the warning census within reach of
-      the workstation's 119/20. **Until that lands, the gate's CI history
-      contains no run that verified anything.**
+- [x] ANSI stripped before every count, canaried in place: colourised
+      compile+warnings PASSES with correct nonzero counts, colourised ERROR
+      FAILS (it passed before), plain error still FAILS.
+- [ ] One conclusive CI run: `UNITS > 0` **and** a non-zero census. Until that
+      lands, the gate's CI history contains no run that verified anything.
+- [ ] Reconcile the census gap: CI's stripped artifact shows **297 findings
+      across 72 targets** where the workstation reports **119 across 20**
+      (`.issues/701` R3b). Not necessarily a defect — CI installs
+      `dtolnay/rust-toolchain@stable`, which may be a newer clippy than the
+      local toolchain, and clippy gains lints between releases (the gate's own
+      preamble anticipates exactly this). Compare `rustc -V` on both before
+      treating either number as the baseline, and do NOT quote 297 into
+      `.issues/701` until that is settled.
 - [ ] Read the wall-clock off that run — `full_gate.yml`'s preamble sets it as
       the promotion criterion for per-push and says "do not guess". The two
       vacuous runs' 2m30s is NOT that number and must not be quoted as it.

@@ -144,6 +144,32 @@ set +e
 "${GATE_ARGS[@]}" >"$LOG" 2>&1
 set -e
 
+# ── Strip ANSI before ANY counting ──────────────────────────────────────────
+# Every count below is `^`-anchored, and cargo emits colour when
+# CARGO_TERM_COLOR=always — which .github/workflows/full_gate.yml sets. A
+# coloured line begins with an escape sequence, not with `warning`/`error`/
+# whitespace, so EVERY counter matched zero and the gate reported
+#   ✓ full gate PASSED — 0 errors ... (0 warning finding(s) across 0 target(s))
+# over a log holding 32 compiled units and 297 warning findings (measured from
+# run 33530563741's uploaded artifact).
+#
+# The error counter was defeated the same way, which is the serious half: the
+# gate could not have FAILED in CI. A completely broken workspace would have
+# printed the same green. Locally it worked only by accident — cargo suppresses
+# colour when stdout is not a TTY, and here it is redirected to $LOG.
+#
+# Stripped IN PLACE rather than into a second file: the artifact humans
+# download is then plain text, which is what you want when reading it in a
+# browser, and there is no chance of a later counter being pointed at the
+# unstripped copy.
+#
+# Portable CSI strip (BSD sed on macOS, GNU sed on Linux). LC_ALL=C so the
+# byte-oriented match cannot be reinterpreted under a UTF-8 locale.
+if [ -s "$LOG" ]; then
+    LC_ALL=C sed $'s/\033\[[0-9;]*[a-zA-Z]//g' "$LOG" >"$LOG.plain" \
+        && mv "$LOG.plain" "$LOG"
+fi
+
 # ── Layer 4: zero errors ────────────────────────────────────────────────────
 # Count `error` lines and unbuildable targets separately: a target can fail to
 # build with its diagnostics attributed to a dependency, and an error can be a
@@ -190,10 +216,13 @@ if [ "$UNITS" -eq 0 ] && [ "$WARN_TALLIES" -eq 0 ]; then
     KEEP_LOG=1
     echo "✗ full gate INCONCLUSIVE — the run compiled 0 units and replayed 0"
     echo "  diagnostics, so it verified NOTHING. This is not a pass."
-    echo "  Cause is almost always a restored build cache that cargo considers"
-    echo "  fresh: no rebuild, and no replayable diagnostics to fall back on."
-    echo "  Fix by running cold (drop the cache restore) — a rot check that"
-    echo "  cannot see the code cannot detect rot."
+    echo "  Two causes seen so far, and they need different fixes:"
+    echo "    1. The log did not parse — e.g. colour codes ahead of every"
+    echo "       ^-anchor. Check the log: if it HAS Checking/warning lines,"
+    echo "       the census is broken, not the build. (This was the real cause"
+    echo "       of the first three CI runs; the ANSI strip above fixes it.)"
+    echo "    2. A restored build cache cargo considers fresh: no rebuild, and"
+    echo "       no replayable diagnostics to fall back on. Run cold."
     echo "  log: $LOG"
     exit 1
 fi
