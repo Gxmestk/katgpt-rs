@@ -174,7 +174,7 @@ fn g2_inflection_at_approximately_10_percent() {
         // Compute JS-uniqueness directly via the batched helper.
         let mut u = js_divergence_batch(&traj_refs, &mut scratch_m);
         // Sort descending — inflection_index expects sorted-desc.
-        u.sort_by(|a, b| b.partial_cmp(a).unwrap_or(core::cmp::Ordering::Equal));
+        u.sort_by(|a, b| b.total_cmp(a));
 
         let infl = inflection_index(&u);
         // Inflection location as fraction of K: infl / K.

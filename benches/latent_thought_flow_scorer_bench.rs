@@ -539,7 +539,7 @@ fn run_g1(
         // because their composite score is below the median (cost-aware budget).
         if !scored.is_empty() {
             let mut composite_vals: Vec<f32> = scored.iter().map(|s| s.composite).collect();
-            composite_vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            composite_vals.sort_by(|a, b| a.total_cmp(b));
             let median = composite_vals[composite_vals.len() / 2];
             for s in &scored {
                 if s.composite < median {

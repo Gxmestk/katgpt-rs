@@ -189,7 +189,7 @@ fn bench_bt_rank_goat_proof() {
         let pw_pick = pw_scores
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map_or(0, |(i, _)| i);
 
         if bt_pick == true_best {
@@ -253,11 +253,7 @@ fn bench_bt_rank_goat_proof() {
         // Win rate ranking
         let win_rates = compute_win_rates(&comparisons, N_CANDIDATES);
         let mut wr_ranking: Vec<usize> = (0..N_CANDIDATES).collect();
-        wr_ranking.sort_by(|&a, &b| {
-            win_rates[b]
-                .partial_cmp(&win_rates[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        wr_ranking.sort_by(|&a, &b| win_rates[b].total_cmp(&win_rates[a]));
         let wr_tau = kendall_tau(&wr_ranking, &true_order);
 
         bt_tau_sum += bt_tau as f64;

@@ -118,13 +118,13 @@ fn measure_at_alpha(
         let argmax_pre = scores_pre
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap();
         let argmax_post = scores_post
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap();
         if argmax_pre != argmax_post {

@@ -276,7 +276,7 @@ fn recall_at_k(
             .collect();
 
         // Sort descending by score
-        scores.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scores.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         // Check if correct item is in top k
         let correct_idx = query.correct_item_idx;

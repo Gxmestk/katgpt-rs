@@ -100,7 +100,7 @@ fn bench_reconciliation_latency_vs_duration() {
             let elapsed = start.elapsed().as_nanos() as f64 / 1000.0;
             latencies.push(elapsed);
         }
-        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        latencies.sort_by(|a, b| a.total_cmp(b));
 
         let p50 = percentile(&latencies, 50.0);
         let p99 = percentile(&latencies, 99.0);
@@ -151,7 +151,7 @@ fn bench_reconciliation_k_sweep() {
             let elapsed = start.elapsed().as_nanos() as f64 / 1000.0;
             latencies.push(elapsed);
         }
-        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        latencies.sort_by(|a, b| a.total_cmp(b));
 
         let p50 = percentile(&latencies, 50.0);
         let p99 = percentile(&latencies, 99.0);

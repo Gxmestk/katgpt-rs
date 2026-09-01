@@ -203,7 +203,7 @@ fn bench_residual_distribution() {
             residuals.push(rollout_residual(&noisy));
         }
 
-        residuals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        residuals.sort_by(|a, b| a.total_cmp(b));
         let min = residuals.first().copied().unwrap_or(0.0);
         let max = residuals.last().copied().unwrap_or(0.0);
         let median = residuals[k / 2];

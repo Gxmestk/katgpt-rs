@@ -213,7 +213,7 @@ fn recall_at_k(
         );
         // Partial sort: we only need the top-k. sort_unstable_by is fine for
         // d=8 × 1000 — this is a PoC, not the hot path.
-        scores.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scores.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
         if scores.iter().take(k).any(|&(_, i)| i == correct_idx) {
             hits += 1;
         }

@@ -354,7 +354,7 @@ fn convergence_avg_elo_monotonically_nondecreasing() {
             indices.sort_by(|&a, &b| {
                 let score_a = quality[a] + rng.f64() * 0.3;
                 let score_b = quality[b] + rng.f64() * 0.3;
-                score_b.partial_cmp(&score_a).unwrap()
+                score_b.total_cmp(&score_a)
             });
             rankings.push(indices);
         }
@@ -455,7 +455,7 @@ fn convergence_speedup_pipeline_vs_random() {
             indices.sort_by(|&a, &b| {
                 let score_a = qualities[a] + rng.f64() * 0.2;
                 let score_b = qualities[b] + rng.f64() * 0.2;
-                score_b.partial_cmp(&score_a).unwrap()
+                score_b.total_cmp(&score_a)
             });
             rankings.push(indices);
         }

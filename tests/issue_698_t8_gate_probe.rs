@@ -453,7 +453,7 @@ fn t698_t8_conditional_gate_mechanism_probe() {
             per_r_rho.len()
         );
         let mut sorted = per_r_rho.clone();
-        sorted.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|x, y| x.total_cmp(y));
         let median = sorted[sorted.len() / 2];
         let mean_cos_by_r: Vec<f32> = (0..R_MAX - 1)
             .map(|i| (0..N_PROMPTS).map(|t| ctx.cos[t][i]).sum::<f32>() / N_PROMPTS as f32)

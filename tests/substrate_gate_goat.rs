@@ -510,7 +510,7 @@ fn g4_cna_mask_from_activation_patterns() {
             .collect();
 
         // Sort by delta descending
-        deltas.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        deltas.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Select top-K
         for (ch, _delta) in deltas.iter().take(top_k) {
