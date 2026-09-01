@@ -1,0 +1,125 @@
+# Reusable doc-drift audit — one definition, called by every sibling.
+#
+# Issue 702's closing condition is "each sibling either runs the two auditors on
+# some cadence or records why not." riir-clippy satisfied it first (`1df3599`)
+# by hand-writing the job in its own rust.yml. That works, and copying it into
+# five more repos would also work — right up until one of them drifts.
+#
+# The job encodes three facts, and every one of them fails SILENTLY GREEN if a
+# copy gets it wrong:
+#
+#   1. Run the two AUDITORS, not docs_gate.sh. Two of that gate's four checks
+#      are katgpt-rs-rooted by construction — count_features.py takes no repo
+#      argument, and skill_repo_set_gate.py gates katgpt-rs's own SKILL set —
+#      so the whole gate would be a vacuous green in a sibling.
+#   2. Invoke them BY PATH from a katgpt-rs checkout. 702's zero-script-copies
+#      property is deliberate: the auditor fixes then apply workspace-wide with
+#      no sync step. A vendored copy is a fork that rots.
+#   3. Pass the target path EXPLICITLY. With no argument the scripts default to
+#      auditing the repo they live in — katgpt-rs. A sibling that drops the '.'
+#      audits the WRONG REPO and passes forever, which is precisely the class of
+#      failure this whole issue is about.
+#
+# So it lives here once, and a caller writes three lines:
+#
+#     docs-drift:
+#       uses: katopz/katgpt-rs/.github/workflows/sibling_docs_drift.yml@develop
+#       with:
+#         min_labels: 1
+#
+# Fact (3) becomes structurally unreachable — there is no path argument for a
+# caller to omit — and the assert-audited-tree step below turns the remaining
+# way to get it wrong into a red instead of a green.
+#
+# Access: katgpt-rs is PUBLIC, and a public repo's reusable workflow is callable
+# from any repository, so the private siblings can use it with the default
+# GITHUB_TOKEN and no PAT. If a caller ever hits a permissions error here, the
+# fallback is riir-clippy's proven inline form in its rust.yml — copy that, and
+# re-read the three facts above before trusting the green.
+#
+# Ref pinning: callers use @develop deliberately. An auditor fix in katgpt-rs
+# should reach every sibling without six follow-up commits — that is the entire
+# point. The cost is that a bad auditor commit reds six repos at once; the
+# selftest() that runs on every auditor invocation is what makes that acceptable.
+
+name: sibling-docs-drift
+
+on:
+  workflow_call:
+    inputs:
+      katgpt_ref:
+        description: "katgpt-rs ref holding the auditors. develop is where they are fixed."
+        type: string
+        default: develop
+      min_labels:
+        description: >-
+          Minimum bench-doc labels expected in the caller. 0 means "this repo has
+          no labels and that is fine". Set to 1 in any repo that HAS labels: a
+          repo that goes from N labels to zero otherwise reports a clean green,
+          which is indistinguishable from nobody having looked.
+        type: number
+        default: 0
+  # Not only workflow_call. An entry point nothing can invoke standalone cannot
+  # be smoke-tested, and this repo's own rule is that an uninvoked assertion is
+  # unknown rather than passing. Dispatching this from katgpt-rs audits
+  # katgpt-rs, which is a real exercise of every step below.
+  workflow_dispatch:
+
+jobs:
+  docs-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No `repository:` — in a reusable workflow this checks out the CALLER at
+      # the caller's SHA, which is the tree we intend to audit.
+      - uses: actions/checkout@v6
+
+      - name: Check out katgpt-rs (public sibling — the auditors' only home)
+        uses: actions/checkout@v6
+        with:
+          repository: katopz/katgpt-rs
+          ref: ${{ inputs.katgpt_ref }}
+          path: .auditors
+
+      # The guard for fact (3). The auditors print "=== Auditing <basename> ==="
+      # per repo, so the audited basename is checkable against the caller's repo
+      # name. If the two ever disagree, the run audited someone else's tree and
+      # its green means nothing.
+      - name: Bench-doc + Cargo-comment audit vs the manifests
+        env:
+          MIN_LABELS: ${{ inputs.min_labels }}
+        run: |
+          set -uo pipefail
+          expected="${GITHUB_REPOSITORY##*/}"
+          rc=0
+          for script in bench_doc_audit.py cargo_comment_audit.py; do
+            echo "▸ $script"
+            out="$(python3 ".auditors/scripts/$script" . 2>&1)" || rc=1
+            printf '%s\n' "$out"
+            if ! printf '%s\n' "$out" | grep -qF "=== Auditing $expected ==="; then
+              echo "✗ $script audited a tree that is not '$expected' — the target"
+              echo "  path did not resolve to this checkout. A pass here would be"
+              echo "  a green over the wrong repository."
+              rc=1
+            fi
+          done
+
+          # Vacuous-green guard. Only the bench-doc auditor reports labels; the
+          # Cargo-comment count is left unpinned because a repo legitimately
+          # having zero inline feature comments is common and uninteresting.
+          if [ "${MIN_LABELS:-0}" -gt 0 ]; then
+            labels="$(python3 ".auditors/scripts/bench_doc_audit.py" . 2>/dev/null \
+                      | sed -n 's/.*checked \([0-9]*\) labels.*/\1/p' | head -1)"
+            labels="${labels:-0}"
+            if [ "$labels" -lt "$MIN_LABELS" ]; then
+              echo "✗ $labels bench-doc labels < required $MIN_LABELS."
+              echo "  Either the auditor went blind to this repo's dialect (702's"
+              echo "  riir-chain bug: 26 docs, zero tokens, '0 mismatches'), or the"
+              echo "  labelled docs were removed — in which case lower min_labels"
+              echo "  in the caller in the same commit."
+              rc=1
+            else
+              echo "✓ $labels bench-doc labels (>= $MIN_LABELS required)"
+            fi
+          fi
+          exit $rc

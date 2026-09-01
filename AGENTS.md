@@ -144,6 +144,31 @@ Two of the checks are worth knowing about specifically:
   26 riir-chain benchmark docs audited as clean while being unreadable
   (`.issues/702`).
 
+### The docs gate covers ONE repo — two more tiers cover the rest
+
+Both auditors accept a repo path and audit any repo, and for months nothing
+pointed them anywhere but here. A sibling with stale labels then looks exactly
+like a sibling nobody has checked. Three tiers now, deliberately different
+cadences, and none of them subsumes another:
+
+| instrument | where | cadence | scope |
+|---|---|---|---|
+| `docs_gate.yml` / `docs_gate.sh` | CI + workstation | per-push | katgpt-rs only |
+| `sibling_docs_drift.yml` | sibling CI (reusable) | caller's choice | one caller |
+| `scripts/docs_drift_sweep.py` | workstation | on demand | every contract repo |
+
+The sweep is **deliberately not** in `docs_gate.sh`'s `CHECKS`: CI has a single
+checkout, so it would derive an empty population and print a confident green
+over zero repos. Its population is derived (BOUNDARY.md + a `.git` dir); its
+expectations are committed (`scripts/docs_drift_floors.txt`), because deriving
+both from the same walk is what makes a cross-repo gate permanently green.
+
+`sibling_docs_drift.yml` is `workflow_call` so the three easy-to-get-wrong facts
+live once rather than once per sibling — the worst being that the auditors
+default to auditing **katgpt-rs**, so a sibling that omits the path argument
+passes forever against the wrong repository. The workflow asserts the audited
+tree is the caller's.
+
 `scripts/ci_gate_coverage.py` is a **report, not a gate** (always exit 0): which
 of the derived contract repos actually gate their full compile+lint surface in
 CI, following each workflow into the scripts it calls. Run it instead of

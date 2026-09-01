@@ -1,0 +1,47 @@
+# Committed expectations for scripts/docs_drift_sweep.py — the VOCABULARY half
+# of Issue 702's vocabulary-vs-population split. The population (which repos
+# exist) is derived from BOUNDARY.md + a .git dir and is never typed here; this
+# file records only WHICH repos are known to carry drift-auditable labels, so a
+# repo that silently drops out of the walk reds the sweep instead of shrinking
+# it into a confident green.
+#
+# Format:  <repo>  <min bench-doc labels>  <min Cargo.toml comments>
+#
+# The minimums are deliberately PRESENCE, not the observed count.
+# ---------------------------------------------------------------
+# It is tempting to pin the exact current count and call it a ratchet. Two
+# reasons not to, and they point the same way:
+#
+#   1. It would duplicate a defense that already exists and is stronger.
+#      Auditor blindness — the 702 failure where riir-chain's 26 benchmark docs
+#      produced no token at all and still printed "0 mismatches" — is caught by
+#      bench_doc_audit.py's selftest(), which pins real line shapes from BOTH
+#      dialects, runs on EVERY invocation, and is canaried. Re-detecting it here
+#      by watching a number wobble is a weaker instrument aimed at a solved
+#      problem.
+#   2. It would red constantly and then be ignored. Four-plus agents author and
+#      retire .benchmarks docs across these repos daily; an exact floor turns
+#      every legitimate doc removal into a failure. docs_gate.sh's own preamble
+#      records where that ends: a red nobody trusts trains the next reader to
+#      assume the tool is broken.
+#
+# So the assertion this file makes is the one the sweep is uniquely able to
+# make: "this repo bears labels, therefore the sweep must have SEEN it." A zero
+# where a 1 is expected means the repo vanished from the walk or went fully
+# dark — neither of which selftest() can see, because selftest() never leaves
+# this repo.
+#
+# Ratcheting a specific repo tighter is supported — just raise its number. Do
+# that only where the corpus is stable enough to hold it.
+#
+# Observed counts at the 2026-09-01 measurement are in the trailing comments,
+# as context for anyone deciding whether a drop is churn or a regression.
+
+katgpt-rs	1	1	# observed 2026-09-01: 92 labels, 396 comments
+riir-ai	1	1	# observed 2026-09-01: 78 labels, 10 comments
+riir-chain	1	1	# observed 2026-09-01: 2 labels, 4 comments
+riir-clippy	1	0	# observed 2026-09-01: 9 labels, 0 comments
+riir-dapps	1	0	# observed 2026-09-01: 1 labels, 0 comments
+riir-mmorpg-examples	1	0	# observed 2026-09-01: 2 labels, 0 comments
+riir-neuron-db	1	0	# observed 2026-09-01: 11 labels, 0 comments
+riir-train	1	0	# observed 2026-09-01: 5 labels, 0 comments
