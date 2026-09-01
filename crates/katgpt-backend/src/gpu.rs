@@ -1238,7 +1238,7 @@ mod tests {
     #[test]
     fn test_gpu_backend_device_name() {
         let Ok(b) = GpuBackend::new() else { return };
-        assert_eq!(backend.device_name(), "GPU");
+        assert_eq!(b.device_name(), "GPU");
     }
 
     #[test]
@@ -1773,7 +1773,7 @@ mod tests {
         let init_elapsed = {
             let start = std::time::Instant::now();
             let Ok(b) = GpuBackend::new() else { return };
-            (start.elapsed(), backend)
+            (start.elapsed(), b)
         };
         let mut backend = init_elapsed.1;
 

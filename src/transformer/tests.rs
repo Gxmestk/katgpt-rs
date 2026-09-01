@@ -2374,21 +2374,35 @@ fn test_forward_base_standard_fallback_no_weights() {
 }
 
 /// Plan 574 changed `cluster_map_from_embeddings` from a round-robin stub into
-/// real k-means, so this no longer asserts equality with round-robin.
+/// real k-means, and this test originally asserted that all-identical rows
+/// collapse into one mega-cluster.
 ///
-/// With all-identical rows there is no geometry to separate, and k-means
-/// correctly collapses everything into a single cluster. That is the *safe*
-/// degenerate outcome: one cluster means `clustered_lm_head` selects it for any
-/// `topk >= 1` and computes the full vocabulary — no pruning benefit, but no
-/// correctness loss either.
+/// `5528c2d9` reverted that outcome deliberately: a single cluster holding the
+/// whole vocabulary is *degenerate*, not safe — `clustered_lm_head` then selects
+/// it for any `topk >= 1` and computes the full vocabulary, so the pruning path
+/// silently becomes a slower no-op. Constant projected geometry now falls back
+/// to the baseline map instead, which is what k-means reduces to when there is
+/// no geometry to exploit.
+///
+/// That commit missed this copy of the assertion (Issue 700 R2). Two other
+/// tests pin the same contract — `cluster_build::tests::
+/// constant_geometry_falls_back_to_round_robin` in the owning crate and
+/// riir-ai's `test_cluster_map_from_embeddings_fallback` — so this one is
+/// written against `cluster_map_round_robin` too, keeping all three in step.
 #[test]
-fn test_cluster_map_from_embeddings_collapses_identical_rows() {
+fn test_cluster_map_from_embeddings_falls_back_on_identical_rows() {
     let lm_head = vec![0.0f32; 100 * 32];
     let map = cluster_map_from_embeddings(&lm_head, 100, 32, 25);
 
-    assert_eq!(map.len(), 1, "identical rows cannot be separated");
-    assert_eq!(map[0].len(), 100, "every token must still be covered");
-    assert!(map[0].iter().copied().eq(0..100));
+    assert_eq!(
+        map,
+        cluster_map_round_robin(100, 25),
+        "constant geometry must fall back to the baseline map, not one mega-cluster"
+    );
+    // Coverage is the invariant the old assertion was really guarding.
+    let mut seen: Vec<usize> = map.iter().flatten().copied().collect();
+    seen.sort_unstable();
+    assert!(seen.iter().copied().eq(0..100), "every token must still be covered");
 }
 
 /// A short weight buffer must fall back rather than panic.
