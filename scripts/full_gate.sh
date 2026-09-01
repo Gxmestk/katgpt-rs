@@ -119,9 +119,25 @@ mkdir -p "$(dirname "$LOG")"
 
 # Retain the log when the gate fails. The summary below prints error CLASSES and
 # the first diagnostic; everything else — every remaining site, every warning —
-# lives only in this file, and re-deriving it costs another >13 min run. On a
-# pass there is nothing in it worth the disk.
+# lives only in this file, and re-deriving it costs another >13 min run.
+#
+# "On a pass there is nothing in it worth the disk" was wrong, and cost a run.
+# A PASS still reports a warning-finding count (119 across 20 targets on
+# 2026-09-01), and the per-lint / per-crate breakdown behind that number exists
+# ONLY here — it is the input to Issue 701 R3b. Worse, re-deriving it is not
+# simply expensive: a second run against a now-warm target dir emits almost
+# nothing, because cargo does not replay diagnostics for crates it considers
+# fresh. The log is gone until something invalidates the cache.
+#
+# So: if the caller NAMED a path via $FULL_GATE_LOG, they asked for the file —
+# honour that on pass as well as on fail. An unnamed run still gets a temp file
+# cleaned up on success.
+# `if`, not `[ … ] && KEEP_LOG=1`: this script runs under `set -e`, where a
+# trailing AND-list whose test fails takes the whole run down.
 KEEP_LOG=0
+if [ -n "${FULL_GATE_LOG:-}" ]; then
+    KEEP_LOG=1
+fi
 trap '[ "$KEEP_LOG" -eq 1 ] && echo "  full log retained: $LOG" || rm -f "$LOG"' EXIT
 echo "▸ $GATE_CMD"
 set +e
