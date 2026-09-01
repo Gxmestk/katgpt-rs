@@ -30,7 +30,8 @@ landed. Apply them to every feature-gate claim you encounter.
 - You encounter a `// Default-off until G1–GN GOAT gate passes` comment
   in source code
 - Before promoting a feature flag to default-on (or demoting to opt-in)
-  in any of the 7 repos
+  in any product-set repo (**8**; canonical list in `katgpt-rs/AGENTS.md`
+  §"Repo count" — this said 7 and silently excluded `riir-dapps`)
 - Quarterly as a feature-gate-hygiene gate (alongside `doc-sync` and
   `goat-audit`)
 

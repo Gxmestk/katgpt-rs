@@ -38,9 +38,13 @@ non-negotiable per the canonical proposals in `katgpt-rs/.proposals/`.
 - **Cross-repo GOAT cherry-pick audit** → use the `goat-audit` skill.
 - **Bug fixes with no architectural angle.**
 
-## Repos in scope (the 7-repo stack)
+## Repos in scope (the product/distillation set — **8**)
 
-Same layout as the `research` and `goat-audit` skills:
+Same layout as the `research` and `goat-audit` skills. **Canonical home for this
+list: `katgpt-rs/AGENTS.md` §"Repo count"** (and Research 003) — it is copied
+here for reading convenience, so when the two disagree, AGENTS.md wins. This
+copy said "7-repo stack" and omitted `riir-dapps` from 2026-08-20 until
+2026-09-01, which is what a duplicated count does:
 
 ```
 katgpt-rs          ← public engine (default target for generic primitives)
@@ -52,7 +56,15 @@ riir-game-sdk      ← private game-vocabulary facade + dev-tool workspace
                       (consumers: riir-mmorpg-examples, seal-online-remaster; vocabulary source is
                       riir-games-shared in riir-ai workspace, re-exported via facade)
 riir-armageddon    ← private arena/game-product domain types
+riir-dapps         ← private dApp layer (game outcome → generic chain settlement;
+                      added 2026-08-20 — route settlement COMPOSITION here, not
+                      riir-chain, which owns only value/authority primitives)
 ```
+
+> The 8 above are the *product/distillation* set, not the workspace. The
+> workspace is 18 repos with a root `BOUNDARY.md` — see the `substrate-first`
+> skill's Step 2 for the derived enumeration. Routing targets a product repo;
+> **searching** must cover all 18.
 
 **Target-repo routing rule:** pick the repo that *owns the surface being
 changed*. A primitive that ships in `katgpt-core` → proposal in

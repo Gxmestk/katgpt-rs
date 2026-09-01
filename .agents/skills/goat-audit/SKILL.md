@@ -25,7 +25,12 @@ Use this skill when auditing whether the riir-* private repos have consumed the 
 - Single-repo refactors with no cross-repo angle.
 - Bug fixes with no architectural impact.
 
-## Repos in scope (the 7-repo stack — audit focuses on the 4 cherry-pick targets)
+## Repos in scope (the product set of 8 — audit focuses on the 4 cherry-pick targets)
+
+> Canonical list: `katgpt-rs/AGENTS.md` §"Repo count". `riir-dapps` (dApp layer,
+> added 2026-08-20) is the 8th and is OUT OF SCOPE here for the same reason as
+> riir-game-sdk: it composes outcomes, it hosts no feature-gated katgpt
+> primitive to audit.
 
 ```
 katgpt-rs          ← public engine (substrate: katgpt-core + 16 leaf crates + root)

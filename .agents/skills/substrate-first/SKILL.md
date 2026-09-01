@@ -5,7 +5,9 @@ description: Pre-implementation DRY gate + existing-code drift audit for the mul
 
 # Substrate-First — DRY gate + drift audit
 
-The 7-repo workspace has a recurring failure mode: an agent receives a task
+The workspace — **18 repos** carrying a root `BOUNDARY.md` as of 2026-09-01,
+derived by the snippet in Step 2 rather than typed here — has a recurring
+failure mode: an agent receives a task
 ("add threat perception"), jumps to implementation without checking existing
 substrate, and builds a **parallel system** that duplicates functionality
 already shipped under a different name. The user then has to catch it manually.
@@ -95,10 +97,33 @@ names.
 ```bash
 # Grep ALL repos for the substrate names from Step 1.
 # Use multiple variants — the concept may exist under any of them.
+#
+# DERIVE the repo set; never type it (fixed 2026-09-01 — the hard-coded
+# 7-repo brace list this replaced could not see 11 of the 18 contract repos,
+# INCLUDING two product-set ones: riir-armageddon consumes
+# `GenericSpatialBelief` in 3 files that the canonical DRY grep was structurally
+# unable to find, and riir-dapps was equally invisible. A gate that cannot see a
+# repo cannot tell you whether it consumes substrate or duplicates it.)
+cd /Users/katopz/git
 grep -rn 'GenericSpatialBelief\|SpatialBelief\|confidence_decay' \
-    --include='*.rs' \
-    /Users/katopz/git/{katgpt-rs,riir-ai,riir-chain,riir-neuron-db,riir-train,riir-game-sdk,riir-mmorpg-examples}/
+    --include='*.rs' --exclude-dir=target --exclude-dir=.git \
+    $(ls -d */ | while read -r d; do
+        [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && printf '%s ' "$d"
+      done)
+```
 
+Three deliberate details, each measured on this pattern (2026-09-01):
+
+| detail | why |
+|---|---|
+| `-d "$d/.git"`, not `-e` | a `git worktree` has a `.git` **file**. `ai-perfwt` (a riir-ai worktree) otherwise contributes 43 duplicate hits — a DRY gate reporting one implementation twice is the failure it exists to prevent |
+| `--exclude-dir=target` | the old form had none, and spent nearly all of its 23 s inside build dirs |
+| unquoted `$( … )`, not `$VAR` | zsh does **not** word-split an unquoted parameter expansion (grep would get one giant argument and fail) but it *does* split an unquoted command substitution. Verified in this shell |
+
+Net: **227 hits in 1.4 s** vs the old form's 221 in 23 s — strictly wider
+coverage, no worktree duplicates, 16× faster.
+
+```bash
 # Also grep .research/ and .proposals/ for design rules that apply:
 grep -rn 'two-brain\|fog-of-war\|domain classification\|sync boundary' \
     /Users/katopz/git/*/.{research,proposals,docs}/ 2>/dev/null
