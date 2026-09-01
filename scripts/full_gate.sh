@@ -50,6 +50,10 @@
 #
 # Honour CARGO_TARGET_DIR to avoid fighting a concurrent build:
 #   CARGO_TARGET_DIR=/tmp/full_gate scripts/full_gate.sh
+#
+# Honour FULL_GATE_LOG to put the clippy log somewhere retrievable (CI artifact
+# upload). Retained on failure, removed on a pass, either way.
+#   FULL_GATE_LOG=/tmp/full_gate.log scripts/full_gate.sh
 set -euo pipefail
 
 ALLOW_PARTIAL=0
@@ -75,6 +79,21 @@ fi
 # pipefail a failed substitution pipeline would kill the script here with no
 # diagnostic at all.
 APPLE_GATED=$({ grep -rl 'target_os = "macos"' --include='*.rs' crates src 2>/dev/null || true; } | wc -l | tr -d ' ')
+
+# Verify the instrument before trusting its verdict. A zero here reads exactly
+# like a working grep over a surface that no longer exists, and BOTH readings
+# invalidate something: zero means either this grep drifted (paths moved) or the
+# device-backend surface is gone — in which case the workflow is paying for a
+# macOS runner, and billing macOS minutes at a multiple of Linux, for nothing.
+# Either way a human must decide, so fail rather than narrate a vacuous pass.
+if [ "$APPLE_GATED" -eq 0 ]; then
+    echo "✗ platform layer found NO target_os = \"macos\" files under crates/ src/"
+    echo "  Either the grep drifted from the tree, or the device-backend surface is"
+    echo "  gone. If the latter, .github/workflows/full_gate.yml should stop paying"
+    echo "  for macos-latest — revisit its 'Why macos-latest' preamble."
+    exit 1
+fi
+
 if [ "$(uname -s)" != "Darwin" ]; then
     echo "⚠ not macOS — $APPLE_GATED file(s) gated on target_os = \"macos\" will NOT compile,"
     echo "  even with --all-features (the cfg is all(target_os, feature))."
@@ -90,8 +109,20 @@ fi
 # ── Layer 3: the gate ───────────────────────────────────────────────────────
 # `--keep-going` is not optional: without it cargo stops at the first failing
 # target. The run that found the five breaks reported only two without it.
-LOG="$(mktemp -t full_gate)"
-trap 'rm -f "$LOG"' EXIT
+# $FULL_GATE_LOG overrides the location so a CI job can upload the log as an
+# artifact. Retention alone is not enough there: a GitHub runner is destroyed
+# when the job ends, so a path printed into a dead runner's filesystem is
+# unreachable — the weekly run would be left with only the summary, which is
+# the situation the retention exists to fix.
+LOG="${FULL_GATE_LOG:-$(mktemp -t full_gate)}"
+mkdir -p "$(dirname "$LOG")"
+
+# Retain the log when the gate fails. The summary below prints error CLASSES and
+# the first diagnostic; everything else — every remaining site, every warning —
+# lives only in this file, and re-deriving it costs another >13 min run. On a
+# pass there is nothing in it worth the disk.
+KEEP_LOG=0
+trap '[ "$KEEP_LOG" -eq 1 ] && echo "  full log retained: $LOG" || rm -f "$LOG"' EXIT
 echo "▸ $GATE_CMD"
 set +e
 "${GATE_ARGS[@]}" >"$LOG" 2>&1
@@ -111,6 +142,7 @@ BROKEN_N=$({ printf '%s' "$BROKEN" | grep -c . || true; })
 WARNINGS=$({ grep -cE '^warning:' "$LOG" || true; })
 
 if [ "$DIAGS" -ne 0 ] || [ "$BROKEN_N" -ne 0 ]; then
+    KEEP_LOG=1
     echo "✗ full gate FAILED — $DIAGS error diagnostic(s), $BROKEN_N unbuildable target(s)"
     # `|| true`: bash exempts the left side of `&&` from `set -e`, but being
     # explicit here beats relying on that exemption in a failure path that must
