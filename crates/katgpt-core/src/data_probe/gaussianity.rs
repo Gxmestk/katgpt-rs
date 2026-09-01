@@ -294,7 +294,7 @@ pub fn ks_d_vs_fitted_gaussian(sample: &[f32], scratch: &mut [f32]) -> f32 {
     }
 
     scratch[..n].copy_from_slice(&sample[..n]);
-    scratch[..n].sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    scratch[..n].sort_by(|a, b| a.total_cmp(b));
     ks_d_sorted_inplace(&mut scratch[..n])
 }
 

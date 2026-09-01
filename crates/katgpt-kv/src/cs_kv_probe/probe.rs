@@ -282,11 +282,7 @@ mod tests {
 
         // Top-2 by score.
         let mut idx: Vec<usize> = (0..n_heads).collect();
-        idx.sort_by(|&a, &b| {
-            ranking.scores[b]
-                .partial_cmp(&ranking.scores[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        idx.sort_by(|&a, &b| ranking.scores[b].total_cmp(&ranking.scores[a]));
         let cs_top2: std::collections::HashSet<usize> = idx.iter().take(2).copied().collect();
         for &h in &signal_heads {
             assert!(

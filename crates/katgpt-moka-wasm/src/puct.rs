@@ -389,7 +389,7 @@ impl PuctPlayer {
             .map(|i| (policy[i], Some(i)))
             .collect();
         scored.push((policy[BOARD_AREA], None));
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
         scored.truncate(self.top_k);
 
         // Softmax the top_k priors for normalized P(s,a).

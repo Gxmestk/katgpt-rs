@@ -112,11 +112,7 @@ impl RegressionSuite {
         let records = TrialLog::load(path)?;
 
         let mut ranked: Vec<_> = records.into_iter().collect();
-        ranked.sort_by(|a, b| {
-            b.reward
-                .partial_cmp(&a.reward)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ranked.sort_by(|a, b| b.reward.total_cmp(&a.reward));
 
         let traces: Vec<GoldenTrace> = ranked
             .into_iter()

@@ -461,7 +461,7 @@ impl GoPlayer for GoValidatorPlayer {
 
         // Sort descending by score (best first)
         let mut sorted = scored;
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Try validated moves first
         for &((r, c), _score) in &sorted {

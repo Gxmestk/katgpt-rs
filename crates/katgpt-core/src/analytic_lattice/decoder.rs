@@ -269,8 +269,8 @@ mod tests {
             .collect();
 
         // Sort both by score descending.
-        simd_scores.sort_by(|a, b| b.partial_cmp(a).unwrap());
-        ref_scores.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        simd_scores.sort_by(|a, b| b.total_cmp(a));
+        ref_scores.sort_by(|a, b| b.total_cmp(a));
 
         // Ranking must match exactly (sigmoid is monotone, so ranking is
         // determined by the dot product alone).

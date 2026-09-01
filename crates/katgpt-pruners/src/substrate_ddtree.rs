@@ -134,11 +134,7 @@ pub fn expand_substrate_branches(
     }
 
     // Sort by score descending
-    branches.sort_by(|a, b| {
-        b.score()
-            .partial_cmp(&a.score())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    branches.sort_by(|a, b| b.score().total_cmp(&a.score()));
 
     ExpansionResult {
         branches,

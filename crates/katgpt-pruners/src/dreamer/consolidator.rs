@@ -32,11 +32,7 @@ impl DreamerConsolidator {
 
         // Sort indices by Q-value for clustering
         let mut indexed: Vec<usize> = (0..region.arm_indices.len()).collect();
-        indexed.sort_by(|&a, &b| {
-            region.q_snapshot[a]
-                .partial_cmp(&region.q_snapshot[b])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        indexed.sort_by(|&a, &b| region.q_snapshot[a].total_cmp(&region.q_snapshot[b]));
 
         // Cluster by Q-value proximity
         let mut merged: Vec<(Vec<usize>, f32)> = Vec::new();

@@ -342,9 +342,7 @@ mod tests {
     fn top_k(scores: &[f32], k: usize) -> Vec<usize> {
         let mut idx: Vec<usize> = (0..scores.len()).collect();
         idx.sort_by(|&a, &b| {
-            scores[b]
-                .partial_cmp(&scores[a])
-                .unwrap_or(core::cmp::Ordering::Equal)
+            scores[b].total_cmp(&scores[a])
                 .then(a.cmp(&b))
         });
         idx.truncate(k);

@@ -336,11 +336,7 @@ impl AutoResearchResult {
             .iter()
             .filter(|a| a.status == ArmStatus::Active && a.pulls > 0)
             .collect();
-        sorted_arms.sort_by(|a, b| {
-            b.mean_reward()
-                .partial_cmp(&a.mean_reward())
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        sorted_arms.sort_by(|a, b| b.mean_reward().total_cmp(&a.mean_reward()));
 
         for (rank, arm) in sorted_arms.iter().take(5).enumerate() {
             println!(
@@ -654,7 +650,7 @@ fn prune_weak_arms(arms: &mut [ResearchArm]) {
         return; // Not enough arms to prune meaningfully
     }
 
-    rewards.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    rewards.sort_by(|a, b| a.total_cmp(b));
     let threshold_idx = (rewards.len() as f32 * PRUNING_PERCENTILE) as usize;
     let threshold = rewards[threshold_idx];
 

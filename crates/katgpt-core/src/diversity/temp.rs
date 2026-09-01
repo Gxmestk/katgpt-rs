@@ -1437,7 +1437,7 @@ mod tests {
                 epsilon,
             ));
         }
-        random_min_bounds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        random_min_bounds.sort_by(|a, b| a.total_cmp(b));
         let random_median = random_min_bounds[random_min_bounds.len() / 2];
         let ratio = selected_min_bound / random_median;
 

@@ -193,11 +193,11 @@ pub fn recos_sim(a: &[f32; 8], b: &[f32; 8]) -> f32 {
     //               and dot/bound is negative/negative = positive in [0,1].
     let mut a_sorted = *a;
     let mut b_sorted = *b;
-    a_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    a_sorted.sort_by(|x, y| x.total_cmp(y));
     if dot >= 0.0 {
-        b_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        b_sorted.sort_by(|x, y| x.total_cmp(y));
     } else {
-        b_sorted.sort_by(|x, y| y.partial_cmp(x).unwrap());
+        b_sorted.sort_by(|x, y| y.total_cmp(x));
     }
     let bound = dot_8(&a_sorted, &b_sorted);
     if bound.abs() < 1e-12 {
@@ -224,11 +224,11 @@ pub fn recos_sim_ranking(a: &[f32; 8], b: &[f32; 8]) -> f32 {
     let dot = dot_8(a, b);
     let mut a_sorted = *a;
     let mut b_sorted = *b;
-    a_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    a_sorted.sort_by(|x, y| x.total_cmp(y));
     if dot >= 0.0 {
-        b_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+        b_sorted.sort_by(|x, y| x.total_cmp(y));
     } else {
-        b_sorted.sort_by(|x, y| y.partial_cmp(x).unwrap());
+        b_sorted.sort_by(|x, y| y.total_cmp(x));
     }
     let bound = dot_8(&a_sorted, &b_sorted);
     if bound.abs() < 1e-12 {
@@ -270,11 +270,11 @@ pub fn recos_sim_slice(a: &[f32], b: &[f32]) -> f32 {
 pub fn recos_sim_slice_into(a: &mut [f32], b: &mut [f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len());
     let dot: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
-    a.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+    a.sort_unstable_by(|x, y| x.total_cmp(y));
     if dot >= 0.0 {
-        b.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+        b.sort_unstable_by(|x, y| x.total_cmp(y));
     } else {
-        b.sort_unstable_by(|x, y| y.partial_cmp(x).unwrap());
+        b.sort_unstable_by(|x, y| y.total_cmp(x));
     }
     let bound: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
     if bound.abs() < 1e-12 {

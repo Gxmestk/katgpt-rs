@@ -1397,7 +1397,7 @@ pub fn residual_resample_into(weights: &[f32], n: usize, u: f32, out: &mut [u32]
     }
     let remaining = n.saturating_sub(count);
     if remaining > 0 {
-        residuals.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        residuals.sort_by(|a, b| b.1.total_cmp(&a.1));
         let total: f32 = residuals.iter().map(|r| r.1).sum();
         if total > 0.0 {
             let step = total / remaining as f32;

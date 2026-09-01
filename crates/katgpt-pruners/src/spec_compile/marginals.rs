@@ -212,11 +212,7 @@ impl SpecMarginals {
         }
 
         let mut sorted: Vec<&TokenBias> = self.biases.iter().collect();
-        sorted.sort_unstable_by(|a, b| {
-            b.bias
-                .partial_cmp(&a.bias)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        sorted.sort_unstable_by(|a, b| b.bias.total_cmp(&a.bias));
         sorted.into_iter().take(k).cloned().collect()
     }
 

@@ -141,7 +141,7 @@ fn n_equals_2_diagonal() {
     let mut scratch = SymmetricEigScratch::new();
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 2, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
-    eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    eigs.sort_by(|a, b| a.total_cmp(b));
     assert!((eigs[0] - 3.0).abs() < 1e-12, "eigvals = {eigs:?}");
     assert!((eigs[1] - 5.0).abs() < 1e-12);
     check_eigenpairs(&a, &eigvals, &eigvecs, 2, 1e-12);
@@ -156,7 +156,7 @@ fn n_equals_2_analytic() {
     let mut scratch = SymmetricEigScratch::new();
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 2, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
-    eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    eigs.sort_by(|a, b| a.total_cmp(b));
     assert!((eigs[0] - 1.0).abs() < 1e-12, "eigvals = {eigs:?}");
     assert!((eigs[1] - 3.0).abs() < 1e-12);
     check_eigenpairs(&a, &eigvals, &eigvecs, 2, 1e-12);
@@ -172,7 +172,7 @@ fn n_equals_3_diagonal() {
     let mut scratch = SymmetricEigScratch::new();
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 3, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
-    eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    eigs.sort_by(|a, b| a.total_cmp(b));
     for (got, expected) in eigs.iter().zip(&[1.0_f64, 2.0, 3.0]) {
         assert!((got - expected).abs() < 1e-12, "eigs = {eigs:?}");
     }
@@ -189,7 +189,7 @@ fn n_equals_3_toeplitz() {
     let mut scratch = SymmetricEigScratch::new();
     symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, 3, 30);
     let mut eigs: Vec<f64> = eigvals.to_vec();
-    eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    eigs.sort_by(|a, b| a.total_cmp(b));
     let expected = vec![2.0 - sqrt2, 2.0, 2.0 + sqrt2];
     for (got, exp) in eigs.iter().zip(&expected) {
         assert!(

@@ -147,11 +147,7 @@ fn jacobi_eigendecompose(matrix: &[f64], dim: usize) -> (Vec<f32>, Vec<f32>) {
 
     // Sort by eigenvalue descending
     let mut indices: Vec<usize> = (0..dim).collect();
-    indices.sort_by(|&a_idx, &b_idx| {
-        eigenvalues[b_idx]
-            .partial_cmp(&eigenvalues[a_idx])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    indices.sort_by(|&a_idx, &b_idx| eigenvalues[b_idx].total_cmp(&eigenvalues[a_idx]));
 
     let sorted_eigenvalues: Vec<f32> = indices.iter().map(|&i| eigenvalues[i]).collect();
     let sorted_eigenvectors = reorder_eigenvector_columns(&eigenvectors, &indices, dim);
@@ -355,11 +351,7 @@ pub fn calibrate_eigenbasis_dual_gram(samples: &[Vec<f32>], head_dim: usize) -> 
 
     // Re-sort by eigenvalue descending (jacobi already sorted, but ensure after padding)
     let mut indices: Vec<usize> = (0..head_dim).collect();
-    indices.sort_by(|&a_idx, &b_idx| {
-        cov_eigenvalues[b_idx]
-            .partial_cmp(&cov_eigenvalues[a_idx])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    indices.sort_by(|&a_idx, &b_idx| cov_eigenvalues[b_idx].total_cmp(&cov_eigenvalues[a_idx]));
 
     let sorted_eigenvalues: Vec<f32> = indices.iter().map(|&i| cov_eigenvalues[i]).collect();
     let sorted_eigenvectors = reorder_eigenvector_columns(&cov_eigenvectors, &indices, head_dim);
@@ -567,7 +559,7 @@ impl LloydMaxQuantizer {
 
         // Initialize centroids via uniform quantile placement
         let mut sorted: Vec<f32> = data.to_vec();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| a.total_cmp(b));
 
         let mut centroids = vec![0.0f32; self.n_levels];
         for (i, c) in centroids.iter_mut().enumerate() {
@@ -842,7 +834,7 @@ pub fn ks_d_statistic(weights: &[f32], scratch: &mut [f32]) -> f32 {
 
     // Copy to scratch for sorting
     scratch[..n].copy_from_slice(&weights[..n]);
-    scratch[..n].sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    scratch[..n].sort_by(|a, b| a.total_cmp(b));
 
     // Compute mean and std from sorted data — single-pass FMA accumulation
     // (sum + sum_sq) halves bandwidth over the sorted slice vs the prior

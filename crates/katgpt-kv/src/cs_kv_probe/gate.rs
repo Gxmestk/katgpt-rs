@@ -180,7 +180,7 @@ mod tests {
         // The finite entries must be exactly the top-k scoring groups:
         // {1(0.9), 3(0.8), 5(0.7), 7(0.6), ...} in descending order.
         let mut expected: Vec<(usize, f32)> = r.scores.iter().copied().enumerate().collect();
-        expected.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        expected.sort_by(|a, b| b.1.total_cmp(&a.1));
         let top_k_groups: std::collections::HashSet<usize> =
             expected.iter().take(k).map(|(g, _)| *g).collect();
         for (g, &b) in out.iter().enumerate() {

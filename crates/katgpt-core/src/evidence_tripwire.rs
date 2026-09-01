@@ -194,7 +194,7 @@ pub fn conformal_threshold(scores: &mut [f64], alpha: f64) -> f64 {
         alpha > 0.0 && alpha < 1.0,
         "conformal_threshold: alpha must be in (0, 1)"
     );
-    scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    scores.sort_by(|a, b| a.total_cmp(b));
     let idx = (((n as f64 + 1.0) * (1.0 - alpha)).ceil() as usize)
         .saturating_sub(1)
         .min(n - 1);

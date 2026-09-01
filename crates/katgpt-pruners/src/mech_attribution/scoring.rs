@@ -123,11 +123,7 @@ pub fn batch_influence_rank(
         .collect();
 
     // Sort descending by catalyst_overlap
-    results.sort_by(|a, b| {
-        b.1.catalyst_overlap
-            .partial_cmp(&a.1.catalyst_overlap)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    results.sort_by(|a, b| b.1.catalyst_overlap.total_cmp(&a.1.catalyst_overlap));
 
     // Mark top-K as high influence
     let top_k = ((samples.len() as f32) * config.top_k_fraction).ceil() as usize;

@@ -139,29 +139,13 @@ impl EigenvalueTracker {
             // Fallback: partial sort to find top-k indices
             scratch_a.clear();
             scratch_a.extend(0..prev.len());
-            scratch_a.select_nth_unstable_by(k - 1, |&a, &b| {
-                prev[b]
-                    .partial_cmp(&prev[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            scratch_a[..k].sort_by(|&a, &b| {
-                prev[b]
-                    .partial_cmp(&prev[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scratch_a.select_nth_unstable_by(k - 1, |&a, &b| prev[b].total_cmp(&prev[a]));
+            scratch_a[..k].sort_by(|&a, &b| prev[b].total_cmp(&prev[a]));
 
             scratch_b.clear();
             scratch_b.extend(0..curr.len());
-            scratch_b.select_nth_unstable_by(k - 1, |&a, &b| {
-                curr[b]
-                    .partial_cmp(&curr[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            scratch_b[..k].sort_by(|&a, &b| {
-                curr[b]
-                    .partial_cmp(&curr[a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scratch_b.select_nth_unstable_by(k - 1, |&a, &b| curr[b].total_cmp(&curr[a]));
+            scratch_b[..k].sort_by(|&a, &b| curr[b].total_cmp(&curr[a]));
 
             (scratch_a, scratch_b)
         };
@@ -421,7 +405,7 @@ mod tests {
             let j = EigenvalueTracker::eigenvalue_jaccard(&windows[i - 1], &windows[i], 3);
             jaccards.push(j);
         }
-        jaccards.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        jaccards.sort_by(|a, b| a.total_cmp(b));
         let median = jaccards[jaccards.len() / 2];
         assert!(
             median >= 0.85,

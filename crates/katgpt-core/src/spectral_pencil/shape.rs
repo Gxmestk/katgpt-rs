@@ -251,7 +251,7 @@ mod tests {
         jacobi_eigen(&full, false, &mut scratch);
         // PSD diagonal matrix: eigenvalues == diagonal entries (sorted)
         let mut want = targets;
-        want.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        want.sort_by(|a, b| a.total_cmp(b));
         for (got, w) in scratch.values.iter().zip(want.iter()) {
             assert!((got - w).abs() < 1e-5, "{got} vs {w}");
         }

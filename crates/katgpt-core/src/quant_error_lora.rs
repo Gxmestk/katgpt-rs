@@ -461,7 +461,7 @@ impl SparseErrorBypass {
         // Partial sort: partition so the top-k are at the front (unordered is fine
         // — we don't need them sorted, just selected).
         indexed.select_nth_unstable_by(k - 1, |a, b| {
-            b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
+            b.0.total_cmp(&a.0)
         });
 
         let mut rows = Vec::with_capacity(k);

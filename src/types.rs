@@ -151,11 +151,7 @@ pub fn top_p_coreset(
     }
 
     // Sort by score descending
-    scratch_indices.sort_by(|&a, &b| {
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    scratch_indices.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
 
     // Compute total and normalize
     let total: f32 = scratch_indices.iter().map(|&i| scores[i].max(0.0)).sum();

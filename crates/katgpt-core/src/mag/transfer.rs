@@ -509,7 +509,7 @@ fn rbf_kernel(a: &[f32], b: &[f32], gamma: f32) -> f32 {
 /// `wasserstein_matches_independent_reference`, whose in-test twin uses a
 /// stable `total_cmp` sort).
 fn sort_f32_ascending(v: &mut [f32]) {
-    v.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    v.sort_unstable_by(|a, b| a.total_cmp(b));
 }
 
 /// Quantile-grid core shared by `wasserstein1d` and

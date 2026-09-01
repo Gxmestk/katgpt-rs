@@ -241,7 +241,7 @@ mod tests {
         xs.push(f32::NAN);
         xs.sort_by(|a, b| desc(*a, *b));
         let mut reals: Vec<f32> = xs.iter().copied().filter(|v| !v.is_nan()).collect();
-        reals.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        reals.sort_by(|a, b| b.total_cmp(a));
         assert_eq!(&xs[..reals.len()], &reals[..], "reals must come out fully sorted");
         assert_eq!(reals.len() + 7, xs.len());
     }

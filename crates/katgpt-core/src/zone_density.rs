@@ -300,7 +300,7 @@ pub fn schedule_outer_first(
     // `sort_by` is stable by contract — equal-density zones keep input order.
     // `partial_cmp(...).unwrap_or(Equal)` defends against NaN (shouldn't occur
     // for population counts, but the FFI boundary doesn't enforce it).
-    scratch.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(core::cmp::Ordering::Equal));
+    scratch.sort_by(|a, b| a.1.total_cmp(&b.1));
     for (i, &(z, _)) in scratch.iter().enumerate() {
         out_order[i] = z;
     }

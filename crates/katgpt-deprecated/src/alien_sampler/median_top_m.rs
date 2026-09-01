@@ -856,7 +856,7 @@ mod tests {
         let mut s = MedianTopMAvailability::new(bank, 10);
         let got = s.availability_embedded(&candidate);
         // Top-10 cosines = the 10 largest values in `cosines`.
-        cosines.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        cosines.sort_by(|a, b| a.total_cmp(b));
         let top10 = &cosines[40..]; // 10 largest
         // Median of 10 (even) = average of top10[4] and top10[5].
         let expected = (top10[4] + top10[5]) * 0.5;

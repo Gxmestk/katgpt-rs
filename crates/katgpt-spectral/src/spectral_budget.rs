@@ -385,9 +385,7 @@ pub fn rank_p_retain(
     let mut indices: Vec<usize> = (0..rows).collect();
     // Partial sort: only need top `keep` elements in correct position.
     indices.select_nth_unstable_by(keep - 1, |&a, &b| {
-        row_norms_buf[b]
-            .partial_cmp(&row_norms_buf[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
+        row_norms_buf[b].total_cmp(&row_norms_buf[a])
     });
 
     // Zero rows NOT in top `keep`.

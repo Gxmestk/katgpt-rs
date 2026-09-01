@@ -1041,9 +1041,9 @@ mod tests {
         // Top-3 singular values should be close to {10, 5, 2} (order-tolerant sign).
         let top3: Vec<f32> = result.singular_values.iter().take(3).cloned().collect();
         let mut expected = [10.0f32, 5.0, 2.0];
-        expected.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        expected.sort_by(|a, b| b.total_cmp(a));
         let mut got = top3.clone();
-        got.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        got.sort_by(|a, b| b.total_cmp(a));
         for (e, g) in expected.iter().zip(got.iter()) {
             assert!(
                 (e - g).abs() < 0.1,
@@ -1154,9 +1154,9 @@ mod tests {
 
         // T3.2 (singular values): top-3 match {10, 5, 2}.
         let mut expected = sigmas;
-        expected.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        expected.sort_by(|a, b| b.total_cmp(a));
         let mut got: Vec<f32> = result.singular_values.iter().take(3).cloned().collect();
-        got.sort_by(|a, b| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        got.sort_by(|a, b| b.total_cmp(a));
         for (e, g) in expected.iter().zip(got.iter()) {
             assert!(
                 (e - g).abs() < 0.1,

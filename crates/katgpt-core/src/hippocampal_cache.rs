@@ -667,11 +667,11 @@ mod tests {
         // The top-4 by score are entries 99, 98, 97, 96.
         let top4_scores: Vec<f32> = entries.iter().map(|(_, _, s)| *s).collect();
         let mut expected = top4_scores.clone();
-        expected.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        expected.sort_by(|a, b| b.total_cmp(a));
         let expected_top4: Vec<f32> = expected[..4].to_vec();
 
         let mut actual_scores: Vec<f32> = cache.slots().map(|(_, _, _, s)| s).collect();
-        actual_scores.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        actual_scores.sort_by(|a, b| b.total_cmp(a));
 
         for (i, (a, e)) in actual_scores.iter().zip(expected_top4.iter()).enumerate() {
             assert!(
@@ -1095,8 +1095,8 @@ mod sorted_vec_tests {
 
         let mut heap_scores: Vec<f32> = heap_cache.slots().map(|(_, _, _, s)| s).collect();
         let mut sorted_scores: Vec<f32> = sorted_cache.scores[..sorted_cache.len()].to_vec();
-        heap_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        sorted_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        heap_scores.sort_by(|a, b| a.total_cmp(b));
+        sorted_scores.sort_by(|a, b| a.total_cmp(b));
 
         for (h, s) in heap_scores.iter().zip(sorted_scores.iter()) {
             assert!((h - s).abs() < 1e-6, "heap {h} != sorted {s}");

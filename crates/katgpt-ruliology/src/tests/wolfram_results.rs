@@ -428,7 +428,7 @@ fn test_cross_paradigm_fsm_vs_tm_matching_pennies() {
     }
 
     // Sort to get top/bottom FSMs.
-    fsm_avg_payoffs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    fsm_avg_payoffs.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     let best = fsm_avg_payoffs.first().expect("at least one FSM");
     let worst = fsm_avg_payoffs.last().expect("at least one FSM");
@@ -478,7 +478,7 @@ fn test_cross_paradigm_ca_tournament_matching_pennies() {
         scores.push((ca.rule(), avg));
     }
 
-    scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scores.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     let best_rule = scores[0].0;
     let best_score = scores[0].1;
@@ -558,7 +558,7 @@ fn test_cross_paradigm_pd_fsm_vs_all() {
         fsm_scores.push((fsm.id(), avg));
     }
 
-    fsm_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    fsm_scores.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     // Grim trigger should be in the top half of PD rankings against CA+TM.
     let gt_rank = fsm_scores.iter().position(|(id, _)| *id == gt_id);

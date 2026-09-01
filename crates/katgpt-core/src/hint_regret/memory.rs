@@ -54,9 +54,7 @@ pub fn beta_lcb_order_into(
         lcbs.push(beta_lcb(s, f, epsilon));
     }
     order.sort_unstable_by(|&a, &b| {
-        lcbs[b]
-            .partial_cmp(&lcbs[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
+        lcbs[b].total_cmp(&lcbs[a])
             .then(a.cmp(&b))
     });
 }
@@ -232,8 +230,7 @@ impl RegretMemory {
         out.sort_by(|&a, &b| {
             let sa = salience(a.r_hat, a.last_seen_tick, now_tick, lambda);
             let sb = salience(b.r_hat, b.last_seen_tick, now_tick, lambda);
-            sb.partial_cmp(&sa)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            sb.total_cmp(&sa)
                 .then(a.last_seen_tick.cmp(&b.last_seen_tick))
         });
     }

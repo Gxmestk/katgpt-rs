@@ -1422,7 +1422,7 @@ mod tests {
 
         // The 3 nearest points should be at distances 1, 2, 3.
         let mut sorted = distances.to_vec();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         assert_eq!(sorted, vec![1.0, 2.0, 3.0]);
     }
 

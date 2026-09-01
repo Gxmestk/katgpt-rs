@@ -256,7 +256,7 @@ fn greedy_top_k(utilities: &[f32], k: usize) -> Vec<usize> {
         .map(|(i, &u)| (i, if u.is_finite() { u } else { f32::NEG_INFINITY }))
         .collect();
     // Partial sort: we only need top-k
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
     indexed.into_iter().take(k).map(|(i, _)| i).collect()
 }
 

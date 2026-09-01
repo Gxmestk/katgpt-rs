@@ -1131,9 +1131,9 @@ mod tests {
         // Mode 1 has 3 rows, 8 columns. Each row should have 8 entries.
         // The set of values should be a permutation of x.
         let mut sorted_buf = buf.clone();
-        sorted_buf.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted_buf.sort_by(|a, b| a.total_cmp(b));
         let mut sorted_x = x.clone();
-        sorted_x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted_x.sort_by(|a, b| a.total_cmp(b));
         assert_eq!(sorted_buf, sorted_x, "unfold must be a permutation");
     }
 

@@ -803,9 +803,7 @@ impl MonopolyPlayer for ValidatorPlayer {
         buildable.sort_by(|a, b| {
             let ratio_a = a.1 as f32 / a.2.max(1) as f32;
             let ratio_b = b.1 as f32 / b.2.max(1) as f32;
-            ratio_b
-                .partial_cmp(&ratio_a)
-                .unwrap_or(std::cmp::Ordering::Equal)
+            ratio_b.total_cmp(&ratio_a)
         });
 
         buildable.into_iter().map(|(sq, _, _)| sq).collect()
@@ -911,7 +909,7 @@ impl MonopolyPlayer for ValidatorPlayer {
             .collect();
 
         // Sort by lowest strategic value first (cheapest to lose)
-        props.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        props.sort_by(|a, b| a.1.total_cmp(&b.1));
         props.into_iter().map(|(sq, _)| sq).collect()
     }
 
@@ -1396,7 +1394,7 @@ impl MonopolyPlayer for HLPlayer {
             })
             .collect();
 
-        props.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        props.sort_by(|a, b| a.1.total_cmp(&b.1));
         props.into_iter().map(|(sq, _)| sq).collect()
     }
 

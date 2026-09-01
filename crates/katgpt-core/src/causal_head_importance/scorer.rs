@@ -108,10 +108,7 @@ pub fn partition_by_causal_score(
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_unstable_by(|&a, &b| {
         // Higher score first; on tie, lower index first.
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.cmp(&b))
+        scores[b].total_cmp(&scores[a]).then(a.cmp(&b))
     });
 
     // Top-k by critical_ratio (round up so a nonzero ratio on a small n does

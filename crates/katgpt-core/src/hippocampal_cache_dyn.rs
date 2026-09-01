@@ -642,7 +642,7 @@ mod tests {
 
         // Compare surviving scores (sorted).
         let mut cg_scores: Vec<f32> = cache_cg.slots().map(|(_, _, _, s)| s).collect();
-        cg_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        cg_scores.sort_by(|a, b| a.total_cmp(b));
 
         // For the dyn version, extract scores from the heap.
         let mut dyn_scores: Vec<f32> = (0..cache_dyn.heap_len)
@@ -651,7 +651,7 @@ mod tests {
                 f32::from_bits(bits)
             })
             .collect();
-        dyn_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        dyn_scores.sort_by(|a, b| a.total_cmp(b));
 
         assert_eq!(cg_scores.len(), dyn_scores.len());
         for (a, b) in cg_scores.iter().zip(dyn_scores.iter()) {

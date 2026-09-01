@@ -195,11 +195,7 @@ impl RuleExtractor {
             .collect();
 
         // Sort descending by score, keep TOP-K.
-        rules.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        rules.sort_by(|a, b| b.score.total_cmp(&a.score));
         rules.truncate(self.top_k);
 
         rules
@@ -228,11 +224,7 @@ pub fn deduplicate_rules(rules: &mut Vec<ExtractedRule>, hamming_threshold: usiz
     }
 
     // Sort by score descending so higher-scored rules come first.
-    rules.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    rules.sort_by(|a, b| b.score.total_cmp(&a.score));
 
     let mut merged = Vec::with_capacity(rules.len());
     let mut consumed = vec![false; rules.len()];

@@ -972,7 +972,7 @@ mod tests {
         jacobi_eigenvalues_symmetric_inplace(&mut mat, 3, 50);
         // Diagonal should still hold the eigenvalues (possibly reordered).
         let mut eigs: Vec<f32> = (0..3).map(|i| mat[i * 3 + i]).collect();
-        eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        eigs.sort_by(|a, b| a.total_cmp(b));
         assert!((eigs[0] - 2.0).abs() < 1e-5);
         assert!((eigs[1] - 3.0).abs() < 1e-5);
         assert!((eigs[2] - 5.0).abs() < 1e-5);
@@ -986,7 +986,7 @@ mod tests {
         let e0 = mat[0];
         let e1 = mat[3];
         let mut eigs = [e0, e1];
-        eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        eigs.sort_by(|a, b| a.total_cmp(b));
         assert!((eigs[0] - 1.0).abs() < 1e-5, "eigs = {eigs:?}");
         assert!((eigs[1] - 3.0).abs() < 1e-5, "eigs = {eigs:?}");
     }
@@ -998,7 +998,7 @@ mod tests {
         let mut mat = [2.0f32, 1.0, 0.0, 1.0, 2.0, 1.0, 0.0, 1.0, 2.0];
         jacobi_eigenvalues_symmetric_inplace(&mut mat, 3, 100);
         let mut eigs: Vec<f32> = (0..3).map(|i| mat[i * 3 + i]).collect();
-        eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        eigs.sort_by(|a, b| a.total_cmp(b));
         assert!(
             (eigs[0] - (2.0 - std::f32::consts::SQRT_2)).abs() < 1e-4,
             "eigs = {eigs:?}"

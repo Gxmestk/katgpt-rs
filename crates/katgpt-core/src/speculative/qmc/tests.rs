@@ -9,7 +9,7 @@ fn ks_uniform(samples: &[f32]) -> (f64, f64) {
     let n = samples.len();
     assert!(n > 0);
     let mut sorted: Vec<f32> = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let mut d_max = 0.0f64;
     let nf = n as f64;
@@ -46,7 +46,7 @@ fn star_discrepancy(samples: &[f32]) -> f64 {
     let n = samples.len();
     assert!(n > 0);
     let mut sorted: Vec<f32> = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let nf = n as f64;
     let mut d_max = 0.0f64;
     for (i, &x) in sorted.iter().enumerate() {
@@ -72,7 +72,7 @@ fn test_lattice_basic() {
     }
     // Points are equally spaced at 1/8 intervals (shifted by Δ).
     let mut sorted = buf;
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     for i in 1..8 {
         let gap = sorted[i] - sorted[i - 1];
         assert!(
@@ -546,7 +546,7 @@ fn ks_normal(samples: &[f32], sigma: f32) -> (f64, f64) {
     let n = samples.len();
     assert!(n > 0);
     let mut sorted: Vec<f32> = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let inv_sigma = (1.0 / sigma) as f64;
     let mut d_max = 0.0f64;
     let nf = n as f64;

@@ -1057,7 +1057,7 @@ impl GoMokaSearchPlayer {
             .collect();
         scored.push((policy[BOARD_AREA], GoAction::Pass));
         // Descending by policy logit; NaN-safe (treats NaN as lowest).
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
         scored.truncate(self.top_k);
         scored.into_iter().map(|(_, a)| a).collect()
     }
@@ -1429,7 +1429,7 @@ impl GoPuctMokaPlayer {
             .map(|&(r, c)| (policy[r * BOARD_SIZE + c], GoAction::Place(r, c)))
             .collect();
         scored.push((policy[BOARD_AREA], GoAction::Pass));
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
         scored.truncate(self.top_k);
 
         // Softmax the top_k priors for normalized P(s,a).

@@ -464,7 +464,7 @@ pub fn compare_delta(fields: &[CmField]) -> Vec<(&str, Option<f64>)> {
     results.sort_by(|a, b| {
         let da = a.1.unwrap_or(0.0);
         let db = b.1.unwrap_or(0.0);
-        db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+        db.total_cmp(&da)
     });
 
     results

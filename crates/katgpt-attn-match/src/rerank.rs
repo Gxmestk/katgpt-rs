@@ -196,11 +196,7 @@ pub fn rerank(
 
     // sort_unstable_by is faster than sort_by for ranking — doesn't preserve
     // equal-element order (fine for ranking) and avoids O(n) worst-case merges.
-    results.sort_unstable_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    results.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
     results
 }
 

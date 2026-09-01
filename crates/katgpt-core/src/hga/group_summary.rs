@@ -150,11 +150,7 @@ impl GroupSummaryCache {
             }
         }
         // Sort by score descending.
-        scores.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scores.sort_by(|a, b| b.score.total_cmp(&a.score));
         scores.shrink_to_fit();
         scores
     }

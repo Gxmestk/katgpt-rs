@@ -157,7 +157,7 @@ impl RubricVector {
         gaps.sort_by(|a, b| {
             let wa = self.weights.get(a.0).copied().unwrap_or(0.0) * a.1;
             let wb = self.weights.get(b.0).copied().unwrap_or(0.0) * b.1;
-            wb.partial_cmp(&wa).unwrap_or(std::cmp::Ordering::Equal)
+            wb.total_cmp(&wa)
         });
 
         gaps
@@ -187,7 +187,7 @@ impl RubricVector {
         gaps.sort_by(|a, b| {
             let wa = self.weights.get(a.0).copied().unwrap_or(0.0) * a.1;
             let wb = self.weights.get(b.0).copied().unwrap_or(0.0) * b.1;
-            wb.partial_cmp(&wa).unwrap_or(std::cmp::Ordering::Equal)
+            wb.total_cmp(&wa)
         });
 
         gaps

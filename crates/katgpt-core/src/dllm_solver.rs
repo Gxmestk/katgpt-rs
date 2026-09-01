@@ -1545,7 +1545,7 @@ mod tests {
         let bestq_idx = scores
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
         assert_eq!(bestq_idx, n_candidates - 1); // last candidate has highest score
@@ -1555,9 +1555,7 @@ mod tests {
         let eqr_k = 5;
         let mut eqr_indexed: Vec<(usize, f32)> =
             scores.iter().enumerate().map(|(i, &s)| (i, s)).collect();
-        eqr_indexed.select_nth_unstable_by(eqr_k - 1, |a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        eqr_indexed.select_nth_unstable_by(eqr_k - 1, |a, b| b.1.total_cmp(&a.1));
         let eqr_top_k: Vec<usize> = eqr_indexed[..eqr_k].iter().map(|&(i, _)| i).collect();
         assert!(eqr_top_k.iter().all(|&i| i >= 10)); // all top-5 are from the "good" group
 

@@ -462,7 +462,7 @@ fn quantile_in_place(data: &mut [f32], q: f32) -> f32 {
     // Sort ascending. f32 has no Ord (NaN), so use partial_cmp with a total
     // fallback. NaN (if present) sorts as less than everything — but the QB
     // caller contract says no NaN in input scores, so this is defensive only.
-    data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    data.sort_by(|a, b| a.total_cmp(b));
     // Type 7 quantile (NumPy default): pos = q * (n - 1).
     let pos = q.clamp(0.0, 1.0) * (n as f32 - 1.0);
     let lo = pos.floor() as usize;

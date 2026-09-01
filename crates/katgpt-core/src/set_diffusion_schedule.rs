@@ -267,11 +267,7 @@ impl PositionOffsetSchedule {
         let mut indexed: Vec<(f32, usize)> = (0..l)
             .map(|ell| (self.reveal_time_from_uniform(uniform(), ell, l), ell))
             .collect();
-        indexed.sort_by(|a, b| {
-            a.0.partial_cmp(&b.0)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.1.cmp(&b.1))
-        });
+        indexed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         indexed.into_iter().map(|(_, idx)| idx).collect()
     }
 
@@ -309,11 +305,7 @@ impl PositionOffsetSchedule {
             .map(|ell| self.reveal_time_from_uniform(uniform(), ell, l))
             .collect();
         let mut indexed: Vec<(f32, usize)> = reveal_times.iter().copied().zip(0..l).collect();
-        indexed.sort_by(|a, b| {
-            a.0.partial_cmp(&b.0)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.1.cmp(&b.1))
-        });
+        indexed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         let order: Vec<usize> = indexed.into_iter().map(|(_, idx)| idx).collect();
         (order, reveal_times)
     }

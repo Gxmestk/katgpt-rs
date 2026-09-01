@@ -631,8 +631,7 @@ pub(super) fn compute_priority_order(n: usize, priorities: &[f32]) -> Vec<usize>
     if !priorities.is_empty() && priorities.len() == n {
         order.sort_by(|&a, &b| {
             priorities[b]
-                .partial_cmp(&priorities[a])
-                .unwrap_or(Ordering::Equal)
+                .total_cmp(&priorities[a])
                 .then_with(|| a.cmp(&b))
         });
     }

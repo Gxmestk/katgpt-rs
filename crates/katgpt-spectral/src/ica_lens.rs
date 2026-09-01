@@ -1199,7 +1199,7 @@ fn p95_accepts_into(lim: &[f32], config: &FastIcaConfig, sort_buf: &mut [f32]) -
     }
     sort_buf[..lim.len()].copy_from_slice(lim);
     let buf = &mut sort_buf[..lim.len()];
-    buf.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    buf.sort_by(|a, b| a.total_cmp(b));
     let idx = ((lim.len() as f32) * 0.95).ceil() as usize;
     let idx = idx.saturating_sub(1).min(lim.len() - 1);
     buf[idx] < config.lim_threshold
@@ -1248,7 +1248,7 @@ pub fn effective_receptive_field(
     }
 
     let mut abs_scores: Vec<f32> = scores_full.iter().map(|x| x.abs()).collect();
-    abs_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    abs_scores.sort_by(|a, b| b.total_cmp(a));
     let top_n_threshold = if top_n >= abs_scores.len() {
         0.0
     } else {
@@ -1542,7 +1542,7 @@ mod tests {
         let mut scratch = vec![0.0_f32; 4];
         jacobi_eig_symmetric_into(&a, 2, 30, &mut eigvals, &mut eigvecs, &mut scratch);
         let mut sorted = eigvals.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         assert!((sorted[0] - 1.0).abs() < 1e-4, "smaller eigval: {sorted:?}");
         assert!((sorted[1] - 3.0).abs() < 1e-4, "larger eigval: {sorted:?}");
     }

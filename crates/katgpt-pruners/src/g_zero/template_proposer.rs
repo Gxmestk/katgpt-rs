@@ -364,7 +364,7 @@ impl TemplateProposer {
             .collect();
 
         // Sort by UCB1 score descending
-        candidates.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(Ordering::Equal));
+        candidates.sort_by(|(_, a), (_, b)| b.total_cmp(a));
 
         // Select from top candidates with some randomness
         let top_k = candidates.len().min(3);

@@ -380,9 +380,7 @@ pub fn enforce_sparsity_bound_with_mag(
     let mut paired: Vec<(u32, f32)> = (0..n).map(|i| (support_hat[i], mag[i].abs())).collect();
     // O(n) partial partition: everything at index < support_true_size has
     // magnitude >= the pivot. Comparator orders by descending magnitude.
-    paired.select_nth_unstable_by(support_true_size, |a, b| {
-        b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-    });
+    paired.select_nth_unstable_by(support_true_size, |a, b| b.1.total_cmp(&a.1));
     paired.truncate(support_true_size);
     // Write survivors back into support_hat in place, then restore ascending
     // coordinate order (callers expect sorted support).
