@@ -221,7 +221,15 @@ FEATURE_TOKEN_RE = re.compile(
     r"\s*\**"  # optional opening bold
     r"([a-zA-Z][a-zA-Z0-9_\-\s,]{0,80}?)"  # status phrase
     r"\**\s*"  # optional closing bold
-    r"(?=[\)\]\n.,;:|]|$)",  # lookahead: status boundary
+    # Status boundary. `(` and `*` were missing, and their absence silently
+    # dropped an entire sibling's convention: riir-chain writes
+    #   **Feature:** `chain_block_producer` — **default-OFF** (implies ...)
+    # where the status is followed by `**` then ` (`. Neither was a boundary,
+    # the lazy status group could not terminate, and the line yielded NO token
+    # at all — so 26 benchmark docs audited as "0 labels, 0 mismatches", which
+    # reads identical to clean. Measured 2026-09-01: 9 repos / 62 docs in that
+    # state (Issue 702).
+    r"(?=[\)\]\n.,;:|(*]|$)",  # lookahead: status boundary
 )
 
 
@@ -367,7 +375,39 @@ def audit_repo(repo_root: Path) -> int:
     return mismatches
 
 
+# Real line shapes from the workspace, each with the (feature, status) the
+# tokenizer must produce. This runs on EVERY invocation — the audit is wired
+# per-push via scripts/docs_gate.sh, and a silent regex regression there does
+# not fail anything: it just recognises fewer labels and still prints
+# "0 mismatches". That is indistinguishable from clean, which is how riir-chain
+# sat at "26 docs, 0 labels" unnoticed. A dropped shape must be loud.
+TOKENIZER_CASES = [
+    # katgpt-rs dialect
+    ("**Feature:** `foo` (opt-in)", "foo", "opt-in"),
+    ("**Feature:** `bar` (**DEFAULT-ON** since 2026-07-20)", "bar", "default"),
+    # riir-chain dialect: status bolded, then an unbracketed ` (` follows.
+    # `(` and `*` were not status boundaries, so this yielded NO token at all.
+    ("**Feature:** `baz` — **default-OFF** (implies `qux`)", "baz", "opt-in"),
+    # negation must still win over the bare word "default"
+    ("**Feature:** `neg` (opt-in, NOT default-on)", "neg", "opt-in"),
+]
+
+
+def selftest() -> None:
+    for line, want_feat, want_status in TOKENIZER_CASES:
+        assert FEATURE_HEADER_RE.match(line), f"header regex missed: {line!r}"
+        hits = FEATURE_TOKEN_RE.findall(line)
+        got = [(f, parse_status_phrase(s)) for f, s in hits]
+        if (want_feat, want_status) not in got:
+            raise SystemExit(
+                f"✗ tokenizer self-test FAILED\n  line:   {line!r}\n"
+                f"  want:   {(want_feat, want_status)}\n  got:    {got}\n"
+                "  A shape this script used to recognise no longer parses. It "
+                "would keep printing '0 mismatches' over fewer labels.")
+
+
 def main(argv: list[str]) -> int:
+    selftest()
     if len(argv) < 2:
         # Default: audit the repo this script lives in.
         here = Path(__file__).resolve().parent.parent
