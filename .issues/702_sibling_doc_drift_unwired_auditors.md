@@ -219,6 +219,36 @@ pass — the same rule this repo's AGENTS.md applies to uninvoked assertions.
 **Not a finding:** `tropical_algebra` (riir-ai) — see false positive 2 above.
 Verified by hand against riir-engine's manifest; the doc is correct.
 
+### The mirror blind spot, measured rather than left as a caveat
+
+The `pkg/feat` -> `feat` collapse is only *wrong* when the qualifier names a
+crate outside the repo. It is also asymmetric: it INFLATES the deployed default
+set, which suppresses the other branch — "doc says DEFAULT but the feature is in
+no default array". So the fix above could have left real drift hidden.
+
+Measured across the repos that have labels, by counting names that reach the
+deployed set ONLY through an external qualifier, then intersecting with docs
+that claim DEFAULT for one of them:
+
+| repo | externally-collapsed names | docs claiming DEFAULT for one | real drift |
+|---|---|---|---|
+| katgpt-rs | **0** | 0 | 0 |
+| riir-ai | 47 | 1 | **0** (doc is correct) |
+| riir-neuron-db | 4 | 0 | 0 |
+| riir-chain | 1 (`esp-println/jtag-serial`) | 0 | 0 |
+| riir-clippy | 0 | 0 | 0 |
+
+katgpt-rs having **zero** is the load-bearing row: this repo's "0 mismatches
+over 92 labels" is not resting on the collapse. The single riir-ai hit is
+`.benchmarks/153_karc_g3_anticipation_salience.md:7`, which writes
+`` `salience_tri_gate` (katgpt-rs, default-on) `` — it names the owning *repo*
+explicitly, and the claim checks out (own-crate default-on in katgpt-core).
+A correct doc, not a suppressed finding.
+
+So the residual blind spot is real in structure and **empty in population**.
+Recording the bound rather than the caveat: a future re-measure only needs to
+re-run the intersection, not re-derive the argument.
+
 ## NOT fixed from here
 
 Each repo owns its own docs and CI per `BOUNDARY.md`, and agents held both
