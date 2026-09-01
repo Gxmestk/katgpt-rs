@@ -249,6 +249,47 @@ def parse_status_word(word: str) -> str:
     return parse_status_phrase(word)
 
 
+# A label may record its own history: "(opt-in at time of writing, 2026-06-30;
+# **promoted to DEFAULT-ON 2026-07-20 by Plan 468**)". Reading only the FIRST
+# status word flags that as a mismatch, which is backwards — the doc is doing
+# exactly what it should, and the auditor was penalising it for being thorough.
+# False positives on correct docs are how a gate earns a reputation for noise
+# and gets ignored.
+#
+# So the LAST explicit transition on the line wins. Note this OVERRIDES rather
+# than SUPPRESSES: a doc claiming "promoted to DEFAULT-ON" for a feature that
+# is not in any default array now fails on the other branch, which a plain
+# skip-if-promotion-mentioned rule would have hidden.
+TRANSITION_RES = [
+    (re.compile(r"(?:re-)?promoted\s+(?:back\s+)?to\s+\**default(?:-on)?\**", re.I),
+     "default"),
+    (re.compile(r"\bnow\s+\**default-on\**", re.I), "default"),
+    (re.compile(r"\bdemoted\s+(?:back\s+)?to\s+\**opt-in\**", re.I), "opt-in"),
+    (re.compile(r"\breverted\s+to\s+\**opt-in\**", re.I), "opt-in"),
+    (re.compile(r"\bnow\s+\**opt-in\**", re.I), "opt-in"),
+]
+
+
+# "**NOT promoted to default — D2F is opt-in research**" contains the exact
+# substring "promoted to default". The first version of the transition rule read
+# that as a promotion and turned one false positive into two, on two docs that
+# were stating their status correctly and emphatically. Negation is checked
+# immediately before the phrase; `**` and whitespace may intervene.
+NEGATION_RE = re.compile(r"\b(?:not|never|no|nor|without)\b[\s*_]*$", re.I)
+
+
+def parse_terminal_transition(line: str, from_idx: int) -> tuple[str, str] | None:
+    """Last explicit, non-negated status transition at/after from_idx."""
+    best_at, best = -1, None
+    for rx, status in TRANSITION_RES:
+        for m in rx.finditer(line, from_idx):
+            if NEGATION_RE.search(line[max(0, m.start() - 24):m.start()]):
+                continue
+            if m.start() > best_at:
+                best_at, best = m.start(), (status, m.group(0))
+    return best
+
+
 def iter_bench_doc_labels(repo_root: Path):
     """Yield (rel_path, lineno, line, feature_name, raw_status, parsed_status)."""
     for sub in (".benchmarks", ".docs"):
@@ -268,6 +309,10 @@ def iter_bench_doc_labels(repo_root: Path):
                     feat = m.group(1)
                     raw = m.group(2)
                     parsed = parse_status_phrase(raw)
+                    trans = parse_terminal_transition(line, m.end())
+                    if trans is not None:
+                        parsed = trans[0]
+                        raw = f"{raw} | transition: {trans[1]!r}"
                     if parsed == "unknown":
                         continue
                     yield (rel, ln, line.strip(), feat, raw, parsed)
