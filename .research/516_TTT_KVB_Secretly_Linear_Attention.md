@@ -2,7 +2,7 @@
 
 > **Paper:** [Test-Time Training with KV Binding Is Secretly Linear Attention](https://arxiv.org/abs/2602.21204) — Liu, Elflein, Litany, Gojcic, Li (NVIDIA · Univ. Toronto · Vector Institute · Technion), ICML 2026
 > **Date:** arXiv v4 2026-05-12, distilled 2026-08-28
-> **Related Research:** 124 (ViTTT — one of the paper's two case studies), 028 (HLA), 070 (GDN2), 482 (Dynamic LA), 019 (TTT-Discover — different track), 387 (Fast-Weight PKM)
+> **Related Research:** 124 (ViTTT — one of the paper's two case studies), 028 (HLA), 070 (GDN2), 482 (Dynamic LA), 019 (TTT-Discover — different track), 387 (Fast-Weight PKM), 526 (Falcon next-latent write alignment — same "state transition = online learning rule" framing, alignment axis)
 > **Verdict: GAIN (corpus-level). The theorem retroactively validates the stack's no-test-time-GD production constraint and its reduced-form linear-attention designs (GDN2, HLA); adds a 4-probe diagnostic kit, a reduction trajectory, and the chunk-associativity boundary. No code or feature gate in this repo; the executable remainder is queued as riir-clippy Issue 054 → kernel_opt Batch 87 (the App-I boundary rules + B79 rider). No plan here — no TTT-KVB layer consumer exists in any served model; `riir-train`'s S-TTT Stage 2 is the E2E class, explicitly out of the paper's scope (see §Boundary).**
 
 ---
@@ -18,6 +18,8 @@ TTT layers that optimize a key-value binding loss in an inner loop (TTT-KVB: LaC
 **Why this matters to the stack:** the stack ships the *reduced* members of this family (GDN2 R070, HLA R028, DLA R482) precisely because production forbids test-time gradient updates (recorded in R124). This paper proves that constraint costs almost nothing — the full TTT machinery's residual capacity gain over reduced linear attention is +0.87 ppl — and supplies the diagnostic that decides, for any future TTT-flavored layer, whether it is secretly a linear attention operator we already have kernels for.
 
 ---
+
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2608.27763 "Fast Weight Attention for Continual Learning"] — picks a specific point in this paper's test-time-regression design space (one-step key shift φ(k_{t−1})→v_t + NLMS ridge normalization + ridge-as-decay); training-bound for served same-step GDN weights, recipe rows → riir-train Plan 369. Full note: katgpt-rs Research 526.
 
 ## Path 0 inventory (closed-form items; three-track panel merged)
 

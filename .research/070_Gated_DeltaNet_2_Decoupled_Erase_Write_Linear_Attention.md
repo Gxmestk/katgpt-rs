@@ -364,6 +364,8 @@ For micro config (hd=4, n_embd=48):
 
 ## Relationship to Existing Research
 
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2608.27763 "Fast Weight Attention for Continual Learning"] — recasts this family's write as NLMS-normalized online ridge under read-after-write semantics with a one-step key shift (φ(k_{t−1})→v_t) + ridge-as-decay coupling; training-bound for served same-step weights, recipe rows → riir-train Plan 369, digit-OOD harness → Plan 369 T1. Full note: katgpt-rs Research 526.
+
 | Research | Overlap | Relationship |
 |----------|---------|-------------|
 | 28 (HLA) | Linear attention, O(1) cache | **Complementary**: HLA compresses moments, GDN2 edits memory. Different inductive biases. |
