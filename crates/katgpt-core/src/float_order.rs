@@ -112,10 +112,8 @@ pub fn cmp_for_min(a: f32, b: f32) -> core::cmp::Ordering {
 
 // ── f64 twins ────────────────────────────────────────────────────────────
 // Same three properties over f64 (riir-ai Issue 832: percentile/rank stats
-// sort f64 latencies, token frequencies, and normalized energies). Only the
-// sort comparators have f64 consumers today; the selection twins
-// (`cmp_for_max_f64`/`cmp_for_min_f64`) land on the first f64 `max_by`/
-// `min_by` consumer.
+// sort f64 latencies, token frequencies, and normalized energies; the first
+// f64 selection consumer is riir-games' wealth-weighted NPC markets).
 
 /// f64 twin of [`key`].
 #[inline]
@@ -147,6 +145,26 @@ pub fn desc_f64(a: f64, b: f64) -> core::cmp::Ordering {
 #[inline]
 pub fn asc_f64(a: f64, b: f64) -> core::cmp::Ordering {
     key_f64(a, f64::INFINITY).total_cmp(&key_f64(b, f64::INFINITY))
+}
+
+/// f64 comparator for `max_by`/`max_by_key` selection that can never select
+/// NaN.
+///
+/// Natural ascending order with NaN mapped BELOW every real value, so the
+/// maximum is always a real number. Equal reals keep std's last-wins tie
+/// rule. (Landed for riir-games' f64 wealth/auction argmax consumers,
+/// riir-ai Issue 832.)
+#[inline]
+pub fn cmp_for_max_f64(a: f64, b: f64) -> core::cmp::Ordering {
+    key_f64(a, f64::NEG_INFINITY).total_cmp(&key_f64(b, f64::NEG_INFINITY))
+}
+
+/// f64 comparator for `min_by`/`min_by_key` selection that can never select
+/// NaN. Identical to [`asc_f64`]; shipped under its own name so selection
+/// call sites read as selection.
+#[inline]
+pub fn cmp_for_min_f64(a: f64, b: f64) -> core::cmp::Ordering {
+    asc_f64(a, b)
 }
 
 #[cfg(test)]
@@ -315,5 +333,28 @@ mod tests {
     fn f64_signed_zeros_tie() {
         assert_eq!(asc_f64(0.0, -0.0), Equal);
         assert_eq!(desc_f64(0.0, -0.0), Equal);
+    }
+
+    #[test]
+    fn f64_selection_never_returns_nan() {
+        let xs = [1.0, f64::NAN, 3.0];
+        assert_eq!(xs.iter().copied().max_by(|a, b| cmp_for_max_f64(*a, *b)), Some(3.0));
+        assert_eq!(xs.iter().copied().min_by(|a, b| cmp_for_min_f64(*a, *b)), Some(1.0));
+        // NaN at the end, the legacy idiom's failure position.
+        let ys = [3.0, f64::NAN];
+        assert_eq!(ys.iter().copied().max_by(|a, b| cmp_for_max_f64(*a, *b)), Some(3.0));
+        assert_eq!(ys.iter().copied().min_by(|a, b| cmp_for_min_f64(*a, *b)), Some(3.0));
+    }
+
+    #[test]
+    fn f64_selection_matches_idiom_off_nan() {
+        let corpus = [f64::INFINITY, 1.0, 0.0, -0.0, -1.0, f64::NEG_INFINITY];
+        for a in corpus {
+            for b in corpus {
+                let legacy = a.partial_cmp(&b).unwrap_or(Equal);
+                assert_eq!(cmp_for_max_f64(a, b), legacy);
+                assert_eq!(cmp_for_min_f64(a, b), legacy);
+            }
+        }
     }
 }
