@@ -70,6 +70,10 @@ fn key(x: f32, nan_sentinel: f32) -> f32 {
 /// Replaces `b.partial_cmp(&a).unwrap_or(Ordering::Equal)` in `sort_by` and
 /// friends: NaN sorts last (it can never top a best-first list), `-0.0` ties
 /// `+0.0`, and every NaN-free pair orders exactly as the replaced idiom.
+/// Takes the closure's NATURAL argument order: `sort_by(|a, b| desc(x_a, x_b))`.
+/// Do NOT preserve the legacy `b.partial_cmp(&a)` argument positions when
+/// swapping this in — the function reverses internally, so `desc(x_b, x_a)`
+/// double-reverses into an ASCENDING sort (riir-ai Issue 841, 5 production sites).
 /// For selection, use [`cmp_for_max`] instead — `max_by` reads its
 /// comparator as natural order and a descending one flips the selection.
 #[inline]
@@ -129,6 +133,11 @@ fn key_f64(x: f64, nan_sentinel: f64) -> f64 {
 }
 
 /// Descending f64 sort comparator (largest first) that is a TOTAL order.
+///
+/// Takes the closure's NATURAL argument order: `sort_by(|a, b| desc_f64(x_a, x_b))`.
+/// Do NOT preserve the legacy `b.partial_cmp(&a)` argument positions when
+/// swapping this in — the function reverses internally, so `desc_f64(x_b, x_a)`
+/// double-reverses into an ASCENDING sort (riir-ai Issue 841, 5 production sites).
 ///
 /// NaN sorts last, `-0.0` ties `+0.0`, and every NaN-free pair orders exactly
 /// as the replaced `b.partial_cmp(&a).unwrap_or(Ordering::Equal)` idiom.
