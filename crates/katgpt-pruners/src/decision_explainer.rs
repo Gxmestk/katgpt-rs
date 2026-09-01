@@ -357,9 +357,8 @@ impl DecisionExplainer for PerturbationExplainer {
                 continue;
             }
 
-            let chosen = match node.candidates.get(node.chosen) {
-                Some(c) => c,
-                None => continue,
+            let Some(chosen) = node.candidates.get(node.chosen) else {
+                continue;
             };
 
             let chosen_total: f32 = chosen.pruner_scores.iter().sum();
@@ -502,9 +501,8 @@ impl PerturbationExplainer {
             return 0.0;
         }
 
-        let chosen = match node.candidates.get(node.chosen) {
-            Some(c) => c,
-            None => return 0.0,
+        let Some(chosen) = node.candidates.get(node.chosen) else {
+            return 0.0;
         };
 
         let chosen_total: f32 = chosen.pruner_scores.iter().sum();

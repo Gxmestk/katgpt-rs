@@ -108,6 +108,7 @@ pub fn enumerate_multifloor_targets(
         targets.push(MultiFloorTarget::Treasure(j));
     }
     targets.push(MultiFloorTarget::Goal);
+    targets.shrink_to_fit();
     targets
 }
 
@@ -305,9 +306,8 @@ fn find_best_stair(
         }
 
         // Compute distance to stair entrance; skip if unreachable
-        let dist = match find_distance(grid, current_pos, entrance_pos, floor_blocked) {
-            Some(d) => d,
-            None => continue,
+        let Some(dist) = find_distance(grid, current_pos, entrance_pos, floor_blocked) else {
+            continue;
         };
 
         // Keep the closest stair entrance

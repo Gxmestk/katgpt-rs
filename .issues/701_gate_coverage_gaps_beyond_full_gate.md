@@ -107,9 +107,43 @@ fix the code. Order that works:
 3. Then decide `-D warnings` wholesale vs a named `-D` subset of the settled
    lints — with the histogram above as the before-picture.
 
-Not attempted in this commit: the heal touches ~76 sites across four crates
-while sibling agents hold WIP in the same tree, and a wide mechanical sweep is
-the worst possible thing to land into someone else's uncommitted work.
+### R3b first slice, measured 2026-09-01 — the healer does not target this surface
+
+Attempted on `crates/katgpt-pruners` (21 findings, 19 of them
+`unnecessary_map_or`, 17 in one file — the tightest available slice):
+
+    cargo heal --fix --write --verify --verify-args "--all-features" crates/katgpt-pruners
+
+Result: **8 edits across 4 files, all `manual_let_else`** (plus one behaviour-
+neutral statement reorder). `manual_let_else` appears **0 times** in the gate's
+141 emitted diagnostics — it is outside the lint set the gate reports. So the
+run reduced the 118-finding surface by **zero**, and none of the top three
+classes was touched:
+
+| lint | findings | healed |
+|---|---|---|
+| `clippy::needless_range_loop` | 37 | 0 |
+| `clippy::needless_borrows_for_generic_args` | 20 | 0 |
+| `clippy::unnecessary_map_or` | 19 | 0 |
+
+Cost: ~25 min, because `--verify-args "--all-features"` makes the healer pay
+**two workspace-wide all-features builds** (baseline + re-check) to validate 8
+edits. Budget for that before scoping a heal on this repo.
+
+Consequences for R3b:
+- **`cargo heal` is the wrong tool for these three classes.** The global rule
+  names `map_or` as mechanical-and-healable, but `clippy::unnecessary_map_or`
+  (suggesting `is_some_and` / `is_none_or`) was not recognised. Route the top
+  three through `cargo clippy --fix` instead, then re-measure.
+- **riir-clippy intake** (per the repo rule on observed misses): the healer's
+  corpus has no rule for the single largest lint class in this repo. Recorded
+  here rather than filed in riir-clippy because an agent held that tree at the
+  time; move it across when free.
+- The 8 edits are kept — compile-verified, semantically identical (every
+  let-else `else` diverges via `return`), and re-checked with the FULL gate
+  rather than the healer's own `cargo check`.
+
+Not attempted: the remaining ~76 sites across four crates in one sweep.
 
 ## Closing conditions
 

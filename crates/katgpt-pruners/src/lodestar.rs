@@ -478,16 +478,14 @@ impl ConstraintPruner for LodestarPruner {
             return false;
         }
         let state = self.current_state(parent_tokens);
-        let next = match self.automaton.transition(state, token_idx) {
-            Some(ns) => ns,
-            None => return false,
+        let Some(next) = self.automaton.transition(state, token_idx) else {
+            return false;
         };
         // Budget check: reject if the successor cannot complete within budget_remaining.
         match self.budget {
             Some(budget) => {
-                let budget_remaining = match budget.checked_sub(depth + 1) {
-                    Some(br) => br,
-                    None => return false,
+                let Some(budget_remaining) = budget.checked_sub(depth + 1) else {
+                    return false;
                 };
                 let d = self.automaton.distance(next);
                 match d {
@@ -933,7 +931,6 @@ mod tests {
 
     #[test]
     fn test_11_larger_header_array_grammar() {
-        let a = header_array_automaton();
         const HDR: usize = 4;
         const OPEN: usize = 0;
         const CLOSE: usize = 1;
@@ -941,6 +938,8 @@ mod tests {
         const HLEN: usize = 3;
         const MAX_DEPTH: usize = 2;
         const ACCEPT: usize = HLEN + MAX_DEPTH * 2;
+
+        let a = header_array_automaton();
 
         // Verify distances: header chain is forced, then array body.
         // ACCEPT=0, states one step from ACCEPT have d=1, etc.

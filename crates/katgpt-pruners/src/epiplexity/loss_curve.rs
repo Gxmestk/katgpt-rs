@@ -80,9 +80,8 @@ impl LossCurveTracker {
 
     /// Epoch-level epiplexity: S_T using last epoch loss as final.
     pub fn epoch_epiplexity(&self) -> f32 {
-        let final_loss = match self.epoch_losses.back() {
-            Some(&l) => l,
-            None => return 0.0,
+        let Some(&final_loss) = self.epoch_losses.back() else {
+            return 0.0;
         };
         self.epoch_losses
             .iter()
