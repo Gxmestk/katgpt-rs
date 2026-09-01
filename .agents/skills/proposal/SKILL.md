@@ -131,7 +131,7 @@ cd /Users/katopz/git
 #  .research = prior art already distilled; .plans = in flight; .issues = tracked)
 for layer in proposals research plans issues; do
   echo "=== .$layer ==="
-  grep -rn "<topic terms>|<codebase-equivalent terms>" -E \
+  grep -rnE "<topic terms>|<codebase-equivalent terms>" \
     $(ls -d */ | while read -r d; do
         [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && [ -d "$d.$layer" ] \
           && printf '%s.%s ' "$d" "$layer"
