@@ -319,10 +319,12 @@ static mut WASMI_SCRATCH: Option<moka::MokaScratch> = None;
 // would reintroduce that reference, so the lint is a false positive here.
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_init() {
+    let _ = std::panic::catch_unwind(|| {
     unsafe {
         *(&raw mut WASMI_WEIGHTS) = Some(moka::MokaWeights::load());
         *(&raw mut WASMI_SCRATCH) = Some(moka::MokaScratch::new());
     }
+});
 }
 
 /// Allocates a `len`-f32 buffer in wasm linear memory and returns its
@@ -349,6 +351,7 @@ pub extern "C" fn wasmi_alloc(len: usize) -> *mut f32 {
 // `static mut` (Rust 2024). clippy::deref_addrof is a false positive here.
 #[allow(clippy::deref_addrof)]
 pub unsafe extern "C" fn wasmi_infer(features_ptr: *const f32, out_ptr: *mut f32) {
+    let _ = std::panic::catch_unwind(|| {
     unsafe {
         let features = std::slice::from_raw_parts(features_ptr, moka::INPUT_ELEMENT_COUNT);
         // `&raw` avoids ever forming a reference to the `static mut` itself
@@ -361,6 +364,7 @@ pub unsafe extern "C" fn wasmi_infer(features_ptr: *const f32, out_ptr: *mut f32
         out[..moka::POLICY_MOVES].copy_from_slice(&policy);
         out[moka::POLICY_MOVES] = value;
     }
+});
 }
 
 // ── Issue 204: PUCT search via wasmi (mirrors `wasmi_infer`'s raw-pointer
@@ -376,6 +380,7 @@ static mut WASMI_PUCT: Option<puct::PuctPlayer> = None;
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_puct_init(budget: usize, c_puct_bits: u32, top_k: usize) {
+    let _ = std::panic::catch_unwind(|| {
     // f32 over a raw C ABI is awkward across wasm targets (some hosts widen
     // f32 args); pass the bit pattern as u32 and reconstruct. Matches how the
     // wasmi test reads the result back.
@@ -383,6 +388,7 @@ pub extern "C" fn wasmi_puct_init(budget: usize, c_puct_bits: u32, top_k: usize)
     unsafe {
         *(&raw mut WASMI_PUCT) = Some(puct::PuctPlayer::new(budget, c_puct, top_k));
     }
+});
 }
 
 /// Run one PUCT search on the board encoded at `cells_ptr` (81 `u8` cells:
@@ -468,6 +474,7 @@ static mut WASMI_ARENA: Option<ArenaState> = None;
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize, batch_k: usize) {
+    let _ = std::panic::catch_unwind(|| {
     let c_puct = f32::from_bits(c_puct_bits);
     let state = ArenaState {
         board: board::Board::new(),
@@ -480,6 +487,7 @@ pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize
     unsafe {
         *(&raw mut WASMI_ARENA) = Some(state);
     }
+});
 }
 
 /// Initialize the arena with the **int8 forward path** enabled explicitly.
@@ -499,6 +507,7 @@ pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_init_int8(budget: usize, c_puct_bits: u32, top_k: usize) {
+    let _ = std::panic::catch_unwind(|| {
     let c_puct = f32::from_bits(c_puct_bits);
     let state = ArenaState {
         board: board::Board::new(),
@@ -511,6 +520,7 @@ pub extern "C" fn wasmi_arena_init_int8(budget: usize, c_puct_bits: u32, top_k: 
     unsafe {
         *(&raw mut WASMI_ARENA) = Some(state);
     }
+});
 }
 
 /// Initialize the arena with the **f32 forward path** (Issue 207 promotion
@@ -520,6 +530,7 @@ pub extern "C" fn wasmi_arena_init_int8(budget: usize, c_puct_bits: u32, top_k: 
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_init_f32(budget: usize, c_puct_bits: u32, top_k: usize, batch_k: usize) {
+    let _ = std::panic::catch_unwind(|| {
     let c_puct = f32::from_bits(c_puct_bits);
     let k = batch_k.max(1);
     let state = ArenaState {
@@ -533,6 +544,7 @@ pub extern "C" fn wasmi_arena_init_f32(budget: usize, c_puct_bits: u32, top_k: u
     unsafe {
         *(&raw mut WASMI_ARENA) = Some(state);
     }
+});
 }
 
 fn with_arena<R>(f: impl FnOnce(&mut ArenaState) -> R) -> R {
@@ -550,10 +562,12 @@ fn with_arena<R>(f: impl FnOnce(&mut ArenaState) -> R) -> R {
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_reset() {
+    let _ = std::panic::catch_unwind(|| {
     with_arena(|s| {
         s.board = board::Board::new();
         s.history.clear();
     });
+});
 }
 
 /// Play a stone at flat board index `idx` (0..81). Caller must have verified
@@ -562,20 +576,24 @@ pub extern "C" fn wasmi_arena_reset() {
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_play(idx: usize) {
+    let _ = std::panic::catch_unwind(|| {
     with_arena(|s| {
         s.board.play(idx);
         s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
     });
+});
 }
 
 /// Pass. Advances to_play + updates history + increments consecutive-passes.
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_pass() {
+    let _ = std::panic::catch_unwind(|| {
     with_arena(|s| {
         s.board.pass();
         s.history.push(None);
     });
+});
 }
 
 /// Write the current board's 81 cells (0=empty, 1=black, 2=white) into
@@ -587,6 +605,7 @@ pub extern "C" fn wasmi_arena_pass() {
 /// `out_ptr` must point to at least 81 writable `u8`s.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wasmi_arena_get_cells(out_ptr: *mut u8) {
+    let _ = std::panic::catch_unwind(|| {
     with_arena(|s| {
         let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, board::AREA) };
         for (i, &c) in s.board.cells.iter().enumerate() {
@@ -597,6 +616,7 @@ pub unsafe extern "C" fn wasmi_arena_get_cells(out_ptr: *mut u8) {
             };
         }
     });
+});
 }
 
 /// Current player to play: 0=black, 1=white.
