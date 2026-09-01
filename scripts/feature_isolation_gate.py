@@ -35,6 +35,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# In CI an ambiguous signal must fail; locally the same signal is usually just
+# "nothing changed". Both GitHub and most other runners set one of these.
+IN_CI = os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true"
+
 # `foo = [...]` at the start of a line inside a [features] table. Cargo feature
 # names are [a-zA-Z0-9_-].
 FEATURE_DEF_RE = re.compile(r"^\+([a-zA-Z][a-zA-Z0-9_-]*)\s*=\s*\[")
@@ -45,17 +49,69 @@ def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, **kw)
 
 
-def resolve_base(argv: list[str]) -> str | None:
-    for cand in (argv[1] if len(argv) > 1 else None,
+def rev(ref: str) -> str | None:
+    r = run(["git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"])
+    return r.stdout.strip() or None
+
+
+def resolve_base(argv: list[str]) -> tuple[str | None, str | None]:
+    """(ref, error). Prefers the REMOTE-tracking ref over a same-named local.
+
+    $GITHUB_BASE_REF is a bare branch name ("develop"). Resolving that to the
+    LOCAL branch is wrong in CI and was actively dangerous: in a shallow
+    single-branch clone the local `develop` IS HEAD, so the gate diffed HEAD
+    against itself, found no touched flags, and reported a green pass. That is
+    the vacuous green this gate exists to prevent, produced by the gate itself.
+    """
+    head = rev("HEAD")
+
+    # An explicitly requested base that does not resolve is an error, not a cue
+    # to fall back. Silently substituting origin/develop for a typo means the
+    # gate reports on a base the caller never asked for — and the diagnostic
+    # then names the substitute, not the typo.
+    explicit = argv[1] if len(argv) > 1 else None
+    if explicit and not any(rev(r) for r in
+                            ([f"origin/{explicit}", explicit]
+                             if "/" not in explicit else [explicit])):
+        return None, f"explicit base ref {explicit!r} does not resolve"
+
+    for cand in (explicit,
                  os.environ.get("GITHUB_BASE_REF"),
-                 "origin/develop"):
+                 "develop"):
         if not cand:
             continue
-        ref = f"origin/{cand}" if cand and "/" not in cand and \
-            run(["git", "rev-parse", "--verify", cand]).returncode != 0 else cand
-        if run(["git", "rev-parse", "--verify", ref]).returncode == 0:
-            return ref
-    return None
+        # remote first, then the literal ref as given
+        for ref in ([f"origin/{cand}", cand] if "/" not in cand else [cand]):
+            sha = rev(ref)
+            if sha is None:
+                continue
+            if sha == head:
+                # base == HEAD means the diff is empty, which is AMBIGUOUS:
+                #
+                #   locally on an up-to-date develop -> genuinely nothing to
+                #     compare, and exit 1 would be obstructive noise;
+                #   in CI on a PR -> the base was never fetched, and an empty
+                #     diff is the vacuous green this gate exists to prevent.
+                #
+                # Same observation, opposite correct response, so it is resolved
+                # by context rather than by picking one and being wrong half the
+                # time.
+                if IN_CI:
+                    return None, (
+                        f"base {ref!r} resolves to HEAD ({sha[:12]}) — in CI "
+                        f"that means the base was not fetched, so an empty diff "
+                        f"proves nothing. Use fetch-depth: 0, or pass an "
+                        f"explicit base ref.")
+                return None, (
+                    f"__NOOP__base {ref!r} == HEAD ({sha[:12]}); nothing to "
+                    f"compare (local up-to-date checkout)")
+            if run(["git", "merge-base", ref, "HEAD"]).returncode != 0:
+                return None, (
+                    f"no merge base between {ref!r} and HEAD — almost always a "
+                    f"shallow clone. Use fetch-depth: 0.")
+            return ref, None
+    return None, ("no usable base ref (tried argv, $GITHUB_BASE_REF, "
+                  "origin/develop, develop)")
 
 
 def manifest_facts(cargo_toml: Path) -> tuple[str | None, set[str]]:
@@ -106,12 +162,14 @@ def changed_flags(base: str) -> list[tuple[str, str]]:
 
 
 def main(argv: list[str]) -> int:
-    base = resolve_base(argv)
+    base, err = resolve_base(argv)
     if base is None:
-        # Not a skip: without a base we do not know what changed, and reporting
-        # a pass would be a claim we cannot support.
-        print("✗ no usable base ref (tried argv, $GITHUB_BASE_REF, "
-              "origin/develop) — cannot determine which flags changed")
+        if err and err.startswith("__NOOP__"):
+            print(f"✓ {err[len('__NOOP__'):]}")
+            return 0
+        # Not a skip: without a trustworthy base we do not know what changed,
+        # and reporting a pass would be a claim we cannot support.
+        print(f"✗ {err}")
         return 1
     print(f"▸ base: {base}")
 
