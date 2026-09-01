@@ -120,6 +120,15 @@ gate. Shape 2 remains unbuilt.
   all 18: still zero copies (only `katgpt-rs/scripts/` has them), so 702's
   conclusion holds — but it held by luck, not by coverage. Note `riir-burner`
   carries 15 scripts of its own and was outside that sweep.
+- **A 5th and 6th instance, found 2026-09-01 while re-measuring Issue 701 R2:**
+  (a) R2's own survey table covered **12 of 18** repos, so 9 repos with no CI at
+  all were counted as 5; it is now produced by `scripts/ci_gate_coverage.py`
+  rather than typed. (b) `riir-clippy/.github/workflows/ops_dashboard.yml` is
+  built around a hard-coded **"the 11 repos"** generator list against a
+  workspace of 18. Not fixed from here — riir-clippy owns it and an agent was
+  active in it. This is the class continuing to produce instances *after* the
+  gate shipped, which is expected: the gate covers `SKILL.md` command blocks
+  only, not workflows or Rust source.
 - `riir-ai/.issues/842` — the liveness rule this borrows (print the population).
 - `riir-chain/BOUNDARY.md` D2 (closed) — the same shape in a lockfile: two build
   roots, one invisible to the checker that existed.

@@ -1,6 +1,9 @@
 # Issue 701 — the three surfaces `scripts/full_gate.sh` still does NOT cover
 
-Status: OPEN (0/3 closed; R3 measured, execution pending) — filed alongside the gate itself so its limits are
+Status: **OPEN — 2 of 6 closing conditions done** (R1a `4c12c4e8`/`baf300fa`;
+R3a measured). R2 re-measured 2026-09-01 and its answer changed: not "11 of 12"
+but **1 of 18**, because the survey itself had the Issue 703 defect. Filed
+alongside the gate itself so its limits are
 recorded rather than implied. `scripts/full_gate.sh` closes the
 compile+lint-surface hole that left `develop` red for weeks (Issue 700 →
 `c284dbb2`, `3e58e821`). It does not close everything, and a gate whose
@@ -82,30 +85,79 @@ Revised candidate designs:
 - **Sampled rotation.** N flags per weekly run, cursor persisted. Still the
   fallback for full 568 coverage; catches rot, not regressions.
 
-## R2 — 11 of 12 sibling repos have no full-gate workflow
+## R2 — 1 of 18 repos gates the full surface (re-measured, derived)
 
-Surveyed 2026-09-01 by listing `.github/workflows/*.yml` and grepping for the
-`--all-targets`/`--all-features` pair:
+**The two earlier hand surveys of this were both wrong, in three separate
+ways.** That is the argument for `scripts/ci_gate_coverage.py`, which now
+produces the table below; do not re-type it.
 
-| Repo | Workflows | Runs the full gate |
-|---|---|---|
-| riir-neuron-db | 2 | **yes** (`rust.yml`) |
-| riir-ai | 1 | no |
-| riir-chain | 3 | no |
-| riir-clippy | 1 | no |
-| riir-dao | 1 | no |
-| riir-deployer | 1 | no |
-| riir-game-sdk | 2 | no |
-| riir-dapps / riir-train / riir-unity / riir-viewbridge / riir-mmorpg-examples | 0 | no |
+| defect | effect on the old answer |
+|---|---|
+| the repo list was **typed** ("11 of 12 sibling repos") | covered **12 of 18** — the Issue 703 class. `riir-armageddon`, `riir-auth`, `riir-burner`, `seal-game-editor` and `katgpt-web` were simply absent, so "5 repos with 0 workflows" was really **9** |
+| only workflow **YAML** was grepped | the gate usually lives in a **script the workflow calls**. `katgpt-rs/full_gate.yml` runs `./scripts/full_gate.sh`; `riir-neuron-db/rust.yml` runs `./scripts/ci_feature_guard.sh`. Grepping YAML alone reports both as ungated |
+| the grep **included comments** | several workflows discuss `--all-features --all-targets` in a preamble while running nothing of the kind. This alone flipped `riir-neuron-db` and `katgpt-rs` in an intermediate run |
 
-The class this gate catches is therefore live and unmeasured across the
-workspace. riir-ai Issue 830 is the precedent for the magnitude: **99 errors /
-50 targets / 9 crates** at a HEAD where every existing gate was green.
+A fourth defect appeared in the *fix*: scoring signals over a concatenated blob
+rates a repo "full" when `--all-targets` is in one script and `--all-features`
+in another. AGENTS.md's entire point is that those axes are **independent**, so
+a green on each separately says nothing about their combination. Signals are now
+scored **per command**, with continuations joined.
 
-NOT fixed from here: each repo owns its own CI per `BOUNDARY.md`, and three of
-them had agents actively working at the time of writing. `scripts/full_gate.sh`
-is written to be portable — the only katgpt-rs-specific parts are the macOS
-platform layer and the AGENTS.md parity check.
+### Measured 2026-09-01 by `scripts/ci_gate_coverage.py`
+
+| repo | workflows | scripts followed | signals | full surface |
+|---|---|---|---|---|
+| `katgpt-rs` | 5 | `scripts/docs_gate.sh`, `scripts/full_gate.sh`, `scripts/proof_gate.sh` | `clippy` `--workspace` `--all-targets` `--all-features` `--keep-going` | **yes** |
+| `katgpt-web` | 1 | — | — | no |
+| `riir-ai` | 1 | `scripts/proof_gate.sh` | — | no |
+| `riir-armageddon` | 0 | — | — | no CI |
+| `riir-auth` | 0 | — | — | no CI |
+| `riir-burner` | 0 | — | — | no CI |
+| `riir-chain` | 3 | `scripts/proof_gate.sh`, `scripts/proof_negative_test.sh`, `scripts/spec_match_gate.sh`, `scripts/standalone_dep_gate.sh`, `scripts/dockerfile_heal_gate.sh`, `scripts/clippy_gate.sh`, `scripts/test_gate.sh`, `scripts/replay_negative_test.sh`, `scripts/feature_pair_gate.sh`, `scripts/frost_client_only_gate.sh`, `scripts/action_slot_policy_gate.sh`, `scripts/settlement_policy_gate.sh`, `scripts/settlement_apply_sites_gate.sh`, `scripts/block_pipeline_reachability_gate.sh`, `scripts/wasm_import_gate.sh` | `--each-feature` `--keep-going` <br>*(scattered across commands: `clippy` `--all-features` `--each-feature` `--keep-going`)* | **needs a human read** — `--all-targets` live in data, not in a command |
+| `riir-clippy` | 1 | — | — | **needs a human read** — `clippy` live in data, not in a command |
+| `riir-dao` | 1 | `scripts/direction_gate.sh` | `clippy` `--all-targets` | partial |
+| `riir-dapps` | 0 | — | — | no CI |
+| `riir-deployer` | 1 | — | — | no |
+| `riir-game-sdk` | 2 | `scripts/ci_wasm32_guard.sh` | — | no |
+| `riir-mmorpg-examples` | 0 | — | — | no CI |
+| `riir-neuron-db` | 2 | `scripts/proof_gate.sh`, `scripts/standalone_dep_gate.sh`, `scripts/ci_feature_guard.sh` | `--all-targets` `--all-features` <br>*(scattered across commands: `--all-targets` `--all-features` `--each-feature`)* | partial |
+| `riir-train` | 0 | — | — | no CI |
+| `riir-unity` | 0 | — | — | no CI |
+| `riir-viewbridge` | 0 | — | — | no CI |
+| `seal-game-editor` | 0 | — | — | no CI |
+
+**1/18 statically full · 2 need a human read · 3 partial · 9 have no CI at all.**
+
+### The two "human read" rows, read
+
+- **`riir-chain` — effectively FULL, in matrix form.** `scripts/clippy_gate.sh`
+  holds a `CONFIGS` table of `pkg:features:--all-targets` rows (with `__ALL__`
+  meaning all-features) that a loop expands into `args=(clippy -p "$pkg" …)`.
+  The flags live in **data**, so no static scorer can see them. This is arguably
+  *stronger* than katgpt-rs's single command — a real feature matrix — though it
+  is per-package rather than `--workspace`. The script is wired from
+  `toolchain_drift.yml`.
+- **`riir-clippy` — NOT gated.** Its one workflow, `ops_dashboard.yml`, is a
+  dashboard generator; it installs the `clippy` *component* but runs no lint
+  gate. **Cross-repo finding while reading it:** that workflow is built around
+  a hard-coded **"the 11 repos"** generator list against a workspace of 18 —
+  another Issue 703 instance, in a sibling's CI. Not fixed from here (riir-clippy
+  owns it, and an agent was active in it); recorded in `.issues/703` §Related.
+
+### Correction to two rows the old table asserted
+
+- `riir-neuron-db` was called **yes**. It is **partial**: its full-surface
+  command is `cargo check --all-features --all-targets` — **`check`, not
+  `clippy`**. That is a documented blind spot in this repo's own AGENTS.md (two
+  `cargo heal` escape classes are rejected by clippy's typeck and accepted by
+  `check`), so the distinction is not pedantic.
+- `riir-chain` was called **no**. See above — it is the most thorough gate in
+  the workspace after this repo's.
+
+NOT fixed from here: each repo owns its own CI per `BOUNDARY.md`, and agents
+were active in several at the time of writing. `scripts/full_gate.sh` is written
+to be portable — the only katgpt-rs-specific parts are the macOS platform layer
+and the AGENTS.md parity check.
 
 ## R3 — the warning surface is not gated
 
