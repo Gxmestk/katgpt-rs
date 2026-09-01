@@ -28,8 +28,25 @@
 # gate's own definition changes — that last trigger matters, because a gate
 # nobody validates after editing is a gate nobody is running.
 #
-# Promotion criterion, if per-push is ever wanted: land one green scheduled run
-# with a warm cache and read its wall-clock off the summary first. Do not guess.
+# Promotion criterion, if per-push is ever wanted: land one green run with a
+# warm cache and read its wall-clock off the summary first. Do not guess.
+#
+# MEASURED 2026-09-01, run 33531188553 — the first CI run of this gate that
+# verified anything at all (see .issues/705):
+#     2m17s wall-clock, 32 units compiled, 297 warning findings across 72
+#     targets, 0 errors.
+# Far cheaper than the >13 min the estimate above assumed, because `cargo clean
+# -p` re-lints only the 32 workspace members while the dependency cache stays
+# warm — the gate's actual subject is small.
+#
+# So per-push is now affordable on TIME. The open question is BILLING, not
+# duration: macOS minutes bill at a multiple of Linux, so ~2m17s per push is
+# roughly 23 Linux-equivalent minutes per push, and several agents push here
+# daily. That is an owner's budget call, deliberately not taken here — the
+# criterion asked for the number, and the number is above.
+#
+# Do NOT quote the 2m30s from runs 33523516143 / 33529923375. Those compiled
+# zero units and measured nothing (.issues/705).
 name: Full gate
 
 on:

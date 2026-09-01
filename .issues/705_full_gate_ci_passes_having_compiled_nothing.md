@@ -136,16 +136,27 @@ crate (`.issues/703`'s shape). 32 members at time of writing.
 - [x] ANSI stripped before every count, canaried in place: colourised
       compile+warnings PASSES with correct nonzero counts, colourised ERROR
       FAILS (it passed before), plain error still FAILS.
-- [ ] One conclusive CI run: `UNITS > 0` **and** a non-zero census. Until that
-      lands, the gate's CI history contains no run that verified anything.
-- [ ] Reconcile the census gap: CI's stripped artifact shows **297 findings
-      across 72 targets** where the workstation reports **119 across 20**
-      (`.issues/701` R3b). Not necessarily a defect — CI installs
-      `dtolnay/rust-toolchain@stable`, which may be a newer clippy than the
-      local toolchain, and clippy gains lints between releases (the gate's own
-      preamble anticipates exactly this). Compare `rustc -V` on both before
-      treating either number as the baseline, and do NOT quote 297 into
-      `.issues/701` until that is settled.
+- [x] One conclusive CI run. **Run `33531188553`, 2026-09-01:**
+      `✓ full gate PASSED — 0 errors, 0 unbuildable targets (297 warning
+      finding(s) across 72 target(s), not gated; 32 unit(s) compiled)`, 2m17s.
+      The first run in this gate's CI history that verified anything.
+- [x] Reconcile the census gap. **Not a defect — different compilers.**
+      Workstation `rustc 1.93.0` (clippy 0.1.93); CI `rustc 1.98.0` via
+      `dtolnay/rust-toolchain@stable`. Five releases apart, and clippy gains
+      lints across them: the dominant finding in the CI artifact is
+      `chunks_exact_to_as_chunks`, whose help URL is literally
+      `rust-clippy/rust-1.98.0/...` and which does not exist in 1.93. So
+      **119/20 is a 1.93 number and 297/72 is a 1.98 number; they are not
+      comparable and neither is wrong.** The gate's own preamble anticipates
+      this ("a weekly run that reds on a toolchain bump is the gate working").
+      `.issues/701` R3b's 119/20 baseline is implicitly toolchain-pinned —
+      do not compare it to a CI figure without stating both `rustc -V`.
+- [ ] Owner call, now that the number exists: `full_gate.yml`'s promotion
+      criterion for per-push is satisfied on TIME (2m17s, vs the >13 min the
+      estimate assumed) but is a BILLING question — macOS bills at a multiple
+      of Linux, so ~23 Linux-equivalent minutes per push with several agents
+      pushing daily. Measurement recorded in the workflow preamble; the
+      decision is not taken from here.
 - [ ] Read the wall-clock off that run — `full_gate.yml`'s preamble sets it as
       the promotion criterion for per-push and says "do not guess". The two
       vacuous runs' 2m30s is NOT that number and must not be quoted as it.
