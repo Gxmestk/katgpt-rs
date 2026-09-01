@@ -201,6 +201,10 @@ pub fn schedule_sign_flip(r: f32, beta_bar: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     #![allow(clippy::float_cmp)]
+    // SWEEP's 3.14159 is an arbitrary non-power-of-two decimal chosen as a
+    // bit-identity hazard, not an approximation of pi. Substituting
+    // `consts::PI` would silently change a pinned test vector.
+    #![allow(clippy::approx_constant)]
 
     use super::*;
 

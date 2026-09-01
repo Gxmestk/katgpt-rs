@@ -136,7 +136,7 @@ fn record_round(
         p.reset();
     }
 
-    let mut snapshots = Vec::with_capacity(katgpt_rs::pruners::bomber::TICK_LIMIT);
+    let mut snapshots = Vec::with_capacity(katgpt_rs::pruners::bomber::TICK_LIMIT as usize);
     let mut all_events: Vec<GameEvent> = Vec::new();
 
     for _ in 0..katgpt_rs::pruners::bomber::TICK_LIMIT {

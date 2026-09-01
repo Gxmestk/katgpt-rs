@@ -65,7 +65,7 @@ fn verify_exact_token_ids_match_python() {
     let Ok(d) = std::fs::read(model_path) else {
         return;
     };
-    let ranks = load_tiktoken_bpe(&data).expect("parse");
+    let ranks = load_tiktoken_bpe(&d).expect("parse");
     let tok = TiktokenTokenizer::from_ranks(&ranks).with_special_tokens(1, 2, 0);
 
     // Python tiktoken reference IDs (verified 2026-08-06 via tiktoken.Encoding

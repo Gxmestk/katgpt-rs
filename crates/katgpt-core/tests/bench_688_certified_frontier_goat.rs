@@ -196,7 +196,7 @@ fn t3_4_report_the_floor_adjacency_only_expansion() {
     );
 
     let mut prim_wins = 0usize;
-    let mut ratios = Vec::with_capacity(SEEDS);
+    let mut ratios = Vec::with_capacity(SEEDS as usize);
     let (mut prim_viol, mut floor_viol) = (0usize, 0usize);
     let (mut prim_cert, mut floor_cert) = (0usize, 0usize);
 

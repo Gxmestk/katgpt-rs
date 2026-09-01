@@ -74,6 +74,37 @@ cargo check --all-features
 cargo test -p katgpt-core --features <feature_name> --lib
 ```
 
+### The full gate — none of the above is a whole-repo claim
+
+Every command listed above is narrow in at least one of three **independent**
+axes, and a green result says nothing about what it compiled to nothing:
+
+| Axis | Blind spot |
+|---|---|
+| `check` vs `clippy` | two `cargo heal` escape classes are rejected by clippy's typeck and accepted by `check` (E0689 ambiguous-integer, E0631 deref-coercion in `redundant_closure`) |
+| default vs `--all-features` | non-default gated code compiles to **nothing** |
+| `-p <crate>` vs `--workspace` | *at the same default features*: a crate's own non-default feature can be switched on by the ROOT crate's defaults once the root is in the selected set |
+| no `--all-targets` | skips every test / bench / example — which is where gated code lives |
+
+The third axis is the least obvious. `cargo test -p katgpt-backend --lib`
+compiled clean while `cargo test --workspace --lib` failed, because `gpu.rs` is
+behind `katgpt-backend/gpu_inference` and the chain
+`katgpt-rs/default -> async_qdq_overlap -> inference_router -> gpu_inference`
+only fires when the root crate is selected. It also silently *shrinks* coverage:
+four crates reporting "0 tests" per-crate contributed 704 under `--workspace`.
+
+So before claiming a repo-wide green, run:
+
+```bash
+cargo clippy --workspace --all-targets --all-features --keep-going
+```
+
+`--keep-going` is not optional — without it the run stops at the first failing
+target and under-reports. This gate was **red on `develop` from at least
+2cb97410 until `c284dbb2`/this commit** (5 broken targets) while every gate in
+the block above was green. Treat a green gate as a claim about its literal
+command, not about the code.
+
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
 Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,

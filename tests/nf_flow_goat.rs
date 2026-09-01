@@ -446,8 +446,19 @@ fn test_goat_flow_score_entropy_discrimination() {
     let (base_b, det_b) = flow_components(&uniform, &selected_b);
 
     // Entropy comparison
-    let entropy_peaked: Vec<f32> = peaked.iter().map(categorical_entropy).collect();
-    let entropy_uniform: Vec<f32> = uniform.iter().map(categorical_entropy).collect();
+    // `as_slice()` makes the &Vec<f32> -> &[f32] coercion explicit. A bare
+    // `.map(categorical_entropy)` does not compile (deref coercion is available
+    // to a call expression, not to a fn item passed as FnMut), and a bare
+    // `.map(|p| categorical_entropy(p))` would be re-flagged as
+    // `redundant_closure` — this form is stable under both.
+    let entropy_peaked: Vec<f32> = peaked
+        .iter()
+        .map(|p| categorical_entropy(p.as_slice()))
+        .collect();
+    let entropy_uniform: Vec<f32> = uniform
+        .iter()
+        .map(|u| categorical_entropy(u.as_slice()))
+        .collect();
 
     eprintln!("═══ GOAT T5.6: Entropy Discrimination (Core NF-CoT Insight) ═══");
     eprintln!(
