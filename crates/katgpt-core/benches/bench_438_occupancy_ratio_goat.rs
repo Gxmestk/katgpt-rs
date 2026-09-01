@@ -87,7 +87,7 @@ fn g2_perf() -> (bool, f64) {
         let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
         times.push((elapsed_ms, ratio));
     }
-    times.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    times.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     // Sink to prevent dead-code elimination.
     let median_ratio_sum: f32 = times[5].1.iter().take(100).sum();

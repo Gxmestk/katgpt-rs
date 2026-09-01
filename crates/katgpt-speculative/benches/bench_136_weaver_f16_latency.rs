@@ -170,8 +170,8 @@ fn main() {
         }
     }
 
-    times_f32.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    times_f16.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_f32.sort_by(|a, b| a.total_cmp(b));
+    times_f16.sort_by(|a, b| a.total_cmp(b));
 
     let median = |v: &[f64]| v[v.len() / 2];
     let p99 = |v: &[f64]| v[((v.len() as f64 * 0.99) as usize).min(v.len() - 1)];

@@ -1101,7 +1101,7 @@ fn g1_dh_18720_lambda_sweep() {
 
     // Sort results by λ for the summary (rayon may return them out of order)
     let mut sorted = results;
-    sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     // ── 5. Summary ───────────────────────────────────────────────────────
     println!();
@@ -1446,7 +1446,7 @@ fn g1_dh_29160_k10_lambda_sweep() {
 
     // Sort results by λ for the summary (rayon may return them out of order)
     let mut sorted = results;
-    sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     // ── 5. Summary ───────────────────────────────────────────────────────
     println!();

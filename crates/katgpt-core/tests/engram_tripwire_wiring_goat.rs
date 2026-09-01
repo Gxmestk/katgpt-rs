@@ -457,7 +457,9 @@ fn engram_tripwire_g1_observer_pure_and_gate_extraction_bit_exact() {
 fn engram_tripwire_g2_check_cost_budget() {
     use std::time::Instant;
 
-    let mut rng = Xs(0xC057);
+    const N: usize = 20_000;
+
+let mut rng = Xs(0xC057);
     let q = random_unit(&mut rng);
     let mut tw = fresh_tripwire();
     let mut m = metrics_scratch();
@@ -470,7 +472,6 @@ fn engram_tripwire_g2_check_cost_budget() {
     let retrieval: Vec<f32> = (0..K).map(|i| 0.90 - 0.03 * i as f32).collect();
     let gates: Vec<f32> = (0..K).map(|i| 0.95 - 0.03 * i as f32).collect();
     let w = World { retrieval, gates };
-    const N: usize = 20_000;
     let t0 = Instant::now();
     let mut fired = 0u32;
     for _ in 0..N {

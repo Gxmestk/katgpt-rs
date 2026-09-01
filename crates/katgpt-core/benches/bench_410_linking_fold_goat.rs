@@ -298,7 +298,7 @@ fn gate_g2_detector_cold_path() -> DetectorResult {
         let _ = black_box(v);
         samples_ms.push(elapsed);
     }
-    samples_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    samples_ms.sort_by(|a, b| a.total_cmp(b));
     let median_ms = samples_ms[samples_ms.len() / 2];
     let pass_audit = median_ms <= DETECTOR_AUDIT_BUDGET_MS;
     println!(
@@ -397,7 +397,7 @@ fn bench_fold(d: usize, variant: FoldVariant) -> FoldResult {
         }
         samples_ns.push(t0.elapsed().as_nanos() as f64);
     }
-    samples_ns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    samples_ns.sort_by(|a, b| a.total_cmp(b));
     // Trim 10% off each end (outliers from scheduling jitter), take the mean
     // of the middle 80%. Median alone is fine too, but trimmed-mean is more
     // stable on macOS where dyld/trustd can spike single samples.

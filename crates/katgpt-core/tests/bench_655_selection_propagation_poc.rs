@@ -315,9 +315,7 @@ fn top_k_indices(scores: &[f32], k: usize, scratch: &mut Vec<usize>) {
     scratch.extend(0..scores.len());
     // Partial selection: nth_element-style via sort (n ≤ ~1k in this POC).
     scratch.sort_by(|&a, &b| {
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(core::cmp::Ordering::Equal)
+        scores[b].total_cmp(&scores[a])
             .then(a.cmp(&b))
     });
     scratch.truncate(k);

@@ -61,7 +61,7 @@ fn time_median_ns(f: &mut dyn FnMut(), iterations: usize) -> f64 {
         f();
         times.push(start.elapsed().as_secs_f64() * 1_000_000_000.0);
     }
-    times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    times.sort_by(|a, b| a.total_cmp(b));
     times[times.len() / 2]
 }
 

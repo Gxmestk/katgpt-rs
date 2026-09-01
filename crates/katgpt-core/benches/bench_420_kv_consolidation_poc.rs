@@ -376,11 +376,7 @@ fn consolidate(
 
         // Top-k selection (partial sort)
         let mut indices: Vec<usize> = (0..step_start).collect();
-        indices.sort_by(|&a, &b| {
-            attn_mass[b]
-                .partial_cmp(&attn_mass[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        indices.sort_by(|&a, &b| attn_mass[b].total_cmp(&attn_mass[a]));
 
         let max_mass = indices.first().map_or(1.0, |&i| attn_mass[i]).max(1e-10);
 

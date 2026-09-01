@@ -198,7 +198,7 @@ fn main() {
     let mmd_after = mmd_sq(&st);
     let (wa, wb) = cluster_share(&st, &w);
     let mut top: Vec<f32> = w.clone();
-    top.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    top.sort_by(|a, b| b.total_cmp(a));
     println!("AFTER : MMD²={mmd_after:.5}  ({:.1}% of before)", 100.0 * mmd_after / mmd_before);
     println!(
         "         weighted cluster shares A/B = {wa:.3}/{wb:.3}  (target {}/{})",

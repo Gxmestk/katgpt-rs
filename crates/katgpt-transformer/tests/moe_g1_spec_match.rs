@@ -140,7 +140,7 @@ fn ref_moe_forward_f64(
         .map(|e| (e, scores[e] + weights.e_score_correction_bias[e] as f64))
         .collect();
     // Sort descending by biased score, take top-K.
-    biased.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    biased.sort_by(|a, b| b.1.total_cmp(&a.1));
     let topk_idx: Vec<usize> = biased.iter().take(k_r).map(|(i, _)| *i).collect();
 
     // 3. Renormalize

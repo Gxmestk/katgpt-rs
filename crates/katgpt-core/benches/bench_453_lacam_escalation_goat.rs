@@ -325,7 +325,7 @@ fn run_latency_sweep(
         current = JointConfig::new(action.moves);
     }
 
-    tick_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    tick_us.sort_by(|a, b| a.total_cmp(b));
     let median = tick_us[tick_us.len() / 2];
     let max = tick_us.last().copied().unwrap_or(0.0);
     let rate = collision_free as f64 / ticks as f64;

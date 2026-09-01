@@ -416,7 +416,7 @@ fn median_u64(data: &mut [u64]) -> u64 {
 }
 
 fn median_f32(data: &mut [f32]) -> f32 {
-    data.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    data.sort_by(|a, b| a.total_cmp(b));
     if data.is_empty() {
         return 0.0;
     }

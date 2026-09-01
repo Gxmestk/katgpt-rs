@@ -264,7 +264,7 @@ fn time_median_ns_fused(f: &mut dyn FnMut() -> AneFusedCost, iterations: usize) 
         let elapsed = start.elapsed().as_secs_f64() * 1_000_000_000.0;
         times.push((elapsed, r));
     }
-    times.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    times.sort_by(|a, b| a.0.total_cmp(&b.0));
     times[times.len() / 2].0
 }
 

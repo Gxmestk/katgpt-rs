@@ -526,8 +526,7 @@ fn g2_single_pass_timing() {
     let rep = dv_report(&scratch.joint, &scratch.perm);
     let bounds_elapsed = t1.elapsed();
     eprintln!(
-        "g2: score(joint+perm) N=1e5 d=64 min-of-5 = {:.3?} (gate ≤ 1.5 ms release; Dot path rayon-chunked at n > 4096), bound math = {:.3?} (reported, not gated)",
-        best, bounds_elapsed
+        "g2: score(joint+perm) N=1e5 d=64 min-of-5 = {best:.3?} (gate ≤ 1.5 ms release; Dot path rayon-chunked at n > 4096), bound math = {bounds_elapsed:.3?} (reported, not gated)"
     );
     assert!(rep.loo.is_finite());
     if !cfg!(debug_assertions) {
@@ -540,8 +539,7 @@ fn g2_single_pass_timing() {
         // is the honest pin.
         assert!(
             best.as_micros() <= 1_500,
-            "single score pass min-of-5 {:.3?} > 1.5 ms",
-            best
+            "single score pass min-of-5 {best:.3?} > 1.5 ms"
         );
     }
 }

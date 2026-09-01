@@ -88,7 +88,7 @@ fn run_with_budget(map: &GridMap, budget_name: &str, multistep: bool) -> (f64, f
     }
 
     let throughput = completions as f64 / STEPS as f64;
-    tick_times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    tick_times_ms.sort_by(|a, b| a.total_cmp(b));
     let median_ms = tick_times_ms[tick_times_ms.len() / 2];
 
     println!(

@@ -195,7 +195,7 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         let _ = corrector.correct(&input);
         times_alloc_us.push(t0.elapsed().as_secs_f64() * 1e6);
     }
-    times_alloc_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_alloc_us.sort_by(|a, b| a.total_cmp(b));
     let median_alloc_us = times_alloc_us[times_alloc_us.len() / 2];
     let p99_alloc_idx = ((times_alloc_us.len() as f64 - 1.0) * 0.99) as usize;
     let p99_alloc_us = times_alloc_us[p99_alloc_idx];
@@ -212,7 +212,7 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         let _ = corrector.correct_with_scratch(&input, &mut scratch);
         times_scratch_us.push(t0.elapsed().as_secs_f64() * 1e6);
     }
-    times_scratch_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_scratch_us.sort_by(|a, b| a.total_cmp(b));
     let median_scratch_us = times_scratch_us[times_scratch_us.len() / 2];
     let p99_scratch_idx = ((times_scratch_us.len() as f64 - 1.0) * 0.99) as usize;
     let p99_scratch_us = times_scratch_us[p99_scratch_idx];
@@ -227,7 +227,7 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
         let _ = corrector.correct_parallel(&input, &mut scratch);
         times_parallel_us.push(t0.elapsed().as_secs_f64() * 1e6);
     }
-    times_parallel_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_parallel_us.sort_by(|a, b| a.total_cmp(b));
     let median_parallel_us = times_parallel_us[times_parallel_us.len() / 2];
     let p99_parallel_idx = ((times_parallel_us.len() as f64 - 1.0) * 0.99) as usize;
     let p99_parallel_us = times_parallel_us[p99_parallel_idx];

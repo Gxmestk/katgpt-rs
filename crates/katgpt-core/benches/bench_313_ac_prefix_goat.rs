@@ -324,7 +324,7 @@ fn time_median_ms(f: &mut dyn FnMut() -> f32, iterations: usize) -> f64 {
         let _ = f();
         times.push(start.elapsed().as_secs_f64() * 1000.0);
     }
-    times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    times.sort_by(|a, b| a.total_cmp(b));
     times[times.len() / 2]
 }
 

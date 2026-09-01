@@ -128,12 +128,7 @@ fn ranking_load_bearing_all_above_bystanders() {
     // Rank by IE descending (ties broken by index ascending, matching
     // partition_by_causal_score's tiebreak).
     let mut order: Vec<usize> = (0..N_HEADS).collect();
-    order.sort_by(|&a, &b| {
-        ies[b]
-            .partial_cmp(&ies[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.cmp(&b))
-    });
+    order.sort_by(|&a, &b| ies[b].total_cmp(&ies[a]).then(a.cmp(&b)));
 
     // The top-K_LOAD_BEARING positions must be exactly the load-bearing heads
     // (indices 0..K). Bystanders occupy the tail.
@@ -200,12 +195,7 @@ fn knockout_ie_ordered_collapses_random_stays_high() {
 
     // IE-ordered knockout: knock out the top-K_LOAD_BEARING heads (all load-bearing).
     let mut order: Vec<usize> = (0..N_HEADS).collect();
-    order.sort_by(|&a, &b| {
-        ies[b]
-            .partial_cmp(&ies[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.cmp(&b))
-    });
+    order.sort_by(|&a, &b| ies[b].total_cmp(&ies[a]).then(a.cmp(&b)));
     let ie_knocked: Vec<usize> = order[..K_LOAD_BEARING].to_vec();
     let m_after_ie = harness.m_after_knockout(&ie_knocked);
     let ratio_ie = m_after_ie / m_baseline;

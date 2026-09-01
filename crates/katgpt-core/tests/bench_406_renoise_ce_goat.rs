@@ -243,11 +243,7 @@ fn clr_renoise_fusion_select(
         clr_rank[idx] = rank;
     }
     let mut drift_ranked: Vec<usize> = (0..n).collect();
-    drift_ranked.sort_by(|&a, &b| {
-        drifts[a]
-            .partial_cmp(&drifts[b])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    drift_ranked.sort_by(|&a, &b| drifts[a].total_cmp(&drifts[b]));
     let mut drift_rank = vec![0usize; n];
     for (rank, &idx) in drift_ranked.iter().enumerate() {
         drift_rank[idx] = rank;

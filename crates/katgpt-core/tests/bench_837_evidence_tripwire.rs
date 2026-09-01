@@ -288,6 +288,7 @@ fn retrieval_scores(w: &World) -> Vec<f32> {
         let norm_s = norm_s.max(1e-12).sqrt();
         out.push(d / (norm_q * norm_s));
     }
+    out.shrink_to_fit();
     out
 }
 
@@ -305,6 +306,7 @@ fn gates(w: &World) -> Vec<f32> {
         sigmoid_fuse_into(&w.q_lat, lat, &v, &mut out, &cfg);
         g.push(out[0]);
     }
+    g.shrink_to_fit();
     g
 }
 
@@ -424,8 +426,7 @@ fn bench_837_evidence_tripwire_regression_gate() {
 
     assert!(
         fpr <= 0.09,
-        "G-FPR FAILED: held-out benign FPR {:.3} > 0.09",
-        fpr
+        "G-FPR FAILED: held-out benign FPR {fpr:.3} > 0.09"
     );
     assert!(
         bs1.rate() <= 0.10,

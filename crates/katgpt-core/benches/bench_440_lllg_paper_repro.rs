@@ -509,7 +509,7 @@ fn run_simulation(map: &GridMap, n_agents: usize, steps: usize, seed: u64) -> Si
     }
 
     // Compute metrics.
-    tick_times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    tick_times_ms.sort_by(|a, b| a.total_cmp(b));
     let median_tick_ms = tick_times_ms[tick_times_ms.len() / 2];
     let max_tick_ms = tick_times_ms.last().copied().unwrap_or(0.0);
 
@@ -620,7 +620,7 @@ fn run_no_guidance_baseline(map: &GridMap, n_agents: usize, steps: usize, seed: 
         current = JointConfig::new(action.moves);
     }
 
-    tick_times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    tick_times_ms.sort_by(|a, b| a.total_cmp(b));
     let median_tick_ms = tick_times_ms[tick_times_ms.len() / 2];
     let max_tick_ms = tick_times_ms.last().copied().unwrap_or(0.0);
 

@@ -208,8 +208,8 @@ fn au_roc(scores: &[f32], labels: &[bool]) -> f64 {
         .filter(|&(_, &l)| !l)
         .map(|(s, _)| *s)
         .collect();
-    pos.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    neg.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    pos.sort_by(|a, b| a.total_cmp(b));
+    neg.sort_by(|a, b| a.total_cmp(b));
     // Count pairs with pos > neg via two-pointer walk over the sorted neg array.
     // For each pos score (ascending), find how many neg scores are strictly
     // smaller, plus 0.5 for ties.

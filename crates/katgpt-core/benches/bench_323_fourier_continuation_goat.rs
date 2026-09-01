@@ -192,7 +192,7 @@ fn gate_g1_wrap_discontinuity_reduction() -> GateResult {
     let mut interior_d2: Vec<f32> = (1..n - 1)
         .map(|i| (x[i + 1] - 2.0 * x[i] + x[i - 1]).abs())
         .collect();
-    interior_d2.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    interior_d2.sort_by(|a, b| a.total_cmp(b));
     let median_d2 = interior_d2[interior_d2.len() / 2];
     let join_d2 = (x_ext[n] - 2.0 * x_ext[n - 1] + x_ext[n - 2]).abs();
     let smooth_ratio = if median_d2 > 1e-12 {
@@ -244,9 +244,8 @@ fn diagnostic_spectral_derivative_gibbs() -> (f32, f32, f32) {
     let naive_err = max_boundary_error(&naive_deriv, &analytic_deriv, boundary);
 
     let ext_len = n + n / 2;
-    let x_ext = match fourier_continue(&x, ext_len, &FcConfig::DEFAULT) {
-        Ok(v) => v,
-        Err(_) => return (naive_err, f32::NAN, f32::NAN),
+    let Ok(x_ext) = fourier_continue(&x, ext_len, &FcConfig::DEFAULT) else {
+        return (naive_err, f32::NAN, f32::NAN);
     };
     let fc_deriv_ext = spectral_derivative(&x_ext);
     let fc_deriv: Vec<f32> = fc_deriv_ext[..n].to_vec();

@@ -106,11 +106,7 @@ fn rank_desc(values: &[f32]) -> Vec<f32> {
     let n = values.len();
     // Build index array sorted by value descending.
     let mut idx: Vec<usize> = (0..n).collect();
-    idx.sort_by(|&a, &b| {
-        values[b]
-            .partial_cmp(&values[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    idx.sort_by(|&a, &b| values[b].total_cmp(&values[a]));
     let mut ranks = vec![0.0f32; n];
     let mut i = 0;
     while i < n {
@@ -189,13 +185,13 @@ fn run_substrate_1(rng_seed: u32) -> Substrate1Result {
     // Rank edges by abs(sum-flux) desc → top-3 edge indices.
     let mut sum_ranked: Vec<(usize, f32)> =
         (0..n_edges).map(|e| (e, sum_flux.data[e].abs())).collect();
-    sum_ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    sum_ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
     let top3_sum: Vec<usize> = sum_ranked.iter().take(3).map(|(e, _)| *e).collect();
 
     // Rank edges by abs(max-flux) desc → top-3 edge indices.
     let mut max_ranked: Vec<(usize, f32)> =
         (0..n_edges).map(|e| (e, max_flux.data[e].abs())).collect();
-    max_ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    max_ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
     let top3_max: Vec<usize> = max_ranked.iter().take(3).map(|(e, _)| *e).collect();
 
     let sd = sym_diff_size(&top3_sum, &top3_max);
