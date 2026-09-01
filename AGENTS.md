@@ -311,7 +311,13 @@ system that duplicates already-shipped substrate under a different name
 > 18 repos, 211 cross-repo dep edges measured"*. It was 15 at the 2026-08-21
 > run recorded here before; the count moved because contracts were added, not
 > because repos were, and **this paragraph did not** — which is the failure it
-> warns about, committed by the paragraph itself. Don't re-type the number:
+> warns about, committed by the paragraph itself. **19 later the same day**,
+> and this time because a repo genuinely was added: `seal-remake` was
+> scaffolded at 23:41 with a root BOUNDARY.md (derived, not re-run through
+> `ci_boundary_contract.sh` — so the 211-edge figure above is NOT re-measured
+> and should be read as of the earlier run). `scripts/repo_set.txt` was
+> regenerated the same hour (`01e19858`) because the docs gate went red on the
+> drift, which is the instrument working. Don't re-type the number:
 >
 > ```bash
 > cd /Users/katopz/git && for d in */; do
