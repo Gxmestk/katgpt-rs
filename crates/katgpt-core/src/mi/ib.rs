@@ -44,7 +44,7 @@ impl IbReport {
     /// Dominates `other` in the IB Pareto sense (≥ relevance, ≤ cost, at
     /// least one strict).
     #[must_use]
-    pub fn dominates(&self, other: &IbReport) -> bool {
+    pub fn dominates(&self, other: &Self) -> bool {
         let ge = self.i_ty >= other.i_ty;
         let le = self.i_xt <= other.i_xt;
         let strict = self.i_ty > other.i_ty || self.i_xt < other.i_xt;

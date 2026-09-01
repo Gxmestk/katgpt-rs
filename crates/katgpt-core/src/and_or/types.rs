@@ -159,7 +159,7 @@ impl<G, S> AndOrNode<G, S> {
 
     /// Borrow a child by index. Returns `None` for leaves or out-of-bounds.
     #[inline]
-    pub fn child(&self, idx: usize) -> Option<&AndOrNode<G, S>> {
+    pub fn child(&self, idx: usize) -> Option<&Self> {
         match self {
             Self::Or { children, .. } | Self::And { children, .. } => children.get(idx),
             Self::Leaf { .. } => None,
@@ -168,7 +168,7 @@ impl<G, S> AndOrNode<G, S> {
 
     /// Mutably borrow a child by index.
     #[inline]
-    pub fn child_mut(&mut self, idx: usize) -> Option<&mut AndOrNode<G, S>> {
+    pub fn child_mut(&mut self, idx: usize) -> Option<&mut Self> {
         match self {
             Self::Or { children, .. } | Self::And { children, .. } => children.get_mut(idx),
             Self::Leaf { .. } => None,
@@ -177,7 +177,7 @@ impl<G, S> AndOrNode<G, S> {
 
     /// Iterate over direct children.
     #[inline]
-    pub fn children(&self) -> &[AndOrNode<G, S>] {
+    pub fn children(&self) -> &[Self] {
         match self {
             Self::Or { children, .. } | Self::And { children, .. } => children,
             Self::Leaf { .. } => &[],
@@ -189,7 +189,7 @@ impl<G, S> AndOrNode<G, S> {
     /// Add a child to an OR or AND node. No-op for leaves.
     ///
     /// For AND nodes, the new child is unsolved by default (bit = 0 in `solved_bits`).
-    pub fn push_child(&mut self, child: AndOrNode<G, S>) {
+    pub fn push_child(&mut self, child: Self) {
         match self {
             Self::Or { children, .. } => {
                 children.push(child);

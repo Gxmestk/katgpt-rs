@@ -80,9 +80,8 @@ impl FoldBandit {
     /// Reward combines acceptance and savings; penalty applies when
     /// verification fails.
     pub fn record_reward(&mut self, budget: f32, accepted: bool, tokens_saved_ratio: f32) {
-        let arm = match budget_to_arm(budget) {
-            Some(idx) => idx,
-            None => return,
+        let Some(arm) = budget_to_arm(budget) else {
+            return;
         };
 
         let reward = if accepted {

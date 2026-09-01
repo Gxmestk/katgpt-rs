@@ -117,9 +117,8 @@ impl SeasonalPoolForecaster {
             if back >= n {
                 break;
             }
-            let y = match self.history.back(back) {
-                Some(v) => v,
-                None => break,
+            let Some(y) = self.history.back(back) else {
+                break;
             };
             let age = step as f32;
             let w = fast_exp(-self.exp_lambda * age);

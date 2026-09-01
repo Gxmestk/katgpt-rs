@@ -788,6 +788,7 @@ fn expand_shl_from_stack(c: i64, local_a: u32) -> Vec<WasmInstr> {
         out.push(instr(OP_LOCAL_GET, a));
         out.push(ni(OP_I32_ADD));
     }
+    out.shrink_to_fit();
     out
 }
 

@@ -369,10 +369,7 @@ pub fn kernel_weight(
             bandwidth,
             steepness,
         } => {
-            let pos = match entity_pos {
-                Some(p) => p,
-                None => return 0.0,
-            };
+            let Some(pos) = entity_pos else { return 0.0 };
             let dx = pos[0] - center[0];
             let dy = pos[1] - center[1];
             let dist = (dx * dx + dy * dy).sqrt();

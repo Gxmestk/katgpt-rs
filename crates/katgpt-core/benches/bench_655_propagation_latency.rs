@@ -207,9 +207,7 @@ fn main() {
         idx.clear();
         idx.extend(0..n);
         idx.sort_by(|a, b| {
-            seed[*b]
-                .partial_cmp(&seed[*a])
-                .unwrap_or(std::cmp::Ordering::Equal)
+            seed[*b].total_cmp(&seed[*a])
                 .then(a.cmp(b))
         });
         idx.truncate(32);
@@ -266,9 +264,7 @@ fn main() {
             idx.clear();
             idx.extend(0..n);
             idx.sort_by(|a, b| {
-                fused[*b]
-                    .partial_cmp(&fused[*a])
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                fused[*b].total_cmp(&fused[*a])
                     .then(a.cmp(b))
             });
             idx.truncate(32);

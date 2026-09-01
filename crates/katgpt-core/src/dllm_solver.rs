@@ -1565,7 +1565,7 @@ mod tests {
             assert!(mbr_idx < n_candidates);
             // MBR selects from top-K, so it should be in the good group
             let mut top_k_idx: Vec<usize> = (0..n_candidates).collect();
-            top_k_idx.sort_by(|&a, &b| scores[b].partial_cmp(&scores[a]).unwrap());
+            top_k_idx.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
             let top_k_set: std::collections::HashSet<usize> =
                 top_k_idx[..k].iter().copied().collect();
             assert!(top_k_set.contains(&mbr_idx), "MBR should select from top-K");
@@ -1582,10 +1582,7 @@ mod tests {
 
         let start_bestq = std::time::Instant::now();
         for _ in 0..n_iters {
-            let _ = scores
-                .iter()
-                .enumerate()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+            let _ = scores.iter().enumerate().max_by(|a, b| a.1.total_cmp(b.1));
         }
         let bestq_time = start_bestq.elapsed() / n_iters;
 

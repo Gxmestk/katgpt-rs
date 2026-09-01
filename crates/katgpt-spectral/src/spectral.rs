@@ -433,6 +433,15 @@ pub fn waterfill_bits(
     min_bits: u8,
     max_bits: Option<u8>,
 ) -> Vec<u8> {
+    #[inline]
+    fn pow4(k: u32) -> f64 {
+        if (k as usize) < POW4_LUT.len() {
+            POW4_LUT[k as usize]
+        } else {
+            4f64.powi(k as i32)
+        }
+    }
+
     let d = eigenvalues.len();
     let mut bits = vec![min_bits; d];
     let mut allocated = d * min_bits as usize;
@@ -450,14 +459,6 @@ pub fn waterfill_bits(
         }
         lut
     };
-    #[inline]
-    fn pow4(k: u32) -> f64 {
-        if (k as usize) < POW4_LUT.len() {
-            POW4_LUT[k as usize]
-        } else {
-            4f64.powi(k as i32)
-        }
-    }
 
     while allocated < total_bits {
         // Find dim with highest marginal gain
@@ -764,9 +765,8 @@ impl LloydMaxQuantizer {
 
     /// Compute MSE of the quantizer on given data.
     pub fn mse(&self, x: &[f32]) -> f32 {
-        let centroids = match self.centroids.as_ref() {
-            Some(c) => c,
-            None => return f32::MAX,
+        let Some(centroids) = self.centroids.as_ref() else {
+            return f32::MAX;
         };
         let total: f64 = x
             .iter()
@@ -816,6 +816,7 @@ pub fn generate_selective_qjl_signs(qjl_dim: usize, d_eff: usize, seed: u64) -> 
         let bit = (rng.next() & 1) as f32;
         signs.push(2.0 * bit - 1.0);
     }
+    signs.shrink_to_fit();
     signs
 }
 

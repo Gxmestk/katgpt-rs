@@ -1249,7 +1249,7 @@ fn test_dyadic_bootstrap_strided_subsequence_is_valid_sub_lattice() {
         // Sort; the cyclic gap structure of a size-m lattice has all
         // pairwise neighbor gaps equal to 1/m (with one wrap gap).
         let mut sorted = sub_batch.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
         let mut gaps = Vec::with_capacity(m);
         for i in 0..m - 1 {
             gaps.push(sorted[i + 1] - sorted[i]);

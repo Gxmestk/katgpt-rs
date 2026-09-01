@@ -43,7 +43,7 @@ impl NotGaussian {
     #[must_use]
     pub fn score(&self) -> Option<f32> {
         match *self {
-            NotGaussian::GateFired { score, .. } => Some(score),
+            Self::GateFired { score, .. } => Some(score),
             _ => None,
         }
     }

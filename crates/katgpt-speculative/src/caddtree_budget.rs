@@ -86,10 +86,7 @@ impl AcceptanceSurrogate {
         let mut cum_confidence = 1.0_f32;
         let mut total = 0.0_f32;
         for marg in marginals.iter() {
-            let top1 = match marg.iter().copied().reduce(f32::max) {
-                Some(p) => p,
-                None => break,
-            };
+            let Some(top1) = marg.iter().copied().reduce(f32::max) else { break };
             cum_confidence *= top1;
             let gate = sigmoid(self.confidence_k * (cum_confidence - self.confidence_threshold));
             total += gate;
@@ -114,10 +111,7 @@ impl AcceptanceSurrogate {
             if marg.is_empty() {
                 break;
             }
-            let top1 = match marg.iter().copied().reduce(f32::max) {
-                Some(p) => p,
-                None => break,
-            };
+            let Some(top1) = marg.iter().copied().reduce(f32::max) else { break };
             // With B branches, the best candidate improves acceptance.
             // P(at least one good branch) = 1 - (1 - top1)^B, capped at 1.0.
             let effective_prob = 1.0 - (1.0 - top1).powi(budget as i32).min(1.0);
@@ -493,7 +487,9 @@ pub fn build_dd_tree_adaptive_mux_residual(
     use katgpt_core::mux_demux::compute_mux_residual;
 
     // 1. Build the adaptive tree (existing logic, unchanged).
-    let (tree, budget) = build_dd_tree_adaptive(marginals, config);
+    use katgpt_core::simd::fast_exp;
+
+let (tree, budget) = build_dd_tree_adaptive(marginals, config);
 
     let n_embd = config.n_embd;
     let vocab_size = config.vocab_size;
@@ -539,7 +535,6 @@ pub fn build_dd_tree_adaptive_mux_residual(
     }
 
     let mut path_scores: Vec<f32> = Vec::with_capacity(path_count);
-    use katgpt_core::simd::fast_exp;
     for n in &tree {
         if n.depth == position {
             path_scores.push(fast_exp(n.score - max_score));

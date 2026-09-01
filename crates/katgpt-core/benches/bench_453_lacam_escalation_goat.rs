@@ -159,7 +159,7 @@ fn naive_step(
         // Include wait.
         let wait_dist = current.dist_heuristic(goal) as usize;
         candidates.push((*current, wait_dist, rng.f32()));
-        candidates.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.partial_cmp(&b.2).unwrap()));
+        candidates.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.total_cmp(&b.2)));
         moves.push(candidates[0].0);
     }
     JointAction::new(moves)

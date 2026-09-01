@@ -1067,7 +1067,7 @@ mod tests {
 
             // Reference: full sort
             let mut ref_pairs: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-            ref_pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            ref_pairs.sort_by(|a, b| b.1.total_cmp(&a.1));
             let ref_indices: Vec<usize> = ref_pairs[..k].iter().map(|(i, _)| *i).collect();
 
             assert_eq!(

@@ -1157,14 +1157,14 @@ fn g1_dh_18720_lambda_sweep() {
         println!("  VERDICT: no λ passes both G1 legs at this config — informational only; `karc_forecaster` was promoted DEFAULT-ON (Phase 22) under the split-config contract via other configs.");
         if let Some(best_nrmse) = sorted
             .iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(&b.1))
         {
             println!(
                 "  best NRMSE:      λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
                 best_nrmse.0, best_nrmse.1, best_nrmse.2
             );
         }
-        if let Some(best_thr) = sorted.iter().max_by(|a, b| a.2.partial_cmp(&b.2).unwrap()) {
+        if let Some(best_thr) = sorted.iter().max_by(|a, b| a.2.total_cmp(&b.2)) {
             println!(
                 "  best threshold:  λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
                 best_thr.0, best_thr.1, best_thr.2
@@ -1502,14 +1502,14 @@ fn g1_dh_29160_k10_lambda_sweep() {
         println!("  VERDICT: no λ passes both G1 legs at this config — informational only; `karc_forecaster` was promoted DEFAULT-ON (Phase 22) under the split-config contract via other configs.");
         if let Some(best_nrmse) = sorted
             .iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(&b.1))
         {
             println!(
                 "  best NRMSE:      λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
                 best_nrmse.0, best_nrmse.1, best_nrmse.2
             );
         }
-        if let Some(best_thr) = sorted.iter().max_by(|a, b| a.2.partial_cmp(&b.2).unwrap()) {
+        if let Some(best_thr) = sorted.iter().max_by(|a, b| a.2.total_cmp(&b.2)) {
             println!(
                 "  best threshold:  λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
                 best_thr.0, best_thr.1, best_thr.2

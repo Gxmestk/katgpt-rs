@@ -717,9 +717,8 @@ impl SlodPruner {
 
 impl crate::traits::ConstraintPruner for SlodPruner {
     fn is_valid(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
-        let tier = match self.tier_index(depth) {
-            Some(t) => t,
-            None => return true,
+        let Some(tier) = self.tier_index(depth) else {
+            return true;
         };
         match self.tier_pruners.get(tier) {
             Some(pruner) => pruner.is_valid(depth, token_idx, parent_tokens),
@@ -742,7 +741,7 @@ impl crate::traits::ConstraintPruner for SlodPruner {
             return;
         };
         if let Some(pruner) = self.tier_pruners.get(tier) {
-            pruner.batch_is_valid(depth, candidates, parent_tokens, results)
+            pruner.batch_is_valid(depth, candidates, parent_tokens, results);
         } else {
             let len = candidates.len().min(results.len());
             results[..len].fill(true);
@@ -750,9 +749,8 @@ impl crate::traits::ConstraintPruner for SlodPruner {
     }
 
     fn propagate(&mut self, depth: usize, token_idx: usize, parent_token: &[usize]) -> bool {
-        let tier = match self.tier_index(depth) {
-            Some(t) => t,
-            None => return true,
+        let Some(tier) = self.tier_index(depth) else {
+            return true;
         };
         match self.tier_pruners.get_mut(tier) {
             Some(pruner) => pruner.propagate(depth, token_idx, parent_token),
@@ -761,9 +759,8 @@ impl crate::traits::ConstraintPruner for SlodPruner {
     }
 
     fn manifold_score(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> f32 {
-        let tier = match self.tier_index(depth) {
-            Some(t) => t,
-            None => return 1.0,
+        let Some(tier) = self.tier_index(depth) else {
+            return 1.0;
         };
         match self.tier_pruners.get(tier) {
             Some(pruner) => pruner.manifold_score(depth, token_idx, parent_tokens),
@@ -852,6 +849,7 @@ fn mad_peak_picker(
         }
     }
 
+    boundaries.shrink_to_fit();
     boundaries
 }
 

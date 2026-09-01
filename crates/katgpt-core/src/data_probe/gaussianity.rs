@@ -247,7 +247,7 @@ pub fn sketched_gaussianity(states: &[f32], scratch: &mut GaussianityScratch) ->
             proj[i] = acc as f32;
         }
         // Sort the projections in place; the KS core reads the sorted slice.
-        proj.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+        proj.sort_by(|x, y| x.total_cmp(y));
         let d_stat = ks_d_sorted_inplace(proj);
         if d_stat > worst_d {
             worst_d = d_stat;

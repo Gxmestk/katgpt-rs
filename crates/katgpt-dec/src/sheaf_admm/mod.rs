@@ -351,9 +351,7 @@ impl SheafMaps {
                 .collect();
             pairs.sort_unstable_by(|a, b| {
                 // Higher score first; on tie, lower dim first.
-                b.0.partial_cmp(&a.0)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then(a.1.cmp(&b.1))
+                b.0.total_cmp(&a.0).then(a.1.cmp(&b.1))
             });
             let selected: Vec<usize> = pairs.iter().take(k).map(|&(_, d)| d).collect();
             owned.push(selected);

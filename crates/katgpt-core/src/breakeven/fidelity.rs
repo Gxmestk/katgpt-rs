@@ -24,13 +24,7 @@ pub enum CompressionLevel {
 
 impl CompressionLevel {
     /// All levels from highest to lowest fidelity.
-    pub const ALL: [CompressionLevel; 5] = [
-        CompressionLevel::None,
-        CompressionLevel::Bit8,
-        CompressionLevel::Bit4,
-        CompressionLevel::Bit3,
-        CompressionLevel::Bit2,
-    ];
+    pub const ALL: [Self; 5] = [Self::None, Self::Bit8, Self::Bit4, Self::Bit3, Self::Bit2];
 
     /// Bits per element.
     pub const fn bits(&self) -> u8 {
@@ -202,13 +196,11 @@ impl FidelityMatcher {
         // Iterate from highest compression (Bit2) down to None.
         for &level in CompressionLevel::ALL.iter().rev() {
             let level_idx = level as usize;
-            let level_deltas = match deltas.get(level_idx) {
-                Some(d) => d,
-                None => continue,
+            let Some(level_deltas) = deltas.get(level_idx) else {
+                continue;
             };
-            let delta = match level_deltas.get(effective_pos) {
-                Some(&d) => d,
-                None => continue,
+            let Some(&delta) = level_deltas.get(effective_pos) else {
+                continue;
             };
             if delta as f64 <= self.target_delta {
                 return level;
@@ -248,8 +240,7 @@ impl CompressionSweep {
     pub fn deltas_for_level(&self, level: CompressionLevel) -> &[f32] {
         self.deltas
             .get(level as usize)
-            .map(|d| d.as_slice())
-            .unwrap_or(&[])
+            .map_or(&[], |d| d.as_slice())
     }
 }
 

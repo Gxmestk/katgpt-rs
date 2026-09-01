@@ -266,8 +266,8 @@ fn parity_vs_jacobi_random_spd() {
             // eigenvalues in the same order).
             let mut hh_sorted: Vec<f64> = hh_eigvals.to_vec();
             let mut jac_sorted: Vec<f64> = jac_eigvals.to_vec();
-            hh_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            jac_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            hh_sorted.sort_by(|a, b| a.total_cmp(b));
+            jac_sorted.sort_by(|a, b| a.total_cmp(b));
             let mut max_eigval_err = 0.0_f64;
             for (&h, &j) in hh_sorted.iter().zip(&jac_sorted) {
                 let err = (h - j).abs();

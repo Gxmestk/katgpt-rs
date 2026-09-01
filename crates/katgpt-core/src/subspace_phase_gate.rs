@@ -1177,12 +1177,7 @@ mod tests {
             let sv = result.singular_values[j];
             // Find the ground-truth index whose σ is closest to this sv.
             let k = (0..3)
-                .min_by(|&a, &b| {
-                    (sigmas[a] - sv)
-                        .abs()
-                        .partial_cmp(&(sigmas[b] - sv).abs())
-                        .unwrap_or(Ordering::Equal)
-                })
+                .min_by(|&a, &b| (sigmas[a] - sv).abs().total_cmp(&(sigmas[b] - sv).abs()))
                 .expect("3 ground-truth sigmas");
             let dot: f32 = r.iter().zip(v_true[k].iter()).map(|(a, b)| a * b).sum();
             assert!(

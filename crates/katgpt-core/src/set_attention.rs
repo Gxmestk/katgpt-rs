@@ -632,9 +632,7 @@ fn topk_accumulate(
         // and the order is preserved bit-identically to the previous full-sort
         // (both use sort_unstable_by, so tie-breaking is identical).
         let cmp_alpha = |&a: &usize, &b: &usize| {
-            scratch_alpha[b]
-                .partial_cmp(&scratch_alpha[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
+            scratch_alpha[b].total_cmp(&scratch_alpha[a])
         };
         if effective_k > 0 {
             let (front, _, _) = idx.select_nth_unstable_by(effective_k - 1, cmp_alpha);
@@ -1112,9 +1110,7 @@ fn topk_accumulate_weighted(
         }
         // Partial sort: select top-effective_k indices by α (descending).
         let cmp_alpha = |&a: &usize, &b: &usize| {
-            scratch_alpha[b]
-                .partial_cmp(&scratch_alpha[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
+            scratch_alpha[b].total_cmp(&scratch_alpha[a])
         };
         if effective_k > 0 {
             let (front, _, _) = idx.select_nth_unstable_by(effective_k - 1, cmp_alpha);

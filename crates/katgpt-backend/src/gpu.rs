@@ -1659,7 +1659,7 @@ mod tests {
                     last_batch = t_batch;
                 }
             }
-            ratios.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            ratios.sort_by(|a, b| a.total_cmp(b));
             let median = ratios[ratios.len() / 2];
             eprintln!(
                 "width {width}: seq {last_seq:.1} µs/token vs batch {last_batch:.1} µs/token — median speedup {median:.2}× (ratios: {ratios:?})"

@@ -276,7 +276,7 @@ impl Metrics {
             for k in 0..D {
                 ranked[k] = (pred[k], k);
             }
-            ranked.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+            ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
             let rank_of_true = ranked
                 .iter()
                 .position(|(_, idx)| *idx == true_argmax)
