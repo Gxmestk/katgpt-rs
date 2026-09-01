@@ -139,7 +139,17 @@ set -e
 DIAGS=$({ grep -E '^error(\[|:)' "$LOG" || true; } | { grep -v 'could not compile' || true; } | wc -l | tr -d ' ')
 BROKEN=$({ grep -E 'could not compile' "$LOG" || true; } | sort -u)
 BROKEN_N=$({ printf '%s' "$BROKEN" | grep -c . || true; })
-WARNINGS=$({ grep -cE '^warning:' "$LOG" || true; })
+# Count warning FINDINGS, not warning lines. Cargo emits a per-target
+# "`crate` (lib test) generated N warnings" tally that also starts with
+# `warning:`, so a raw line count silently adds one per target — and lands
+# misleadingly close to the real emitted total. Measured on the first green run:
+# 138 lines = 118 findings + 20 tallies, while the tallies themselves sum to 141
+# (118 + 23 duplicates, the same finding compiled in both `lib` and `lib test`).
+# Three different quantities within 23 of each other; report the one a reader
+# can act on.
+WARN_LINES=$({ grep -cE '^warning' "$LOG" || true; })
+WARN_TALLIES=$({ grep -cE '^warning: .* generated [0-9]+ warning' "$LOG" || true; })
+WARNINGS=$((WARN_LINES - WARN_TALLIES))
 
 if [ "$DIAGS" -ne 0 ] || [ "$BROKEN_N" -ne 0 ]; then
     KEEP_LOG=1
@@ -164,4 +174,4 @@ if ! grep -qF "$GATE_CMD" AGENTS.md; then
     exit 1
 fi
 
-echo "✓ full gate PASSED — 0 errors, 0 unbuildable targets ($WARNINGS warning line(s), not gated)"
+echo "✓ full gate PASSED — 0 errors, 0 unbuildable targets ($WARNINGS warning finding(s) across $WARN_TALLIES target(s), not gated)"

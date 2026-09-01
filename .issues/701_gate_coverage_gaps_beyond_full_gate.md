@@ -1,6 +1,6 @@
 # Issue 701 — the three surfaces `scripts/full_gate.sh` still does NOT cover
 
-Status: OPEN (0/3 closed) — filed alongside the gate itself so its limits are
+Status: OPEN (0/3 closed; R3 measured, execution pending) — filed alongside the gate itself so its limits are
 recorded rather than implied. `scripts/full_gate.sh` closes the
 compile+lint-surface hole that left `develop` red for weeks (Issue 700 →
 `c284dbb2`, `3e58e821`). It does not close everything, and a gate whose
@@ -61,20 +61,55 @@ platform layer and the AGENTS.md parity check.
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
-Measured on the first green run: **138 warning lines** across the workspace at
-`--all-targets --all-features`, of which **62 come from `katgpt-core`'s lib test
-alone**. So `-D warnings` is not a one-line change and is not attempted here.
-Anything adopted should be measured further first: a per-lint histogram, then a
-decision on whether to gate the whole surface or a named subset.
 
-Note the count is *warning lines*, not distinct findings — cargo emits a
-per-target "generated N warnings" summary line that this figure includes. Get
-the histogram before treating 138 as the size of the job.
+**Measured 2026-09-01** (`--workspace --all-targets --all-features`, both
+message formats, cross-reconciled). Three quantities live within 23 of each
+other here, and the first green run's headline reported none of them:
 
-Note the interaction with R1's tooling and with `cargo heal`: mechanical classes
-should be healed (see the `cargo-heal` skill), not hand-fixed, and the healer's
-own `--verify` is a `cargo check` — blind to the clippy-only classes that the
-full gate exists to catch.
+| Quantity | Value | What it is |
+|---|---|---|
+| `^warning` lines | 138 | findings **plus** cargo's 20 per-target tallies — the old headline |
+| emitted warnings | 141 | JSON count; also the exact sum of those 20 tallies |
+| **distinct findings** | **118** | 141 − 23 duplicates (same site compiled in `lib` *and* `lib test`) |
+
+The 23 duplicates are 21 in `katgpt-pruners` plus two singletons; deduplicating
+the JSON by (lint, file, line, column) yields 118, matching the human-format
+render exactly. The gate now reports 118 findings across 20 targets —
+`scripts/full_gate.sh` counted lines before this, which is why "138" appears in
+this issue's history.
+
+Deduplicated histogram — 24 distinct lints, 118 findings:
+
+| n | lint | class |
+|---|---|---|
+| 37 | `clippy::needless_range_loop` | mechanical |
+| 20 | `clippy::needless_borrows_for_generic_args` | mechanical |
+| 19 | `clippy::unnecessary_map_or` | mechanical (38 emitted, 19 distinct) |
+| 6 | `unused_mut` | mechanical |
+| 4 | `unused_variables` | needs judgement (may indicate dead logic) |
+| 3 each | `unusual_byte_groupings`, `dead_code`, `manual_repeat_n` | mixed |
+| ≤2 each | 16 further lints incl. `if_same_then_else`, `too_many_arguments`, `question_mark` | needs judgement |
+
+By crate: `katgpt-core` 70, `katgpt-pruners` 21, root benches 13, root tests 8,
+`katgpt-attn` 3, `katgpt-speculative`/`katgpt-types`/`src` 1 each.
+
+**Decision recorded: heal, then gate — not `-D warnings` now.** The top three
+lints are **76 of 118 (64%)** and are exactly `cargo heal`'s mechanical domain
+(global rule; `cargo-heal` skill). Flipping `-D warnings` first would red the
+gate on 118 findings at once and the pressure would be to disable the gate, not
+fix the code. Order that works:
+
+1. `cargo heal --fix --write --verify` the three mechanical classes — but note
+   `--verify` is a `cargo check`, blind to the clippy-only classes this gate
+   exists to catch, so re-run the full gate after, not the healer's own verify.
+   `katgpt-pruners` alone offers 19 machine-applicable suggestions.
+2. Re-measure. The residual should be ~30-40, mostly judgement calls.
+3. Then decide `-D warnings` wholesale vs a named `-D` subset of the settled
+   lints — with the histogram above as the before-picture.
+
+Not attempted in this commit: the heal touches ~76 sites across four crates
+while sibling agents hold WIP in the same tree, and a wide mechanical sweep is
+the worst possible thing to land into someone else's uncommitted work.
 
 ## Closing conditions
 
@@ -83,7 +118,10 @@ full gate exists to catch.
       avoided).
 - [ ] R2: the remaining repos either run the gate or record why not; the
       measured error count per repo is reported, not assumed to be zero.
-- [ ] R3: the warning surface is measured and a gate decision recorded.
+- [x] R3a: the warning surface is measured (118 findings / 24 lints / per-crate
+      + per-lint histogram above) and the gate decision recorded: heal the
+      mechanical 64% first, re-measure, then choose the `-D` scope.
+- [ ] R3b: execute that order — heal, re-measure, flip the chosen `-D` set.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
 Refs: `scripts/full_gate.sh`, `.github/workflows/full_gate.yml`,
