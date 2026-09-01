@@ -96,4 +96,25 @@ jobs:
       # refuses to report a pass, so this step cannot silently degrade into the
       # partial gate the preamble warns about.
       - name: Full gate (workspace, all targets, all features, keep-going)
+        env:
+          # Put the clippy log where the next step can upload it. The script
+          # retains it only on failure and removes it on a pass, so the upload
+          # below is correctly conditioned on failure().
+          FULL_GATE_LOG: ${{ runner.temp }}/full_gate.log
         run: ./scripts/full_gate.sh
+
+      # The script's failure summary prints error CLASSES and the first
+      # diagnostic — enough to triage, not enough to fix. The rest exists only
+      # in the log, and a GitHub runner is destroyed when the job ends, so
+      # without this step the only way to see the remaining sites is to
+      # re-run the whole >13 min gate locally.
+      - name: Upload gate log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-gate-log
+          path: ${{ runner.temp }}/full_gate.log
+          # A cold failing run's log is large and its value decays fast; the
+          # commit that broke the gate is what matters, and that is in git.
+          retention-days: 14
+          if-no-files-found: warn
