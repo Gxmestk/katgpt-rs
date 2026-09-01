@@ -2026,7 +2026,16 @@ pub use katgpt_types::depth_invariance::{
     feature = "tucker_factorization",
     feature = "svd_cca",
     feature = "twist_smc",
-    feature = "mi_est"
+    feature = "mi_est",
+    // Both joined the rule late and broke it silently: each consumes
+    // `linalg::ridge_solve` and neither gated this `pub mod`, so
+    // `--no-default-features --features <either>` failed E0433. Found by the
+    // Issue 701 R1b default-on isolation sweep (2026-09-01) — the FIRST run of
+    // that scope, and it found them in 4.1 minutes. Nothing else catches this
+    // class: `--all-features` compiles the union, where some other consumer
+    // always brings `linalg` in.
+    feature = "velocity_field_ensemble",
+    feature = "hebbian_kernel_memory"
 ))]
 pub mod linalg;
 

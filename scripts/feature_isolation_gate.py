@@ -27,11 +27,23 @@ does not build in isolation, or the gate could not determine what to check.
 from __future__ import annotations
 
 import os
+import random
 import re
+import statistics
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
+
+# Same directory, so a plain import resolves. Reused rather than re-derived on
+# purpose: "which flags are default-on" is subtle (a `default` entry may be a
+# `pkg/flag` passthrough naming a flag this manifest does not define), and two
+# definitions of it would drift. count_features.py is also what Issue 701's
+# "197 default-on" figure comes from, so the scope below is that number by
+# construction instead of by coincidence.
+from count_features import load_features
+from bench_doc_audit import iter_cargo_manifests
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -161,7 +173,199 @@ def changed_flags(base: str) -> list[tuple[str, str]]:
     return out
 
 
+def collect_flags(scope: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """(in-scope, passthrough-only) (package, flag) pairs for a named scope.
+
+    scope="default-on" -> only flags in a manifest's `default` array.
+    scope="all"        -> every flag the manifest declares (Issue 701's 568).
+
+    A manifest's `default` array may name `otherpkg/flag`. Such an entry is
+    default-on *as this package consumes it*, but the flag is defined
+    elsewhere and `cargo check -p thispkg --features flag` would not resolve
+    it — so it cannot be isolated here. Those are returned SEPARATELY and
+    reported, never silently dropped ("no silent caps"): they are a real gap
+    in this scope, not an absence of one.
+    """
+    inscope: list[tuple[str, str]] = []
+    passthrough: list[tuple[str, str]] = []
+    for toml in sorted(iter_cargo_manifests(ROOT)):
+        default_on, all_flags, _ = load_features(toml)
+        if not all_flags:
+            continue
+        try:
+            with toml.open("rb") as f:
+                pkg = tomllib.load(f).get("package", {}).get("name")
+        except Exception:
+            continue
+        if not pkg:
+            continue
+        wanted = all_flags if scope == "all" else default_on
+        for flag in sorted(wanted):
+            (inscope if flag in all_flags else passthrough).append((pkg, flag))
+    return inscope, passthrough
+
+
+def check_flags(targets: list[tuple[str, str]]) -> tuple[list, list[float]]:
+    """Build each (package, flag) alone.
+
+    Returns (failures, per-flag seconds, (pkg, flag, seconds) rows).
+
+    Timing is collected because Issue 701 R1b is blocked on a real measurement,
+    not on an estimate: the figure it carries is an extrapolation from n=6 with
+    a 26x range, which is a point estimate wearing the costume of a bound."""
+    failed, secs, rows = [], [], []
+    for i, (pkg, flag) in enumerate(targets, 1):
+        cmd = ["cargo", "check", "-p", pkg, "--no-default-features",
+               "--features", flag]
+        t0 = time.monotonic()
+        r = run(cmd)
+        dt = time.monotonic() - t0
+        secs.append(dt)
+        rows.append((pkg, flag, dt))
+        if r.returncode == 0:
+            print(f"  [{i}/{len(targets)}] ✓ {pkg}/{flag}  {dt:.1f}s", flush=True)
+        else:
+            failed.append((pkg, flag))
+            tail = [l for l in r.stderr.splitlines()
+                    if l.startswith("error")][:5]
+            print(f"  [{i}/{len(targets)}] ✗ {pkg}/{flag} does NOT build alone"
+                  f"  {dt:.1f}s", flush=True)
+            for l in tail:
+                print(f"      {l}", flush=True)
+    return failed, secs, rows
+
+
+def selftest() -> None:
+    """Pin the scope invariant. Cheap, no fixtures, and it can actually fail.
+
+    `all` must be a superset of `default-on` — they walk the same manifests and
+    differ only in which flag names they keep. If a future edit filters the two
+    scopes differently (say, skipping a manifest in one path), the isolation
+    sweep would silently under-cover and still print a confident pass, which is
+    the failure mode this whole gate exists to prevent."""
+    d, _ = collect_flags("default-on")
+    a, _ = collect_flags("all")
+    missing = set(d) - set(a)
+    if missing:
+        raise SystemExit(
+            "✗ scope self-test FAILED — default-on is not a subset of all\n"
+            f"  {len(missing)} pair(s) missing, e.g. {sorted(missing)[:3]}")
+    if not d or not a:
+        raise SystemExit(
+            f"✗ scope self-test FAILED — empty scope "
+            f"(default-on={len(d)}, all={len(a)}); the manifest walk found "
+            f"nothing, so any sweep would pass vacuously")
+
+
+def parse_opts(argv: list[str]) -> tuple[dict, list[str]]:
+    """Pull the scope options out, leave the positional base ref in place.
+
+    Hand-parsed rather than argparse'd to keep the existing calling convention
+    exactly: `feature_isolation_gate.py [base_ref]` is what
+    .github/workflows/feature_isolation.yml passes today, and a gate is not the
+    place to discover that its own invocation changed shape."""
+    opts = {"scope": "diff", "sample": 0, "seed": 701, "list": False}
+    rest, i = [], 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--scope" and i + 1 < len(argv):
+            opts["scope"] = argv[i + 1]; i += 2; continue
+        if a == "--sample" and i + 1 < len(argv):
+            opts["sample"] = int(argv[i + 1]); i += 2; continue
+        if a == "--seed" and i + 1 < len(argv):
+            opts["seed"] = int(argv[i + 1]); i += 2; continue
+        if a == "--list":
+            opts["list"] = True; i += 1; continue
+        rest.append(a); i += 1
+    return opts, rest
+
+
+def report_by_package(rows: list[tuple[str, str, float]]) -> None:
+    """Per-package cost. The global mean hides the only variable that matters.
+
+    Measured 2026-09-01: a sweep's per-flag cost is dominated by how much the
+    PREVIOUS check left warm, not by the flag. Consecutive
+    `--no-default-features` builds share almost the whole dependency graph, so
+    only the top crate rebuilds — which is why Issue 701's 39.5s/flag figure
+    (measured as isolated checks against a default-featured target dir, i.e.
+    the per-PR cost) over-estimates a SWEEP by an order of magnitude."""
+    by: dict[str, list[float]] = {}
+    for pkg, _flag, dt in rows:
+        by.setdefault(pkg, []).append(dt)
+    print("\n▸ per package (n, mean, total):")
+    for pkg in sorted(by, key=lambda k: -sum(by[k])):
+        v = by[pkg]
+        print(f"    {pkg:<22} n={len(v):<4} mean {statistics.fmean(v):6.1f}s"
+              f"   total {sum(v) / 60:5.1f} min")
+
+
+def report_timing(secs: list[float], total_scope: int) -> None:
+    """The measurement Issue 701 R1b is blocked on, printed as a range."""
+    if not secs:
+        return
+    mean, med = statistics.fmean(secs), statistics.median(secs)
+    print(f"\n▸ timing over {len(secs)} flag(s): "
+          f"mean {mean:.1f}s  median {med:.1f}s  "
+          f"min {min(secs):.1f}s  max {max(secs):.1f}s  "
+          f"total {sum(secs) / 60:.1f} min")
+    if len(secs) < total_scope:
+        # Both, because they differ a lot on this distribution and quoting only
+        # the mean is how the n=6 estimate in Issue 701 came to be read as a
+        # bound. A long tail makes the mean the honest planning number and the
+        # median the honest typical-flag number; neither alone is the answer.
+        print(f"  extrapolated to all {total_scope}: "
+              f"{mean * total_scope / 3600:.1f} h (mean) / "
+              f"{med * total_scope / 3600:.1f} h (median)")
+        print(f"  point estimate from n={len(secs)}, NOT a bound — "
+              f"the per-flag range here is "
+              f"{max(secs) / max(min(secs), 0.1):.0f}x")
+
+
+def run_scope(opts: dict) -> int:
+    targets, passthrough = collect_flags(opts["scope"])
+    total = len(targets)
+    names = len({f for _, f in targets})
+    print(f"▸ scope: {opts['scope']} — {total} (package, flag) pair(s) "
+          f"across {names} unique flag name(s)")
+    if total != names:
+        # Issue 701 sizes this work as "197 default-on flags". That is the
+        # unique-NAME count; the same name defined in two manifests is two
+        # different builds and can pass in one and fail in the other.
+        print(f"  note: {total - names} pair(s) are a flag name defined in "
+              f"more than one manifest — each is its own build")
+    if passthrough:
+        print(f"  note: {len(passthrough)} default entry(ies) are "
+              f"`pkg/flag` passthroughs, not isolable from here")
+    if opts["sample"] and opts["sample"] < total:
+        rng = random.Random(opts["seed"])
+        targets = sorted(rng.sample(targets, opts["sample"]))
+        print(f"▸ sampled {len(targets)} of {total} (seed {opts['seed']}, "
+              f"reproducible)")
+    if opts["list"]:
+        for pkg, flag in targets:
+            print(f"    {pkg}/{flag}")
+        return 0
+    failed, secs, rows = check_flags(targets)
+    report_by_package(rows)
+    report_timing(secs, total)
+    if failed:
+        print(f"\n✗ feature isolation FAILED — {len(failed)}/{len(targets)}: "
+              + ", ".join(f"{p}/{f}" for p, f in failed))
+        return 1
+    print(f"\n✓ feature isolation PASSED — {len(targets)}/{len(targets)} "
+          f"flag(s) build alone")
+    return 0
+
+
 def main(argv: list[str]) -> int:
+    selftest()
+    opts, argv = parse_opts(argv)
+    if opts["scope"] != "diff":
+        if opts["scope"] not in ("default-on", "all"):
+            print(f"✗ unknown --scope {opts['scope']!r} "
+                  f"(known: diff, default-on, all)")
+            return 1
+        return run_scope(opts)
     base, err = resolve_base(argv)
     if base is None:
         if err and err.startswith("__NOOP__"):
@@ -181,22 +385,7 @@ def main(argv: list[str]) -> int:
 
     print(f"▸ {len(targets)} touched flag(s): "
           + ", ".join(f"{p}/{f}" for p, f in targets))
-    failed = []
-    for pkg, flag in targets:
-        cmd = ["cargo", "check", "-p", pkg, "--no-default-features",
-               "--features", flag]
-        print(f"▸ {' '.join(cmd)}")
-        r = run(cmd)
-        if r.returncode == 0:
-            print(f"    ✓ {pkg}/{flag} builds alone")
-        else:
-            failed.append((pkg, flag))
-            tail = [l for l in r.stderr.splitlines()
-                    if l.startswith("error")][:5]
-            print(f"    ✗ {pkg}/{flag} does NOT build alone")
-            for l in tail:
-                print(f"      {l}")
-
+    failed, _, _ = check_flags(targets)
     if failed:
         print(f"✗ feature isolation FAILED — {len(failed)}/{len(targets)}: "
               + ", ".join(f"{p}/{f}" for p, f in failed))
