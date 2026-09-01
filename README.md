@@ -3266,6 +3266,29 @@ higher than the strength arm — while the strength arm's top pick
 refutation: the dd_tree `BestAdvantage` variant (score by `Q_i − mean_j Q_j`)
 is rank-invariant vs `BestQ` by mechanism — not shipped (Research 509 §5).
 
+### 🧮 float_order — NaN-safe total-order comparators (the `partial_cmp().unwrap_or` abort class, Issue 832)
+
+`f32: PartialOrd` is not a total order, so the widespread idiom
+`b.partial_cmp(&a).unwrap_or(Ordering::Equal)` inside a sort comparator is
+INTRANSITIVE the moment one NaN enters the slice: std's sort **aborts in
+release** ("user-provided comparison function does not correctly implement a
+total order") — small slices survive on the insertion-sort fast path, which is
+exactly why the shape passes fixtures and panics at production sizes. The
+same idiom in `max_by`/`min_by` is worse: no abort, the corrupt value can
+just WIN.
+
+`katgpt_core::float_order` ships four comparators with three shared
+properties: **NaN loses** (sorts to the far end; `total_cmp` alone does the
+OPPOSITE — IEEE-754 ranks +NaN ABOVE `+INFINITY`, promoting the corrupt
+value to rank 0), **`-0.0` ≡ `+0.0`** (preserving the replaced idiom's tie
+behavior), and **NaN-free ordering bit-identical to the code swapped out**
+(11-value corpus pin). Unconditional module (no feature gate, zero-cost
+unless invoked) — `desc`/`asc` for sorts + `cmp_for_max`/`cmp_for_min` for
+selections, with f64 twins (`desc_f64`/`asc_f64`). Generalizes riir-rag's
+`score_cmp_desc`; consumed by the riir-ai Issue 832 workspace sweep (102
+reachable sites fixed across 12 crates, every fixed crate gated by a
+NaN-abort test that fails against the old comparator).
+
 ### Dev workflow
 
 All work happens on **`develop`** (no feature branches). Use [conventional
