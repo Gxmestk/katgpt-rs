@@ -152,6 +152,7 @@ Delta: **dynamic-per-token + context-grounded + bounded vs static + signal-free 
 **One-line reasoning:** the 5th paper in a family we already ship (LT2, any-time loops, loop-stability PoC, gain/cost halting) — no new capability class on either track; the value is a decisive signal-diff on our own gate (static/unbounded vs input-conditioned/bounded), the strongest evidence yet that loop anchors must be frozen not drifting (+0.70 nats), a transcribable copy-late schedule with a free convexity bound, halter constants (l_min=2, concavity, exit-as-quality-rule), KV-mean across steps, and a strictly-simpler-than-ILSD any-time training trick landing on a NextLat config field that exists today.
 
 **Files this session:** `katgpt-rs/.research/519` (this note) · `katgpt-rs/.issues/698_grt_anchored_gated_loop_upgrades.md` · `riir-train/.plans/364_grt_recurrent_depth_recipe.md` · cross-ref lines added to 273 + 414.
+**Resolution:** Issue 698 resolved 2026-09-01 — all tasks closed, record in git history.
 
 ### Defend-wrong status (§3.6)
 
