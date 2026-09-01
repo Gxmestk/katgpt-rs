@@ -19,7 +19,6 @@
 //! Single reference over-anchors rubric to one trajectory.
 //! [`RubricGatedConfig::min_references`] defaults to 2 to enforce this.
 
-use std::cmp::Ordering;
 
 use crate::absorb_compress::{AbsorbCompress, AbsorbCompressLayer};
 use crate::review_metrics::ReviewMetrics;

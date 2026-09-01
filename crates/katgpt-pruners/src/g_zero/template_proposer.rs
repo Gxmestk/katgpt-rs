@@ -37,7 +37,6 @@
 //! proposer.observe_delta(pair.template_id, 0.42);
 //! ```
 
-use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
 

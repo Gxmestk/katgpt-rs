@@ -28,7 +28,6 @@
 //! (see [`MokaPlayer::observe_external_move`]).
 
 use std::any::Any;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use fastrand::Rng;
