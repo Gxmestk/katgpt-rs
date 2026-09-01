@@ -125,8 +125,19 @@ Don't take that as permanently settled — a workflow file is identical on disk
 whether or not it can execute, which is why this went unnoticed. The axis is
 now measured: `scripts/ci_gate_coverage.py` reports, per workflow, which
 declared triggers can actually fire, keeping **dead**, **unmeasured** (no remote
-refs) and **PR-only** apart. It took the workspace from 7 dead workflows to 1.
-Run it rather than re-reading trigger blocks by hand.
+refs), **untracked** (committed by nobody yet — a colleague's in-flight file is
+not a defect) and **PR-only** apart. It took the workspace from 7 dead workflows
+to 1. Run it rather than re-reading trigger blocks by hand.
+
+"Can fire" is still not "does fire". A workflow reachable only by
+`workflow_dispatch` is a button, not a schedule, and three sibling repos
+(`riir-chain`, `riir-dao`, `riir-neuron-db`) carry their whole Rust compile/lint
+surface in exactly such a file — each by a *documented* main-only owner call
+whose `push` is inert anyway, because `main` carries no copy of the workflow.
+The report crosses the two axes rather than printing them side by side, which is
+how that state stayed invisible: the coverage table credited the command and the
+reachability table listed the trigger, and nothing multiplied them together
+(`.issues/706`).
 
 ### The docs gate — same discipline, opposite cadence
 
@@ -187,9 +198,17 @@ tree is the caller's.
 
 `scripts/ci_gate_coverage.py` is a **report, not a gate** (always exit 0): which
 of the derived contract repos actually gate their full compile+lint surface in
-CI, following each workflow into the scripts it calls. Run it instead of
-re-typing the answer — that question has been answered by hand twice and been
-wrong both times (`.issues/701` R2).
+CI, following each workflow into the scripts it calls, **and whether anything
+automatically starts it**. Run it instead of re-typing the answer — that
+question has been answered by hand twice and been wrong both times
+(`.issues/701` R2).
+
+Its own join is pinned by a `selftest()` that runs on every invocation, five
+shapes, and the pin was canaried by reintroducing the bug it exists to catch —
+a first cut asked only whether *any* scheduled workflow carried a cargo signal,
+and a data-borne mention in `riir-chain`'s scheduled `toolchain_drift.yml` was
+enough to vouch for a dispatch-only `rust.yml`. A weak automatic gate must not
+speak for a strong manual one.
 
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 

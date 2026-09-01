@@ -87,6 +87,58 @@ def _on_branch(root: Path, repo: str, branch: str, rel: str) -> bool:
     return _git(root, repo, "ls-tree", "--name-only", f"origin/{branch}", rel) == rel
 
 
+def _tracked(root: Path, repo: str, rel: str) -> bool:
+    """Is this workflow committed at all, on any branch?
+
+    An untracked file is UNFINISHED WORK, not a dead gate — it reaches no
+    branch because nobody has pushed it yet. Reporting it as "cannot fire"
+    raises a false alarm against a colleague's in-flight edit, which is how a
+    report earns the reputation that gets it ignored. Caught live: a sibling
+    agent added riir-deployer/rust.yml mid-run and it landed in the dead
+    block."""
+    return bool(_git(root, repo, "ls-files", "--", rel))
+
+def _on_block(wf: Path) -> str:
+    """The `on:` block, comments stripped, or "" if the file declares none.
+
+    Deliberately parsed from raw text rather than with a YAML load: this script
+    must not acquire a PyYAML dependency to answer a question about a handful
+    of keywords. Shared by both trigger readers so they cannot disagree about
+    where the block ends."""
+    try:
+        raw = wf.read_text(errors="replace")
+    except OSError:
+        return ""
+    body = re.split(r"^jobs:", raw, maxsplit=1, flags=re.M)[0]
+    live = "\n".join(l for l in body.splitlines()
+                      if not l.lstrip().startswith("#"))
+    parts = re.split(r"^on:", live, maxsplit=1, flags=re.M)
+    return parts[1] if len(parts) > 1 else ""
+
+
+def push_gap(root: Path, repo: str, wf: Path, dflt: str) -> str:
+    """Why a declared `push` cannot fire — named, because the fix depends on it.
+
+    GitHub evaluates `push` against the workflow file ON THE PUSHED REF, so a
+    filter naming a branch that carries no copy of the file is inert no matter
+    how many pushes land there. Two different repairs follow from the two
+    causes (promote the file to that branch, or widen the filter to a branch
+    that has it), and "never fires" alone does not say which."""
+    blk = _on_block(wf)
+    m = re.search(r"^\s+push:(.*?)(?=^\s{2}\S|\Z)", blk, re.M | re.S)
+    if not m:
+        return ""
+    rel = wf.relative_to(root / repo).as_posix()
+    brs = re.search(r"branches:\s*\[([^\]]*)\]", m.group(1))
+    names = ([b.strip().strip("'\"") for b in brs.group(1).split(",") if b.strip()]
+             if brs else [dflt])
+    missing = [b for b in names if not _on_branch(root, repo, b, rel)]
+    if not missing:
+        return ""
+    return (f"push[{','.join(names)}] inert — "
+            f"{', '.join(missing)} carries no copy of this file")
+
+
 def reachable_triggers(root: Path, repo: str, wf: Path, dflt: str) -> set[str]:
     """Which of this workflow's triggers can actually fire.
 
@@ -94,17 +146,9 @@ def reachable_triggers(root: Path, repo: str, wf: Path, dflt: str) -> set[str]:
     this script must not acquire a PyYAML dependency to answer a question about
     two keywords, and the block is regular enough to read directly."""
     rel = wf.relative_to(root / repo).as_posix()
-    try:
-        raw = wf.read_text(errors="replace")
-    except OSError:
+    on_blk = _on_block(wf)
+    if not on_blk:
         return set()
-    body = re.split(r"^jobs:", raw, maxsplit=1, flags=re.M)[0]
-    live = "\n".join(l for l in body.splitlines()
-                      if not l.lstrip().startswith("#"))
-    on_blk = re.split(r"^on:", live, maxsplit=1, flags=re.M)
-    if len(on_blk) < 2:
-        return set()
-    on_blk = on_blk[1]
     out: set[str] = set()
     declared: set[str] = set()
     for kw in ("schedule", "workflow_dispatch", "workflow_call", "push",
@@ -178,6 +222,44 @@ def cargo_commands(lines: list[str]) -> list[str]:
     return joined
 
 
+def _best(lines: list[str]) -> tuple[list[str], str]:
+    """Highest-scoring single cargo command in a pool, scored PER COMMAND.
+
+    Extracted so the repo-wide pool and the per-workflow pools cannot drift
+    apart in how they score — the join below is only meaningful if both sides
+    answer the same question the same way."""
+    best: list[str] = []
+    best_cmd = ""
+    for cmd in cargo_commands(lines):
+        sig = [s for s in SIGNALS if s in cmd]
+        if len(sig) > len(best):
+            best, best_cmd = sig, cmd
+    return best, best_cmd
+
+
+def _wf_pool(root: Path, repo: str, wf: Path) -> list[str]:
+    """One workflow's own lines plus those of every script IT invokes.
+
+    Deliberately NOT deduped against sibling workflows. survey()'s aggregate
+    pool follows each script once, which is right for "what does this repo
+    run" and wrong for "which workflow starts this command" — a script
+    invoked by two workflows belongs to both, and dropping it from the second
+    would report that workflow as carrying no compile surface."""
+    wl = live_lines(wf)
+    out, seen = list(wl), set()
+    for m in SCRIPT_RE.finditer("\n".join(wl)):
+        rel = m.group(1)
+        cand = root / repo / rel
+        if cand.is_file() and rel not in seen:
+            seen.add(rel)
+            out += live_lines(cand)
+    return out
+
+
+def WF_DIR(repo: str) -> Path:
+    return GIT_ROOT / repo / ".github" / "workflows"
+
+
 def survey(root: Path, repo: str) -> dict:
     wf_dir = root / repo / ".github" / "workflows"
     workflows = sorted(p for p in wf_dir.glob("*")
@@ -198,16 +280,25 @@ def survey(root: Path, repo: str) -> dict:
     # point is that the axes are INDEPENDENT, so a green on each separately says
     # nothing about their combination. A blob scan cannot tell those apart and
     # rated riir-chain "full" on axes spread across 15 scripts.
-    best: list[str] = []
-    best_cmd = ""
-    for cmd in cargo_commands(lines):
-        sig = [s for s in SIGNALS if s in cmd]
-        if len(sig) > len(best):
-            best, best_cmd = sig, cmd
+    best, best_cmd = _best(lines)
     dflt = default_branch(root, repo)
     reach = {wf.name: reachable_triggers(root, repo, wf, dflt) for wf in workflows}
+    # Per-workflow attribution. The aggregate `best` above answers "does a
+    # full-surface command exist in this repo"; it cannot answer "does anything
+    # START it", because it pools every workflow into one bag. Keeping the
+    # per-workflow score lets the join below cross coverage with reachability
+    # without disturbing the columns Issue 701 R2 quotes.
+    per_wf = {}
+    for wf in workflows:
+        wl = _wf_pool(root, repo, wf)
+        sigs, cmd = _best(wl)
+        in_cmds = {s for c in cargo_commands(wl) for s in SIGNALS if s in c}
+        per_wf[wf.name] = {
+            "signals": sigs, "cmd": cmd,
+            "dynamic": sorted({s for s in SIGNALS if s in "\n".join(wl)} - in_cmds,
+                              key=SIGNALS.index)}
     return {"repo": repo, "workflows": len(workflows), "scripts": scripts,
-            "default_branch": dflt, "reach": reach,
+            "default_branch": dflt, "reach": reach, "per_wf": per_wf,
             "signals": best, "cmd": best_cmd,
             "any": sorted({s for c in cargo_commands(lines) for s in SIGNALS
                            if s in c}, key=SIGNALS.index),
@@ -231,7 +322,92 @@ def survey(root: Path, repo: str) -> dict:
                 key=SIGNALS.index)}
 
 
+
+def hand_only(rows: list[dict]) -> list[tuple[dict, list[str]]]:
+    """Repos whose STRONGEST compile/lint command no automatic trigger starts.
+
+    Separated from the printing so it can be pinned by selftest(): an assertion
+    nothing has ever seen fail is not known to be able to fail, which is the
+    defect this whole family of scripts exists to catch."""
+    # Strength is compared, not mere presence. A first cut asked only "does ANY
+    # automatically-triggered workflow carry a cargo signal", and riir-chain
+    # slipped through it: the scheduled toolchain_drift.yml names the full-gate
+    # flags in a data table, which was enough to mask rust.yml — the repo's
+    # actual compile gate, and dispatch-only. A weak automatic gate must not
+    # vouch for a strong manual one.
+    #
+    # Lexicographic (real commands, then data-borne): a signal sitting in a
+    # CONFIGS table is worth something — riir-chain's feature matrix is
+    # arguably more thorough than any single command — but never enough to
+    # outrank a signal in an actual `cargo` invocation.
+    AUTOMATIC = {"schedule", "push"}
+
+    def strength(v):
+        return (len(v.get("signals", ())), len(v.get("dynamic", ())))
+
+    handonly = []
+    for r in rows:
+        live_wf = {n for n, t in r["reach"].items()
+                   if any(not x.startswith("-") for x in t)}
+        # Workflows with no live trigger at all are the `dead` block's finding,
+        # already printed above; counting them here would report one defect
+        # twice and blur "cannot run" into "runs only when asked".
+        carriers = {n for n in live_wf if strength(r["per_wf"].get(n, {})) > (0, 0)}
+        if not carriers:
+            continue
+        auto = {n for n, t in r["reach"].items()
+                if AUTOMATIC & {x for x in t if not x.startswith("-")}}
+        best_all = max(strength(r["per_wf"][n]) for n in carriers)
+        best_auto = max([strength(r["per_wf"][n]) for n in carriers & auto],
+                        default=(0, 0))
+        if best_auto >= best_all:
+            continue
+        handonly.append((r, sorted(n for n in carriers
+                                   if strength(r["per_wf"][n]) == best_all)))
+    return handonly
+
+
+def selftest() -> None:
+    """Pin the join's verdict on five shapes, including the regression it hit.
+
+    Case C is the one that matters: a scheduled workflow naming the full-gate
+    flags in a DATA table must not vouch for a dispatch-only workflow that runs
+    them. A first cut asked only "is any automatic workflow a carrier" and let
+    riir-chain through."""
+    def repo(name, per_wf, reach):
+        return {"repo": name, "per_wf": per_wf, "reach": reach}
+    FULL = {"signals": ["clippy", "--all-targets", "--all-features"], "dynamic": []}
+    WEAK = {"signals": [], "dynamic": ["clippy", "--all-targets", "--all-features"]}
+    NONE = {"signals": [], "dynamic": []}
+    cases = [
+        # (row, must_be_flagged, why)
+        (repo("A-auto-full", {"g.yml": FULL},
+              {"g.yml": {"push", "schedule"}}), False,
+         "a full gate on push+schedule is covered"),
+        (repo("B-manual-only", {"g.yml": FULL},
+              {"g.yml": {"workflow_dispatch"}}), True,
+         "dispatch-only compile gate is a button, not a schedule"),
+        (repo("C-weak-auto-masks", {"rust.yml": FULL, "drift.yml": WEAK},
+              {"rust.yml": {"workflow_dispatch"},
+               "drift.yml": {"schedule", "workflow_dispatch"}}), True,
+         "a data-borne signal on a schedule must not vouch for a manual gate"),
+        (repo("D-dead-carrier", {"g.yml": FULL}, {"g.yml": set()}), False,
+         "a workflow with no live trigger is the dead block's finding"),
+        (repo("E-equal", {"a.yml": FULL, "b.yml": FULL},
+              {"a.yml": {"workflow_dispatch"}, "b.yml": {"push"}}), False,
+         "the same surface also runs on push"),
+    ]
+    flagged = {r["repo"] for r, _ in hand_only([c[0] for c in cases])}
+    for row, want, why in cases:
+        if (row["repo"] in flagged) != want:
+            raise SystemExit(
+                f"✗ hand_only self-test FAILED on {row['repo']}\n"
+                f"  expected flagged={want}, got flagged={row['repo'] in flagged}\n"
+                f"  {why}")
+
+
 def main(argv: list[str]) -> int:
+    selftest()
     repos = derive_repos(GIT_ROOT)
     rows = [survey(GIT_ROOT, r) for r in repos]
     md = "--markdown" in argv
@@ -301,6 +477,9 @@ def main(argv: list[str]) -> int:
                 partial.append(f"{r['repo']}/{name}: declared {' '.join(lost)} — never fires")
             if r["default_branch"] == "?":
                 unknown.append(f"{r['repo']}/{name}")
+            elif not live and not _tracked(GIT_ROOT, r["repo"],
+                                           f".github/workflows/{name}"):
+                unknown.append(f"{r['repo']}/{name} (untracked — not committed yet)")
             elif not live:
                 dead.append(f"{r['repo']}/{name}")
             elif live == {"pull_request?"}:
@@ -335,6 +514,45 @@ def main(argv: list[str]) -> int:
               f"this script cannot see. Unmeasured, not clean:")
         for u in unknown:
             print(f"    ? {u}")
+
+    # ── The join: coverage x reachability ────────────────────────────────────
+    # The two blocks above are each honest on its own and, read one after the
+    # other, add up to a claim neither of them makes. The top table credits
+    # riir-neuron-db with `--all-targets --all-features`; the reachability
+    # table says its rust.yml fires on `workflow_dispatch` alone. Nothing
+    # crossed them, so the repo read as covered while the command it was
+    # credited for only ever ran when a human clicked it. A dispatch-only gate
+    # is a button, not a schedule — the same "decoration, not coverage" the
+    # dead-workflow block above says out loud, one step less obvious because
+    # the workflow genuinely can run.
+    #
+    # Note what this deliberately does NOT do: it leaves the columns above
+    # untouched. They answer "what would this gate cover" and Issue 701 R2
+    # quotes their numbers; this answers "does anything start it".
+    handonly = hand_only(rows)
+    if handonly:
+        print(f"\n▸ {len(handonly)} repo(s) whose compile/lint gate fires ONLY by "
+              f"hand — the command is\n  real and the workflow can run, but no "
+              f"schedule and no push ever starts it:")
+        for r, carriers in handonly:
+            print(f"    ⌾ {r['repo']}")
+            for n in carriers:
+                trig = sorted(t for t in r["reach"].get(n, ()) if not t.startswith("-"))
+                sig = (" ".join(r["per_wf"][n]["signals"])
+                       or " ".join(r["per_wf"][n]["dynamic"]) + " (in data)")
+                print(f"        {n}[{','.join(trig) or 'UNREACHABLE'}]  {sig}")
+                gap = push_gap(GIT_ROOT, r["repo"], WF_DIR(r["repo"]) / n,
+                               r["default_branch"])
+                if gap:
+                    print(f"          └─ {gap}")
+        print("  Several of these are a DOCUMENTED owner call (main-only, to spend\n"
+              "  no Actions minutes on develop pushes) — read the workflow preamble\n"
+              "  before filing. The finding is not that the choice is wrong; it is\n"
+              "  that a main-only push cannot fire while main carries no copy of\n"
+              "  the file, so the intended promote-to-main trigger is inert too.")
+    else:
+        print("\n▸ every repo carrying a compile/lint command has an automatic "
+              "trigger for it")
     return 0
 
 

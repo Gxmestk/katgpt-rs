@@ -268,6 +268,14 @@ contract; 18 are repos.
 - [ ] `riir-game-sdk/nightly.yml` — that repo's owner call, different shape.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
+## Successor: "can fire" is not "does fire"
+
+This issue's question was whether a trigger can fire at all. `.issues/706` asks
+the next one — whether anything *starts* it. Three repos whose workflows this
+issue counted as live carry their entire Rust compile/lint surface behind
+`workflow_dispatch` alone, and the `push` each declares is inert because `main`
+carries no copy of the file. Same family, one step less visible.
+
 Refs: `d2228161` (the sweep + reusable workflow), `.issues/701` R2 (same
 one-repo-of-many shape for the compile/lint surface), `.issues/702` (same shape
 for the doc auditors), `.issues/703` (same shape for hand-typed repo sets).
