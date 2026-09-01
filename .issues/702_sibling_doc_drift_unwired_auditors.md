@@ -1,8 +1,11 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (1/4 drift fixes done — riir-neuron-db closed in `c06133e`;
-auditor coverage closed in 3 more layers, 2 new findings, 2 self-inflicted
-false positives caught before they shipped)** —
+Status: **OPEN (2/4 drift fixes done — riir-neuron-db closed in `c06133e`;
+riir-clippy closed in `7736e30`, its audit re-run 9 labels / 0 mismatches;
+remaining: riir-ai `osc_emotion` + `band_edge_trigger`, both in that repo's
+`.benchmarks/` while its sessions are active; auditor coverage closed in 3
+more layers, 2 new findings, 2 self-inflicted false positives caught before
+they shipped)** —
 filed from katgpt-rs because the tooling lives here; the fixes belong in the
 owning repos. Re-measured 2026-09-01 across all **18** contract repos (the
 original table covered 8), which turned up something the wiring gap was hiding:
