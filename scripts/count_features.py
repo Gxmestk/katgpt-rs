@@ -23,6 +23,16 @@ from pathlib import Path
 import tomllib
 
 
+# Deliberately permissive: up to three intervening words, and "default
+# features" as well as "default-on". Canaried at each widening — the first
+# version required a literal "N flags" / "N total flags" / "N feature flags",
+# so "999 tunable flags" and "999 default features" both sailed past a sweep
+# whose whole job was catching phrasings nobody predicted. A sweep that only
+# recognises the shapes already in `claims` is decoration.
+SWEEP = (r"\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}flags?\b"
+         r"|\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}default(?:-on|\s+features)\b")
+
+
 def load_features(path: Path) -> tuple[set[str], set[str], dict[str, list[str]]]:
     """Return (default_on, all_flags, raw_map) for a Cargo.toml [features] table."""
     with path.open("rb") as f:
@@ -97,11 +107,17 @@ def main() -> int:
     # So: every known phrasing is checked at every occurrence, AND any
     # claim-shaped number that no pattern recognises is a hard failure rather
     # than a silent skip. An unknown phrasing must not be able to pass.
-    print("\n## README claim check")
-    readme = root / "README.md"
-    text = readme.read_text(encoding="utf-8")
+    print("\n## doc claim check")
     actual_total, actual_default = len(grand_total), len(grand_default)
     expect = {"total": actual_total, "default": actual_default}
+
+    # Every doc that states a flag count, not just README. examples/README.md
+    # claimed "292 flags" — matching no manifest, current or historical — and
+    # was invisible to a README-only check. One canonical pair (total,
+    # default-on) is asserted everywhere it appears; a doc wanting a different
+    # scope must add a named pattern here, which makes the new quantity
+    # reviewable instead of silently authoritative.
+    docs = ["README.md", "examples/README.md"]
 
     claims = [
         (r"(\d+)\s+feature flags\s*\((\d+)\s+default-on", ("total", "default")),
@@ -110,47 +126,55 @@ def main() -> int:
         (r"\*\*(\d+)\s+feature flags\*\*\s+with\s+\*\*(\d+)\s+default-on",
          ("total", "default")),
         (r"feature flag table\s*\((\d+)\s+flags\)", ("total",)),
+        (r"The full set\s*\((\d+)\s+flags\b", ("total",)),
     ]
 
-    def line_of(idx: int) -> int:
-        return text.count("\n", 0, idx) + 1
-
-    covered: list[tuple[int, int]] = []
     failures: list[str] = []
-    sites = 0
-    for rx, fields in claims:
-        for m in re.finditer(rx, text):
-            sites += 1
-            covered.append(m.span())
-            ln = line_of(m.start())
-            for field, raw in zip(fields, m.groups()):
-                got = int(raw)
-                mark = "✓" if got == expect[field] else "✗"
-                print(f"  {mark} L{ln}: {field} = {got} (measured {expect[field]})")
-                if got != expect[field]:
-                    failures.append(
-                        f"README.md:{ln} claims {field}={got}, measured {expect[field]}")
+    total_sites = 0
 
-    if sites == 0:
-        print(f"  ✗ no parseable feature-flag claim found in {readme.name}")
-        print(f"    measured: {actual_total} total, {actual_default} default-on")
-        return 1
-    print(f"  … {sites} claim site(s) recognised")
-
-    # Deliberately permissive: up to three intervening words, and "default
-    # features" as well as "default-on". Canaried at each widening — the first
-    # version required a literal "N flags" / "N total flags" / "N feature
-    # flags", so "999 tunable flags" and "999 default features" both sailed
-    # past a sweep whose whole job was catching phrasings nobody predicted.
-    # A sweep that only recognises the shapes already in `claims` is decoration.
-    sweep = (r"\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}flags?\b"
-             r"|\b(\d+)\+?\s+(?:[A-Za-z][\w-]*\s+){0,3}default(?:-on|\s+features)\b")
-    for m in re.finditer(sweep, text):
-        if any(a <= m.start() < b for a, b in covered):
+    for rel in docs:
+        path = root / rel
+        if not path.exists():
+            failures.append(f"{rel}: listed in `docs` but missing — its claims "
+                            f"are unchecked, which is how coverage silently shrinks")
             continue
-        failures.append(
-            f"README.md:{line_of(m.start())} unrecognised flag-count phrasing "
-            f"{m.group(0)!r} — add it to `claims` or reword it; it is NOT checked")
+        text = path.read_text(encoding="utf-8")
+
+        def line_of(idx: int, _t: str = text) -> int:
+            return _t.count("\n", 0, idx) + 1
+
+        covered: list[tuple[int, int]] = []
+        sites = 0
+        for rx, fields in claims:
+            for m in re.finditer(rx, text):
+                sites += 1
+                covered.append(m.span())
+                ln = line_of(m.start())
+                for field, raw in zip(fields, m.groups()):
+                    got = int(raw)
+                    mark = "✓" if got == expect[field] else "✗"
+                    print(f"  {mark} {rel}:{ln}: {field} = {got} "
+                          f"(measured {expect[field]})")
+                    if got != expect[field]:
+                        failures.append(
+                            f"{rel}:{ln} claims {field}={got}, "
+                            f"measured {expect[field]}")
+
+        if sites == 0:
+            failures.append(
+                f"{rel}: no parseable feature-flag claim found — either the doc "
+                f"stopped stating one (drop it from `docs`) or the phrasing "
+                f"changed and is now unchecked")
+        total_sites += sites
+
+        for m in re.finditer(SWEEP, text):
+            if any(a <= m.start() < b for a, b in covered):
+                continue
+            failures.append(
+                f"{rel}:{line_of(m.start())} unrecognised flag-count phrasing "
+                f"{m.group(0)!r} — add it to `claims` or reword it; NOT checked")
+
+    print(f"  … {total_sites} claim site(s) recognised across {len(docs)} doc(s)")
 
     # ── "Default features include: …" list contents ─────────────────────────
     # Two independent things go stale here. The names: README listed nine
@@ -161,12 +185,17 @@ def main() -> int:
     # internally consistent with that line's own stale 155 and with nothing
     # else. N is defined here as "default-on flags not named on this line", so
     # it is computable and therefore assertable.
-    dm = re.search(r"Default features include:(.*)", text)
+    readme_text = (root / "README.md").read_text(encoding="utf-8")
+
+    def line_of_readme(idx: int) -> int:
+        return readme_text.count("\n", 0, idx) + 1
+
+    dm = re.search(r"Default features include:(.*)", readme_text)
     if not dm:
         failures.append("README.md: 'Default features include:' block not found "
                         "— the list check silently covers nothing")
     else:
-        line, ln = dm.group(1), line_of(dm.start())
+        line, ln = dm.group(1), line_of_readme(dm.start())
         # Only names OUTSIDE parentheses are list entries. Inside them is
         # commentary that legitimately backticks non-default identifiers —
         # "implies `engram`", "alias for `sense_composition`", function names
@@ -202,11 +231,11 @@ def main() -> int:
             print(f"  ✓ L{ln}: 'and {want_more} more' closes the default-on count")
 
     if failures:
-        print("  ✗ README has drifted from the manifests")
+        print("  ✗ doc claims have drifted from the manifests")
         for f in failures:
             print(f"    - {f}")
         return 1
-    print("  ✓ README matches the manifests")
+    print(f"  ✓ all claim sites across {len(docs)} doc(s) match the manifests")
     return 0
 
 
