@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-30
 **Issue:** originally tracked in Issue 001 (closed + removed; this benchmark is the canonical record).
-**Feature:** `hla_eigenbasis_recovery` (opt-in)
+**Feature:** `hla_eigenbasis_recovery` (opt-in at the time of this bench; **on by transitive default** as of 2026-09-01 — no bare entry in any `default[]`, but `katgpt-rs/default -> ica_lens -> katgpt-spectral/ica_lens -> hla_eigenbasis_recovery`, so a default build ships it enabled)
 **Host:** M-series aarch64, release build, isolated `CARGO_TARGET_DIR=/tmp/issue001-target`
 **Run:** `cargo bench --bench hla_eigenbasis_bench --features hla_eigenbasis_recovery`
 

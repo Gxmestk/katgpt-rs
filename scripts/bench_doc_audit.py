@@ -121,18 +121,9 @@ def iter_cargo_manifests(repo_root: Path):
             yield Path(dirpath) / "Cargo.toml"
 
 
-def find_cargo_defaults(repo_root: Path) -> set[str]:
-    """All feature names that appear in any Cargo.toml's `default = [...]`,
-    **plus** their transitive closure across the feature-dependency graph.
-
-    Without transitive resolution, features that are enabled indirectly
-    (e.g. `sense_lod` is in default and enables `slod` via its dep list)
-    would be wrongly flagged as opt-in (the session-13 false-positive
-    class on `slod`).
-    """
-    # Collect: for each Cargo.toml, (default_set, feature_deps_map)
-    # feature_deps_map[feat_name] = set of feat-names it enables
-    by_manifest: list[tuple[set[str], dict[str, set[str]]]] = []
+def load_manifests(repo_root: Path) -> dict[str, dict]:
+    """`package name -> features table` for every source manifest in the repo."""
+    out: dict[str, dict] = {}
     for cargo in iter_cargo_manifests(repo_root):
         try:
             with cargo.open("rb") as f:
@@ -140,47 +131,63 @@ def find_cargo_defaults(repo_root: Path) -> set[str]:
         except Exception as e:
             print(f"WARN: could not parse {cargo}: {e}", file=sys.stderr)
             continue
-        feats = data.get("features", {})
-        if not feats:
-            continue
-        default_list = feats.get("default", [])
-        defaults: set[str] = set()
-        deps: dict[str, set[str]] = {}
-        for name, spec in feats.items():
-            normalized: set[str] = set()
-            if isinstance(spec, list):
-                for s in spec:
-                    n = _parse_feature_spec(s)
-                    if n:
-                        normalized.add(n)
-            deps[name] = normalized
-            if name == "default" and isinstance(spec, list):
-                for s in spec:
-                    n = _parse_feature_spec(s)
-                    if n:
-                        defaults.add(n)
-        by_manifest.append((defaults, deps))
+        feats = data.get("features") or {}
+        pkg = (data.get("package") or {}).get("name")
+        if pkg and feats:
+            out.setdefault(pkg, {}).update(feats)
+    return out
 
-    # Transitive closure per manifest, then union across manifests.
-    any_default: set[str] = set()
-    for defaults, deps in by_manifest:
-        resolved = set(defaults)
-        changed = True
-        # Cap iterations at len(deps)+2 to guarantee termination.
-        for _ in range(len(deps) + 2):
-            if not changed:
-                break
-            changed = False
-            new_added: set[str] = set()
-            for feat in list(resolved):
-                for dep in deps.get(feat, ()):
-                    if dep not in resolved and dep not in new_added:
-                        new_added.add(dep)
-            if new_added:
-                resolved |= new_added
-                changed = True
-        any_default |= resolved
-    return any_default
+
+def find_cargo_defaults(repo_root: Path) -> set[str]:
+    """Features a default build turns on anywhere in the repo.
+
+    Reachability over a `(package, feature)` graph, from every member's
+    `default` as a root. This replaces two heuristics that were each wrong in
+    an opposite direction, and it is why the graph is worth the extra pass:
+
+    * **Per-manifest closure UNDER-approximated.** It could not follow a chain
+      that leaves a manifest and comes back:
+      `riir-games-civ/default -> osc_emotion -> riir-games-shared/osc_emotion
+      -> osc_npc`. `osc_npc` ships on in a default build and the old model
+      reported it opt-in, so a doc stating the truth audited as drift.
+    * **Collapsing `pkg/feat` to `feat` OVER-approximated.** riir-engine's
+      default reaches `katgpt-core/tropical_algebra`; collapsing credited
+      riir-engine's own, separately-defined `tropical_algebra` (which is NOT in
+      its default). Here the edge simply leaves the repo and is not followed —
+      measured 47 such bogus names in riir-ai alone.
+
+    Walking `(pkg, feat)` nodes gets both right by construction rather than by
+    two suppression rules layered on a wrong number.
+    """
+    return reachable_features(load_manifests(repo_root))
+
+
+def reachable_features(mans: dict[str, dict]) -> set[str]:
+    """The `(package, feature)` reachability walk — pure, so it can be pinned."""
+    seen: set[tuple[str, str]] = {(p, "default") for p, f in mans.items()
+                                  if "default" in f}
+    stack = list(seen)
+    while stack:
+        pkg, feat = stack.pop()
+        spec = mans.get(pkg, {}).get(feat)
+        if not isinstance(spec, list):
+            continue
+        for x in spec:
+            if not isinstance(x, str) or not x or x.startswith("dep:"):
+                continue
+            if "/" in x:
+                tpkg, _, rest = x.partition("/")
+                tpkg = tpkg.rstrip("?")
+                tfeat = rest.split("/")[0]
+                if tpkg not in mans:
+                    continue  # edge leaves the repo — not ours to resolve
+            else:
+                tpkg, tfeat = pkg, x
+            node = (tpkg, tfeat)
+            if node not in seen:
+                seen.add(node)
+                stack.append(node)  # expanding an undefined feature is a no-op
+    return {f for _, f in seen if f != "default"}
 
 
 def local_default_closure(feats: dict) -> set[str]:
@@ -392,6 +399,18 @@ TRANSITION_RES = [
     (re.compile(r"(?:re-)?promoted\s+(?:back\s+)?to\s+\**default(?:-on)?\**", re.I),
      "default"),
     (re.compile(r"\bnow\s+\**default-on\**", re.I), "default"),
+    # A feature with no bare entry in any `default[]` that a default build still
+    # enables through a `pkg/feat` chain. This is a distinct third state, not a
+    # sloppy way of saying default-on, and the workspace already names it:
+    # riir-neuron-db's README has a §"Transitive default" section for it. Two
+    # katgpt-rs benchmark docs are in exactly this state and said "opt-in".
+    # Deliberately the FULL phrase, not a looser `transitive.*default`. The
+    # negation guard below only inspects text immediately before the match, so a
+    # pattern that can start mid-phrase escapes it: on
+    # "(opt-in, NOT on by transitive default)" the loose form matched at
+    # "transitive", six characters past the "NOT", and read the label as
+    # default-on. The selftest's negation case caught it.
+    (re.compile(r"\bon\s+by\s+transitive\s+default\b", re.I), "default"),
     (re.compile(r"\bdemoted\s+(?:back\s+)?to\s+\**opt-in\**", re.I), "opt-in"),
     (re.compile(r"\breverted\s+to\s+\**opt-in\**", re.I), "opt-in"),
     (re.compile(r"\bnow\s+\**opt-in\**", re.I), "opt-in"),
@@ -464,6 +483,16 @@ def classify_token(line: str, m: "re.Match") -> tuple[str, str]:
         wide = widened_status(line, m.start("status"))
         if wide is not None:
             parsed, raw = wide[0], f"{raw!r} -> widened: {wide[1]!r}"
+    # The terminal transition overrides whatever the base phrase said, and it
+    # lives HERE rather than in the caller for the same reason the widening
+    # does: a status rule outside the shared path is a rule the selftest cannot
+    # reach. Adding the transitive-default vocabulary with this still in
+    # `iter_bench_doc_labels` made the new pin fail while the production path
+    # was correct — the pin was right, the factoring was wrong.
+    trans = parse_terminal_transition(line, m.end())
+    if trans is not None:
+        parsed = trans[0]
+        raw = f"{raw} | transition: {trans[1]!r}"
     return parsed, raw
 
 
@@ -486,10 +515,6 @@ def iter_bench_doc_labels(repo_root: Path):
                     qual = m.group("qual")
                     feat = m.group("feat")
                     parsed, raw = classify_token(line, m)
-                    trans = parse_terminal_transition(line, m.end())
-                    if trans is not None:
-                        parsed = trans[0]
-                        raw = f"{raw} | transition: {trans[1]!r}"
                     if parsed == "unknown":
                         continue
                     yield (rel, ln, line.strip(), qual, feat, raw, parsed)
@@ -502,6 +527,16 @@ def audit_repo(repo_root: Path) -> int:
     defined_features = find_defined_features(repo_root)
     package_names = find_package_names(repo_root)
     own_default = find_own_crate_defaults(repo_root)
+    # own-crate default is a strict subset of the deployed default by
+    # construction (a bare local entry is also an edge in the reachability
+    # graph). If that ever fails the two models have diverged and the
+    # forwarded-only suppression below would silently stop firing — so say so
+    # rather than quietly mis-suppress. Holds in all 18 repos as of 2026-09-01.
+    stray = own_default - any_default
+    if stray:
+        print(f"  WARN: own-default not a subset of deployed-default: "
+              f"{sorted(stray)[:8]} ({len(stray)}) — the forwarded-only rule "
+              f"may mis-suppress", file=sys.stderr)
 
     mismatches = 0
     checked = 0
@@ -532,8 +567,16 @@ def audit_repo(repo_root: Path) -> int:
             print(f"    line: {line}")
         elif parsed == "opt-in" and is_default:
             # Forwarded-only: the owning crate ships it off, an ancestor's
-            # default pulls it in. "opt-in" is a defensible reading.
-            if feat not in own_default:
+            # default pulls it in. "opt-in" is a defensible reading — but ONLY
+            # for a label that scopes its claim to a crate. A NAMESPACED token
+            # (`riir-wallet/siwr`) is making a per-crate claim, so accept it if
+            # either model agrees. A BARE token in a repo-level doc is making a
+            # deployed claim, and suppressing it hides real drift: katgpt-rs's
+            # own `` `still_kv` (opt-in, Plan 245) `` and
+            # `` `hla_eigenbasis_recovery` (opt-in) `` are both reached from the
+            # root default in three hops, and a blanket forwarded-only rule
+            # silently excused both.
+            if qual is not None and feat not in own_default:
                 forwarded += 1
                 continue
             if SCOPED_CLAIM_RE.search(line):
@@ -585,12 +628,44 @@ TOKENIZER_CASES = [
     ("**Feature:** `baz` — **default-OFF** (implies `qux`)", None, "baz", "opt-in"),
     # negation must still win over the bare word "default"
     ("**Feature:** `neg` (opt-in, NOT default-on)", None, "neg", "opt-in"),
+    # third state: no bare `default[]` entry, but a `pkg/feat` chain reaches it
+    ("**Feature:** `tr` (opt-in at the time of this bench; **on by transitive "
+     "default** as of 2026-09-01 — via `a/default -> b/tr`)", None, "tr", "default"),
+    # ...and the negation of it must still read as opt-in
+    ("**Feature:** `trneg` (opt-in, NOT on by transitive default)",
+     None, "trneg", "opt-in"),
 ]
 
 
 # The riir-engine shape that produced a confident false drift report. A future
 # "simplification" back to `_parse_feature_spec` here re-introduces it, so it is
 # pinned rather than merely commented.
+# The two chains the (package, feature) graph exists for. Both were wrong under
+# the models it replaced, in opposite directions, and both produced a confident
+# audit verdict against a doc that was correct.
+REACHABILITY_CASE = {
+    # cross-manifest chain: civ/default -> osc_emotion -> shared/osc_emotion
+    #                       -> osc_npc.  A per-manifest closure stops at the
+    #                       manifest boundary and calls osc_npc opt-in.
+    "riir-games-civ": {
+        "default": ["osc_emotion"],
+        "osc_emotion": ["civ_emotion", "riir-games-shared/osc_emotion"],
+        "civ_emotion": [],
+    },
+    "riir-games-shared": {
+        "osc_emotion": ["osc_npc"],
+        "osc_npc": [],
+    },
+    # external edge: the target crate is NOT in this repo, so `tropical_algebra`
+    # must NOT be credited. Collapsing `pkg/feat` to `feat` credits it.
+    "riir-engine": {
+        "default": ["se2_equivariant"],
+        "se2_equivariant": ["katgpt-core/tropical_algebra"],
+        "tropical_algebra": ["katgpt-core/tropical_algebra"],
+    },
+}
+
+
 LOCAL_CLOSURE_CASE = {
     "default": ["se2_equivariant", "band_edge_trigger"],
     "se2_equivariant": ["katgpt-core/tropical_algebra"],
@@ -602,6 +677,16 @@ LOCAL_CLOSURE_CASE = {
 
 
 def selftest() -> None:
+    reach = reachable_features(REACHABILITY_CASE)
+    if "osc_npc" not in reach or "tropical_algebra" in reach:
+        raise SystemExit(
+            "✗ reachability self-test FAILED\n"
+            f"  got: {sorted(reach)}\n"
+            "  `osc_npc` MUST be reachable (civ/default -> osc_emotion ->\n"
+            "  riir-games-shared/osc_emotion -> osc_npc crosses a manifest\n"
+            "  boundary), and `tropical_algebra` MUST NOT be (reachable only\n"
+            "  via katgpt-core/, a crate outside the repo). Getting either wrong\n"
+            "  reports drift on a doc that is correct — see find_cargo_defaults.")
     own = local_default_closure(LOCAL_CLOSURE_CASE)
     if "tropical_algebra" in own or "band_edge_trigger" not in own:
         raise SystemExit(

@@ -1,11 +1,13 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (2/4 drift fixes + the cadence condition done for riir-clippy —
-riir-neuron-db drift closed in `c06133e`; riir-clippy drift closed in `7736e30`
-+ its weekly docs-drift CI job landed in `1df3599`; remaining: riir-ai
-`osc_emotion` + `band_edge_trigger`, both in that repo's `.benchmarks/` while
-its sessions are active; auditor coverage closed in 3 more layers, 2 new
-findings, 2 self-inflicted false positives caught before they shipped)** —
+Status: **OPEN (all 4 original drift rows CLOSED — riir-neuron-db `c06133e`,
+riir-clippy `7736e30` (+ weekly docs-drift CI in `1df3599`), riir-ai
+`osc_emotion` + `band_edge_trigger` in riir-ai `95354cd62`. Reopened in scope,
+not in status: replacing the per-manifest closure with a `(package, feature)`
+reachability graph exposed **2 previously invisible drifts in katgpt-rs
+itself**, both fixed here. Every one of the 18 contract repos now audits at 0
+mismatches. Remaining: the cadence condition for the other label-bearing
+siblings)** —
 filed from katgpt-rs because the tooling lives here; the fixes belong in the
 owning repos. Re-measured 2026-09-01 across all **18** contract repos (the
 original table covered 8), which turned up something the wiring gap was hiding:
@@ -261,6 +263,82 @@ A correct doc, not a suppressed finding.
 So the residual blind spot is real in structure and **empty in population**.
 Recording the bound rather than the caveat: a future re-measure only needs to
 re-run the intersection, not re-derive the argument.
+
+## The closure was wrong in BOTH directions — and hid drift in this repo
+
+`find_cargo_defaults` computed the default closure **per manifest**, then unioned.
+That is two errors, not one, and they point opposite ways:
+
+* **UNDER-approximation — it could not follow a chain that leaves a manifest.**
+  `riir-games-civ/default -> osc_emotion -> riir-games-shared/osc_emotion ->
+  osc_npc` crosses a manifest boundary, so `osc_npc` read as opt-in while a
+  default build ships it on. Found the hard way: correcting a riir-ai doc to say
+  the true thing made the audit go RED against the corrected doc.
+* **OVER-approximation — collapsing `pkg/feat` to `feat`.** Right for the
+  deployed question (target crate is in-repo) and wrong when the qualifier names
+  an external crate. 47 bogus names in riir-ai alone.
+
+Both are gone: reachability over `(package, feature)` nodes from every member's
+`default` as a root, not following an edge whose target package is outside the
+repo. **Measured across 18 repos x both auditors, it changed exactly one
+verdict** (the riir-ai false positive) and left the other 17 bit-identical —
+including katgpt-rs's 92 labels and 396 Cargo comments.
+
+### It found two stale labels in katgpt-rs's own benchmarks
+
+The old model literally could not see these — both are reached in three hops
+through a `pkg/feat` edge, so the per-manifest closure stopped short:
+
+5. `.benchmarks/001_hla_eigenbasis_recovery_goat.md:5` said
+   `` `hla_eigenbasis_recovery` (opt-in) ``.
+   `katgpt-rs/default -> ica_lens -> katgpt-spectral/ica_lens ->
+   hla_eigenbasis_recovery`.
+6. `.benchmarks/245_still_kv_goat_metric_fix.md:5` said
+   `` `still_kv` (opt-in, Plan 245) ``.
+   `katgpt-rs/default -> chain_fold -> katgpt-speculative/chain_fold`, which
+   lists both `still_kv` and `katgpt-kv/still_kv`.
+
+Both verified by hand against the manifests (root `default[]`,
+`katgpt-spectral/Cargo.toml:139`, `katgpt-speculative/Cargo.toml:132`) rather
+than taken from the auditor. This is the same class as items 1-4 — and it
+landed in the repo that owns the auditor, which is the argument against reading
+"my own gate is green" as "my own docs are right".
+
+### The forwarded-only rule was too broad, and the fix narrowed it
+
+Suppressing every forwarded-only opt-in label would have excused both of the
+above. The rule is right only for a label that **scopes its claim**: a
+namespaced token (`riir-wallet/siwr`) is a per-crate claim, so accept it when
+either model agrees; a BARE token in a repo-level doc is a deployed claim and
+gets no suppression. Narrowed accordingly — which is precisely what turned
+these two from silent skips into findings.
+
+### A third status word, because two states were not enough
+
+`opt-in` / `default-on` cannot describe a feature with no bare `default[]` entry
+that a default build still enables through a chain. The workspace already had a
+name for it — riir-neuron-db's README carries a §"Transitive default" section —
+so `on by transitive default` is now transition vocabulary, and both katgpt-rs
+labels use it.
+
+Deliberately matched as the FULL phrase. A looser `transitive.*default` escaped
+the negation guard (which only inspects text immediately before the match) by
+matching at "transitive" in `(opt-in, NOT on by transitive default)`, six
+characters past the "NOT", and read that label as default-on. The selftest's
+negation case caught it.
+
+### Seven pins, all canaried, and the second DRY defect it exposed
+
+Adding the transitive vocabulary made the new pin fail while the production path
+was correct — because `parse_terminal_transition` was applied in
+`iter_bench_doc_labels`, *outside* the shared `classify_token`. The pin was
+right and the factoring was wrong; the transition now lives in the one status
+path. This is the second time in this issue that a status rule outside the
+shared path made a pin unable to reach it (the first was the widened retry).
+
+All seven pins were re-canaried by reverting each fix in a copy; each exits 1
+naming the shape. An `own_default ⊆ deployed_default` invariant check now warns
+rather than silently mis-suppressing — it holds in all 18 repos.
 
 ## NOT fixed from here
 

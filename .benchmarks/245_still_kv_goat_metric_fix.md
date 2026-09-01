@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-29
 **Issue:** 011 (G1 — `still_kv::integration_tests::goat_t24_compact_cache_quality`)
-**Feature:** `still_kv` (opt-in, Plan 245)
+**Feature:** `still_kv` (opt-in at the time of this bench; **on by transitive default** as of 2026-09-01 — no bare entry in any `default[]`, but `katgpt-rs/default -> chain_fold -> katgpt-speculative/chain_fold` lists both `still_kv` and `katgpt-kv/still_kv`, so a default build ships it enabled)
 **Verdict:** The G1 failure was a **broken test metric**, not a feature quality deficit. Metric replaced (not thresholds lowered). Gate now PASSES legitimately.
 
 ---
