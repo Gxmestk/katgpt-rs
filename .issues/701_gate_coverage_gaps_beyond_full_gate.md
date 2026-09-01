@@ -252,9 +252,25 @@ Not attempted: the remaining ~76 sites across four crates in one sweep.
       scoping in the workflow — `scripts/feature_isolation_gate.py` +
       `.github/workflows/feature_isolation.yml`, diff-bounded, macos-latest,
       pull_request only (push has no base ref and would pass vacuously).
-- [ ] R1b: broader coverage than the diff — the 197 default-on flags at ~2.2 h
-      measured, as a weekly run. Needs one real COLD runner timing first; every
-      number here is warm-cache.
+- [x] R1b-measure: broader coverage than the diff — **DONE 2026-09-01**, and
+      the estimate it was blocked on was wrong by 32x. All **228** default-on
+      (package, flag) pairs built in isolation in **4.1 min** (mean 1.08s,
+      median 0.50s), not the extrapolated ~2.2 h. **2 real failures found and
+      fixed** (`b50db0ef`): `katgpt-core/hebbian_kernel_memory` and
+      `velocity_field_ensemble` both consume `linalg::ridge_solve` without
+      joining the `cfg(any(...))` that gates `pub mod linalg`. Full numbers,
+      the per-package table and the category error behind the old estimate:
+      `.benchmarks/696_default_on_feature_isolation_sweep.md`.
+- [ ] R1b-cadence: wire it, and at what cadence — the only part still open, and
+      it is a billing call rather than a measurement. At 4.1 min the cost
+      question no longer gates the decision on any plausible runner multiplier,
+      and this gate has no `cfg(target_os)` surface so it can run on ubuntu
+      (unlike the full gate). Recommendation: weekly `--scope default-on` on
+      ubuntu. It catches a class NOTHING else does — `--all-features` compiles
+      the union where some other consumer always supplies `linalg`, and the
+      per-PR gate is diff-bounded so it never looks at a flag whose own
+      definition did not change. Both flags above were invisible to every
+      existing gate and were found by this sweep's first run.
 - [ ] R2: the remaining repos either run the gate or record why not; the
       measured error count per repo is reported, not assumed to be zero.
 - [x] R3a: the warning surface is measured (118 findings / 24 lints / per-crate
