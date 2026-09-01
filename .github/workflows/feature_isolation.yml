@@ -1,0 +1,71 @@
+# Feature isolation — does a flag compile ON ITS OWN, not just in the union.
+#
+# `--all-features` (scripts/full_gate.sh) proves the union compiles. It says
+# nothing about a single feature building alone, and every primitive here ships
+# behind an opt-in flag, so "flag X alone is broken" is a live failure mode the
+# full gate is blind to by construction. Issue 701 R1.
+#
+# ── Why the diff bounds it, and not `cargo hack --each-feature` ──────────────
+# Measured 2026-09-01, M3 Max, warm target dir, seeded sample of 6 of the 280
+# root opt-in flags: mean 39.5s per flag (range 4.2s-110.2s). That is ~6.2 h for
+# all 568 flags and ~2.2 h for the 197 default-on ones — plus ~0.09 GiB disk per
+# flag. So the gate checks only the flags whose DEFINITION the diff touches,
+# which is the case that actually regresses: a flag added or edited without ever
+# being built alone. A 1-3 flag PR is ~40-120s warm.
+#
+# ── Why macos-latest, at a multiple of Linux minutes ─────────────────────────
+# Same reasoning as full_gate.yml, and it is not about this repo's taste. The
+# device backends are `cfg(all(target_os = "macos", feature = ...))`; on Linux
+# such a flag switches ON and still compiles to NOTHING. An isolation gate that
+# reports "builds alone" about a file it compiled empty is exactly the vacuous
+# green these gates exist to catch. The job only builds the touched flags, so
+# the bill stays small.
+#
+# ── Cost honesty ────────────────────────────────────────────────────────────
+# The 40-120s figures are WARM. A cold runner pays a full dependency build
+# first, so rust-cache is load-bearing here, not an optimisation.
+#
+# Sampling before wiring: 21 of 280 root opt-in flags were checked in isolation
+# on 2026-09-01 and all 21 passed. By the rule of three that bounds the failure
+# rate at roughly <=14% (95%), NOT at zero — so expect this gate to find real
+# breakage occasionally. That is the point.
+name: Feature isolation
+
+on:
+  pull_request:
+    paths:
+      - 'Cargo.toml'
+      - 'crates/**/Cargo.toml'
+      - 'scripts/feature_isolation_gate.py'
+      - '.github/workflows/feature_isolation.yml'
+  workflow_dispatch:
+
+# Deliberately NOT run on push-to-develop: there is no base ref there, the
+# script would fall back to origin/develop == HEAD, find no touched flags, and
+# report a pass that proved nothing. A vacuous green is worse than no job.
+
+concurrency:
+  group: feature-isolation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  feature-isolation:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The gate diffs against the PR base; a shallow clone has no base to
+          # diff against, and the script exits 1 rather than guess.
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: feature-isolation
+          cache-on-failure: true
+
+      - name: Feature isolation (flags touched by this PR)
+        run: python3 scripts/feature_isolation_gate.py

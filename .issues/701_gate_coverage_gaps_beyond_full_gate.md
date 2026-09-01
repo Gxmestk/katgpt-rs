@@ -60,6 +60,19 @@ Read the extrapolation as a point estimate, not a bound:
   ~0.09 GiB per flag. Even sub-additive, a 568-flag sweep is tens of GiB, and
   this box was at 60 GiB free with 117 GiB already in `target/`.
 
+### Is isolation currently green? Sampled before wiring anything
+
+21 of the 280 root opt-in flags (7.5%), three seeded batches, 2026-09-01:
+**21 pass / 0 fail**. Read that as a low failure rate, NOT as zero — by the rule
+of three, 0/21 bounds the rate at roughly **<=14% at 95% confidence**. Enough to
+wire a PR gate without expecting it to red every flag-touching PR; not enough to
+claim the flag surface is clean.
+
+One harness note, because it nearly misread as a finding: the sampling loop
+exited 1 with all 21 green. The last command in the block was
+`[ -n "$fails" ] && echo ...`, and `[ -n "" ]` returns 1 — the failing exit was
+the harness, not the sample.
+
 Revised candidate designs:
 - **Changed-flags-only (best per-PR).** `--each-feature` restricted to flags
   whose *definition* the diff touches. Bounded by the diff, not the manifest: a
@@ -183,9 +196,13 @@ Not attempted: the remaining ~76 sites across four crates in one sweep.
 
 ## Closing conditions
 
-- [ ] R1: a per-feature-isolation check runs on some cadence, with its sampling
-      or scoping stated in the workflow (a silent top-N is the thing being
-      avoided).
+- [x] R1a: a per-feature-isolation check runs on a stated cadence with its
+      scoping in the workflow — `scripts/feature_isolation_gate.py` +
+      `.github/workflows/feature_isolation.yml`, diff-bounded, macos-latest,
+      pull_request only (push has no base ref and would pass vacuously).
+- [ ] R1b: broader coverage than the diff — the 197 default-on flags at ~2.2 h
+      measured, as a weekly run. Needs one real COLD runner timing first; every
+      number here is warm-cache.
 - [ ] R2: the remaining repos either run the gate or record why not; the
       measured error count per repo is reported, not assumed to be zero.
 - [x] R3a: the warning surface is measured (118 findings / 24 lints / per-crate
