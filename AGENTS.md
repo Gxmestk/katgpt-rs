@@ -114,16 +114,41 @@ preamble for the measured cost and the promotion criterion.
 
 ### The docs gate — same discipline, opposite cadence
 
-`scripts/docs_gate.sh` runs the three manifest/doc drift assertions
-(`count_features.py`, `bench_doc_audit.py`, `cargo_comment_audit.py`) and
+`scripts/docs_gate.sh` runs the manifest/doc/skill drift assertions and
 `.github/workflows/docs_gate.yml` runs it **per-push** on ubuntu-latest. Both
 choices are deliberately the inverse of the full gate's, and both files say why:
 this gate has no `cfg(target_os)` surface so platform cannot change its verdict,
 and it costs ~3s rather than >13 min.
 
-All three checks existed before that wiring and **nothing invoked any of them**;
-two were red on `develop`, both on false positives against docs that were
-correct. Treat an uninvoked assertion as unknown, not as passing.
+The `CHECKS` array in that script is the list. **The count is deliberately not
+written here** — this paragraph said "the three" for one commit after the fourth
+was added, which is the drift the gate itself exists to catch, committed by the
+paragraph describing it.
+
+The original three existed before that wiring and **nothing invoked any of
+them**; two were red on `develop`, both on false positives against docs that
+were correct. Treat an uninvoked assertion as unknown, not as passing.
+
+Two of the checks are worth knowing about specifically:
+
+- `skill_repo_set_gate.py` (Issue 703) fails on a `SKILL.md` command block that
+  types the repo set by hand instead of deriving it. It reads sibling repos,
+  which CI does not have, so it separates its **vocabulary** (committed
+  `scripts/repo_set.txt`, re-derived and failed-on-drift by every workstation
+  run) from its **population** (12 `SKILL.md` locally, 8 in CI) and prints both.
+  A gate that skipped in CI instead would be the vacuous green it exists to
+  catch. Mark a deliberately narrow block `<!-- repo-set-ok: <reason> -->`.
+- `bench_doc_audit.py` runs a `selftest()` on every invocation pinning the line
+  shapes its tokenizer must recognise. Without it a regex regression is silent:
+  the audit recognises fewer labels and still prints "0 mismatches". That is how
+  26 riir-chain benchmark docs audited as clean while being unreadable
+  (`.issues/702`).
+
+`scripts/ci_gate_coverage.py` is a **report, not a gate** (always exit 0): which
+of the derived contract repos actually gate their full compile+lint surface in
+CI, following each workflow into the scripts it calls. Run it instead of
+re-typing the answer — that question has been answered by hand twice and been
+wrong both times (`.issues/701` R2).
 
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
