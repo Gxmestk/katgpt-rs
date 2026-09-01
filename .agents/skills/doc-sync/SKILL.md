@@ -44,7 +44,20 @@ claims rot:
   every other repo LINKS. Never copy a cross-repo rule into a second file —
   that is the duplication doc-sync exists to catch.
 
-## The workspace repos and their doc shapes (14 as of 2026-08-28)
+## The workspace repos and their doc shapes (**18**, measured 2026-09-01)
+
+> The header said *"14 as of 2026-08-28"* over a table of **12** rows until
+> 2026-09-01 — wrong twice, and six repos had no row at all, so a sync run that
+> walked this table skipped them silently. Don't re-type the count; derive the set
+> the same way the boundary gate does:
+>
+> ```bash
+> cd /Users/katopz/git && for d in */; do
+>   [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && echo "${d%/}"
+> done
+> ```
+>
+> Canonical count + product-vs-workspace split: `katgpt-rs/AGENTS.md` §"Repo count".
 
 Each repo has a different doc layout. **Read the repo's `AGENTS.md` first** —
 it documents the canonical layout and the numbering discipline.
@@ -63,6 +76,12 @@ it documents the canonical layout and the numbering discipline.
 | `riir-viewbridge` | **No `.docs/` folder** — AGENTS.md-centric (workspace layout, boundary rules, latent/raw wall, issue log) + `.benchmarks/` (Bench 002 node GOAT). The Rust FFI side of the Unity bridge. | Role + boundary + build commands. | same | `develop` |
 | `riir-dapps` | **No `.docs/` folder** — AGENTS.md-centric (the one-way game → dapps → chain invariant, the three-test rule, tiered-durability record) + `.plans/` / `.issues/` / `.benchmarks/`. The settlement-composition layer. | Boundary + build + the `direction_gate` + kat rail status. | same | `develop` |
 | `riir-dao` | **No `.docs/` folder** — AGENTS.md-centric (the KAT tokenomics agent: signals → strategy → guard → advisory → commit; the G5 advisory-only verdict) + `.plans/` / `.benchmarks/`. | Boundary + build + the direction gate. | same | `develop` |
+| `riir-armageddon` | **`.docs/` exists but is EMPTY** — AGENTS.md-centric in practice (arena/game-product domain types). Added 2026-09-01 | yes | `.issues` 005, `.plans` 008 | **`main`** — not `develop`; check before branching |
+| `riir-auth` | **`.docs/` exists but holds only `.highwater`** — i.e. no docs at all, AGENTS.md-centric in practice (the numbering file was created ahead of the folder's first document). Added 2026-09-01 | yes | `.issues` 002, `.benchmarks` 4, `.plans`/`.docs`/`.research` at 0 | `develop` |
+| `riir-burner` | **Flat numbered FILES, no folders** — `.docs/001_model_verdict.md` … `016_*.md` (7 files; two share 016 — the numbering discipline is not enforced here). Added 2026-09-01 | yes | `.issues` 015, `.plans` 019 | `develop` |
+| `riir-deployer` | **2 numbered folders** (`01_orientation/`, `02_runbooks/`) + a `.docs/README.md` index — the smallest numbered shape in the workspace. No `CLAUDE.md`. Added 2026-09-01 | yes | `.issues` 003, `.plans` 002, `.benchmarks` 001 | `develop` |
+| `katgpt-web` | **No `.docs/` folder** — AGENTS.md-centric. Added 2026-09-01 | yes | none | **`feat/percepta-arch-diagrams`** — the only repo whose checkout is not on its trunk; sync the branch you find, and say which one in the run log |
+| `seal-game-editor` | **NAMED (not numbered) `.docs/` subfolders** — `new-game-schema/`, `registry/`, plus loose `SEALM_ASSETS.md`. Carries `ARCHITECTURE.md` + `DESIGN.md` alongside AGENTS/README, and `ARCHITECTURE.md` is where the internal layering lives (`BOUNDARY.md` covers only the outer edge). Added 2026-09-01 | yes | `.issues` 141, `.plans` 140 | `develop` |
 
 ## The sync workflow (per repo)
 
@@ -245,7 +264,7 @@ contract — fix the skill then, but also note the gap.
 - **Do not** write a doc entry for a plan that hasn't landed yet. Speculative docs go in `.proposals/`.
 - **Do not** remove a negative-result entry when closing its issue — the negative result is load-bearing documentation.
 - **Do not** upgrade a GOAT FAIL to a PASS in the docs without the benchmark file to back it.
-- **Do not** impose a `.docs/` shape that differs from the repo's existing convention (e.g. don't create a `.docs/` folder for `riir-mmorpg-examples`, `riir-unity`, `riir-viewbridge`, `riir-dapps`, or `riir-dao`, which are AGENTS.md-centric) — respect the repo's existing shape. As of 2026-08-28, eight of the fourteen repos use numbered folders (`riir-clippy` at its 12-folder book, `12_ane/` added by riir-ai Issue 726 T0) and six are AGENTS.md-centric. The rule is about matching the shape, not about whether to have one — and a shape change is a deliberate, committed decision governed by the **Shape-change contract** above (it updates THIS file in the same pass via the grep-able checklist, not something a sync run improvises).
+- **Do not** impose a `.docs/` shape that differs from the repo's existing convention (e.g. don't create a `.docs/` folder for `riir-mmorpg-examples`, `riir-unity`, `riir-viewbridge`, `riir-dapps`, `riir-dao`, `riir-armageddon`, `riir-auth` or `katgpt-web`, which are AGENTS.md-centric) — respect the repo's existing shape. Measured 2026-09-01 across all **18**, and it is four shapes, not two: **8** numbered folders (katgpt-rs, riir-ai, riir-chain, riir-neuron-db, riir-train, riir-game-sdk, riir-clippy at its 12-folder book, riir-deployer at just two), **8** AGENTS.md-centric (the list above — `riir-armageddon` and `riir-auth` have a `.docs/` directory holding no document, which reads as a shape but is not one), **1** flat numbered FILES (`riir-burner`), **1** NAMED subfolders (`seal-game-editor`). The old text said 'eight of the fourteen … and six are AGENTS.md-centric' over a 12-row table — a split that summed to neither. The rule is about matching the shape, not about whether to have one — and a shape change is a deliberate, committed decision governed by the **Shape-change contract** above (it updates THIS file in the same pass via the grep-able checklist, not something a sync run improvises).
 - **Do not** renumber existing docs — the numbering discipline is monotonic and never reused.
 - **Do not** document trivial mechanical commits (lockfile bumps, clippy fixes) unless they close a tracked issue.
 
