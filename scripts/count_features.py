@@ -22,6 +22,9 @@ from pathlib import Path
 
 import tomllib
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bench_doc_audit import iter_cargo_manifests
+
 
 # Deliberately permissive: up to three intervening words, and "default
 # features" as well as "default-on". Canaried at each widening — the first
@@ -57,10 +60,16 @@ def main() -> int:
     # EVERY workspace manifest, which is what the module docstring has always
     # claimed. It used to hardcode two (root + katgpt-core) and so measured a
     # SUBSET while reporting it as the workspace: 537/189 against an actual
-    # 568/197 across 29 manifests. The gap is small because most crate features
-    # are passthrough duplicates of root/core names, which is exactly why the
-    # under-scope survived — it looked right.
-    tomls = [root / "Cargo.toml"] + sorted((root / "crates").glob("*/Cargo.toml"))
+    # 568/197. The gap is small because most crate features are passthrough
+    # duplicates of root/core names, which is exactly why the under-scope
+    # survived — it looked right.
+    #
+    # Discovered by walking, not by a `crates/*/Cargo.toml` glob: the glob
+    # assumes every crate sits exactly one level down, so a nested crate that
+    # defined features would be silently uncounted — the same class of bug one
+    # level deeper. `iter_cargo_manifests` is shared with the doc auditors, so
+    # all four checks agree on what "the workspace" means.
+    tomls = [p for p in sorted(iter_cargo_manifests(root)) if load_features(p)[1]]
 
     print("=" * 72)
     print("katgpt-rs feature-flag audit")

@@ -61,6 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_doc_audit import (
     find_cargo_defaults,
     find_defined_features,
+    iter_cargo_manifests,
     parse_status_phrase,
 )
 
@@ -86,9 +87,7 @@ def find_cargo_defaults_per_manifest(repo_root: Path) -> dict[Path, set[str]]:
     feature specs.
     """
     result: dict[Path, set[str]] = {}
-    for cargo in repo_root.rglob("Cargo.toml"):
-        if "target" in cargo.parts:
-            continue
+    for cargo in iter_cargo_manifests(repo_root):
         try:
             with cargo.open("rb") as f:
                 data = tomllib.load(f)
@@ -220,7 +219,7 @@ DEMOTE_NEGATION_RES = [
         r"\bstays\s+off\b",
         r"\bnot\s+default-on\b",
         r"\bnot\s+promoted\b",
-        r"\bpromotion\s+(?:blocked|deferred|pending|depends)\b",
+        r"\bpromotion\s+(?:blocked|deferred|pending|depends|waits)\b",
     ]
 ]
 
@@ -238,8 +237,18 @@ CANONICAL_DEFAULT_RE = re.compile(
 # Used after canonical and opt-in checks fall through.
 DEFAULT_ON_MENTION_RE = re.compile(r"\bDEFAULT-ON\b", re.IGNORECASE)
 
-# Explicit "Opt-in" (capitalized emphasis) — human-written status claim.
-EXPLICIT_OPTIN_RE = re.compile(r"\bOpt-in\b")
+# Explicit "Opt-in" / "OPT-IN" (capitalized emphasis) — human-written status
+# claim. Deliberately NOT case-insensitive: bare lowercase "opt-in" is casual
+# prose and is handled later by STRONG_OPTIN_RES, after the default-on checks.
+#
+# The all-caps form was missing, and it is a convention here, not a one-off:
+# 32 comment lines use "OPT-IN" against 176 using "Opt-in". Any of those 32
+# that also mention "default-on" incidentally — e.g. describing ANOTHER
+# feature's promotion precedent — fell through rule 3 to rule 4's
+# case-INSENSITIVE `\bDEFAULT-ON\b` and was classified default-on. That is how
+# `signed_coupling_dynamics`, whose comment ends "OPT-IN — promotion waits on a
+# production consumer", was reported as claiming default-on.
+EXPLICIT_OPTIN_RE = re.compile(r"\b(?:Opt-in|OPT-IN)\b")
 
 # Strong default-on phrases — fallback after canonical + Opt-in checks.
 STRONG_DEFAULT_RES = [
@@ -339,9 +348,7 @@ def iter_cargo_comment_labels(repo_root: Path):
     raw_comment is the full inline comment text (for the caller to apply
     local-scope-override and cross-crate-claim checks).
     """
-    for cargo in repo_root.rglob("Cargo.toml"):
-        if "target" in cargo.parts:
-            continue
+    for cargo in iter_cargo_manifests(repo_root):
         rel = cargo.relative_to(repo_root).as_posix()
         try:
             text = cargo.read_text(encoding="utf-8", errors="replace")

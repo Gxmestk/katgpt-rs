@@ -1,0 +1,76 @@
+# Docs gate — manifest/doc drift assertions, run by CI rather than by hope.
+#
+# All three checks this runs already existed in scripts/. Nothing invoked any of
+# them, and measured on 2026-09-01 two were RED on `develop`, both from false
+# positives on docs that were CORRECT (see scripts/docs_gate.sh for the detail).
+# A red assertion nobody runs is worse than none: it teaches the next reader
+# that the tool is broken.
+#
+# ── Why ubuntu-latest here, when full_gate.yml insists on macOS ──────────────
+# Opposite reasoning, same care. The full gate must run on macOS because the
+# device backends are `cfg(all(target_os = "macos", feature = ...))` and compile
+# to NOTHING elsewhere, so a Linux run would report a vacuous green. This gate
+# is pure Python over Cargo manifests and markdown — no cfg surface at all — so
+# platform cannot change its verdict, and macOS minutes bill at a multiple.
+# Don't "align" this with the full gate's runner.
+#
+# ── Why per-push, when full_gate.yml is weekly ──────────────────────────────
+# Measured: ~3s for all three (0.1 + 1.4 + 1.5), against >13 min for the full
+# gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
+# pruned — pathlib's rglob("Cargo.toml") descended into target/ (117 GB, ~1.3M
+# entries) and filtered afterwards, at four call sites per run. Doc drift is
+# also introduced per-commit and is cheapest to catch in the commit that
+# introduces it, which is the opposite of the full gate's slow-rot failure mode.
+name: Docs gate
+
+on:
+  push:
+    branches: [main, develop]
+    # NOTE: duplicated rather than shared via a YAML anchor — GitHub Actions
+    # does not support anchors/aliases, and a local `yaml.safe_load` DOES
+    # resolve them, so validating here would have reported a green workflow
+    # that GitHub then rejected. Keep the two lists in sync by hand.
+    paths:
+      - 'README.md'
+      - 'examples/README.md'
+      - 'Cargo.toml'
+      - 'crates/**/Cargo.toml'
+      - '.benchmarks/**/*.md'
+      - '.docs/**/*.md'
+      - 'scripts/count_features.py'
+      - 'scripts/bench_doc_audit.py'
+      - 'scripts/cargo_comment_audit.py'
+      - 'scripts/docs_gate.sh'
+      - '.github/workflows/docs_gate.yml'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'examples/README.md'
+      - 'Cargo.toml'
+      - 'crates/**/Cargo.toml'
+      - '.benchmarks/**/*.md'
+      - '.docs/**/*.md'
+      - 'scripts/count_features.py'
+      - 'scripts/bench_doc_audit.py'
+      - 'scripts/cargo_comment_audit.py'
+      - 'scripts/docs_gate.sh'
+      - '.github/workflows/docs_gate.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docs-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs-gate:
+    runs-on: ubuntu-latest
+    # Generous multiple of the ~3s measured runtime; a timeout this far above
+    # the measurement means a hit indicates a hang, not a slow day.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      # No toolchain, no cache, no cargo: the checks parse manifests as TOML and
+      # docs as text. tomllib is stdlib from 3.11, which ubuntu-latest ships.
+      - name: Docs gate (flag counts, bench-doc labels, Cargo comments)
+        run: ./scripts/docs_gate.sh
