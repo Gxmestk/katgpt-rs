@@ -110,6 +110,45 @@ pub fn cmp_for_min(a: f32, b: f32) -> core::cmp::Ordering {
     asc(a, b)
 }
 
+// ── f64 twins ────────────────────────────────────────────────────────────
+// Same three properties over f64 (riir-ai Issue 832: percentile/rank stats
+// sort f64 latencies, token frequencies, and normalized energies). Only the
+// sort comparators have f64 consumers today; the selection twins
+// (`cmp_for_max_f64`/`cmp_for_min_f64`) land on the first f64 `max_by`/
+// `min_by` consumer.
+
+/// f64 twin of [`key`].
+#[inline]
+fn key_f64(x: f64, nan_sentinel: f64) -> f64 {
+    if x.is_nan() {
+        nan_sentinel
+    } else if x == 0.0 {
+        // Collapses -0.0 into +0.0; `total_cmp` would otherwise order them.
+        0.0
+    } else {
+        x
+    }
+}
+
+/// Descending f64 sort comparator (largest first) that is a TOTAL order.
+///
+/// NaN sorts last, `-0.0` ties `+0.0`, and every NaN-free pair orders exactly
+/// as the replaced `b.partial_cmp(&a).unwrap_or(Ordering::Equal)` idiom.
+#[inline]
+pub fn desc_f64(a: f64, b: f64) -> core::cmp::Ordering {
+    key_f64(b, f64::NEG_INFINITY).total_cmp(&key_f64(a, f64::NEG_INFINITY))
+}
+
+/// Ascending f64 sort comparator (smallest first) that is a TOTAL order.
+///
+/// NaN sorts last (a corrupt cost must never look cheap), `-0.0` ties `+0.0`,
+/// and every NaN-free pair orders exactly as the replaced
+/// `a.partial_cmp(&b).unwrap_or(Ordering::Equal)` idiom.
+#[inline]
+pub fn asc_f64(a: f64, b: f64) -> core::cmp::Ordering {
+    key_f64(a, f64::INFINITY).total_cmp(&key_f64(b, f64::INFINITY))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,12 +198,12 @@ mod tests {
 
     #[test]
     fn nan_sorts_last_under_both_directions() {
-        let mut xs = vec![1.0, f32::NAN, 3.0, f32::NAN, -2.0, 0.0, f32::NAN];
+        let mut xs = [1.0, f32::NAN, 3.0, f32::NAN, -2.0, 0.0, f32::NAN];
         xs.sort_by(|a, b| desc(*a, *b));
         assert_eq!(&xs[..4], &[3.0, 1.0, 0.0, -2.0]);
         assert!(xs[4..].iter().all(|v| v.is_nan()), "NaN must sort last");
 
-        let mut ys = vec![1.0, f32::NAN, 3.0, f32::NAN, -2.0, 0.0, f32::NAN];
+        let mut ys = [1.0, f32::NAN, 3.0, f32::NAN, -2.0, 0.0, f32::NAN];
         ys.sort_by(|a, b| asc(*a, *b));
         assert_eq!(&ys[..4], &[-2.0, 0.0, 1.0, 3.0]);
         assert!(ys[4..].iter().all(|v| v.is_nan()), "NaN must sort last");
@@ -225,5 +264,56 @@ mod tests {
             assert_eq!(desc(a, b), asc(b, a), "desc(a,b) must equal asc(b,a) off NaN");
             assert_eq!(cmp_for_max(a, b), cmp_for_min(a, b), "selection comparators agree off NaN");
         }
+    }
+
+    // ── f64 twins ──────────────────────────────────────────────────────
+
+    /// Same 11-value corpus pin as the f32 comparators, over f64.
+    #[test]
+    fn f64_matches_partial_cmp_idiom_on_nan_free_corpus() {
+        let corpus = [
+            f64::INFINITY,
+            f64::MAX,
+            1.0,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE * 0.5, // subnormal
+            0.0,
+            -0.0,
+            -f64::MIN_POSITIVE * 0.5,
+            -1.0,
+            f64::MIN,
+            f64::NEG_INFINITY,
+        ];
+        for a in corpus {
+            for b in corpus {
+                let legacy = a.partial_cmp(&b).unwrap_or(Equal);
+                assert_eq!(asc_f64(a, b), legacy, "asc_f64({a},{b}) diverged");
+                assert_eq!(desc_f64(a, b), legacy.reverse(), "desc_f64({a},{b}) diverged");
+            }
+        }
+    }
+
+    /// NaN must sink under BOTH f64 directions, including past +inf.
+    #[test]
+    fn f64_nan_sorts_last_under_both_directions() {
+        let mut xs = [1.0, f64::NAN, f64::INFINITY, f64::NAN, -2.0, 0.0];
+        xs.sort_by(|a, b| desc_f64(*a, *b));
+        assert_eq!(&xs[..4], &[f64::INFINITY, 1.0, 0.0, -2.0]);
+        assert!(xs[4..].iter().all(|v| v.is_nan()), "NaN must sort last (desc)");
+
+        let mut ys = [1.0, f64::NAN, f64::INFINITY, f64::NAN, -2.0, 0.0];
+        ys.sort_by(|a, b| asc_f64(*a, *b));
+        assert_eq!(&ys[..3], &[-2.0, 0.0, 1.0]);
+        // Under asc, NaN maps to +INFINITY — it TIES a real +inf (both sit
+        // past every real value), so the tail holds {inf, NaN, NaN} in any
+        // order. No other real value may appear there.
+        assert!(ys[3..].iter().all(|v| v.is_nan() || *v == f64::INFINITY));
+        assert_eq!(ys[3..].iter().filter(|v| v.is_nan()).count(), 2);
+    }
+
+    #[test]
+    fn f64_signed_zeros_tie() {
+        assert_eq!(asc_f64(0.0, -0.0), Equal);
+        assert_eq!(desc_f64(0.0, -0.0), Equal);
     }
 }

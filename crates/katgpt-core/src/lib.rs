@@ -90,6 +90,15 @@ pub mod attention;
 #[cfg(feature = "newton_schulz")]
 pub mod newton_schulz;
 
+// float_order — NaN-safe total-order f32/f64 comparators (generalizes riir-rag
+// score_cmp_desc; the workspace partial_cmp-unwrap_or(Equal) panic class):
+// NaN sinks under both directions, -0.0 ties +0.0, NaN-free ordering is
+// identical to the replaced idiom. Always compiled (ungated) — sorts run in
+// every build, including --no-default-features consumers (riir-ai Issue 832
+// T1: the cfg had landed on this module instead of `rating`, inverting both
+// modules' documented gating).
+pub mod float_order;
+
 // rating — Elo + Plackett-Luce rating primitives (Issue 686, promoted from
 // four in-stack copies: katgpt-pruners arena EloCalculator + proof
 // lambda_to_elo, riir-ai riir-games ruliology ParadigmRanking, riir-clippy
@@ -97,12 +106,6 @@ pub mod newton_schulz;
 // f64 canonical + f32 twins (riir-clippy's persisted ratings keep their
 // exact numerics). Zero-cost-unless-invoked.
 #[cfg(feature = "rating")]
-// float_order — NaN-safe total-order f32 comparators (generalizes riir-rag
-// score_cmp_desc; the workspace partial_cmp-unwrap_or(Equal) panic class):
-// NaN sinks under both directions, -0.0 ties +0.0, NaN-free ordering is
-// identical to the replaced idiom. Always compiled — sorts run everywhere.
-pub mod float_order;
-
 pub mod rating;
 
 // laprop — LaProp normalize-before-accumulate momentum (Issue 689, from
