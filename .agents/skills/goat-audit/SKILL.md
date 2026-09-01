@@ -84,14 +84,34 @@ Source the "default-on since" from the inline comment in the Cargo.toml (e.g. `#
 
 **Skill correction (2026-07-09, Issue 420):** the prior version of this paragraph cited `riir-engine/src/kvarn_quality.rs` defining `KvCacheQualityReport` as a duplicate of `katgpt-kv::kvarn::KvCacheQualityReport`. That example was factually wrong — `katgpt-kv` does NOT ship `KvCacheQualityReport` (verified: 0 matches across `katgpt-rs/**/*.rs`). The riir-engine type is a legitimately local `ThinkingController` abstraction (Plan 199 T1), NOT fork drift. The `crate::transformer` shadow case above replaces it as the canonical example.
 
-For each primitive, run ALL THREE greps in parallel across `riir-ai/`, `riir-chain/`, `riir-neuron-db/`:
+For each primitive, run ALL THREE greps in parallel across the three consumer
+repos named by §"Repos in scope" above.
 
-```
+**This narrow set is deliberate, not drift** — it is the reasoned in-scope list
+(product set of 8 minus the four documented OUT OF SCOPE entries), which is why
+the block carries the marker below and `scripts/skill_repo_set_gate.py` does not
+flag it. Widen it only by editing §"Repos in scope" first; the scope section is
+the decision, this grep is only its implementation.
+
+Caveat worth knowing when you read a "0 consumers" result: it is a claim about
+these three repos, not about the workspace's 18. A DUPLICATE of a primitive can
+live in an out-of-scope repo (`riir-armageddon` consumes `GenericSpatialBelief`
+in 3 files) — the anti-duplication sweep that covers all of them is
+`substrate-first` Audit Step 2, not this one.
+
+<!-- repo-set-ok: the reasoned in-scope consumer set per §"Repos in scope" -->
+```bash
+cd /Users/katopz/git
+
 # Layer 1 — feature-name grep (catches Cargo.toml forwards + cfg gates)
-grep "<feature_name>" riir-ai/**/*.toml riir-chain/**/*.toml riir-neuron-db/**/*.toml
+# -r + --include, NOT `riir-ai/**/*.toml`: bash without `shopt -s globstar`
+# expands `**` as a single `*`, so the old form silently checked ONE level.
+grep -rn "<feature_name>" --include='*.toml' --exclude-dir=target \
+  riir-ai/ riir-chain/ riir-neuron-db/
 
 # Layer 2 — struct/function-name grep (catches actual code consumption)
-grep "<CamelCaseStruct>|<snake_case_fn>" riir-ai/**/*.rs riir-chain/**/*.rs riir-neuron-db/**/*.rs
+grep -rnE "<CamelCaseStruct>|<snake_case_fn>" --include='*.rs' \
+  --exclude-dir=target riir-ai/ riir-chain/ riir-neuron-db/
 
 # Layer 3 — consumer-vs-duplicate check (MANDATORY for every Layer 2 hit)
 # For each file returned by Layer 2, grep the FILE for katgpt imports.

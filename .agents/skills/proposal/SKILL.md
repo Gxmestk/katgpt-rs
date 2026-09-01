@@ -114,32 +114,41 @@ Write (in your own working, not into the file yet):
 
 This is where the proposal skill differs from `research`: the grep is
 **scoped to the proposal topic**, not the full corpus. Run these in parallel,
-all seven repos, all four document layers + code:
+every contract repo (derived below), all four document layers + code:
 
-```
-# Layer A — prior proposals (strongest precedent, MUST reason about each hit)
-grep "<topic terms>|<codebase-equivalent terms>" \
-  katgpt-rs/.proposals riir-ai/.proposals riir-chain/.proposals riir-neuron-db/.proposals
+DERIVE the repo set; never type it. The four-repo list this replaced
+(`katgpt-rs riir-ai riir-chain riir-neuron-db`) could not see **784 of the
+2,509 documents** in these layers — 31%, and `.issues` was the worst at 21 of
+145 (85% invisible). A prior-art grep exists to stop a duplicate proposal, so a
+layer it cannot read is a layer it cannot clear. Measured 2026-09-01; canonical
+repo set lives in `AGENTS.md` §"Repo count", derived, never copied here.
 
-# Layer B — research notes (prior art already distilled in-house)
-grep "<terms>" \
-  katgpt-rs/.research riir-ai/.research riir-chain/.research riir-neuron-db/.research
+```bash
+cd /Users/katopz/git
 
-# Layer C — plans (what's already been planned / in flight)
-grep "<terms>" \
-  katgpt-rs/.plans riir-ai/.plans riir-chain/.plans riir-neuron-db/.plans
-
-# Layer D — issues (POCs / refactors / open questions already tracked)
-grep "<terms>" \
-  katgpt-rs/.issues riir-ai/.issues riir-chain/.issues riir-neuron-db/.issues
+# Layers A-D — one derived set per document layer. Substitute the layer name.
+# (.proposals = strongest precedent and MUST be reasoned about per hit;
+#  .research = prior art already distilled; .plans = in flight; .issues = tracked)
+for layer in proposals research plans issues; do
+  echo "=== .$layer ==="
+  grep -rn "<topic terms>|<codebase-equivalent terms>" -E \
+    $(ls -d */ | while read -r d; do
+        [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && [ -d "$d.$layer" ] \
+          && printf '%s.%s ' "$d" "$layer"
+      done)
+done
 
 # Layer E — shipped code (what actually exists today)
-grep "<CamelCaseStruct>|<snake_case_fn>" \
-  katgpt-rs/src katgpt-rs/crates \
-  riir-ai/crates \
-  riir-chain/src riir-chain/crates \
-  riir-neuron-db/src
+grep -rnE "<CamelCaseStruct>|<snake_case_fn>" \
+  --include='*.rs' --exclude-dir=target --exclude-dir=.git \
+  $(ls -d */ | while read -r d; do
+      [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && printf '%s ' "$d"
+    done)
 ```
+
+`-d "$d/.git"`, not `-e`: a `git worktree` has a `.git` **file**, and including
+one reports a single document twice. `--exclude-dir=target` is not cosmetic —
+without it Layer E spends nearly all its time inside build directories.
 
 **MANDATORY reasoning per hit** (this is the user's explicit ask: "more focus
 and reasoning on related proposal topic when grep"). For every hit, classify

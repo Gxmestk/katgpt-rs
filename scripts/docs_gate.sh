@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Docs gate — the three manifest/doc drift assertions, as one command.
+# Docs gate — the manifest/doc/skill drift assertions, as one command.
+# The count is deliberately NOT written here: CHECKS below is the list, and a
+# prose count beside a list is the drift this repo keeps rediscovering.
 #
 # Why this file exists: all three checks already existed, and NOTHING ran any of
 # them. Measured 2026-09-01, two of the three were RED on `develop`:
@@ -25,7 +27,16 @@
 # and markdown, no cfg(target_os) surface, so ubuntu is correct and macOS would
 # only cost more. Don't "fix" it to macos-latest.
 #
-# Runs all three even after one fails — the same reason full_gate.sh passes
+# skill_repo_set_gate.py (added 2026-09-01, Issue 703) has a second axis the
+# other three do not: it reads SIBLING repos, which CI does not have. It does
+# NOT skip there — it separates its VOCABULARY (committed snapshot,
+# scripts/repo_set.txt) from its POPULATION (the SKILL.md it can actually see),
+# prints both, and the workstation run re-derives the snapshot and FAILS on
+# drift. So CI checks this repo's 8 skills against all 18 repo names, and says
+# out loud that it saw 8 of 12. A gate that skipped instead would be the
+# vacuous green it exists to catch.
+#
+# Runs every check even after one fails — the same reason full_gate.sh passes
 # --keep-going: stopping at the first failure under-reports the drift.
 set -uo pipefail
 
@@ -36,6 +47,7 @@ CHECKS=(
     "scripts/count_features.py:flag counts in README + examples/README vs every manifest"
     "scripts/bench_doc_audit.py:(default-on|opt-in) labels in .benchmarks + .docs vs Cargo defaults"
     "scripts/cargo_comment_audit.py:inline Cargo.toml comments vs the default closure"
+    "scripts/skill_repo_set_gate.py:hand-typed repo sets in SKILL.md command blocks (Issue 703)"
 )
 
 if ! command -v python3 >/dev/null 2>&1; then

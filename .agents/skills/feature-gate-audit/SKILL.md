@@ -260,19 +260,25 @@ After running an audit, produce a per-feature verdict table:
   action (verify the gate is still pending by checking the latest plan
   phase status).
 
-## Scope — the 7 workspace repos
+## Scope — every contract repo, derived
 
+This section used to be a typed 8-row table headed "the 7 workspace repos".
+It disagreed with its own header, omitted 11 repos that carry a `BOUNDARY.md`,
+and listed `seal-online-remaster/`, **which does not exist** (the directory is
+`seal-online-remaster-unity/`; the editor lives in `seal-game-editor/`). A
+feature-gate audit scoped by that table audits a workspace that is not this one.
+
+Derive it. The canonical count and the two axes (product set vs workspace) live
+in `AGENTS.md` §"Repo count" — do not copy either number here.
+
+```bash
+cd /Users/katopz/git && for d in */; do
+  [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && echo "${d%/}"
+done
 ```
-katgpt-rs/              ← engine primitives; mostly DEFAULT-ON at this layer
-riir-ai/                ← multi-crate workspace; engine/SDK/games layers
-                          (the most common site of layer splits)
-riir-chain/             ← chain lib + daemon
-riir-neuron-db/         ← leaf crate (re-exported by riir-chain)
-riir-train/             ← training-method research
-riir-game-sdk/          ← game-vocabulary facade over riir-ai
-seal-online-remaster/   ← consumer (seal-core / mmorpg)
-riir-mmorpg-examples/   ← consumer (orchard multiplayer POC)
-```
+
+`-d "$d/.git"`, not `-e`: a `git worktree` has a `.git` **file**, and counting
+one audits the same crate twice.
 
 For each repo, **read its `AGENTS.md` first** — it documents the
 canonical feature-gate layout and the layer-split conventions for that

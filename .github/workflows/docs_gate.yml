@@ -1,7 +1,7 @@
 # Docs gate — manifest/doc drift assertions, run by CI rather than by hope.
 #
-# All three checks this runs already existed in scripts/. Nothing invoked any of
-# them, and measured on 2026-09-01 two were RED on `develop`, both from false
+# The first three checks this runs already existed in scripts/. Nothing invoked
+# any of them, and measured on 2026-09-01 two were RED on `develop`, from false
 # positives on docs that were CORRECT (see scripts/docs_gate.sh for the detail).
 # A red assertion nobody runs is worse than none: it teaches the next reader
 # that the tool is broken.
@@ -15,7 +15,8 @@
 # Don't "align" this with the full gate's runner.
 #
 # ── Why per-push, when full_gate.yml is weekly ──────────────────────────────
-# Measured: ~3s for all three (0.1 + 1.4 + 1.5), against >13 min for the full
+# Measured: ~3s for the original three (0.1 + 1.4 + 1.5) and ~0.03s (12 SKILL.md, no build dirs walked)
+# for the skill repo-set gate, against >13 min for the full
 # gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
 # pruned — pathlib's rglob("Cargo.toml") descended into target/ (117 GB, ~1.3M
 # entries) and filtered afterwards, at four call sites per run. Doc drift is
@@ -40,6 +41,9 @@ on:
       - 'scripts/count_features.py'
       - 'scripts/bench_doc_audit.py'
       - 'scripts/cargo_comment_audit.py'
+      - 'scripts/skill_repo_set_gate.py'
+      - 'scripts/repo_set.txt'
+      - '.agents/skills/**/SKILL.md'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   pull_request:
@@ -53,6 +57,9 @@ on:
       - 'scripts/count_features.py'
       - 'scripts/bench_doc_audit.py'
       - 'scripts/cargo_comment_audit.py'
+      - 'scripts/skill_repo_set_gate.py'
+      - 'scripts/repo_set.txt'
+      - '.agents/skills/**/SKILL.md'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   workflow_dispatch:
@@ -72,5 +79,5 @@ jobs:
 
       # No toolchain, no cache, no cargo: the checks parse manifests as TOML and
       # docs as text. tomllib is stdlib from 3.11, which ubuntu-latest ships.
-      - name: Docs gate (flag counts, bench-doc labels, Cargo comments)
+      - name: Docs gate (flag counts, bench-doc labels, Cargo comments, skill repo sets)
         run: ./scripts/docs_gate.sh
