@@ -15,10 +15,13 @@
 #   2. Invoke them BY PATH from a katgpt-rs checkout. 702's zero-script-copies
 #      property is deliberate: the auditor fixes then apply workspace-wide with
 #      no sync step. A vendored copy is a fork that rots.
-#   3. Pass the target path EXPLICITLY. With no argument the scripts default to
-#      auditing the repo they live in — katgpt-rs. A sibling that drops the '.'
-#      audits the WRONG REPO and passes forever, which is precisely the class of
-#      failure this whole issue is about.
+#   3. Pass the target path EXPLICITLY, and keep the two checkouts UNNESTED.
+#      With no argument the scripts default to auditing the repo they live in —
+#      katgpt-rs — so a sibling that drops the path audits the WRONG REPO and
+#      passes forever. Subtler, and measured here on the first real run: if the
+#      katgpt-rs checkout sits INSIDE the audited tree, the manifest walk
+#      descends into it and folds katgpt-rs's files into the caller's result
+#      while the header still names the caller.
 #
 # So it lives here once, and a caller writes three lines:
 #
@@ -77,16 +80,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # No `repository:` — in a reusable workflow this checks out the CALLER at
-      # the caller's SHA, which is the tree we intend to audit.
-      - uses: actions/checkout@v6
+      # BOTH checkouts are placed in SIBLING directories, never nested. The
+      # first version put the caller at the workspace root and katgpt-rs in
+      # `.auditors/` beneath it — so the auditors' manifest walk descended INTO
+      # the katgpt-rs checkout and audited its files as if they were the
+      # caller's. Measured on the first real run: riir-neuron-db, which has zero
+      # inline Cargo comments, reported 396 — exactly katgpt-rs's count.
+      #
+      # Note what the tree-name guard below did NOT catch: the header still read
+      # "=== Auditing riir-neuron-db ===", because the top-level directory was
+      # genuinely the caller. Contamination came in through a different door
+      # than the one guarded. Sibling layout closes it structurally.
+      #
+      # The caller's path is `${{ github.repository }}` (e.g. `org/name`) rather
+      # than a fixed word so its BASENAME stays the real repo name — the guard
+      # compares against that, and a fixed `repo/` would make it fail on every
+      # run.
+      - name: Check out the calling repo (the tree under audit)
+        uses: actions/checkout@v6
+        with:
+          path: ${{ github.repository }}
 
       - name: Check out katgpt-rs (public sibling — the auditors' only home)
         uses: actions/checkout@v6
         with:
           repository: katopz/katgpt-rs
           ref: ${{ inputs.katgpt_ref }}
-          path: .auditors
+          path: _auditors
 
       # The guard for fact (3). The auditors print "=== Auditing <basename> ==="
       # per repo, so the audited basename is checkable against the caller's repo
@@ -95,13 +115,14 @@ jobs:
       - name: Bench-doc + Cargo-comment audit vs the manifests
         env:
           MIN_LABELS: ${{ inputs.min_labels }}
+          TARGET: ${{ github.repository }}
         run: |
           set -uo pipefail
           expected="${GITHUB_REPOSITORY##*/}"
           rc=0
           for script in bench_doc_audit.py cargo_comment_audit.py; do
             echo "▸ $script"
-            out="$(python3 ".auditors/scripts/$script" . 2>&1)" || rc=1
+            out="$(python3 "_auditors/scripts/$script" "$TARGET" 2>&1)" || rc=1
             printf '%s\n' "$out"
             if ! printf '%s\n' "$out" | grep -qF "=== Auditing $expected ==="; then
               echo "✗ $script audited a tree that is not '$expected' — the target"
@@ -115,7 +136,7 @@ jobs:
           # Cargo-comment count is left unpinned because a repo legitimately
           # having zero inline feature comments is common and uninteresting.
           if [ "${MIN_LABELS:-0}" -gt 0 ]; then
-            labels="$(python3 ".auditors/scripts/bench_doc_audit.py" . 2>/dev/null \
+            labels="$(python3 "_auditors/scripts/bench_doc_audit.py" "$TARGET" 2>/dev/null \
                       | sed -n 's/.*checked \([0-9]*\) labels.*/\1/p' | head -1)"
             labels="${labels:-0}"
             if [ "$labels" -lt "$MIN_LABELS" ]; then
