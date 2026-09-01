@@ -116,7 +116,7 @@ struct Stats {
 
 fn compute_stats(samples: &[f64]) -> Stats {
     let mut sorted = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let n = sorted.len();
     Stats {
         p50: sorted[n / 2],

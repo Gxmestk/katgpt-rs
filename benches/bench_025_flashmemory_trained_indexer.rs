@@ -601,7 +601,7 @@ fn run_bench() {
 
 fn sort_median(v: &[f32]) -> f32 {
     let mut s = v.to_vec();
-    s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    s.sort_by(|a, b| a.total_cmp(b));
     s[s.len() / 2]
 }
 

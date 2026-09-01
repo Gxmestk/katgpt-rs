@@ -196,11 +196,7 @@ fn build_leaderboard(
             elo,
         })
         .collect();
-    rankings.sort_by(|a, b| {
-        b.elo
-            .partial_cmp(&a.elo)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    rankings.sort_by(|a, b| b.elo.total_cmp(&a.elo));
 
     let mut md = String::from("## GOAT Proof: SkillLifecycle Tournament\n\n");
     md.push_str("| Rank | Variant | W | L | Win% | ELO | Direct Win% |\n");
@@ -345,7 +341,7 @@ fn main() {
 
     // Print leaderboard table
     let mut sorted: Vec<(&str, f64)> = elos.iter().map(|(k, &v)| (k.as_str(), v)).collect();
-    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     println!(
         "  | {:<4} | {:<16} | {:>3} | {:>3} | {:>5} | {:>6} | {:>9} |",

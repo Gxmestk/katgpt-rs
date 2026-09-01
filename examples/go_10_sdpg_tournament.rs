@@ -258,7 +258,7 @@ fn run_tournament(
     entries.sort_by(|a, b| {
         let wr_a = a.wins as f64 / a.games as f64;
         let wr_b = b.wins as f64 / b.games as f64;
-        wr_b.partial_cmp(&wr_a).unwrap_or(std::cmp::Ordering::Equal)
+        wr_b.total_cmp(&wr_a)
     });
 
     // Print leaderboard

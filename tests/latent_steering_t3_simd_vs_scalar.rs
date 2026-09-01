@@ -94,7 +94,7 @@ fn time_median_ns_batched<F: FnMut(&mut [f32])>(
         times_ns.push(dt);
     }
     black_box(state.as_ptr());
-    times_ns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_ns.sort_by(|a, b| a.total_cmp(b));
     times_ns[iters / 2]
 }
 
@@ -206,7 +206,7 @@ fn t3_simd_vs_scalar_throughput() {
         crowd_ns.push(t0.elapsed().as_nanos() as f64);
     }
     black_box(&states);
-    crowd_ns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    crowd_ns.sort_by(|a, b| a.total_cmp(b));
     let p50_us = crowd_ns[N_ITERS / 2] / 1000.0;
     let crowd_verdict = if p50_us < GATE_CROWD_US {
         "PASS"

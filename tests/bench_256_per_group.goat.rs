@@ -84,7 +84,7 @@ fn dense_topk_cache(
             (i, dot * scale)
         })
         .collect();
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
     scored.into_iter().take(k).map(|(i, _)| i).collect()
 }
 

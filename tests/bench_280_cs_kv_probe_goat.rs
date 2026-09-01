@@ -579,9 +579,7 @@ println!("\n=== T3.5: apply zero-allocation ===");
 fn top_k_indices(scores: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..scores.len()).collect();
     idx.sort_by(|&a, &b| {
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
+        scores[b].total_cmp(&scores[a])
             .then_with(|| a.cmp(&b))
     });
     idx.truncate(k);

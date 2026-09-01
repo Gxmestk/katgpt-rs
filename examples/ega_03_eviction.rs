@@ -145,7 +145,7 @@ fn main() {
 
     // Sort positions by energy ascending.
     let mut ranked: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
-    ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    ranked.sort_by(|a, b| a.1.total_cmp(&b.1));
 
     println!("┌──────┬──────────┬────────────┬──────────┐");
     println!("│ Rank │ Position │ Energy     │ Type     │");

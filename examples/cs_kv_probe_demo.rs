@@ -58,11 +58,7 @@ fn main() {
 
     // Rank groups by score, print top-10.
     let mut idx: Vec<usize> = (0..n_heads).collect();
-    idx.sort_by(|&a, &b| {
-        ranking.scores[b]
-            .partial_cmp(&ranking.scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    idx.sort_by(|&a, &b| ranking.scores[b].total_cmp(&ranking.scores[a]));
     println!("CS-KV Probe — top-10 groups (signal = {signal_heads:?}):");
     for (rank, &g) in idx.iter().take(10).enumerate() {
         let marker = if signal_heads.contains(&g) {

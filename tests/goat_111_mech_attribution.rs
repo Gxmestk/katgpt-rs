@@ -435,7 +435,7 @@ fn p6_augmented_data_reaches_target_in_80_percent_of_baseline_rounds() {
     {
         // Sort by catalyst score descending
         let mut sorted_scored = scored.clone();
-        sorted_scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        sorted_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let mut total_score = 0.0;
         let mut count = 0;

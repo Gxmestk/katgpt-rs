@@ -350,10 +350,10 @@ fn assert_alloc_tracking_live() {}
 
 #[test]
 fn g4_alloc_free_steady_state_10k_steps() {
-    assert_alloc_tracking_live();
-
     const STEPS: u64 = 10_000;
     const WARMUP: u64 = 256;
+
+    assert_alloc_tracking_live();
 
     // Text path: normalization streams into a stack BLAKE3 hasher; the
     // answer String is never materialized. The answer CORPUS is pre-built

@@ -293,7 +293,7 @@ let model_p = format!("{}/model.safetensors", model_dir());
     let tok_s = 1000.0 / mean_ms;
 
     let mut sorted = decode_latencies_ms.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let p50 = sorted[n / 2];
     let p99 = sorted[(n * 99) / 100];
 

@@ -238,7 +238,7 @@ fn test_goat_flow_gate_discrimination() {
 
     // Sort scores to identify quartiles
     let mut sorted_scores: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    sorted_scores.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_scores.sort_by(|a, b| a.1.total_cmp(&b.1));
 
     let _q1_start = 0;
     let q4_start = 3 * n_sequences / 4;
@@ -329,7 +329,7 @@ fn test_goat_flow_budget_distribution() {
         .enumerate()
         .map(|(i, &b)| (i, b - b.floor()))
         .collect();
-    fracs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    fracs.sort_by(|a, b| b.1.total_cmp(&a.1));
     for &(i, _) in &fracs {
         if remaining == 0 {
             break;

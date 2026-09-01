@@ -290,7 +290,7 @@ fn proof_5_top1_converged_selects_low_residual() {
     let min_idx = all_residuals
         .iter()
         .enumerate()
-        .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+        .min_by(|(_, a), (_, b)| a.total_cmp(b))
         .map_or(0, |(i, _)| i);
     let min_residual = all_residuals[min_idx];
 
@@ -317,7 +317,7 @@ fn proof_5_top1_converged_selects_low_residual() {
     // Log for verification
     let median_residual = {
         let mut sorted = all_residuals.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        sorted.sort_by(|a, b| a.total_cmp(b));
         sorted[k as usize / 2]
     };
     println!(

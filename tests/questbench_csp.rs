@@ -49,7 +49,7 @@ fn seeded_relevance(len: usize, seed: u64) -> Vec<f32> {
 fn rank(values: &[f64]) -> Vec<f64> {
     let n = values.len();
     let mut indexed: Vec<(usize, f64)> = values.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
 
     let mut ranks = vec![0.0f64; n];
     let mut i = 0;
@@ -114,7 +114,7 @@ fn simulated_tree_depth(relevance: &[f32], _vocab_size: usize) -> usize {
 
     // Sort relevance descending to simulate top-k tree selection
     let mut sorted: Vec<f32> = relevance.to_vec();
-    sorted.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| b.total_cmp(a));
 
     let total_mass: f32 = sorted.iter().sum();
     if total_mass <= 0.0 {

@@ -240,7 +240,7 @@ fn spearman(xs: &[f32], ys: &[f32]) -> f32 {
 
 fn rank_average(v: &[f32]) -> Vec<f64> {
     let mut idx: Vec<usize> = (0..v.len()).collect();
-    idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap_or(std::cmp::Ordering::Equal));
+    idx.sort_by(|&a, &b| v[a].total_cmp(&v[b]));
     let mut ranks = vec![0.0f64; v.len()];
     let mut i = 0;
     while i < idx.len() {

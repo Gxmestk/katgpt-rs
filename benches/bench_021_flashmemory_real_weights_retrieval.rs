@@ -336,7 +336,7 @@ fn run_bench() {
     println!("{}", "=".repeat(70));
 
     // Cosine similarity statistics.
-    cos_sims.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    cos_sims.sort_by(|a, b| a.total_cmp(b));
     let cs_min = cos_sims.first().copied().unwrap_or(0.0);
     let cs_p25 = cos_sims[cos_sims.len() / 4];
     let cs_median = cos_sims[cos_sims.len() / 2];
@@ -348,7 +348,7 @@ fn run_bench() {
     println!("  min={cs_min:.4}  p25={cs_p25:.4}  median={cs_median:.4}  p75={cs_p75:.4}  max={cs_max:.4}  mean={cs_mean:.4}");
 
     // Relative MSE statistics.
-    rel_mses.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    rel_mses.sort_by(|a, b| a.total_cmp(b));
     let rm_median = rel_mses[rel_mses.len() / 2];
     let rm_p90 = rel_mses[9 * rel_mses.len() / 10];
     let rm_max = rel_mses.last().copied().unwrap_or(0.0);

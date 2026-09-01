@@ -454,8 +454,8 @@ fn g6_kernel_relevance_gaussian_vs_linear() {
     }
 
     // Sort descending by score, take top-K
-    linear_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-    gaussian_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    linear_scores.sort_by(|a, b| b.1.total_cmp(&a.1));
+    gaussian_scores.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     let linear_top_k: Vec<usize> = linear_scores.iter().take(top_k).map(|(i, _)| *i).collect();
     let gaussian_top_k: Vec<usize> = gaussian_scores

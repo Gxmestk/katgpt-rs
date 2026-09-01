@@ -27,7 +27,7 @@ fn make_vec(dim: usize, seed: usize) -> Vec<f32> {
 /// Return indices of the top-k values in descending order.
 fn topk_indices(scores: &[f32], k: usize) -> Vec<usize> {
     let mut indexed: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
     indexed.into_iter().take(k).map(|(i, _)| i).collect()
 }
 

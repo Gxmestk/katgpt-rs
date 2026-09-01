@@ -150,7 +150,7 @@ fn t6_3_forward_pass_produces_finite_logits() {
 
     // Find top-5 predicted tokens
     let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
     eprintln!("   top-5 tokens: {:?}", &indexed[..5]);
 
     assert_eq!(nan_count, 0, "NaN in logits");
@@ -201,12 +201,12 @@ fn g1_logits_match_pytorch_reference() {
     // individual logits differ slightly due to f32 accumulation order.
     let mut rust_pairs: Vec<(f32, usize)> =
         logits.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-    rust_pairs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    rust_pairs.sort_by(|a, b| b.0.total_cmp(&a.0));
     let rust_top5: Vec<usize> = rust_pairs.iter().take(5).map(|(_, i)| *i).collect();
 
     let mut ref_pairs: Vec<(f32, usize)> =
         ref_logits.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-    ref_pairs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    ref_pairs.sort_by(|a, b| b.0.total_cmp(&a.0));
     let ref_top5: Vec<usize> = ref_pairs.iter().take(5).map(|(_, i)| *i).collect();
 
     eprintln!("   Rust top-5:  {rust_top5:?}");

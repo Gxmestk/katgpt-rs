@@ -104,11 +104,7 @@ mod tests {
 
         // Find top-10 token indices by max score (only non-zero)
         let mut ranked: Vec<usize> = (0..vocab_size).collect();
-        ranked.sort_by(|&a, &b| {
-            max_scores[b]
-                .partial_cmp(&max_scores[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ranked.sort_by(|&a, &b| max_scores[b].total_cmp(&max_scores[a]));
 
         // Take top-K that actually have non-zero score
         let top_k = 10;

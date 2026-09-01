@@ -231,7 +231,7 @@ fn dash_attn_route(
         .filter(|(_, p)| **p > 0.0)
         .map(|(i, p)| (i, *p))
         .collect();
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
     let selected_chunks: Vec<usize> = scored.iter().take(n_c).map(|(i, _)| *i).collect();
 
     // Sink = first chunk, local = last chunk.
@@ -306,7 +306,7 @@ fn hga_route(
         .filter(|(_, p)| **p > 0.0)
         .map(|(i, p)| (i, *p))
         .collect();
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
     // Look at up to n_chunks chunks for group scoring.
     let selected_chunks: Vec<usize> = scored.iter().take(n_chunks).map(|(i, _)| *i).collect();
 

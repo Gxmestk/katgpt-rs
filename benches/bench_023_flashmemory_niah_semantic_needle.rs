@@ -469,7 +469,7 @@ fn main() {
     // is measured by Bench 021 (cos ≥ 0.96). This bench is a DIAGNOSTIC of
     // centroid selection quality, NOT a gate.
     let mut corrs_sorted = corrs.clone();
-    corrs_sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    corrs_sorted.sort_by(|a, b| a.total_cmp(b));
     let median_corr = corrs_sorted[corrs_sorted.len() / 2];
     println!("  Min per-head block-mass Pearson r   : {min_corr:.6}");
     println!("  Median per-head block-mass Pearson r : {median_corr:.6}");

@@ -599,7 +599,7 @@ fn gradient_check_model(config: KimiK3ModelConfig, l: usize, label: &str) {
         tol * 100.0
     );
     // Print all checks sorted by rel_err descending
-    all_errs.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap());
+    all_errs.sort_by(|a, b| b.3.total_cmp(&a.3));
     eprintln!("Top 15 errors:");
     for (label, analytic, numeric, err) in all_errs.iter().take(15) {
         eprintln!(

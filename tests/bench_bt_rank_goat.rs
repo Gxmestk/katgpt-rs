@@ -140,11 +140,7 @@ fn bench_bt_rank_goat_proof() {
     /// True quality ranking (best first).
     fn true_quality_order(qualities: &[f32]) -> Vec<usize> {
         let mut ranked: Vec<usize> = (0..qualities.len()).collect();
-        ranked.sort_by(|&a, &b| {
-            qualities[b]
-                .partial_cmp(&qualities[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ranked.sort_by(|&a, &b| qualities[b].total_cmp(&qualities[a]));
         ranked
     }
 

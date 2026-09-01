@@ -113,11 +113,7 @@ fn attention_scores(queries: &[f32], keys: &[f32]) -> Vec<f32> {
 /// Top-k key indices for a query, sorted by score descending.
 fn top_k_keys(scores_for_query: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..N_KEYS).collect();
-    idx.sort_unstable_by(|&a, &b| {
-        scores_for_query[b]
-            .partial_cmp(&scores_for_query[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    idx.sort_unstable_by(|&a, &b| scores_for_query[b].total_cmp(&scores_for_query[a]));
     idx.truncate(k);
     idx
 }

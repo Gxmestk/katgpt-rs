@@ -294,7 +294,7 @@ fn proof_t7_eviction_removes_low_energy_first() {
 
     // Sort positions by energy ascending
     let mut indexed: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
 
     println!("T7 — Eviction report:");
     for (rank, (pos, e)) in indexed.iter().enumerate() {
@@ -365,7 +365,7 @@ fn proof_t7_eviction_preserves_attention_quality() {
     // Evict bottom 25% (4 positions) by energy
     let k = seq_len / 4;
     let mut indexed: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
     let evicted: Vec<usize> = indexed[..k].iter().map(|(p, _)| *p).collect();
 
     // Zero out evicted positions and renormalize
@@ -466,7 +466,7 @@ fn proof_t8_combined_pipeline() {
     // Step 4: Evict bottom 25% by energy → verify no signal evicted
     let k = seq_len / 4; // 8
     let mut indexed: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
     let evicted: Vec<usize> = indexed[..k].iter().map(|(p, _)| *p).collect();
 
     let evicted_signal: Vec<usize> = evicted
@@ -576,7 +576,7 @@ fn proof_t9_eviction_simulation() {
 
     // Sort by energy ascending
     let mut indexed: Vec<(usize, f32)> = energy.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+    indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
 
     println!("\n### T9 — Eviction Simulation (seq_len={seq_len}, head_dim={head_dim})\n");
     println!("**Ranked positions (low → high energy):**\n");

@@ -138,7 +138,7 @@ fn rank_average(xs: &[f32], out_ranks: &mut [f32]) {
     debug_assert_eq!(out_ranks.len(), n);
     // (value, original_index)
     let mut idx: Vec<(f32, usize)> = xs.iter().enumerate().map(|(i, &v)| (v, i)).collect();
-    idx.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(core::cmp::Ordering::Equal));
+    idx.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     let mut i = 0;
     while i < n {
@@ -202,7 +202,7 @@ fn spearman_bootstrap_ci(xs: &[f32], ys: &[f32], n_boot: usize, rng: &mut Lcg) -
         }
         rhos.push(spearman(&bx, &by));
     }
-    rhos.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    rhos.sort_by(|a, b| a.total_cmp(b));
     let lo_idx = (0.025 * n_boot as f32).floor() as usize;
     let hi_idx = (0.975 * n_boot as f32).ceil() as usize;
     let hi_idx = hi_idx.min(n_boot - 1);

@@ -361,7 +361,7 @@ fn section_delta_evolution(num_episodes: usize, board_size: usize) {
         })
         .collect();
 
-    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    ranked.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     for (rank, (idx, delta)) in ranked.iter().enumerate() {
         let medal = match rank {

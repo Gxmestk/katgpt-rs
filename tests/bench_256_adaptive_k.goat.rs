@@ -101,7 +101,7 @@ fn build_scattered_set(n_blocks: usize) -> QuerySet {
 /// Full-sort dense top-k block indices from raw dot-product scores.
 fn dense_topk_blocks(scores: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    idx.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    idx.sort_by(|a, b| b.1.total_cmp(&a.1));
     idx.into_iter().take(k).map(|(i, _)| i).collect()
 }
 /// Compute raw dot(query, centroid[i]) for each block. Order matches scaled

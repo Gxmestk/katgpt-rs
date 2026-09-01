@@ -240,11 +240,7 @@ fn print_goat_verdict(stats: &HashMap<Strategy, StrategyStats>) {
     println!("|----------|---|---|---|------|------------|-----|");
 
     let mut entries: Vec<_> = stats.iter().collect();
-    entries.sort_by(|a, b| {
-        b.1.elo
-            .partial_cmp(&a.1.elo)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    entries.sort_by(|a, b| b.1.elo.total_cmp(&a.1.elo));
 
     for (&s, st) in entries {
         let emoji = s.emoji();

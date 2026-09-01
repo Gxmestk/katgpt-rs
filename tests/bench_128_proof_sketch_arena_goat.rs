@@ -137,7 +137,7 @@ fn generate_rankings(
             indices.sort_by(|&a, &b| {
                 let score_a = qualities[a] + rng.f64() * 0.2;
                 let score_b = qualities[b] + rng.f64() * 0.2;
-                score_b.partial_cmp(&score_a).unwrap()
+                score_b.total_cmp(&score_a)
             });
             indices
         })

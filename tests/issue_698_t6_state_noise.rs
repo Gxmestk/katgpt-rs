@@ -366,7 +366,7 @@ fn t698_t6_state_noise_wash() {
     ];
 
     // G1: per-arm double-run bit-identity (loss grid + ref_drift).
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(arms.len());
     for arm in &arms {
         let gate = ResidualGate::new(R_REF, weights_config.n_embd);
         let a = measure_arm(arm, &weights, &gate, &sdpa_gate, &base_ref);

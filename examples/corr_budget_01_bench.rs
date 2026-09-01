@@ -34,7 +34,7 @@ struct Stats {
 fn compute_stats(samples: &[f64]) -> Stats {
     assert!(!samples.is_empty());
     let mut sorted = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let n = sorted.len();
     Stats {
         p50: sorted[n / 2],

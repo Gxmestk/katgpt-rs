@@ -153,8 +153,7 @@ fn main() {
     ranking.sort_by(|&a, &b| {
         stats[b]
             .survival_rate(GAMES)
-            .partial_cmp(&stats[a].survival_rate(GAMES))
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&stats[a].survival_rate(GAMES))
     });
 
     println!("─── Survival Rate ─────────────────────────────────────────────");
@@ -174,8 +173,7 @@ fn main() {
     ranking.sort_by(|&a, &b| {
         stats[b]
             .win_rate(GAMES)
-            .partial_cmp(&stats[a].win_rate(GAMES))
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&stats[a].win_rate(GAMES))
     });
 
     println!("─── Win Rate ──────────────────────────────────────────────────");

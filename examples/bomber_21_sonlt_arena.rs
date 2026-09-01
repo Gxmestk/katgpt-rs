@@ -404,12 +404,7 @@ fn main() {
     println!("  {}", "─".repeat(80));
 
     let mut ranking: Vec<usize> = (0..4).collect();
-    ranking.sort_by(|&a, &b| {
-        stats[b]
-            .avg_score()
-            .partial_cmp(&stats[a].avg_score())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    ranking.sort_by(|&a, &b| stats[b].avg_score().total_cmp(&stats[a].avg_score()));
 
     for (rank, &idx) in ranking.iter().enumerate() {
         println!(

@@ -227,11 +227,7 @@ fn bench_entropy_boosts_high_entropy_chunks() {
 /// Return the indices of the `k` largest values in `scores` (descending).
 fn topk_indices(scores: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..scores.len()).collect();
-    idx.sort_by(|&a, &b| {
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    idx.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
     idx.truncate(k);
     idx
 }

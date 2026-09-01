@@ -125,7 +125,7 @@ fn h2o_select_top_k(
         .collect();
 
     // Sort descending by score, keep top-budget
-    scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scores.sort_by(|a, b| b.1.total_cmp(&a.1));
     scores.truncate(budget);
 
     // Reconstruct in original position order

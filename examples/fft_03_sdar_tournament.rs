@@ -438,11 +438,7 @@ fn main() {
     println!("\n═══ ELO Rankings ═══\n");
 
     let mut rankings: Vec<(&Strategy, &StrategyStats)> = stats.iter().collect();
-    rankings.sort_by(|a, b| {
-        b.1.elo
-            .partial_cmp(&a.1.elo)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    rankings.sort_by(|a, b| b.1.elo.total_cmp(&a.1.elo));
 
     println!("| Rank | Strategy  | ELO    | W    | L    | D    | Win%   |");
     println!("|------|-----------|--------|------|------|------|--------|");

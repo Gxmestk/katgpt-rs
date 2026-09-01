@@ -101,7 +101,7 @@ fn bernoulli_reward(pos: usize, rng: &mut Rng) -> f32 {
 /// Find indices of top-N Q-values.
 fn top_n_indices(q_values: &[f32], n: usize) -> Vec<usize> {
     let mut indexed: Vec<(usize, f32)> = q_values.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
     indexed.into_iter().take(n).map(|(i, _)| i).collect()
 }
 

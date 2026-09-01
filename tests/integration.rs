@@ -1238,9 +1238,8 @@ fn sudoku4_solve(board: &mut [u8; 16], cache: &mut KVCache2D, step: &mut usize) 
     cache.append(Vec2::new(*step as f32, filled as f32 * 10.0), *step);
     *step += 1;
 
-    let pos = match board.iter().position(|&v| v == 0) {
-        Some(p) => p,
-        None => return true,
+    let Some(pos) = board.iter().position(|&v| v == 0) else {
+        return true;
     };
 
     for digit in 1..=4u8 {

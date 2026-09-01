@@ -187,7 +187,7 @@ fn g2_inflection_at_approximately_10_percent() {
     }
 
     // ── Compute median + IQR over inflection locations. ──
-    inflection_locs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
+    inflection_locs.sort_by(|a, b| a.total_cmp(b));
     let median = inflection_locs[N_DECISION_POINTS / 2];
     let q1 = inflection_locs[N_DECISION_POINTS / 4];
     let q3 = inflection_locs[3 * N_DECISION_POINTS / 4];

@@ -432,7 +432,7 @@ fn main() {
         .map(|i| (i, c_pruner.q_values()[i], c_pruner.visits()[i]))
         .filter(|(_, _, v)| *v > 0)
         .collect();
-    c_arms.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    c_arms.sort_by(|a, b| b.1.total_cmp(&a.1));
     for (arm, q, visits) in c_arms.iter().take(5) {
         let name = token_name(*arm);
         println!("    arm={arm:>2} ({name:<8}) Q={q:.3} visits={visits}");
@@ -443,7 +443,7 @@ fn main() {
         .map(|i| (i, u_pruner.q_values()[i], u_pruner.visits()[i]))
         .filter(|(_, _, v)| *v > 0)
         .collect();
-    u_arms.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    u_arms.sort_by(|a, b| b.1.total_cmp(&a.1));
     for (arm, q, visits) in u_arms.iter().take(5) {
         let name = token_name(*arm);
         println!("    arm={arm:>2} ({name:<8}) Q={q:.3} visits={visits}");

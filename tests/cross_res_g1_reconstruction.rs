@@ -219,7 +219,7 @@ fn g1_reconstruction_cosine() {
         }
     }
 
-    cosines.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    cosines.sort_by(|a, b| a.total_cmp(b));
     let mean: f32 = cosines.iter().sum::<f32>() / cosines.len() as f32;
     let min = cosines.first().copied().unwrap_or(0.0);
     let p10 = cosines[(cosines.len() as f32 * 0.10) as usize];

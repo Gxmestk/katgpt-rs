@@ -136,7 +136,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 /// Select top-K indices by score value (descending).
 fn top_k_indices(scores: &[f32], k: usize) -> Vec<usize> {
     let mut indexed: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    indexed.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
     indexed.into_iter().take(k).map(|(i, _)| i).collect()
 }
 

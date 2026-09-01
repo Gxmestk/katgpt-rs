@@ -140,7 +140,7 @@ fn main() {
             (i, dot * scale)
         })
         .collect();
-    full_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    full_scores.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     println!("  Full attention top-{TOP_K}:");
     for (rank, &(block, score)) in full_scores.iter().take(TOP_K).enumerate() {

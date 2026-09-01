@@ -294,7 +294,7 @@ fn g2_variant_a_rank_preservation_transported_weights() {
         }
     }
 
-    cosines.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    cosines.sort_by(|a, b| a.total_cmp(b));
     let mean: f32 = cosines.iter().sum::<f32>() / cosines.len() as f32;
     let min = cosines.first().copied().unwrap_or(0.0);
     let median = cosines[cosines.len() / 2];

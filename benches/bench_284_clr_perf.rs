@@ -173,7 +173,7 @@ fn bench_k(k: usize) -> (f64, f64, f64) {
         black_box((w, r));
         samples.push(elapsed.as_secs_f64() * 1e6); // → microseconds
     }
-    samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    samples.sort_by(|a, b| a.total_cmp(b));
 
     let mean = samples.iter().sum::<f64>() / samples.len() as f64;
     let p50 = samples[samples.len() / 2];

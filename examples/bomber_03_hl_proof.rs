@@ -495,8 +495,7 @@ fn main() {
     ranking.sort_by(|&a, &b| {
         stats[b]
             .survival_rate()
-            .partial_cmp(&stats[a].survival_rate())
-            .unwrap_or(std::cmp::Ordering::Equal)
+            .total_cmp(&stats[a].survival_rate())
     });
 
     for (rank, &idx) in ranking.iter().enumerate() {

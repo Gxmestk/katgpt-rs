@@ -90,7 +90,7 @@ fn g4_crowd_scale_perf() {
     }
     std::hint::black_box(&states);
 
-    latencies_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    latencies_us.sort_by(|a, b| a.total_cmp(b));
     let p50 = latencies_us[N_ITERS / 2];
     let p95 = latencies_us[(N_ITERS as f64 * 0.95) as usize];
     let p99 = latencies_us[(N_ITERS as f64 * 0.99) as usize];

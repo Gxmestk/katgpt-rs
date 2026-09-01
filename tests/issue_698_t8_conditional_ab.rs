@@ -372,7 +372,7 @@ fn t698_t8_conditional_gate_ab() {
         .collect();
 
     // G1: per-arm double-run bit-identity.
-    let mut results = Vec::new();
+    let mut results = Vec::with_capacity(arms.len());
     for arm in &arms {
         let a = measure_arm(arm, &weights, &sdpa_gate, &nat_ref);
         let b = measure_arm(arm, &weights, &sdpa_gate, &nat_ref);

@@ -297,7 +297,7 @@ fn compute_covariance_eigenvalues(data: &[Vec<f32>], dim: usize) -> Vec<f32> {
         }
     }
 
-    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    eigenvalues.sort_by(|a, b| b.total_cmp(a));
     eigenvalues
 }
 

@@ -130,11 +130,7 @@ fn print_eval_row(idx: usize, trial: &katgpt_rs::pruners::go::autoresearch::Tria
 fn print_leaderboard(result: &katgpt_rs::pruners::go::autoresearch::AutoResearchResult) {
     let mut arms: Vec<_> = result.arms.iter().filter(|a| a.pulls > 0).collect();
 
-    arms.sort_by(|a, b| {
-        b.mean_reward()
-            .partial_cmp(&a.mean_reward())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    arms.sort_by(|a, b| b.mean_reward().total_cmp(&a.mean_reward()));
 
     println!();
     println!("  Arm Leaderboard (by cumulative win rate):");

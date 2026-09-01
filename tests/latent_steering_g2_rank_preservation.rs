@@ -132,7 +132,7 @@ fn measure_at_alpha(
         }
     }
 
-    cosines.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    cosines.sort_by(|a, b| a.total_cmp(b));
     let mean = cosines.iter().sum::<f32>() / cosines.len() as f32;
     let min = cosines[0];
     let flip_rate = argmax_flips as f32 / states.len() as f32;

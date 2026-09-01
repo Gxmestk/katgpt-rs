@@ -51,7 +51,7 @@ fn bench_entmax(n_chunks: usize) -> (f64, f64) {
         times_us.push(elapsed.as_nanos() as f64 / 1000.0);
     }
 
-    times_us.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    times_us.sort_by(|a, b| a.total_cmp(b));
     let median = times_us[times_us.len() / 2];
     let mean = times_us.iter().sum::<f64>() / times_us.len() as f64;
 

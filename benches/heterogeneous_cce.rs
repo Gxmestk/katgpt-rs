@@ -125,7 +125,7 @@ fn bench_scale(n_players: usize, n_iters: usize) -> f64 {
         black_box(&rho);
         times_us.push(elapsed);
     }
-    times_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_us.sort_by(|a, b| a.total_cmp(b));
     times_us[n_iters / 2]
 }
 
@@ -150,7 +150,7 @@ fn bench_primal_dual_scale(n_players: usize, n_steps: usize, n_iters: usize) -> 
         black_box(&report);
         times_us.push(elapsed);
     }
-    times_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times_us.sort_by(|a, b| a.total_cmp(b));
     times_us[n_iters / 2]
 }
 

@@ -519,12 +519,7 @@ fn run_arena(
     println!("  {}", "─".repeat(80));
 
     let mut ranking: Vec<usize> = (0..4).collect();
-    ranking.sort_by(|&a, &b| {
-        stats[b]
-            .elo
-            .partial_cmp(&stats[a].elo)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    ranking.sort_by(|&a, &b| stats[b].elo.total_cmp(&stats[a].elo));
 
     for (rank, &idx) in ranking.iter().enumerate() {
         println!(

@@ -219,8 +219,8 @@ fn run_one_scale(ctx: &ScaleCtx<'_>, seq_len: usize) -> ScaleResult {
 
     // Aggregate (post-warmup).
     let warmup = ctx.block_size.min(seq_len);
-    cos_sims.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    rel_mses.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    cos_sims.sort_by(|a, b| a.total_cmp(b));
+    rel_mses.sort_by(|a, b| a.total_cmp(b));
 
     let cos_median = cos_sims[cos_sims.len() / 2];
     let mse_median = rel_mses[rel_mses.len() / 2];
