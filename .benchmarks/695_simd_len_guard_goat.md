@@ -114,6 +114,29 @@ compile on `develop` — see Issue 700 (pre-existing, reproduced at clean HEAD).
 The guard introduces no allocation: reslicing is a bounds check plus a fat-pointer
 narrowing. No heap traffic added to any kernel.
 
+## The second copy — `katgpt-dec` (found by the follow-up sweep)
+
+`crates/katgpt-dec/src/simd.rs` ships its **own** `simd_dot_f32`, a near-verbatim
+twin of katgpt-types' `scalar_dot_f32`, and carried the identical hole. The
+duplication is deliberate and correct: `katgpt-dec` declares **zero
+dependencies** so `katgpt-core` can re-export it as `katgpt_core::dec` without a
+cyclic package dep. Consuming the guarded substrate twin would create exactly the
+edge that design forbids, so the guard is applied in place instead. Pinned by
+`crates/katgpt-dec/tests/simd_len_guard_695.rs`; `katgpt-dec` is 225 lib + 2 new,
+0 failed.
+
+## Cross-repo sweep — the class is confined to katgpt-rs
+
+Scanned `riir-ai`, `riir-chain`, `riir-neuron-db`, `riir-game-sdk`, `riir-train`,
+`riir-clippy`, `riir-dapps`, `katgpt-web` for safe `pub fn` taking an explicit
+`len`-like param over a slice. Three candidates, **all sound** — each pins the
+exact length with a real (not `debug_`) `assert_eq!` before any unchecked use:
+`riir-infer-core/src/wall.rs:110 wall_prefix_prefill`,
+`riir-train-engine/src/adapter_centroid.rs:258 split_adapter_weights`,
+`riir-train-engine/src/maglev_drafter/joint.rs:976 make_shifted_targets`.
+`katgpt-attn-match/src/score_matrix.rs:57 row_max` likewise asserts and indexes
+safely. No sibling-repo fix required.
+
 ## Regression gate
 
 `crates/katgpt-types/tests/simd_len_guard_700.rs` — 11 tests, all safe code, one

@@ -48,6 +48,12 @@ pub fn simd_sigmoid_inplace(x: &mut [f32]) {
 /// preserves single-rounding FMA semantics on hardware that has it.
 #[inline(always)]
 pub fn simd_dot_f32(a: &[f32], b: &[f32], len: usize) -> f32 {
+    // Soundness gate (Bench 695): this is a SAFE fn that reads via
+    // `get_unchecked` up to `len`. Without this reslice a caller's bad `len`
+    // is an out-of-bounds read, not a panic. katgpt-dec keeps ZERO deps by
+    // design (see Cargo.toml), so the guard is applied here rather than by
+    // consuming katgpt-types' already-guarded twin.
+    let (a, b) = (&a[..len], &b[..len]);
     let mut acc = [0.0f32; 4];
     let chunks = len / 4;
     let mut i = 0;
