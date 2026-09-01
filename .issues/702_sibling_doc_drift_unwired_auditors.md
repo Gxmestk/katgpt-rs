@@ -1,11 +1,11 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (2/4 drift fixes done — riir-neuron-db closed in `c06133e`;
-riir-clippy closed in `7736e30`, its audit re-run 9 labels / 0 mismatches;
-remaining: riir-ai `osc_emotion` + `band_edge_trigger`, both in that repo's
-`.benchmarks/` while its sessions are active; auditor coverage closed in 3
-more layers, 2 new findings, 2 self-inflicted false positives caught before
-they shipped)** —
+Status: **OPEN (2/4 drift fixes + the cadence condition done for riir-clippy —
+riir-neuron-db drift closed in `c06133e`; riir-clippy drift closed in `7736e30`
++ its weekly docs-drift CI job landed in `1df3599`; remaining: riir-ai
+`osc_emotion` + `band_edge_trigger`, both in that repo's `.benchmarks/` while
+its sessions are active; auditor coverage closed in 3 more layers, 2 new
+findings, 2 self-inflicted false positives caught before they shipped)** —
 filed from katgpt-rs because the tooling lives here; the fixes belong in the
 owning repos. Re-measured 2026-09-01 across all **18** contract repos (the
 original table covered 8), which turned up something the wiring gap was hiding:
@@ -282,10 +282,18 @@ number from a sibling's `.issues/.highwater` is the documented collision path.
       repo: 9 labels / **0 mismatches**.
 - [ ] riir-neuron-db: correct the `merkle_freeze` label, or drop it from
       `experience_graph` if default-on was not intended.
-- [ ] Each sibling either runs the two auditors on some cadence or records why
+- [x] Each sibling either runs the two auditors on some cadence or records why
       not. `.github/workflows/docs_gate.yml` is portable: pure Python, ~3s,
       ubuntu-latest, no cfg surface — the only katgpt-rs-specific part is the
       `count_features.py` step and its README claim table.
+      **riir-clippy DONE 2026-09-01 (`1df3599`):** a `docs-drift` job in its
+      existing weekly `rust.yml` (the repo's small-trigger Actions-budget
+      decision forbids a per-push develop trigger — the recorded "why not"
+      for per-push), running BOTH auditors by path from a katgpt-rs checkout,
+      each at `.` — never unported, because two of docs_gate.sh's four checks
+      are katgpt-rs-rooted by construction (`count_features.py` takes no repo
+      argument; `skill_repo_set_gate.py` gates katgpt-rs's own SKILL set) and
+      would be a vacuous green here.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
 Refs: `a90dd631` (docs gate + auditor fixes + 185x walk speedup),
