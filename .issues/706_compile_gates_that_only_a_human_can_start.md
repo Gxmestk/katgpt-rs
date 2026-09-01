@@ -104,6 +104,32 @@ Verified additive: output diffed against `HEAD`'s script, byte-identical above
 the new section (the only other delta was `riir-deployer` gaining an untracked
 workflow mid-session, from another agent).
 
+## What the dormancy costs, measured 2026-09-02
+
+This stopped being hypothetical the day after filing. `riir-neuron-db`'s
+`rust.yml` — the dispatch-only workflow in the table above — chains
+`cargo hack --each-feature`, which is the **only** gate in the workspace that
+builds each feature flag in isolation. It is a careful piece of work: it even
+installs `cargo-hack` explicitly, with a comment saying that the guard's
+auto-skip "in CI would be the exact 'green gate that verified nothing' failure
+this workflow exists to prevent." The author anticipated the vacuous green.
+
+Nothing starts it.
+
+Meanwhile `katgpt-rs`, which had no such gate at all, ran that scope for the
+first time (Issue 701 R1b, `.benchmarks/696`) and found **16 flags that do not
+build in isolation** — 2 of them default-on, i.e. on the shipped surface. Root
+causes: a `cfg(any(feature = ...))` two later consumers never joined, and seven
+features whose code uses a module or a `dep:` they never declare. Every one was
+invisible to `--all-features`, which compiles the union where some other
+consumer always supplies the missing piece.
+
+So the gate is not redundant with the full gate, and its dormancy is not a
+theoretical loss. One repo has the right instrument switched off; the repo
+without it accumulated 16 breaks. That is the strongest available argument for
+recommendation (1) — add a `schedule` — and it applies to `riir-neuron-db`
+first.
+
 ## Closing conditions
 
 - [x] Measure the axis and cross it with coverage.
@@ -112,7 +138,9 @@ workflow mid-session, from another agent).
 - [x] Correct AGENTS.md, which described the reachability axis as the whole
       question.
 - [ ] Owner decision per repo (`riir-chain`, `riir-dao`, `riir-neuron-db`) —
-      recommendation (1), add a `schedule`. **Not applied: sibling repos, and
+      recommendation (1), add a `schedule`. **`riir-neuron-db` is now the
+      priority**: its dormant gate is the workspace's only `--each-feature`
+      coverage, and katgpt-rs measured what its absence costs (16 breaks). **Not applied: sibling repos, and
       each has an actively-working agent.**
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 

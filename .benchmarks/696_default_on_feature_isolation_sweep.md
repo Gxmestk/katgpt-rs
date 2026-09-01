@@ -1,6 +1,8 @@
 # Bench 696 — the default-on feature-isolation sweep: 4.1 min, not 2.2 h, and it found two broken flags
 
-Status: **MEASURED + FIXED 2026-09-01.** All 228 default-on (package, flag)
+Status: **MEASURED + FIXED 2026-09-01/02.** Default-on scope AND the full
+`--scope all` (1130 pairs) both swept; **16 broken flags found and fixed**
+(2 default-on, 14 opt-in), re-verified 1130/1130. All 228 default-on (package, flag)
 pairs isolated. 2 failures, both real, both fixed in `b50db0ef`. Re-verified
 green. Issue 701 R1b's blocking estimate is superseded — the sweep is **32x
 cheaper** than recorded, and the reason is a category error in the original
@@ -141,6 +143,76 @@ gating the decision on any plausible runner multiplier. The remaining open
 question is **cadence and where it runs** — a billing call, not a measurement
 (the gate has no `cfg(target_os)` surface, so unlike the full gate it can run
 on ubuntu). Recommendation and cost are in `.issues/701` R1b.
+
+## Addendum — the all-scope sweep: 1130 pairs, 24.2 min, 14 more failures
+
+Run after the default-on scope, same target dir, `--scope all`.
+
+| | Issue 701 R1 estimate | measured |
+|---|---|---|
+| scope | "568 flags" ≈ 6.2 h | **1130** builds, **24.2 min** |
+| per-flag | 39.5s | mean 1.3s, median 0.5s, max 224.0s |
+| failures | never run | **14** |
+
+Twice the builds R1 assumed, in ~1/15th the estimated time.
+
+The 14 collapse to **8 root causes** — several failures are transitive
+(`expression_pruner`, `concept_grounding`, `expression_pruner_dep` all inherit
+from `symbolic_distill`; `twist_smc` from `numeric_stability`; both
+`domino_lora` passthroughs from `katgpt-speculative`). Two mechanisms, one
+shape — **a feature whose code uses something it never declares**:
+
+| crate | feature | needed | mechanism |
+|---|---|---|---|
+| `katgpt-speculative` | `domino_lora` | `dep:blake3`, `dep:bytemuck` | dep never activated |
+| `katgpt-core` | `numeric_stability` | `mag_mining` | module `mag` gated elsewhere |
+| `katgpt-transformer` | `swir_switch_thinking` | `thinking_cot` | module gated elsewhere |
+| `katgpt-forward` | `thinking_prune` | `katgpt-pruners/sr2am_configurator` | cross-crate type |
+| `katgpt-pruners` | `symbolic_distill` | `bandit` | `absorb_compress` + `review_metrics` |
+| `katgpt-pruners` | `sdar_gate` | `bandit` | same |
+| `katgpt-pruners` | `epiplexity_bandit` | `sr2am_configurator` | `configurator_bandit` |
+| `katgpt-pruners` | `self_distilling_bandit` | `bandit` | same |
+
+**Fix shape.** Idiomatic Cargo feature dependencies, not wider
+`cfg(any(feature = ...))` lists. A feature declaring what it requires is
+self-documenting, and sibling features in these same manifests already do it
+(`expression_pruner = ["symbolic_distill"]`). The `linalg` fix above used the
+cfg form only because `linalg` has no feature of its own to depend on. Trailing
+doc comments were preserved byte-for-byte — `count_features.py` and
+`cargo_comment_audit.py` read them.
+
+Three of the fixed flags — `epiplexity_bandit`, `self_distilling_bandit`,
+`swir_switch_thinking` — are **default-on in the ROOT manifest and passed
+there** while failing in their own crate. That is the "same name, two
+manifests, two different builds" correction above, with consequences: a
+downstream crate enabling `katgpt-pruners/epiplexity_bandit` directly got a
+broken build, while the root's path worked because some other default flag
+happened to supply the missing module.
+
+### Verification, and two ways the verification nearly lied
+
+- 14/14 fixed flags build alone; `cargo check --workspace` at default features
+  green (the fixes enlarge the default closure, so this mattered); docs gate
+  4/4 with no audited claim moved.
+- **The 1130 re-sweep reported 1130/1130 in 2.2 min at mean 0.1s / max 0.4s.**
+  That is not a sweep cost and barely a verification — it is cargo replaying
+  fresh fingerprints. Do NOT quote it. The honest cost is the 24.2 min figure
+  from the run that actually built.
+- A cold re-verify then reported "compiled 0 units" for most flags, which looked
+  like the same vacuity one level down. It was the **measuring line** that was
+  wrong: `cargo check` prints **"Checking"**, and reserves "Compiling" for build
+  scripts and proc-macros. Counting the right verb from an empty target dir:
+  `katgpt-pruners/symbolic_distill` → 43 checked / 29 compiled, rc=0. Genuinely
+  cold, genuinely green.
+
+### Follow-up: reconsider `cargo hack --each-feature`
+
+R1 rejected the standard tool as "not affordable" on the 39.5s/flag figure this
+document supersedes. That objection no longer holds; `cargo-hack 0.6.45` is
+installed locally and `riir-neuron-db` already wires it. A maintained tool
+should be weighed against this bespoke harness before the harness grows further
+— the harness's remaining advantages are per-flag timing, the `default-on`
+scope, sampling, and no extra tool dependency. Not decided here.
 
 Refs: `b50db0ef` (fix + harness), `.issues/701` R1 (the estimate this
 supersedes), `.issues/705` (the full gate, blind to this class by

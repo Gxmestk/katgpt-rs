@@ -212,7 +212,7 @@ elf_sde = ["katgpt-speculative/elf_sde"]
 # Thinking Prune — FrozenBaseGuard schedule (Plan 171). Empty tracking flag —
 # gates build_dd_tree_screened_with_schedule + 2 tests. PrunerSchedule is
 # unconditional in katgpt-pruners, no upstream forward needed.
-thinking_prune = []
+thinking_prune = ["katgpt-pruners/sr2am_configurator"]
 
 # GDSD Advantage-Guided Pruner (Plan 169). Forwards to katgpt-pruners so
 # GdsdPruner + GdsdConfig + identity_advantage resolve (they are gated

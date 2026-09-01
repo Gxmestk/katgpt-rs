@@ -223,7 +223,7 @@ spec_cost_model = ["katgpt-core/spec_cost_model"]
 peira_distill = []
 
 # Domino LoRA causal correction adapter (Plan 231). Zero extra deps.
-domino_lora = []
+domino_lora = ["dep:blake3", "dep:bytemuck"]
 
 # Tracking flags for caddtree_budget's mux_residual variant. The function
 # `build_dd_tree_adaptive_mux_residual` is gated `all(mux_demux, rcd_residual)`.
