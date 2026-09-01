@@ -183,6 +183,104 @@ def find_cargo_defaults(repo_root: Path) -> set[str]:
     return any_default
 
 
+def local_default_closure(feats: dict) -> set[str]:
+    """Features one manifest turns on in its OWN default, via LOCAL edges only.
+
+    `_parse_feature_spec` deliberately collapses `pkg/feat` to `feat`, which is
+    right for the deployed model (the target crate is in this repo, so the flag
+    really does turn on) and WRONG here: riir-engine has
+
+        se2_equivariant = ["katgpt-core/tropical_algebra"]   # :503, in default
+        tropical_algebra = ["katgpt-core/tropical_algebra", ...]  # :2085, NOT
+
+    Collapsing the first entry credits riir-engine's own, separately-defined
+    `tropical_algebra` as default-on. It is not, and the resulting report was a
+    confident false drift on a doc that was correct. Only a BARE entry
+    activates a feature of the same crate.
+    """
+    deps: dict[str, set[str]] = {}
+    for name, spec in feats.items():
+        acc: set[str] = set()
+        if isinstance(spec, list):
+            for x in spec:
+                if x and not x.startswith("dep:") and "/" not in x:
+                    acc.add(x)
+        deps[name] = acc
+    resolved = set(deps.get("default", ()))
+    for _ in range(len(deps) + 2):
+        add = {d for k in resolved for d in deps.get(k, ()) if d not in resolved}
+        if not add:
+            break
+        resolved |= add
+    # only a crate that DEFINES the feature can speak for its own default
+    return {f for f in resolved if f in feats}
+
+
+def find_own_crate_defaults(repo_root: Path) -> set[str]:
+    """Features that some crate turns on in its OWN default closure, counting
+    only crates that actually DEFINE the feature.
+
+    This is the strict subset of `find_cargo_defaults`. The difference between
+    the two is the *forwarded-only* set: a feature whose owning crate ships it
+    off, which is nonetheless on in a default build because an ancestor's
+    `default` list names `child/feature`.
+
+    Both readings of such a flag are defensible, so a doc that calls it opt-in
+    is not drift. Measured 2026-09-01: riir-chain's
+    `` `riir-wallet/siwr` (client + RP kit, default-OFF) `` is exactly this —
+    off in riir-wallet, on via riir-chaind's `default -> chain_siwr`. Reporting
+    it would have been a false positive on a doc that is right, which is the
+    failure mode this script's own comments call out as how a gate earns a
+    reputation for noise.
+    """
+    own: set[str] = set()
+    for cargo in iter_cargo_manifests(repo_root):
+        try:
+            with cargo.open("rb") as f:
+                data = tomllib.load(f)
+        except Exception:
+            continue
+        feats = data.get("features") or {}
+        if not feats:
+            continue
+        # LOCAL activations only. `_parse_feature_spec` deliberately collapses
+        # `pkg/feat` to `feat`, which is right for the deployed model (the
+        # target crate is in this repo, so the flag really does turn on) and
+        # WRONG here: `se2_equivariant = ["katgpt-core/tropical_algebra"]` does
+        # not turn on riir-engine's own, separately-defined `tropical_algebra`
+        # (riir-engine/Cargo.toml:503 vs :2085). Crediting it produced a
+        # confident false drift report on a doc that was correct. Only a bare
+        # entry activates a feature of the same crate.
+        own |= local_default_closure(feats)
+    return own
+
+
+def find_package_names(repo_root: Path) -> set[str]:
+    """Every `[package] name` in the repo — the set of qualifiers this repo can
+    actually resolve.
+
+    A doc label `riir-neuron-db/density_aware_wake` inside riir-ai names a
+    SIBLING repo's flag. Checking it against riir-ai's own Cargo manifests is
+    not a weaker check, it is a wrong one: measured 2026-09-01, 3 of the 12
+    cross-repo tokens in the workspace carry a feature name that is ALSO
+    defined locally with a different default status, so the naive read invents
+    a mismatch on a doc that is correct. Siblings are also absent in CI, so
+    resolving them there is not an option either — the qualifier is the only
+    signal available, and an unresolvable one must be reported, not dropped.
+    """
+    names: set[str] = set()
+    for cargo in iter_cargo_manifests(repo_root):
+        try:
+            with cargo.open("rb") as f:
+                data = tomllib.load(f)
+        except Exception:
+            continue
+        name = (data.get("package") or {}).get("name")
+        if name:
+            names.add(name)
+    return names
+
+
 def find_defined_features(repo_root: Path) -> set[str]:
     """All feature names defined in any Cargo.toml under repo_root."""
     defined: set[str] = set()
@@ -212,14 +310,19 @@ FEATURE_HEADER_RE = re.compile(
 #   `foo` (opt-in, same as Phase 1) — paren with extra context
 # We capture the feature name and a window of ~80 chars after it for status
 # classification (instead of requiring the status to be in tight parens).
+#   `crate/foo` (opt-in)            — namespaced (Cargo `pkg/feature` syntax)
+# Groups are NAMED, not numbered: adding the qualifier group shifted every
+# positional index, and a positional consumer would have silently started
+# reading the qualifier as the feature name.
 FEATURE_TOKEN_RE = re.compile(
-    r"`([a-zA-Z][a-zA-Z0-9_\-]*?)`"
+    r"`(?:(?P<qual>[a-zA-Z][a-zA-Z0-9_\-]*)/)?"
+    r"(?P<feat>[a-zA-Z][a-zA-Z0-9_\-]*?)`"
     r"(?:\s*=\s*\[[^\]]*\])?"  # optional Cargo-like = [...]
     r"\s*"  # optional whitespace
     r"(?:[\(\[]|\u2014|\u2013|--|:)"  # status separator: ( [ — – -- :
     r"?"  # separator optional (status may be inline)
     r"\s*\**"  # optional opening bold
-    r"([a-zA-Z][a-zA-Z0-9_\-\s,]{0,80}?)"  # status phrase
+    r"(?P<status>[a-zA-Z][a-zA-Z0-9_\-\s,+/]{0,80}?)"  # status phrase
     r"\**\s*"  # optional closing bold
     # Status boundary. `(` and `*` were missing, and their absence silently
     # dropped an entire sibling's convention: riir-chain writes
@@ -315,8 +418,57 @@ def parse_terminal_transition(line: str, from_idx: int) -> tuple[str, str] | Non
     return best
 
 
+# The captured status is a LAZY match ending at the first boundary, so a
+# compound parenthetical loses everything after its first comma:
+#
+#   **Features:** `riir-wallet/siwr` (client + RP kit, default-OFF), forwarded
+#
+# captures "client + RP kit" -> unknown, and the real status word sits one
+# comma further on. Retrying over the rest of the enclosing clause recovers it.
+#
+# This runs ONLY when the tight capture already parsed to `unknown`, i.e. on
+# labels the caller was about to discard. It is therefore monotone by
+# construction: it can promote unknown -> default/opt-in, and can never change
+# a verdict the tokenizer already reached. That property is why it needs no
+# A/B to be safe — but it was measured anyway (Issue 702).
+CLAUSE_END_RE = re.compile(r"[\)\]|]")
+
+
+def widened_status(line: str, from_idx: int) -> tuple[str, str] | None:
+    """Re-read the status over the remainder of the enclosing clause."""
+    end = CLAUSE_END_RE.search(line, from_idx)
+    seg = line[from_idx : end.start() if end else min(len(line), from_idx + 160)]
+    if not seg.strip():
+        return None
+    parsed = parse_status_phrase(seg)
+    return None if parsed == "unknown" else (parsed, seg.strip())
+
+
+# A label may explicitly scope its claim to one crate: "opt-in in this crate —
+# see npc.md §Feature gate landscape for the layered gate split". That doc is
+# describing a layered split it is fully aware of; the flat repo-wide model
+# cannot adjudicate it and flagging it is noise. Counted, never silent.
+SCOPED_CLAIM_RE = re.compile(r"\bin\s+(?:this|the)\s+crate\b", re.I)
+
+
+def classify_token(line: str, m: "re.Match") -> tuple[str, str]:
+    """(parsed_status, raw) for one token match — the ONE status path.
+
+    The selftest previously re-implemented this inline, so a canary that broke
+    the iterator's copy left the selftest green: the pin guarded a duplicate,
+    not the production path. Both call this now.
+    """
+    raw = m.group("status")
+    parsed = parse_status_phrase(raw)
+    if parsed == "unknown":
+        wide = widened_status(line, m.start("status"))
+        if wide is not None:
+            parsed, raw = wide[0], f"{raw!r} -> widened: {wide[1]!r}"
+    return parsed, raw
+
+
 def iter_bench_doc_labels(repo_root: Path):
-    """Yield (rel_path, lineno, line, feature_name, raw_status, parsed_status)."""
+    """Yield (rel, lineno, line, qualifier|None, feature, raw, parsed)."""
     for sub in (".benchmarks", ".docs"):
         d = repo_root / sub
         if not d.is_dir():
@@ -331,16 +483,16 @@ def iter_bench_doc_labels(repo_root: Path):
                 if not FEATURE_HEADER_RE.search(line):
                     continue
                 for m in FEATURE_TOKEN_RE.finditer(line):
-                    feat = m.group(1)
-                    raw = m.group(2)
-                    parsed = parse_status_phrase(raw)
+                    qual = m.group("qual")
+                    feat = m.group("feat")
+                    parsed, raw = classify_token(line, m)
                     trans = parse_terminal_transition(line, m.end())
                     if trans is not None:
                         parsed = trans[0]
                         raw = f"{raw} | transition: {trans[1]!r}"
                     if parsed == "unknown":
                         continue
-                    yield (rel, ln, line.strip(), feat, raw, parsed)
+                    yield (rel, ln, line.strip(), qual, feat, raw, parsed)
 
 
 def audit_repo(repo_root: Path) -> int:
@@ -348,10 +500,23 @@ def audit_repo(repo_root: Path) -> int:
     print(f"\n=== Auditing {repo_root.name} ===")
     any_default = find_cargo_defaults(repo_root)
     defined_features = find_defined_features(repo_root)
+    package_names = find_package_names(repo_root)
+    own_default = find_own_crate_defaults(repo_root)
 
     mismatches = 0
     checked = 0
-    for rel, ln, line, feat, raw, parsed in iter_bench_doc_labels(repo_root):
+    foreign = 0
+    forwarded = 0
+    scoped = 0
+    for rel, ln, line, qual, feat, raw, parsed in iter_bench_doc_labels(repo_root):
+        # A `pkg/feature` label whose pkg is not a crate HERE is a sibling
+        # repo's flag: unauditable from this repo, and auditing it against the
+        # local manifests is actively wrong (see find_package_names). Count it
+        # so the skip is visible — a silently dropped label is the failure mode
+        # this whole script exists to catch (Issue 702).
+        if qual is not None and qual not in package_names:
+            foreign += 1
+            continue
         # Only consider feature_name that exists as a defined Cargo feature.
         # This avoids false positives on use-case names, paper-artifact names,
         # etc. (the session-12 insight).
@@ -363,15 +528,33 @@ def audit_repo(repo_root: Path) -> int:
             mismatches += 1
             print(f"  [MISMATCH] doc says DEFAULT but feature NOT in any Cargo default")
             print(f"    file: {rel}:{ln}")
-            print(f"    feat: {feat}  raw_status: {raw!r}")
+            print(f"    feat: {qual + '/' if qual else ''}{feat}  raw_status: {raw!r}")
             print(f"    line: {line}")
         elif parsed == "opt-in" and is_default:
+            # Forwarded-only: the owning crate ships it off, an ancestor's
+            # default pulls it in. "opt-in" is a defensible reading.
+            if feat not in own_default:
+                forwarded += 1
+                continue
+            if SCOPED_CLAIM_RE.search(line):
+                scoped += 1
+                continue
             mismatches += 1
             print(f"  [MISMATCH] doc says OPT-IN but feature IS in some Cargo default")
             print(f"    file: {rel}:{ln}")
-            print(f"    feat: {feat}  raw_status: {raw!r}")
+            print(f"    feat: {qual + '/' if qual else ''}{feat}  raw_status: {raw!r}")
             print(f"    line: {line}")
-    print(f"  -> checked {checked} labels, {mismatches} mismatches")
+    tail = f"  -> checked {checked} labels, {mismatches} mismatches"
+    notes = []
+    if foreign:
+        notes.append(f"{foreign} cross-repo (qualifier not a crate here)")
+    if forwarded:
+        notes.append(f"{forwarded} forwarded-only (off in owning crate)")
+    if scoped:
+        notes.append(f"{scoped} crate-scoped claim")
+    if notes:
+        tail += " [skipped: " + "; ".join(notes) + "]"
+    print(tail)
     return mismatches
 
 
@@ -381,27 +564,62 @@ def audit_repo(repo_root: Path) -> int:
 # not fail anything: it just recognises fewer labels and still prints
 # "0 mismatches". That is indistinguishable from clean, which is how riir-chain
 # sat at "26 docs, 0 labels" unnoticed. A dropped shape must be loud.
+# Each case is (line, expected_qualifier, expected_feature, expected_status).
 TOKENIZER_CASES = [
     # katgpt-rs dialect
-    ("**Feature:** `foo` (opt-in)", "foo", "opt-in"),
-    ("**Feature:** `bar` (**DEFAULT-ON** since 2026-07-20)", "bar", "default"),
+    ("**Feature:** `foo` (opt-in)", None, "foo", "opt-in"),
+    ("**Feature:** `bar` (**DEFAULT-ON** since 2026-07-20)", None, "bar", "default"),
+    # Namespaced `pkg/feature`. `/` was absent from the name class, so these
+    # produced NO token at all: 15 in-repo labels across 3 repos were unread,
+    # and reported as "0 mismatches" — clean and blind are the same output.
+    ("**Feature:** `katgpt-core/gaussianity_probe` (opt-in)",
+     "katgpt-core", "gaussianity_probe", "opt-in"),
+    ("**Feature:** `riir-wallet/siwr` (**DEFAULT-ON**)",
+     "riir-wallet", "siwr", "default"),
+    # compound parenthetical: the status word is the LAST clause, and the tight
+    # lazy capture stops at the first comma ("client + RP kit" -> unknown).
+    ("**Features:** `riir-wallet/siwr` (client + RP kit, default-OFF), forwarded as",
+     "riir-wallet", "siwr", "opt-in"),
     # riir-chain dialect: status bolded, then an unbracketed ` (` follows.
     # `(` and `*` were not status boundaries, so this yielded NO token at all.
-    ("**Feature:** `baz` — **default-OFF** (implies `qux`)", "baz", "opt-in"),
+    ("**Feature:** `baz` — **default-OFF** (implies `qux`)", None, "baz", "opt-in"),
     # negation must still win over the bare word "default"
-    ("**Feature:** `neg` (opt-in, NOT default-on)", "neg", "opt-in"),
+    ("**Feature:** `neg` (opt-in, NOT default-on)", None, "neg", "opt-in"),
 ]
 
 
+# The riir-engine shape that produced a confident false drift report. A future
+# "simplification" back to `_parse_feature_spec` here re-introduces it, so it is
+# pinned rather than merely commented.
+LOCAL_CLOSURE_CASE = {
+    "default": ["se2_equivariant", "band_edge_trigger"],
+    "se2_equivariant": ["katgpt-core/tropical_algebra"],
+    "tropical_algebra": ["katgpt-core/tropical_algebra", "latent_functor"],
+    "band_edge_trigger": ["hla"],
+    "hla": [],
+    "latent_functor": [],
+}
+
+
 def selftest() -> None:
-    for line, want_feat, want_status in TOKENIZER_CASES:
+    own = local_default_closure(LOCAL_CLOSURE_CASE)
+    if "tropical_algebra" in own or "band_edge_trigger" not in own:
+        raise SystemExit(
+            "✗ own-default self-test FAILED\n"
+            f"  got own-default closure: {sorted(own)}\n"
+            "  `tropical_algebra` must NOT be in it (reachable only as\n"
+            "  `katgpt-core/tropical_algebra`, a DIFFERENT crate's flag), and\n"
+            "  `band_edge_trigger` MUST be (a bare entry in `default`).\n"
+            "  Collapsing `pkg/feat` to `feat` here reports false drift on\n"
+            "  correct docs — see local_default_closure.")
+    for line, want_qual, want_feat, want_status in TOKENIZER_CASES:
         assert FEATURE_HEADER_RE.match(line), f"header regex missed: {line!r}"
-        hits = FEATURE_TOKEN_RE.findall(line)
-        got = [(f, parse_status_phrase(s)) for f, s in hits]
-        if (want_feat, want_status) not in got:
+        got = [(m.group("qual"), m.group("feat"), classify_token(line, m)[0])
+               for m in FEATURE_TOKEN_RE.finditer(line)]
+        if (want_qual, want_feat, want_status) not in got:
             raise SystemExit(
                 f"✗ tokenizer self-test FAILED\n  line:   {line!r}\n"
-                f"  want:   {(want_feat, want_status)}\n  got:    {got}\n"
+                f"  want:   {(want_qual, want_feat, want_status)}\n  got:    {got}\n"
                 "  A shape this script used to recognise no longer parses. It "
                 "would keep printing '0 mismatches' over fewer labels.")
 

@@ -1,6 +1,7 @@
 # Issue 702 — the doc-drift auditors run in ONE repo of eighteen, and three siblings carry confirmed stale labels
 
-Status: **OPEN (0/3 fixes; measurement re-done and a 4th condition added)** —
+Status: **OPEN (0/4 fixes; auditor coverage closed in 3 more layers, 2 new
+findings, 2 self-inflicted false positives caught before they shipped)** —
 filed from katgpt-rs because the tooling lives here; the fixes belong in the
 owning repos. Re-measured 2026-09-01 across all **18** contract repos (the
 original table covered 8), which turned up something the wiring gap was hiding:
@@ -80,6 +81,13 @@ nothing *invokes* them outside this repo.
 18 contract repos. The 10 added rows are all clean, so the conclusion held, but
 it held without having been checked. Same class as `.issues/703`.)
 
+**Superseded 2026-09-01 (second pass).** The counts above were taken with a
+tokenizer that could not read a `` `crate/feature` `` token at all. After the
+three fixes in §"Namespaced labels" the label counts are katgpt-rs **92**,
+riir-ai **77**, riir-chain **2**, riir-neuron-db **11**; riir-ai's mismatch
+count went 1 → **2**. Every other row is unchanged. Treat the table above as
+the first-pass record, not the current state.
+
 A zero above is not automatically a clean bill of health — it can mean no label
 matched the recognised forms at all. That caveat was written when it was only a
 suspicion; it has now been chased to the end for every zero row, and the answer
@@ -110,6 +118,106 @@ This is the stale-flag-state class: the feature was promoted and the benchmark
 doc that gated the promotion never got updated. It matters because those docs
 are the GOAT record — a reader deciding whether a primitive is production
 default reads the benchmark, not the manifest.
+
+## Namespaced labels: three more layers of the same blindness (2026-09-01)
+
+The first pass closed with "18 namespaced `crate/feature` tokens are the one
+known gap left". Closing it turned up that the gap was three stacked defects,
+each of which alone produced *silently fewer labels and still "0 mismatches"*:
+
+1. **`/` was absent from the token name class.** `` `katgpt-core/gaussianity_probe` ``
+   yielded no token. The *vocabulary* for it already existed
+   (`_parse_feature_spec` has normalised `crate/foo` since the first version) —
+   only the tokenizer lacked it. Exactly the shape of the riir-chain dialect bug
+   above, one layer down.
+2. **The status capture is lazy and stops at the first comma.** A compound
+   parenthetical — `` `riir-wallet/siwr` (client + RP kit, default-OFF) `` —
+   captured `"client + RP kit"` → `unknown` → discarded, with the real status
+   word one comma further on. Now retried over the remainder of the enclosing
+   clause (`widened_status`). The retry fires **only** where the tight capture
+   already returned `unknown`, so it is monotone by construction: it can
+   promote unknown → default/opt-in and can never change a verdict the
+   tokenizer already reached.
+3. **`+` was absent from the status class**, which is why (2)'s line produced no
+   token to retry in the first place.
+
+Measured effect: **+6 labels** from (1) alone, **+21 labels** with (2) and (3)
+— riir-ai 62 → 77, katgpt-rs 91 → 92, riir-chain 1 → 2, riir-neuron-db 10 → 11.
+
+### Most `unknown` verdicts were correct, and that had to be checked too
+
+Of the namespaced tokens, 16 still parse as `unknown` — and for 15 of them that
+is the **right** answer: they are forwarding *targets* named inside another
+feature's parenthetical (`` `ruliology` (opt-in, root forwards to
+`katgpt-ruliology/ruliology` + …) ``), where the bare feature is the actual
+label and is already read. Only the riir-chain siwr line was a primary label.
+
+## Two false positives this work created, caught before shipping
+
+Both were produced by the new coverage, and both would have red-flagged a doc
+that is **correct**. They are recorded because the near-miss is the lesson:
+widening an auditor's reach adds false positives as readily as findings, and the
+script's own comments already warn that false positives are how a gate earns a
+reputation for noise and gets ignored.
+
+1. **Forwarded-only defaults.** `riir-wallet/siwr` is off in `riir-wallet`'s own
+   `default`, and on in a default build only because `riir-chaind`'s
+   `default -> chain_siwr -> riir-wallet/siwr` pulls it in. Both readings are
+   defensible, so "default-OFF" is not drift. Since own-crate-default ⊆
+   deployed-default always, this collapses to one rule: **suppress the
+   opt-in-vs-default mismatch when a feature is default only by forwarding.**
+   New `find_own_crate_defaults` / `local_default_closure` compute the strict
+   subset; the count is reported, never silently dropped.
+2. **Cross-crate name collapse.** `_parse_feature_spec` collapses `pkg/feat` to
+   `feat` — correct for the deployed model, wrong for the own-crate model.
+   riir-engine has `se2_equivariant = ["katgpt-core/tropical_algebra"]` in its
+   `default` (Cargo.toml:503) *and* a separate local
+   `tropical_algebra = [...]` (:2085) that is **not** in default. Collapsing
+   credited the local flag as default-on and reported confident drift on
+   `` `tropical_algebra` (riir-engine, opt-in) ``, which is right. Only a BARE
+   entry activates a same-crate feature; `local_default_closure` now enforces
+   that, and it is pinned (see below).
+
+A third suppression is textual: a label may scope its own claim
+(`` `npc_sleep_time` (sleep_time_catalog, opt-in in this crate — see npc.md
+§Feature gate landscape for the layered gate split) ``). That doc is describing
+a layered split it is fully aware of; the flat repo-wide model cannot adjudicate
+it. `SCOPED_CLAIM_RE` skips and counts it.
+
+`checked N labels, M mismatches` now carries a `[skipped: …]` tail naming every
+suppressed bucket (cross-repo / forwarded-only / crate-scoped), so none of the
+three is invisible.
+
+### The pins were vacuous until canaried — two of four
+
+`selftest()` gained the namespaced + compound shapes and an own-default case.
+Canarying all four by reverting each fix in a copy, **two passed anyway**:
+
+- The widened-retry pin was guarding a **duplicate**: `selftest` re-implemented
+  the status logic inline, so breaking the iterator's copy left it green. Both
+  now call one `classify_token`.
+- The own-default canary was the wrong inverse — the defect is the *collapse*
+  via `_parse_feature_spec`, not merely admitting namespaced entries. Re-run
+  against the real pre-fix code it fires.
+
+All four now exit 1 naming the shape. An uncanaried pin is an unknown, not a
+pass — the same rule this repo's AGENTS.md applies to uninvoked assertions.
+
+## New confirmed drift (4th), and one non-finding
+
+4. **riir-ai** — `.benchmarks/498_hla_band_edge_quality.md:6` says
+   `` `riir-engine/band_edge_trigger` (Plan 498 Phase 1, opt-in) ``.
+   `band_edge_trigger` IS a bare entry in `crates/riir-engine/Cargo.toml`
+   `default[]`. Corroborated inside riir-ai's own corpus: `498_hla_band_edge_burn_in.md`
+   records "**promoted to DEFAULT-ON by this gate**" and adds it to the default
+   list, and `551_band_edge_level_playing_field.md:7` says "default-on since
+   Plan 498 Phase 4". The Phase-1 doc was accurate when written and was never
+   updated — the same stale-GOAT-record class as items 1–3, and the reason the
+   in-line `parse_terminal_transition` rule is not enough: here the promotion is
+   recorded in a *different* document.
+
+**Not a finding:** `tropical_algebra` (riir-ai) — see false positive 2 above.
+Verified by hand against riir-engine's manifest; the doc is correct.
 
 ## NOT fixed from here
 
