@@ -343,7 +343,10 @@ pub fn sigmoid_fuse_into(
 /// # Zero-allocation
 ///
 /// Same fused-RMSNorm + dot trick as [`sigmoid_fuse_into`] — no scratch.
-#[cfg(feature = "engram_privilege")]
+/// Compiled under `engram_privilege` (the Issue-656 consumer) OR
+/// `engram_tripwire` (the Issue-837 detector — the returned unscaled gate IS
+/// the tripwire's per-source consumption weight).
+#[cfg(any(feature = "engram_privilege", feature = "engram_tripwire"))]
 #[inline]
 pub fn sigmoid_fuse_scaled_into(
     q: &[f32],

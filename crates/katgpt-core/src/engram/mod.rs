@@ -81,6 +81,16 @@ mod tokenizer;
 #[cfg(feature = "engram_privilege")]
 mod privilege;
 
+// Issue 837 wiring — the stateful detector half of the detector+repair split
+// (riir-ai Bench 832 §Wiring; owner call executed 2026-09-01). Composes the
+// `evidence_tripwire` primitive (metrics + conformal threshold) with this
+// module's fusion gates: benign-pool ring + split-conformal threshold +
+// verdict with suspect attribution (the drop target; the privilege ledger
+// below stays the repair half for the diffuse-poison axis the rank channel
+// cannot see). Opt-in (`engram_tripwire`).
+#[cfg(feature = "engram_tripwire")]
+mod tripwire;
+
 // Issue 039 — whole-architecture commitment root. Sibling to `commitment.rs`,
 // gated one layer deeper than its siblings: it depends on `EngramTableId`
 // from `commitment.rs` AND needs `engram` itself compiled (so the feature
@@ -126,8 +136,10 @@ pub use hotswap::EngramHotSwap;
 pub use kernel::{
     SigmoidFusionConfig, rmsnorm_into, sigmoid_fuse_into, sigmoid_fuse_multi_branch_into,
 };
-#[cfg(feature = "engram_privilege")]
+#[cfg(any(feature = "engram_privilege", feature = "engram_tripwire"))]
 pub use kernel::sigmoid_fuse_scaled_into;
+#[cfg(feature = "engram_tripwire")]
+pub use tripwire::{EngramTripwire, EngramTripwireConfig, EngramTripwireVerdict, suspect_gate_source};
 #[cfg(feature = "engram_privilege")]
 pub use privilege::{
     CreditAssignment, PrivilegeConfig, PrivilegeLedger, PrivilegeTrace,
