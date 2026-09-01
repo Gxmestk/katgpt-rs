@@ -112,6 +112,19 @@ still quotes the command it runs). `.github/workflows/full_gate.yml` runs it
 weekly and on demand; per-push is deliberately not enabled — see that file's
 preamble for the measured cost and the promotion criterion.
 
+### The docs gate — same discipline, opposite cadence
+
+`scripts/docs_gate.sh` runs the three manifest/doc drift assertions
+(`count_features.py`, `bench_doc_audit.py`, `cargo_comment_audit.py`) and
+`.github/workflows/docs_gate.yml` runs it **per-push** on ubuntu-latest. Both
+choices are deliberately the inverse of the full gate's, and both files say why:
+this gate has no `cfg(target_os)` surface so platform cannot change its verdict,
+and it costs ~3s rather than >13 min.
+
+All three checks existed before that wiring and **nothing invoked any of them**;
+two were red on `develop`, both on false positives against docs that were
+correct. Treat an uninvoked assertion as unknown, not as passing.
+
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
 Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,
