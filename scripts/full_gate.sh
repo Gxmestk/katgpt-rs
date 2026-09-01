@@ -167,6 +167,37 @@ WARN_LINES=$({ grep -cE '^warning' "$LOG" || true; })
 WARN_TALLIES=$({ grep -cE '^warning: .* generated [0-9]+ warning' "$LOG" || true; })
 WARNINGS=$((WARN_LINES - WARN_TALLIES))
 
+# ── Layer 3b: liveness — did this run examine anything at all? ───────────────
+# The gate reported "✓ full gate PASSED — 0 errors, 0 unbuildable targets
+# (0 warning finding(s) across 0 target(s))" on its first TWO CI runs, having
+# compiled ZERO units. Same command, same repo, same day: the workstation
+# reports 119 findings across 20 targets. A green built from nothing is exactly
+# the vacuous pass this gate exists to catch, arrived at by the gate itself.
+#
+# Two independent signals, because either alone has a blind spot:
+#   UNITS   — cargo actually built something ("Compiling"/"Checking" lines).
+#   TALLIES — cargo REPLAYED cached diagnostics without rebuilding, which a
+#             warm local re-run does (Issue 701 R3b measured 119/20 that way).
+# A conclusive run has at least one. Zero of both means the run is telling you
+# about its cache, not about the code.
+#
+# A genuinely warning-free workspace with a fully warm target dir would also
+# land here — and "I cannot distinguish clean from unmeasured" is the honest
+# thing to say about that state, not a pass. Invalidate the cache and re-run.
+UNITS=$({ grep -cE '^[[:space:]]*(Compiling|Checking) ' "$LOG" || true; })
+
+if [ "$UNITS" -eq 0 ] && [ "$WARN_TALLIES" -eq 0 ]; then
+    KEEP_LOG=1
+    echo "✗ full gate INCONCLUSIVE — the run compiled 0 units and replayed 0"
+    echo "  diagnostics, so it verified NOTHING. This is not a pass."
+    echo "  Cause is almost always a restored build cache that cargo considers"
+    echo "  fresh: no rebuild, and no replayable diagnostics to fall back on."
+    echo "  Fix by running cold (drop the cache restore) — a rot check that"
+    echo "  cannot see the code cannot detect rot."
+    echo "  log: $LOG"
+    exit 1
+fi
+
 if [ "$DIAGS" -ne 0 ] || [ "$BROKEN_N" -ne 0 ]; then
     KEEP_LOG=1
     echo "✗ full gate FAILED — $DIAGS error diagnostic(s), $BROKEN_N unbuildable target(s)"
@@ -190,4 +221,6 @@ if ! grep -qF "$GATE_CMD" AGENTS.md; then
     exit 1
 fi
 
-echo "✓ full gate PASSED — 0 errors, 0 unbuildable targets ($WARNINGS warning finding(s) across $WARN_TALLIES target(s), not gated)"
+# UNITS is printed on every pass, not just when it is interesting: the number
+# that would have exposed the vacuous CI green was never on screen.
+echo "✓ full gate PASSED — 0 errors, 0 unbuildable targets ($WARNINGS warning finding(s) across $WARN_TALLIES target(s), not gated; $UNITS unit(s) compiled)"

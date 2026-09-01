@@ -92,6 +92,39 @@ jobs:
           # which is how a 180-minute ceiling stays survivable.
           cache-on-failure: true
 
+      # ── Why the workspace artifacts are thrown away, and the deps kept ──
+      # The cache above made this gate VACUOUS. Measured on its first two CI
+      # runs (33523516143 push, 33529923375 dispatch): "Restored from cache ...
+      # full match: true", then cargo compiled ZERO units, replayed ZERO
+      # diagnostics, and the gate printed
+      #   ✓ full gate PASSED — 0 errors, 0 unbuildable targets (0 warning
+      #     finding(s) across 0 target(s))
+      # while the same command on the workstation reported 119 findings across
+      # 20 targets the same day. A green built from nothing — the exact failure
+      # this gate exists to catch, committed by the gate.
+      #
+      # `cargo clean -p` on each workspace member only. That is the honest split
+      # of the cache: DEPENDENCIES are the expensive part and the gate makes no
+      # claim about them, while the WORKSPACE MEMBERS are the entire subject of
+      # the assertion and must be re-linted every run. Deleting the whole cache
+      # instead would be correct but pays a full cold dep build every week for
+      # no added coverage.
+      #
+      # Members are enumerated from `cargo metadata`, never typed — a hand-typed
+      # list silently stops covering a new crate, which is this repo's most
+      # frequently rediscovered defect (Issue 703).
+      #
+      # scripts/full_gate.sh Layer 3b now FAILS a run that compiled nothing and
+      # replayed nothing, so if this step ever stops working the gate says so
+      # instead of printing another zero-built green.
+      - name: Drop workspace artifacts so the gate actually re-lints them
+        run: |
+          set -euo pipefail
+          members=$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json,sys; print(" ".join(p["name"] for p in json.load(sys.stdin)["packages"]))')
+          echo "▸ re-linting $(printf '%s\n' $members | wc -l | tr -d ' ') workspace member(s)"
+          for m in $members; do cargo clean -p "$m" 2>/dev/null || true; done
+
       # Strict: no --allow-partial-platform. On a non-macOS runner the script
       # refuses to report a pass, so this step cannot silently degrade into the
       # partial gate the preamble warns about.
@@ -108,13 +141,21 @@ jobs:
       # in the log, and a GitHub runner is destroyed when the job ends, so
       # without this step the only way to see the remaining sites is to
       # re-run the whole >13 min gate locally.
+      # `always()`, not `failure()`. A green's evidence used to be destroyed with
+      # the runner, which is why two vacuous passes went unexamined: the summary
+      # said PASSED and the log that would have shown "0 units compiled" was
+      # unreachable. A pass whose working is unavailable is a claim, not a
+      # result — and this gate's whole subject is the difference.
       - name: Upload gate log
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: full-gate-log
           path: ${{ runner.temp }}/full_gate.log
-          # A cold failing run's log is large and its value decays fast; the
-          # commit that broke the gate is what matters, and that is in git.
+          # A cold run's log is large and its value decays fast; the commit
+          # that broke the gate is what matters, and that is in git.
           retention-days: 14
+          # `warn`, not `error`: the script removes the log on a pass when
+          # FULL_GATE_LOG is unset. It is set above, so a missing file here is
+          # itself worth seeing — but it must not fail an otherwise-green gate.
           if-no-files-found: warn
