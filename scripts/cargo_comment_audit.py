@@ -20,7 +20,8 @@ Exit code: 0 if no mismatches, 1 if any mismatch found.
 
 Strategy
 --------
-1. Walk every `Cargo.toml` in the repo (skipping `target/`).
+1. Read every GIT-TRACKED `Cargo.toml` in the repo (falling back to a
+   pruned filesystem walk when the target is not a git repo).
 2. From each `[features]` table, collect:
    - the set of all defined feature names
    - the set of names transitively enabled by `default = [...]`
@@ -59,6 +60,7 @@ import tomllib
 # Reuse the status parser from bench_doc_audit for consistency.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_doc_audit import (
+    UNTRACKED_SKIPPED,
     find_cargo_defaults,
     find_defined_features,
     iter_cargo_manifests,
@@ -438,7 +440,14 @@ def audit_repo(repo_root: Path) -> int:
             print(f"    file: {rel}:{ln}")
             print(f"    feat: {feat}")
             print(f"    line: {line}")
-    print(f"  -> checked {checked} inline comments, {mismatches} mismatches")
+    # Untracked manifests are excluded from the closure (see
+    # bench_doc_audit._tracked_manifests) — say so, rather than letting a
+    # workstation run quietly differ from CI's count with no explanation.
+    _untracked = UNTRACKED_SKIPPED.get(str(repo_root), 0)
+    _tail = (f"  -> checked {checked} inline comments, {mismatches} mismatches"
+             + (f" [skipped: {_untracked} untracked manifest(s) not in git]"
+                if _untracked else ""))
+    print(_tail)
     return mismatches
 
 

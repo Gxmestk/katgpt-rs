@@ -18,7 +18,8 @@ Exit code: 0 if no mismatches, 1 if any mismatch found.
 
 Strategy
 --------
-1. Walk every `Cargo.toml` in the repo (skipping `target/`).
+1. Read every GIT-TRACKED `Cargo.toml` in the repo (falling back to a
+   pruned filesystem walk when the target is not a git repo).
 2. From each `[features]` table, collect:
    - the set of all defined feature names
    - the set of names that appear in `default = [...]`
@@ -106,15 +107,63 @@ def _parse_feature_spec(spec: str) -> str | None:
 PRUNE_DIRS = frozenset({"target", ".git", "node_modules", "__pycache__", ".venv"})
 
 
-def iter_cargo_manifests(repo_root: Path):
-    """Every source Cargo.toml, pruning build/VCS dirs DURING the walk.
+# repo root -> how many on-disk manifests were skipped as untracked. Reported,
+# never silently dropped: this script's whole discipline is that a quietly
+# smaller corpus still prints "0 mismatches".
+UNTRACKED_SKIPPED: dict[str, int] = {}
 
-    The previous form was `repo_root.rglob("Cargo.toml")` followed by
+
+def _tracked_manifests(repo_root: Path) -> list[Path] | None:
+    """Manifests git actually tracks, or None if this is not a usable git repo.
+
+    Why ask git at all: a workstation tree carries manifests CI will never see,
+    and they do not merely pad a count — every one of them feeds the DEFAULT
+    CLOSURE these audits are judged against, so an untracked copy can add a
+    feature to the default set and flip a verdict. Measured 2026-09-01:
+    riir-chain's `cloudflare/edge-wallet-container/.container-src/` is an
+    untracked COPY OF THE REPO, and it made the local audit report 4 inline
+    comments where CI reported 2. katgpt-rs walks 12 untracked manifests of 44;
+    riir-train, 371 of 376.
+
+    In CI this is a no-op by construction — a fresh checkout has nothing
+    untracked — so it changes nothing there and makes the workstation agree.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "-z", "--", "*Cargo.toml"],
+            capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None  # not a git repo, or git unavailable — fall back to the walk
+    out = [repo_root / n.decode() for n in r.stdout.split(b"\0") if n]
+    # An empty result from a real git repo is ambiguous (a repo genuinely
+    # without manifests vs a broken invocation). Fall back rather than silently
+    # audit nothing — the failure mode this whole family of scripts exists for.
+    return out or None
+
+
+def iter_cargo_manifests(repo_root: Path):
+    """Every source Cargo.toml — git-tracked ones if this is a git repo, else a
+    walk that prunes build/VCS dirs DURING traversal.
+
+    The walk's previous form was `repo_root.rglob("Cargo.toml")` followed by
     `if "target" in cargo.parts: continue` — which filters AFTER pathlib has
     already descended into target/. Measured on katgpt-rs: 1,470,215 entries in
     10.7s unpruned versus 143,275 in 0.3s pruned, and four call sites each paid
     it once per run.
     """
+    tracked = _tracked_manifests(repo_root)
+    if tracked is not None:
+        walked = sum(1 for _ in _walk_cargo_manifests(repo_root))
+        UNTRACKED_SKIPPED[str(repo_root)] = max(0, walked - len(tracked))
+        yield from tracked
+        return
+    yield from _walk_cargo_manifests(repo_root)
+
+
+def _walk_cargo_manifests(repo_root: Path):
     for dirpath, dirnames, filenames in os.walk(repo_root):
         dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS]
         if "Cargo.toml" in filenames:
@@ -595,6 +644,9 @@ def audit_repo(repo_root: Path) -> int:
         notes.append(f"{forwarded} forwarded-only (off in owning crate)")
     if scoped:
         notes.append(f"{scoped} crate-scoped claim")
+    untracked = UNTRACKED_SKIPPED.get(str(repo_root), 0)
+    if untracked:
+        notes.append(f"{untracked} untracked manifest(s) not in git")
     if notes:
         tail += " [skipped: " + "; ".join(notes) + "]"
     print(tail)
