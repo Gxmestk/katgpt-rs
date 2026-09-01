@@ -99,6 +99,16 @@ instrument would earn either a false green or a false red:
 - **`katgpt-web/deploy.yml` is unmeasured, not dead.** That repo has no remote
   refs to read a default branch from. Scoring an unmeasured repo as a finding is
   the confident-green-over-nothing inversion, pointed the other way.
+
+  **Root cause found 2026-09-01, and it is worse than a measurement gap:
+  `katgpt-web` has NO GIT REMOTE AT ALL.** `git remote -v` is empty; the repo
+  carries **14 commits** on `feat/percepta-arch-diagrams` — including its
+  `BOUNDARY.md` and `AGENTS.md` — that exist on this disk and nowhere else.
+  It is named in `riir-ai`'s BOUNDARY contract, so the audited set references a
+  repo that has never been pushed. Its CI reachability is unknowable for the
+  same reason its work is unbacked-up, and the second problem is the real one.
+  Creating a remote is an outward-facing action and the owner's call; flagged,
+  not done.
 - **`pull_request` is conditional, not dead.** A `pull_request` run uses the
   workflow file from the PR's *merge commit*, so a develop-only workflow does
   fire on a PR. Whether a PR is ever opened is workflow policy git cannot see —
@@ -235,6 +245,15 @@ defects surfaced only because two instruments had to agree:
 
 Both were invisible from one side alone, and both are the reason a green CI
 wiring is worth nothing until someone reads a real run's log.
+
+## One non-finding, recorded so it is not re-investigated
+
+`ai-perfwt` carries a `BOUNDARY.md` but never appears in the derived repo set.
+That is **correct**: its `.git` is a FILE (`gitdir:
+/Users/katopz/git/riir-ai/.git/worktrees/ai-perfwt`) — it is a git *worktree* of
+`riir-ai`, and `derive_repos` tests `-d .git` precisely so a worktree is not
+counted as a second repo. The docstring already says so. 19 directories carry a
+contract; 18 are repos.
 
 ## Closing conditions
 
