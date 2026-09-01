@@ -201,10 +201,14 @@ def main() -> int:
 
     findings = [(p, f) for p in skills for f in scan(p, vocab)]
     if not findings:
-        print(f"✓ no hand-typed repo set in any SKILL.md command block "
-              f"({len(skills)} scanned)")
         print("  note: fenced SCOPE TABLES (repo names without paths) are out "
               "of scope by design — see this file's docstring")
+        # The population goes in the LAST line on purpose: docs_gate.sh prints
+        # only `tail -1` of a passing check, so a verdict that does not carry
+        # its own scope reaches CI as a bare "clean" — a partial run wearing a
+        # whole one's clothes, which is the entire defect being gated.
+        print(f"✓ no hand-typed repo set — {len(skills)} SKILL.md across "
+              f"{len(covered)} repo(s) [{scope}], vs {len(vocab)} repo names")
         return 0
 
     for path, (start, end, names, brace) in findings:
