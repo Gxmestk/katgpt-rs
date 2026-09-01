@@ -1,6 +1,12 @@
 # Issue 704 — seven sibling workflows cannot fire, and this repo's advertised weekly gate is one of the casualties
 
-Status: **OPEN** — measurement complete and the instrument is wired
+Status: **RESOLVED 2026-09-01 for the approved set; ONE row open.** Default
+branch moved `main` -> `develop` on `riir-ai`, `riir-chain`, `riir-neuron-db`,
+`riir-dao` (org `gist-rs`) and `katgpt-rs` (owner `katopz`), on the owner's
+call — the reversible settings fix, chosen over promote-to-main so the frozen
+v0.1.1 `main` and the promote process are both untouched. **Dead workflows went
+7 -> 1**; the remaining one is `riir-game-sdk/nightly.yml`, outside the approved
+set and a different shape (see below). Original status: measurement complete and the instrument is wired
 (`scripts/ci_gate_coverage.py` grew the axis, `d2228161`+); the two false
 documentation claims in katgpt-rs are corrected; the *fixes* are each repo's own
 call and two of them are outward-facing repo-settings changes, so they are NOT
@@ -150,14 +156,79 @@ repos gate the full surface") now has a prior qualifier: several of the repos it
 scores are running nothing. Coverage and reachability are independent axes, and
 reachability dominates. 701 is another agent's lane; this is noted, not edited.
 
+## After the fix — re-measured, same instrument
+
+```
+▸ reachability (default branch vs where the workflow file lives)
+  katgpt-rs              default=develop  docs_gate.yml[pull_request?,push,workflow_dispatch]  feature_isolation.yml[pull_request?,workflow_dispatch]  full_gate.yml[pull_request?,push,schedule,workflow_dispatch]  lean_proofs.yml[pull_request?,push,workflow_dispatch]  release-plz.yml[workflow_dispatch]  sibling_docs_drift.yml[workflow_call,workflow_dispatch]
+  katgpt-web             default=?        deploy.yml[UNREACHABLE]
+  riir-ai                default=develop  lean_proofs.yml[pull_request?,push,workflow_dispatch]
+  riir-chain             default=develop  lean_proofs.yml[workflow_dispatch]  rust.yml[workflow_dispatch]  toolchain_drift.yml[schedule,workflow_dispatch]
+  riir-clippy            default=develop  ops_dashboard.yml[schedule,workflow_dispatch]  rust.yml[schedule,workflow_dispatch]
+  riir-dao               default=develop  rust.yml[workflow_dispatch]
+  riir-deployer          default=develop  release.yml[push,workflow_dispatch]
+  riir-game-sdk          default=main     nightly.yml[UNREACHABLE]  wasm32.yml[pull_request?,push]
+  riir-neuron-db         default=develop  lean_proofs.yml[workflow_dispatch]  rust.yml[workflow_dispatch]
+
+  1 workflow(s) cannot fire from any trigger — a gate that never runs is decoration, not coverage:
+    - riir-game-sdk/nightly.yml
+  schedule/workflow_dispatch need the file on the DEFAULT branch; push/pull_request
+  need it on a branch their filter names.
+
+  6 workflow(s) RUN but lost a declared trigger — the file fires on one
+  trigger while another it declares (and its docs may advertise) never does:
+    ! riir-chain/lean_proofs.yml: declared push — never fires
+    ! riir-chain/rust.yml: declared push — never fires
+    ! riir-clippy/rust.yml: declared push — never fires
+    ! riir-dao/rust.yml: declared push — never fires
+    ! riir-neuron-db/lean_proofs.yml: declared push — never fires
+    ! riir-neuron-db/rust.yml: declared push — never fires
+
+  1 workflow(s) NOT classified — no remote refs to read a default branch from, or PR-only in a repo whose
+  policy this script cannot see. Unmeasured, not clean:
+    ? katgpt-web/deploy.yml
+```
+
+**katgpt-rs's weekly full gate now fires.** `full_gate.yml` went from
+`[pull_request?, push]` to `[pull_request?, push, schedule, workflow_dispatch]`
+— the >13-minute all-axes gate that AGENTS.md has advertised as weekly since it
+was written runs for the first time. `docs_gate.yml`, `feature_isolation.yml`
+and `sibling_docs_drift.yml` regained their dispatch entry points; the last of
+those was dead in the same commit that introduced it.
+
+**riir-chain's `toolchain_drift.yml` weekly cron is live**, and the four
+siblings' `rust.yml` / `lean_proofs.yml` are now at minimum manually
+dispatchable — previously they had no live trigger at all.
+
+### The six `declared push — never fires` rows are NOT a regression
+
+They are the same `push: branches: [main]` lines as before, still no-ops because
+work lands on `develop` and `main` carries no workflow files. That is each
+repo's **recorded Actions-budget decision** ("main-only, the account is at its
+spending limit"), not drift. Adding `develop` to those filters would trigger a
+full build on every push — precisely the cost those owners declined. Left alone
+deliberately: the fix restored the schedule/dispatch paths without touching
+anyone's budget stance. Their gates run weekly or on demand, not per push.
+
+### The one remaining dead workflow is out of scope here
+
+`riir-game-sdk/nightly.yml` (daily cron) still cannot fire: that repo's default
+is `main`, and unlike the four above its `main` *does* carry a workflow
+(`wasm32.yml`, whose push trigger is live), so it is not the frozen-main shape
+and flipping its default is a different judgement call. Not included in the
+approved set; left for that repo's owner.
+
 ## Closing conditions
 
 - [x] Measure the axis, with the three states kept distinct.
 - [x] Wire it into `scripts/ci_gate_coverage.py` (additive; report, not gate).
 - [x] Correct AGENTS.md's `full_gate.yml` weekly/on-demand claim.
 - [x] Record the caveat inside `sibling_docs_drift.yml`.
-- [ ] Owner decision on default branch vs promote-to-main, per repo.
-- [ ] Re-run `scripts/ci_gate_coverage.py`; expect 0 dead workflows.
+- [x] Owner decision on default branch vs promote-to-main, per repo. **DONE
+      2026-09-01** — default branch, applied to the five repos above.
+- [x] Re-run `scripts/ci_gate_coverage.py`. **7 dead -> 1**, verified against
+      the API *and* a re-derived `origin/HEAD` rather than the PATCH response.
+- [ ] `riir-game-sdk/nightly.yml` — that repo's owner call, different shape.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
 Refs: `d2228161` (the sweep + reusable workflow), `.issues/701` R2 (same

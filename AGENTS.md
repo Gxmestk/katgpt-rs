@@ -112,14 +112,21 @@ still quotes the command it runs). `.github/workflows/full_gate.yml` **declares*
 weekly cron and a manual dispatch; per-push is deliberately not enabled — see
 that file's preamble for the measured cost and the promotion criterion.
 
-Read that as a declaration, not as a schedule that runs. Measured 2026-09-01,
-**neither trigger has ever fired**: `schedule` and `workflow_dispatch` run only
-from a repository's DEFAULT branch, and this repo's default is `main`, frozen
-at the v0.1.1 promote with no `.github/workflows/` at all. The file's own
-comment calls the schedule "the rot check"; the rot check had rotted. Only its
-paths-limited `push` trigger is live. `scripts/ci_gate_coverage.py` now
-measures this axis (`.issues/704`) — six workflows across the workspace declare
-a trigger that cannot fire, and seven sibling workflows cannot fire at all.
+That was a declaration and not a schedule until 2026-09-01. `schedule` and
+`workflow_dispatch` run **only from a repository's DEFAULT branch**, and this
+repo's default was `main` — frozen at the v0.1.1 promote with no
+`.github/workflows/` at all — so **neither trigger had ever fired**. The file's
+own comment calls the schedule "the rot check"; the rot check had rotted, and
+this paragraph advertised it as running. Fixed by moving the default branch to
+`develop` (`.issues/704`), which is where AGENTS.md already says work lands;
+both triggers are live as of that change.
+
+Don't take that as permanently settled — a workflow file is identical on disk
+whether or not it can execute, which is why this went unnoticed. The axis is
+now measured: `scripts/ci_gate_coverage.py` reports, per workflow, which
+declared triggers can actually fire, keeping **dead**, **unmeasured** (no remote
+refs) and **PR-only** apart. It took the workspace from 7 dead workflows to 1.
+Run it rather than re-reading trigger blocks by hand.
 
 ### The docs gate — same discipline, opposite cadence
 

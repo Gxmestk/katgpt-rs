@@ -63,14 +63,13 @@ on:
   # invoke cannot be smoke-tested, and this repo's rule is that an uninvoked
   # assertion is unknown rather than passing.
   #
-  # HONEST CAVEAT, measured 2026-09-01: it does not fire yet. workflow_dispatch
-  # runs ONLY from a repository's DEFAULT branch, and katgpt-rs's default is
-  # `main`, which carries no .github/workflows/ (frozen at the v0.1.1 promote).
-  # So this line is currently aspirational, not live — the same trap that leaves
-  # full_gate.yml's advertised weekly run dead. Tracked in .issues/704; it goes
-  # live the moment this file reaches `main` or the default branch moves.
-  # Until then the ONLY live path here is workflow_call from a sibling, which is
-  # branch-pinned by the caller and therefore unaffected.
+  # It did NOT fire when first committed: workflow_dispatch runs only from a
+  # repository's DEFAULT branch, which was `main` — a branch carrying no
+  # .github/workflows/ at all. Live since the default moved to `develop`
+  # (.issues/704), the same fix that resurrected full_gate.yml's weekly run.
+  # Note for anyone porting this file elsewhere: workflow_call is NOT subject to
+  # that rule (the caller pins a ref), so the reusable path worked throughout —
+  # only the standalone smoke-test entry point was dead.
   workflow_dispatch:
 
 jobs:
