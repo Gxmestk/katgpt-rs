@@ -384,6 +384,10 @@ pub fn dim_capacity_ceiling(d: usize, k: usize, gamma: f64) -> usize {
 /// More efficient than `simd_dot_f32(x, x, len)` — loads data once instead of twice.
 #[inline(always)]
 pub fn simd_sum_sq(x: &[f32], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let x = &x[..len];
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_sum_sq(x, len) }
@@ -954,6 +958,10 @@ unsafe fn avx2_sum_abs_f32(x: &[f32]) -> f32 {
 /// Computes the elementwise difference, squares, and sums in one pass.
 #[inline]
 pub fn simd_dist_sq(a: &[f32], b: &[f32], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (a, b) = (&a[..len], &b[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_dist_sq(a, b, len) }
@@ -1122,6 +1130,10 @@ unsafe fn avx2_dist_sq(a: &[f32], b: &[f32], len: usize) -> f32 {
 /// path for the non-NaN case).
 #[inline]
 pub fn simd_l_inf_distance_f32(a: &[f32], b: &[f32], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (a, b) = (&a[..len], &b[..len]);
     debug_assert_eq!(a.len(), b.len());
     #[cfg(target_arch = "aarch64")]
     {
@@ -1336,6 +1348,10 @@ unsafe fn avx2_l_inf_distance_f32(a: &[f32], b: &[f32], len: usize) -> f32 {
 /// Single-pass operation for MLS and delta routing accumulation.
 #[inline(always)]
 pub fn simd_fused_sub_acc(dst: &mut [f32], a: &[f32], b: &[f32], len: usize) {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (dst, a, b) = (&mut dst[..len], &a[..len], &b[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_fused_sub_acc(dst, a, b, len) }
@@ -1421,6 +1437,10 @@ unsafe fn avx2_fused_sub_acc(dst: &mut [f32], a: &[f32], b: &[f32], len: usize) 
 /// NEON: fused via `vfmaq_f32`. AVX2: fused via `_mm256_fmadd_ps`.
 #[inline(always)]
 pub fn simd_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: usize) {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (dst, src) = (&mut dst[..len], &src[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_fused_scale_acc(dst, src, scale, len) }
@@ -1520,6 +1540,10 @@ unsafe fn avx2_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: us
 /// `half::f16::to_f32()` widening.
 #[inline]
 pub fn simd_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f32, len: usize) {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (dst, src_f16) = (&mut dst[..len], &src_f16[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_fused_scale_acc_f16(dst, src_f16, scale, len) }

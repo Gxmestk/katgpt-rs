@@ -24,6 +24,10 @@ use super::is_avx2_fma_available;
 /// runtime CPU feature detection.
 #[inline(always)]
 pub fn simd_dot_f32(a: &[f32], b: &[f32], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (a, b) = (&a[..len], &b[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_dot_f32(a, b, len) }
@@ -954,6 +958,10 @@ pub fn simd_matmul_relu_rows(
 /// for weight reads while maintaining f32 precision for accumulation.
 #[inline]
 pub fn simd_dot_f16_f32(w_f16: &[half::f16], x_f32: &[f32], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (w_f16, x_f32) = (&w_f16[..len], &x_f32[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_dot_f16_f32(w_f16, x_f32, len) }
@@ -1246,6 +1254,10 @@ unsafe fn fmlal_hi_inline(
 /// Requires `fp16` + `fhm` target features at runtime.
 #[inline(always)]
 pub fn simd_dot_f16_f16(w: &[half::f16], x: &[half::f16], len: usize) -> f32 {
+    // Soundness gate (Issue 700): this is a SAFE fn whose backends do unchecked
+    // pointer loads/stores up to `len`. Reslicing here turns a caller's bad `len`
+    // into a clean panic instead of an OOB read/write, and hands LLVM the length.
+    let (w, x) = (&w[..len], &x[..len]);
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("fp16")
