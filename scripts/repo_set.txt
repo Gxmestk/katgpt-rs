@@ -21,3 +21,4 @@ riir-train
 riir-unity
 riir-viewbridge
 seal-game-editor
+seal-remake
