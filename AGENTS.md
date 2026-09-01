@@ -218,13 +218,25 @@ system that duplicates already-shipped substrate under a different name
 > **Repo count:** the **product/distillation set is 8** — `katgpt-rs` (public) +
 > `riir-ai`, `riir-chain`, `riir-neuron-db`, `riir-train`, `riir-game-sdk`,
 > `riir-armageddon`, `riir-dapps` (private). That is NOT the repo total: the
-> workspace is **15 repos**, all of which now carry a root `BOUNDARY.md`
+> workspace is **18 repos**, all of which carry a root `BOUNDARY.md`
 > (add `riir-mmorpg-examples`, `riir-clippy`, `riir-unity`, `riir-viewbridge`,
-> `riir-auth`, `riir-burner`, `katgpt-web`). Measured 2026-08-21 by
-> `../riir-ai/scripts/ci_boundary_contract.sh`, which enumerates the set
-> instead of trusting a prose count — four of those repos had no contract at
-> all until that run, and `riir-armageddon` had been consuming `riir-games` +
-> `katgpt-core` unaudited. Read a count in prose as a claim, not a fact.
+> `riir-auth`, `riir-burner`, `katgpt-web`, `riir-dao`, `riir-deployer`,
+> `seal-game-editor`). **Re-measured 2026-09-01** by
+> `../riir-ai/scripts/ci_boundary_contract.sh` — *"boundary contract clean —
+> 18 repos, 211 cross-repo dep edges measured"*. It was 15 at the 2026-08-21
+> run recorded here before; the count moved because contracts were added, not
+> because repos were, and **this paragraph did not** — which is the failure it
+> warns about, committed by the paragraph itself. Don't re-type the number:
+>
+> ```bash
+> cd /Users/katopz/git && for d in */; do
+>   [ -f "$d/BOUNDARY.md" ] && [ -d "$d/.git" ] && echo "${d%/}"
+> done
+> ```
+>
+> Four of the 2026-08-21 repos had no contract at all until that run, and
+> `riir-armageddon` had been consuming `riir-games` + `katgpt-core` unaudited.
+> Read a count in prose as a claim, not a fact.
 > The historical "5-repo quintet" terminology referred to the 5 distillation
 > targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
 > facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
