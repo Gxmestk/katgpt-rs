@@ -110,7 +110,11 @@ to report a pass off macOS, where the `target_os = "macos"` device backends
 compile to nothing even with `--all-features`, and checks that this document
 still quotes the command it runs). `.github/workflows/full_gate.yml` **declares** a
 weekly cron and a manual dispatch; per-push is deliberately not enabled — see
-that file's preamble for the measured cost and the promotion criterion.
+that file's preamble for the measured cost and the promotion criterion. That
+preamble also carries the liveness-sentinel record from `.issues/705` — the
+gate's first two CI runs passed over ZERO compiled units (ANSI color codes
+defeated every `^`-anchored counter, including the error count); closed +
+removed 2026-09-02, full narrative in git history.
 
 That was a declaration and not a schedule until 2026-09-01. `schedule` and
 `workflow_dispatch` run **only from a repository's DEFAULT branch**, and this

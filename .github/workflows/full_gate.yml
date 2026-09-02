@@ -32,7 +32,8 @@
 # warm cache and read its wall-clock off the summary first. Do not guess.
 #
 # MEASURED 2026-09-01, run 33531188553 — the first CI run of this gate that
-# verified anything at all (see .issues/705):
+# verified anything at all (.issues/705, closed + removed 2026-09-02; its
+# narrative lives in git history):
 #     2m17s wall-clock, 32 units compiled, 297 warning findings across 72
 #     targets, 0 errors.
 # Far cheaper than the >13 min the estimate above assumed, because `cargo clean
@@ -46,7 +47,7 @@
 # criterion asked for the number, and the number is above.
 #
 # Do NOT quote the 2m30s from runs 33523516143 / 33529923375. Those compiled
-# zero units and measured nothing (.issues/705).
+# zero units and measured nothing (.issues/705, closed + removed).
 name: Full gate
 
 on:
