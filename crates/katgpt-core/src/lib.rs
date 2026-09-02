@@ -989,6 +989,18 @@ pub mod viable_manifold_graph;
 #[cfg(feature = "certified_frontier")]
 pub mod certified_frontier;
 
+// Usage-Rate (Mass/Age) KV Eviction Scoring + Generation-Runaway Canary
+// (Plan 585, Research 523, arXiv:2608.19920 "Learning how to Forget" Seeger
+// et al., AWS 2026). The paper's normalized H2O score `cum_mass / max(1,
+// age)` — O(1)/row/step over caller-supplied attention-mass increments (the
+// `suspect_indices` house pattern; mass producers are consumer-side, riir-ai
+// Issue 836 pull-gated on this plan's GOAT). Plus `RunawayStats` /
+// `runaway_gate`: the R/p128 generation-runaway canary, the promotion gate
+// the Issue 750 lossy-surface rule lacks on the generation axis. Opt-in
+// (Plan 585; GOAT .benchmarks/697).
+#[cfg(feature = "usage_rate_eviction")]
+pub mod kv_eviction;
+
 
 // Canvas Schema Compiler — declared causal topology for attention masks
 // (Plan 419, Research 398, Valdez *Canvas Engineering* July 2026). The
