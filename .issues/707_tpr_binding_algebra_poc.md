@@ -35,6 +35,38 @@ Ship the modelless TPR (Tensor Product Representation) algebra as an opt-in `tpr
 
 > **First real-world consumer (F5):** riir-clippy `.issues/62` — TPR × healer corpus fusion. Its T1 (withheld-pair OOD bench) has NO dependency on this primitive and produces the OOD baseline that gates its Phase 2; its T4 (structured retrieval) is the designated real consumer for this issue's T-G8 intervention battery — the healer corpus beats a synthetic micro-model as the G8 validation dataset.
 >
+> **That baseline now EXISTS — measured 2026-09-02, riir-clippy `.benchmarks/062_withheld_pair_ood.md`**
+> (Phase 1 T1+T2 landed, riir-clippy `ce9d395` preregistration + `cf7d356` results).
+> The consumer's OOD numbers T-G8 must beat, and the caveats that bound the claim:
+>
+> | corpus | ID top-1 | OOD top-1 | paired Δ | chance floor | atomic null (ID/OOD) |
+> |---|---:|---:|---:|---:|---:|
+> | healer, pure retrieval | 52.0% | **4.0%** | +48.0 pp | 2.2% | 0.0% / 0.0% |
+> | healer, shipped `Structural` rerank | 92.0% | 52.0% | +40.0 pp | 2.2% | 0.0% / 0.0% |
+> | `rustc_errors` | 97.7% | **48.8%** | +48.8 pp | 12.5% | 79.1% / 0.0% |
+>
+> Three constraints this puts on T-G8, all measured rather than assumed:
+>
+> 1. **Use `rustc_errors`, not the healer corpus, as the atomic-null arm.** The
+>    healer null is **VACUOUS** — 0.0% on the ID arm too, because no two healer
+>    bindings share a normalized token structure, so the memorizer cannot fit even
+>    its own training set. A null that fails in-distribution certifies nothing.
+>    `rustc_errors` (79.1% ID / 0.0% OOD) is the informative one.
+> 2. **Scope the claim to retrieved-but-demoted rows.** OOD accuracy is a **step
+>    function in the role's remaining filler count**: E0597 (6 fillers) generalizes
+>    at 100.0%, E0596 (2 fillers) collapses to 0.0% *while keeping the true code at
+>    rank 2–7*. A role with one remaining filler has nothing to compose from — any
+>    gain there should be read as **leakage, not systematicity**.
+> 3. **The corpora are nearly role/filler-COLLINEAR** (32/45 clippy roles and 6/8
+>    error codes occur under exactly ONE shape-class), so most unseen combinations
+>    do not exist to be tested. Widening fillers-per-role is a CORPUS task and a
+>    precondition for a strong T-G8, not something the primitive can fix.
+>
+> Also note for T5/BoW: `rustc_errors` being 6/8 single-filler predicts *little*
+> residual gain from the m=1 shared-role fit there, while `clippy_lints` has 13
+> multi-filler roles. That is a prior to test, not a result.
+
+>
 > **First consumer by priority (F6, #1 surface):** riir-ai `.issues/847` — quest_grammar role-move variants over S-V-O (paper Fig 7.4C: the agreement cascade is `SealGrammarAnnotation.verb_forms`; `GrammarValidator` is the downstream re-validation). Its T1 (withheld-(noun, slot)-pair OOD bench) is likewise ungated; its T3–T6 (surgery variant ops + cascade re-validation) consume this issue's T1–T5.
 
 - [-] **T8** OOD withheld-pair eval protocol + L2,1 arm A/B for trained artifacts (edge_lora / hypernet / KG-embedding tables / direction tables). Unblock: next training run touching any matrix that must compose systematically; protocol is cheap and should land as a pinned bench then. Consumers span riir-train, riir-ai (quest_grammar training), riir-clippy.
