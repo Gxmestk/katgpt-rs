@@ -217,6 +217,35 @@ Remaining in R2: riir-train (active sibling lane — next cycle), riir-auth,
 riir-unity, out-of-checkout-set repos (riir-burner, katgpt-web),
 seal-game-editor (read-only — record-why-not only).
 
+**Addendum 2026-09-02 (fourth slice) — riir-clippy's own rust.yml was DEAD on
+arrival; default flipped.** The self-applied R2 (`2044722`, 2026-09-02) landed
+`rust.yml` on riir-clippy's `develop` — but that repo's GitHub default was
+still `main`, so no trigger could reach it: schedule/dispatch fire only from
+the default branch, and `main` carries no copy. The repo that documents the
+Issue-704 lesson was exhibiting it ("a workflow file is identical on disk
+whether or not it can execute"), with its own AGENTS.md claiming the gate
+live. Found via the workflow-list API (`404: workflow rust.yml not found on
+the default branch`) while provisioning the fan-out's secret. Fixed: default
+flipped `main` -> `develop` (`main` strictly behind, verified by
+merge-base; the workflow's own preamble already assumed the flip — "because
+the default branch here is `develop`, that is exactly the branch it
+audits"). All three fan-out rust.ymls (riir-clippy, riir-viewbridge,
+riir-dapps) now register `active` on their default branches via the
+workflows API — the zero-cost parse check, and the reason riir-clippy's
+AGENTS.md CI claim became true only today.
+
+**PENDING — `SIBLING_REPOS_TOKEN` is provisioned NOWHERE.** Org-level needs
+admin; no repo carries it (checked riir-clippy, riir-viewbridge, riir-dapps;
+katgpt-rs has only CARGO_REGISTRY_TOKEN). So all three feature-guard jobs
+will fail LOUD with provisioning instructions at their first trigger —
+the designed Issue-028 expiry-alarm behavior, NOT a regression to
+investigate — while all three standalone jobs run green. The mechanism is
+verified sound: a token that can clone gist-rs private repos works for the
+`x-access-token:` clone shape (probed against riir-ai from a session
+token, 2026-09-02). Provisioning the actual secret is an owner act (a
+fine-grained PAT scoped to the private siblings, ~90-day expiry, the
+riir-clippy rust.yml preamble's spec).
+
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
