@@ -990,9 +990,72 @@ fn on_a_degenerate_corpus_every_counterfactual_role_is_unobserved() {
         observed, 0,
         "{counterfactuals} role-moving counterfactuals, none of them fitted"
     );
+
+    // ── and the other half of the hazard, in the same test ────────────────
+    //
+    // A peer pointed a future reader at this test as the thing that would fail
+    // if someone later made surgery "helpfully" refuse on an unfitted pair —
+    // which would look like a safety improvement and would actually destroy
+    // the signal that the answers are unfitted. That was not true of the
+    // assertions above: they never called surgery. It is true now.
+    //
+    // Both halves have to be asserted together or the finding is only prose:
+    // the pair is NOT in the fit, AND surgery answers it bit-additively
+    // anyway. Either assertion alone is satisfiable by a broken
+    // implementation — refusing satisfies the first, fitting everything
+    // satisfies the second.
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+    let q = Planted {
+        dim: p.dim,
+        d: p.d,
+        m: p.m,
+        n_fillers: p.n_fillers,
+        states: p.states.clone(),
+        bindings: degen.clone(),
+    };
+    let (art, _) = als_fit(input(&q), &cfg).unwrap();
+    let mut scratch = TprScratch::new(&art);
+
+    let b = &degen[0];
+    let (role, v_old) = (b.roles[0], b.fillers[0]);
+    // Keep the role, move the filler — the counterfactual T6 actually asks.
+    // `v_new` is chosen so `(role, v_new)` cannot be in the corpus: under
+    // `role = filler % m` a pair is observed only when `v % m == role`.
+    let v_new = (0..p.n_fillers as u16)
+        .find(|v| *v != v_old && *v % p.m as u16 != role)
+        .expect("a filler outside this role's class exists");
+    assert!(
+        !obs.contains(role, v_new),
+        "({role}, {v_new}) must be outside the fit for this to be the T6 case"
+    );
+
+    let d = art.d;
+    let f_old = art.fillers[v_old as usize * d..(v_old as usize + 1) * d].to_vec();
+    let f_new = art.fillers[v_new as usize * d..(v_new as usize + 1) * d].to_vec();
+    let mut edited = vec![0.0f32; art.dim];
+    encode_into(&art, b, &mut scratch, &mut edited).unwrap();
+    surgery_delta_into(&art, &mut edited, role, &f_old, &f_new, &mut scratch)
+        .expect("surgery must ANSWER an unfitted counterfactual, not refuse it");
+    let mut swapped = b.clone();
+    swapped.fillers[0] = v_new;
+    let mut reencoded = vec![0.0f32; art.dim];
+    encode_into(&art, &swapped, &mut scratch, &mut reencoded).unwrap();
+
+    let scale = reencoded.iter().fold(0.0f32, |a, x| a.max(x.abs()));
+    let err = edited
+        .iter()
+        .zip(reencoded.iter())
+        .fold(0.0f32, |a, (x, y)| a.max((x - y).abs()));
+    assert!(
+        err <= 1e-5 * scale.max(1.0),
+        "surgery must stay exact on an UNFITTED pair — that is the hazard, \
+         not a defect: err {err} scale {scale}"
+    );
+
     println!(
         "062 T6: degenerate corpus — {} distinct pairs over {} fillers, \
-         {counterfactuals} role-moving counterfactuals, {observed} observed",
+         {counterfactuals} role-moving counterfactuals, {observed} observed; \
+         surgery on unfitted ({role}, {v_new}) exact to {err:.3e} (scale {scale:.3})",
         obs.len(),
         spread.fillers
     );
