@@ -322,6 +322,88 @@ pub fn withheld_pair_top1(
     })
 }
 
+/// Distinct role labels per filler id — the covariate a structure verdict's
+/// *interpretation* depends on (Issue 711).
+///
+/// Issue 710's rule was "a control's report must carry whether the control
+/// could have failed". This is the sharper case: a control can be perfectly
+/// capable of failing and still measure the wrong thing. When every filler is
+/// seen with exactly one role, the role is a deterministic function of the
+/// filler, there are **no unseen `(role, filler)` pairs**, and systematicity —
+/// the claim TPR makes — is not posed on that corpus at all. Both a
+/// `structured = true` and a `structured = false` are then unreadable.
+///
+/// Reported as the whole covariate rather than only its threshold, because a
+/// *near*-degenerate corpus (1.02 roles per filler) has the same problem to
+/// within a rounding of the population and would otherwise look healthy.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FillerRoleSpread {
+    /// Largest number of distinct role labels any one filler is seen with.
+    /// `<= 1` is the degenerate case; see [`Self::role_determined_by_filler`].
+    pub max: usize,
+    /// Mean distinct role labels over the fillers that actually appear.
+    pub mean: f32,
+    /// Fillers appearing at least once — the denominator of `mean`, and NOT
+    /// `AlsInput::n_fillers`: an unused filler id would drag the mean toward 0
+    /// and make a degenerate corpus look worse than degenerate.
+    pub fillers: usize,
+}
+
+impl FillerRoleSpread {
+    /// The Issue 711 predicate: every filler appears with at most one role.
+    ///
+    /// Prefer this over deriving it from `n_fillers == n_states`, which is
+    /// only a proxy and is wrong whenever a filler legitimately repeats
+    /// within one role.
+    #[must_use]
+    pub fn role_determined_by_filler(&self) -> bool {
+        self.max <= 1
+    }
+}
+
+/// Measure [`FillerRoleSpread`] over a binding corpus.
+///
+/// One sort over the `(filler, role)` pairs — no hashing, one allocation, and
+/// the pair list doubles as the numerator of `mean` once deduped.
+#[must_use]
+pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
+    let mut pairs: Vec<(u16, u16)> = bindings
+        .iter()
+        .flat_map(|b| b.fillers.iter().copied().zip(b.roles.iter().copied()))
+        .collect();
+    pairs.sort_unstable();
+    pairs.dedup();
+
+    let mut max = 0usize;
+    let mut fillers = 0usize;
+    let mut i = 0usize;
+    while i < pairs.len() {
+        let f = pairs[i].0;
+        let start = i;
+        while i < pairs.len() && pairs[i].0 == f {
+            i += 1;
+        }
+        fillers += 1;
+        max = max.max(i - start);
+    }
+    FillerRoleSpread {
+        max,
+        // `pairs.len()` after dedup IS the sum of per-filler distinct roles.
+        mean: match fillers {
+            0 => 0.0,
+            k => pairs.len() as f32 / k as f32,
+        },
+        fillers,
+    }
+}
+
+/// Shorthand for [`FillerRoleSpread::role_determined_by_filler`] when the
+/// caller wants the predicate and not the covariate (Issue 711 T1).
+#[must_use]
+pub fn role_determined_by_filler(bindings: &[TprBindings]) -> bool {
+    filler_role_spread(bindings).role_determined_by_filler()
+}
+
 /// **T7** BoW structure router report.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BowRouterReport {
@@ -343,6 +425,25 @@ pub struct BowRouterReport {
     /// when the caller's scheme is already `arity == 1` and every role label is
     /// already `0` — i.e. the bag-of-fillers hypothesis was the input.
     pub vacuous: bool,
+    /// Composition covariate over the caller's role vocabulary. `structured`
+    /// is unreadable — not wrong, unreadable — when this is degenerate
+    /// (Issue 711); use [`Self::verdict`] to get the gated answer.
+    pub spread: FillerRoleSpread,
+}
+
+impl BowRouterReport {
+    /// `structured`, but only when the corpus can carry that verdict.
+    ///
+    /// `None` when the router's null was its own input (`vacuous`) or when the
+    /// role is a deterministic function of the filler, in which case the
+    /// structure question is not posed on this corpus at all.
+    #[must_use]
+    pub fn verdict(&self) -> Option<bool> {
+        match self.vacuous || self.spread.role_determined_by_filler() {
+            true => None,
+            false => Some(self.structured),
+        }
+    }
 }
 
 /// **T7** — is this state family structured at all?
@@ -399,6 +500,7 @@ pub fn bow_router(
         ratio,
         structured: ratio > 1.0 + eps,
         vacuous,
+        spread: filler_role_spread(input.bindings),
     })
 }
 
@@ -506,6 +608,25 @@ pub struct ShuffledRoleReport {
     /// assumed, because an identity draw would masquerade as a no-structure
     /// verdict exactly like a vacuous arm does.
     pub moved: usize,
+    /// Composition covariate — see [`FillerRoleSpread`] and [`Self::verdict`].
+    /// Measured on the TRUE bindings, not the permuted ones: a cross-state
+    /// shuffle changes the spread, and it is the input corpus whose
+    /// interpretability is in question (Issue 711).
+    pub spread: FillerRoleSpread,
+}
+
+impl ShuffledRoleReport {
+    /// `degraded`, but only when the corpus can carry that verdict.
+    ///
+    /// `None` when the drawn permutation could not have failed (`vacuous`) or
+    /// when the role is a deterministic function of the filler.
+    #[must_use]
+    pub fn verdict(&self) -> Option<bool> {
+        match self.vacuous || self.spread.role_determined_by_filler() {
+            true => None,
+            false => Some(self.degraded),
+        }
+    }
 }
 
 /// Redraws allowed before a non-vacuous arm gives up on moving a role.
@@ -653,6 +774,7 @@ pub fn shuffled_role_control_with(
         mode,
         vacuous,
         moved,
+        spread: filler_role_spread(input.bindings),
     })
 }
 

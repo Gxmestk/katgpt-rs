@@ -665,3 +665,130 @@ fn candidate_pool_coverage_prices_an_unanswerable_pool() {
     assert_eq!(candidate_pool_coverage(&p.bindings, &[]), 0.0);
     assert_eq!(candidate_pool_coverage(&[], &p.bindings), 0.0);
 }
+
+// ---------------------------------------------------------------------------
+// Issue 711 — a control that CAN fail can still measure the wrong question
+// ---------------------------------------------------------------------------
+
+/// The degenerate shape: the same corpus with the role rewritten as a function
+/// of the filler, so no `(role, filler)` pair is unseen. The predicate is pure
+/// in the bindings, so the states are left as planted — what changes is which
+/// question the corpus is able to answer, not the arithmetic.
+fn roles_from_fillers(bindings: &[TprBindings], m: usize) -> Vec<TprBindings> {
+    let n = m.max(1) as u16;
+    bindings
+        .iter()
+        .map(|b| TprBindings {
+            roles: b.fillers.iter().map(|&v| v % n).collect(),
+            fillers: b.fillers.clone(),
+        })
+        .collect()
+}
+
+#[test]
+fn the_composition_covariate_separates_a_degenerate_corpus_from_a_healthy_one() {
+    // Healthy: roles drawn independently of the filler, so a filler is seen
+    // with several roles and unseen pairs exist to generalize to.
+    let p = planted_retrieval(32, 3, 6, 8, 240, 0x7110);
+    let healthy = filler_role_spread(&p.bindings);
+    assert!(
+        !healthy.role_determined_by_filler(),
+        "8 fillers x 6 roles over 240 states must reuse a filler across roles \
+         (max {}, mean {:.3})",
+        healthy.max,
+        healthy.mean
+    );
+    assert!(healthy.max > 1 && healthy.mean > 1.0);
+    assert_eq!(healthy.fillers, p.n_fillers, "every planted filler appears");
+    assert!(!role_determined_by_filler(&p.bindings));
+
+    // Degenerate: role = filler % m. Same states, same fillers, same counts.
+    let degen = roles_from_fillers(&p.bindings, p.m);
+    let spread = filler_role_spread(&degen);
+    assert!(
+        spread.role_determined_by_filler(),
+        "role = f(filler) leaves one role per filler (max {})",
+        spread.max
+    );
+    assert_eq!(spread.max, 1);
+    assert_eq!(spread.mean, 1.0);
+    assert_eq!(spread.fillers, healthy.fillers, "same filler population");
+    assert!(role_determined_by_filler(&degen));
+    println!(
+        "711: healthy max {} mean {:.3} | degenerate max {} mean {:.3}",
+        healthy.max, healthy.mean, spread.max, spread.mean
+    );
+}
+
+#[test]
+fn the_covariate_is_reported_and_not_only_its_threshold() {
+    // A NEAR-degenerate corpus is the case a threshold alone cannot see: one
+    // filler carries two roles and every other carries one, so the predicate
+    // says "readable" while the mean says the structure question is barely
+    // posed. Both numbers must be available to say that.
+    let p = planted_retrieval(32, 3, 6, 8, 240, 0x7111);
+    let mut near = roles_from_fillers(&p.bindings, p.m);
+    let tipped = near
+        .iter_mut()
+        .find(|b| b.fillers[0] == 0)
+        .expect("filler 0 appears");
+    tipped.roles[0] = (tipped.roles[0] + 1) % p.m as u16;
+
+    let spread = filler_role_spread(&near);
+    assert!(
+        !spread.role_determined_by_filler(),
+        "one filler with two roles is enough to clear the threshold"
+    );
+    assert_eq!(spread.max, 2);
+    assert!(
+        spread.mean < 1.2,
+        "and the mean must still say how thin that is (mean {:.4})",
+        spread.mean
+    );
+}
+
+#[test]
+fn a_structure_verdict_is_withheld_on_a_corpus_that_cannot_carry_it() {
+    let p = planted_retrieval(32, 3, 6, 8, 240, 0x7112);
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+
+    // Two-sided pin, healthy side: the guard must NOT be always-on, or it
+    // would silence every real verdict and read as permanent caution.
+    let bow = bow_router(input(&p), &cfg, 0.05).unwrap();
+    assert!(!bow.spread.role_determined_by_filler());
+    assert_eq!(
+        bow.verdict(),
+        Some(bow.structured),
+        "a healthy corpus must still get an answer"
+    );
+    let shuf = shuffled_role_control(input(&p), &cfg, 0xFEED, 0.05).unwrap();
+    assert!(!shuf.spread.role_determined_by_filler());
+    assert_eq!(shuf.verdict(), Some(shuf.degraded));
+
+    // Two-sided pin, degenerate side: the guard must fire. The probes still
+    // MOVE here — that is the whole point of Issue 711 — so a dead guard
+    // would leave a confident, unreadable bool in its place.
+    let q = Planted {
+        dim: p.dim,
+        d: p.d,
+        m: p.m,
+        n_fillers: p.n_fillers,
+        states: p.states.clone(),
+        bindings: roles_from_fillers(&p.bindings, p.m),
+    };
+    let dbow = bow_router(input(&q), &cfg, 0.05).unwrap();
+    assert!(dbow.spread.role_determined_by_filler());
+    assert!(!dbow.vacuous, "the bow null is still not the input");
+    assert_eq!(dbow.verdict(), None, "ratio {:.4}", dbow.ratio);
+
+    let dshuf = shuffled_role_control(input(&q), &cfg, 0xFEED, 0.05).unwrap();
+    assert!(dshuf.spread.role_determined_by_filler());
+    assert!(!dshuf.vacuous, "the permutation is not a provable identity");
+    assert!(dshuf.moved > 0, "and it actually moved roles");
+    assert_eq!(dshuf.verdict(), None, "ratio {:.4}", dshuf.ratio);
+    println!(
+        "711: degenerate bow ratio {:.4} (structured {}) shuffle ratio {:.4} \
+         (degraded {}, moved {}) — both verdicts withheld",
+        dbow.ratio, dbow.structured, dshuf.ratio, dshuf.degraded, dshuf.moved
+    );
+}

@@ -54,6 +54,24 @@
 //! permutation, which can fail (measured `ratio` 1.85e8 vs the within-state
 //! arm's 1.0 on the same planted corpus). Multi-binding corpora are
 //! bit-identical to the pre-710 behaviour.
+//!
+//! ## The mode no vacuity flag can catch (Issue 711)
+//!
+//! A control can be perfectly capable of failing and still measure the wrong
+//! question. When every filler is seen with exactly one role — `role =
+//! f(filler)` — the probes still *move* (the `m`-role model has more capacity
+//! than the 1-role null and fits differently) and neither `vacuous` flag
+//! fires, but there are **no unseen `(role, filler)` pairs**, so systematicity
+//! is not posed on that corpus. Measured: 445 GPU-optimization rules, one
+//! declared category each, reported `structured = false` — read as "the
+//! largest corpus we have carries no binding structure" when it was a
+//! statement about the scheme's applicability (riir-clippy Bench 063 §12.4).
+//!
+//! The covariate is therefore reported, not just its threshold:
+//! [`FillerRoleSpread`] rides on both [`BowRouterReport::spread`] and
+//! [`ShuffledRoleReport::spread`], and `verdict()` on either report returns
+//! `None` rather than an uninterpretable bool. `max`/`mean` are both carried
+//! so a *near*-degenerate corpus (1.02 roles per filler) is visible too.
 
 pub mod als;
 pub mod types;
@@ -68,9 +86,10 @@ pub use types::{
     TprBindings, TprError, TprScheme,
 };
 pub use validate::{
-    AtomicNull, BicSelection, BindingReport, BowRouterReport, MAX_SHUFFLE_DRAWS, RoleShuffleMode,
-    ShuffledRoleReport, bic_select, bow_router, candidate_pool_coverage, role_shuffle_is_vacuous,
-    role_shuffle_mode_for, shuffled_role_control, shuffled_role_control_with, validate_bindings,
+    AtomicNull, BicSelection, BindingReport, BowRouterReport, FillerRoleSpread, MAX_SHUFFLE_DRAWS,
+    RoleShuffleMode, ShuffledRoleReport, bic_select, bow_router, candidate_pool_coverage,
+    filler_role_spread, role_determined_by_filler, role_shuffle_is_vacuous, role_shuffle_mode_for,
+    shuffled_role_control, shuffled_role_control_with, validate_bindings,
     withheld_pair_top1,
 };
 
