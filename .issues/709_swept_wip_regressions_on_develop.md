@@ -1,8 +1,11 @@
 # Issue 709: three agents' WIP swept into one commit — one regression fixed, one still open
 
-**Status:** T1 FIXED (2026-09-02, same commit as this file). T2 OPEN and NOT
-mine to fix — it belongs to the in-flight wasmi upgrade (riir-ai Plan 563).
-Filed so the second one is visible rather than discovered by a CI red.
+**Status:** T1 FIXED, T2 **RESOLVED by the Plan 563 owner** (verified 2026-09-02
+21:0x — the root manifest, `katgpt-moka-wasm`, `katgpt-pruners` and
+`Cargo.lock` all read wasmi 2 at HEAD with none of them dirty, and
+`cargo metadata --locked` exits 0). T3 **half-landed**: the measuring half
+ships as `scripts/staged_set_audit.py`; the refusing pre-commit hook stays an
+owner call and is deliberately not shipped.
 
 ## What happened
 
@@ -34,18 +37,42 @@ three carried the same 00:29 timestamp as a batch of genuine sibling edits).
   `src/kv_eviction/mod.rs` and the bench file were still tracked — 1002 lines of
   `lib.rs`-declared module gated on a flag nobody could turn on, and a GOAT
   bench that could not be run.
-- [-] **T2** `develop` does not build `--locked`. HEAD's root manifest requires
+- [x] **T2** ~~`develop` does not build `--locked`.~~ **RESOLVED by the owner**,
+  not from here. Re-measured at HEAD: root manifest, `katgpt-moka-wasm` and
+  `katgpt-pruners` all say `wasmi = "2"`, `Cargo.lock` carries `wasmi 2.0.0`
+  (+ `wasmi_collections` / `wasmi_core` / `wasmi_ir`), none of those four files
+  is dirty, and `cargo metadata --locked` exits 0 — i.e. resolution matches the
+  committed lock, which is exactly what T2 said it did not. Leaving it alone
+  was the right call: the migration landed as one tree.
+
+  Original text: `develop` does not build `--locked`. HEAD's root manifest requires
   `wasmi ^2`; HEAD's `Cargo.lock` carries only `1.0.9` (4 entries). The
   uncommitted worktree lock already has `2.0.0`, and
   `crates/katgpt-moka-wasm` + `crates/katgpt-pruners` still say `1.0` at HEAD —
   i.e. the upgrade is mid-flight. **Unblock:** the Plan 563 owner lands the lock
   + the remaining manifests together. Committing the lock alone from here would
   publish a partially-migrated tree, so this is deliberately left alone.
-- [-] **T3** Consider a pre-commit guard that refuses a commit whose staged set
-  contains a file the committing session never touched. **Unblock:** owner call
-  — it trades a real class of loss against friction on every legitimate
-  multi-file commit, and the cheaper habit (`git -C <repo> add <named files>`,
-  never `-A`) already exists in AGENTS.md.
+- [x] **T3a** Ship the **measurement**, which is not an owner call:
+  `scripts/staged_set_audit.py` (report, always exit 0). Single-linkage
+  clustering over the staged files' worktree mtimes — the technique that caught
+  this by hand twice — plus a second, independent signal (a staged path that
+  still has unstaged changes, i.e. a concurrent editor mtime clustering cannot
+  see). `selftest()` pins six shapes on every invocation, including the chaining
+  case, because the failure mode is degrading to "1 episode, always" and
+  printing a confident verdict indistinguishable from a real one.
+
+  **Canaried on this repo's live state**, not asserted: staging one file from a
+  sibling's 20:04:39 rustfmt sweep beside a 21:07:17 file of mine reported
+  `2 editing episodes` + REVIEW; staging mine alone reported `✓ one editing
+  episode`. Two-sided, so neither a dead nor an always-on verdict passes.
+  Documented in AGENTS.md beside the `hash-object` + `update-index` recipe for
+  committing your blob out of a file a sibling is editing.
+- [-] **T3b** The **refusing** pre-commit hook. Still an owner call, and
+  deliberately not shipped: it trades a real class of loss against friction on
+  every legitimate multi-file commit, the cheaper habit (`git -C <repo> add
+  <named files>`, never `-A`) already exists in AGENTS.md, and T3a now makes the
+  signal visible without imposing the trade. **Unblock:** owner decides whether
+  the friction is worth it; the report is the evidence to decide on.
 
 ## Why this keeps happening
 

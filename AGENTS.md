@@ -220,6 +220,41 @@ and a data-borne mention in `riir-chain`'s scheduled `toolchain_drift.yml` was
 enough to vouch for a dispatch-only `rust.yml`. A weak automatic gate must not
 speak for a strong manual one.
 
+### Before committing in a shared worktree — `scripts/staged_set_audit.py`
+
+Several agent sessions write into one worktree routinely, and `git add -A` from
+a repo root is indistinguishable, to git, from intent. `b2527521` committed
+three agents' WIP in six files; one was a build regression nobody saw for a day
+(`.issues/709`). Stage **named files** (`git -C <repo> add <paths>`), never
+`-A` — and before a multi-file commit, run:
+
+```bash
+scripts/staged_set_audit.py            # any repo: pass its path as $1
+```
+
+Also a **report, not a gate** (always exit 0). The refusing pre-commit hook is
+deliberately NOT shipped — it trades a real class of loss against friction on
+every legitimate multi-file commit, which is an owner call (`.issues/709` T3).
+Measuring the signal is not, because it is the technique that caught this by
+hand twice: **worktree mtimes cluster by editing episode.** A 204-file rustfmt
+sweep lands in a 3-second window; your own edits land in the window you were
+running. Two clusters in one staged set means two episodes, and the older one
+is probably not yours. It reports a second, independent signal too — a staged
+path that *still* has unstaged changes, which is a concurrent editor writing
+into the same file right now and which mtime clustering cannot see.
+
+Single-linkage, not fixed-width bins: a session editing continuously for an
+hour is one episode because no two consecutive edits are `GAP_SECONDS` apart.
+Fixed bins would split it and false-positive on exactly the sessions doing the
+most work. A `selftest()` pins six shapes on every invocation, including that
+chaining case — without it the clustering could degrade to "1 episode, always"
+and print a confident single-episode verdict indistinguishable from a real one.
+
+When you must commit into a file a sibling is editing, commit **your blob**
+rather than the worktree's: build HEAD's version + your edit, `git hash-object
+-w`, then `git update-index --cacheinfo`. Their hunks stay uncommitted and the
+worktree stays coherent for them (used for `bench_707` in `8c7ca74b`).
+
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
 Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,
