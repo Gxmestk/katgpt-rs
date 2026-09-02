@@ -30,6 +30,15 @@ use super::types::{
 };
 use crate::linalg::{cholesky_f32, chol_solve_f32, ridge_solve_direct_f32, spd_inverse_f32};
 
+/// The mutable ALS state one sweep can move, in the order `als_fit`'s
+/// destructuring assignment expects: `(fillers, scheme, w, bias, cores)`.
+///
+/// A named alias rather than the tuple inline, so the best-iterate guard's
+/// store and restore cannot drift out of agreement on the field order —
+/// every element is a `Vec<f32>` except one, so a transposition would
+/// compile and silently restore the wrong block (Issue 712).
+type AlsIterate = (Vec<f32>, TprScheme, Vec<f32>, Vec<f32>, Vec<f32>);
+
 /// Minimum projection ridge — guarantees `WᵀW + λI` is positive definite even
 /// when the caller asked for `ridge_lambda = 0`.
 const MIN_PROJECTION_LAMBDA: f32 = 1e-6;
@@ -694,7 +703,7 @@ pub fn als_fit(
     // shipped artifact is then the trajectory minimum BY CONSTRUCTION,
     // independent of fp-path luck.
     let mut best_ssr = prev;
-    let mut best_snap: Option<(Vec<f32>, TprScheme, Vec<f32>, Vec<f32>, Vec<f32>)> = None;
+    let mut best_snap: Option<AlsIterate> = None;
     for _ in 0..cfg.max_sweeps {
         sweeps += 1;
         // Snapshot for the descent guard: blocks 3–4 minimize the CORE-space
@@ -806,8 +815,9 @@ pub fn als_fit(
         prev = ssr;
         if ssr < best_ssr {
             best_ssr = ssr;
-            best_snap =
-                Some((fillers.clone(), scheme.clone(), w.clone(), bias.clone(), cores.clone()));
+            let snap: AlsIterate =
+                (fillers.clone(), scheme.clone(), w.clone(), bias.clone(), cores.clone());
+            best_snap = Some(snap);
         }
         if converged {
             break;
