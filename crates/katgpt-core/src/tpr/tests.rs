@@ -40,6 +40,36 @@ struct Planted {
 /// Generate a corpus that IS a TPR by construction: `e = W·(Σ r_p ⊗ f_v) + b`
 /// with one binding per role block (the positive control of T6 part b).
 fn planted(dim: usize, d: usize, m: usize, n_fillers: usize, n: usize, seed: u64) -> Planted {
+    planted_slots(dim, d, m, n_fillers, n, seed, m)
+}
+
+/// The **retrieval** shape (Issue 710): one `(role, filler)` pair per state,
+/// the role drawn from `0..m`. Every (key, value) index has this shape, and it
+/// is the one on which a within-state role shuffle is a provable identity.
+fn planted_retrieval(
+    dim: usize,
+    d: usize,
+    m: usize,
+    n_fillers: usize,
+    n: usize,
+    seed: u64,
+) -> Planted {
+    planted_slots(dim, d, m, n_fillers, n, seed, 1)
+}
+
+/// `planted` with the per-state binding count decoupled from the arity. At
+/// `slots == m` the roles are `0..m` (the original fixture, RNG draw order
+/// preserved); below it they are drawn, so a state fills a strict subset of
+/// the role blocks.
+fn planted_slots(
+    dim: usize,
+    d: usize,
+    m: usize,
+    n_fillers: usize,
+    n: usize,
+    seed: u64,
+    slots: usize,
+) -> Planted {
     let k = m * d;
     let mut rng = Rng::new(seed);
     let w: Vec<f32> = (0..dim * k).map(|_| rng.sym()).collect();
@@ -61,7 +91,11 @@ fn planted(dim: usize, d: usize, m: usize, n_fillers: usize, n: usize, seed: u64
     for s in 0..n {
         core.fill(0.0);
         let mut b = TprBindings::default();
-        for p in 0..m {
+        for q in 0..slots {
+            let p = match slots == m {
+                true => q,
+                false => rng.below(m),
+            };
             let v = rng.below(n_fillers);
             b.roles.push(p as u16);
             b.fillers.push(v as u16);
@@ -110,7 +144,10 @@ fn fit_orthogonal(p: &Planted) -> (TprArtifact, AlsReport) {
 fn planted_tpr_is_recovered() {
     let p = planted(24, 4, 3, 6, 160, 0xA11CE);
     let (art, rep) = fit_orthogonal(&p);
-    assert_eq!(rep.monotone_violations, 0, "ALS objective must not increase");
+    assert_eq!(
+        rep.monotone_violations, 0,
+        "ALS objective must not increase"
+    );
     assert!(
         rep.residual_energy_fraction < 1e-3,
         "planted corpus must be explained: energy fraction {} (ssr {})",
@@ -127,7 +164,10 @@ fn double_fit_is_bit_identical() {
     let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
     let (a, _) = als_fit(input(&p), &cfg).unwrap();
     let (b, _) = als_fit(input(&p), &cfg).unwrap();
-    assert_eq!(a.commitment, b.commitment, "double fit must be bit-identical");
+    assert_eq!(
+        a.commitment, b.commitment,
+        "double fit must be bit-identical"
+    );
     assert_eq!(a.to_bytes(), b.to_bytes());
 }
 
@@ -346,7 +386,12 @@ fn subset(p: &Planted, idx: &[usize]) -> (Vec<f32>, Vec<TprBindings>) {
 #[test]
 fn bow_router_separates_structured_from_bag_of_fillers() {
     let structured = planted(24, 4, 3, 6, 200, 0x11);
-    let cfg = AlsConfig::new(structured.d, TprScheme::Orthogonal { arity: structured.m });
+    let cfg = AlsConfig::new(
+        structured.d,
+        TprScheme::Orthogonal {
+            arity: structured.m,
+        },
+    );
     let s_rep = bow_router(input(&structured), &cfg, 0.05).unwrap();
     assert!(
         s_rep.structured,
@@ -398,6 +443,12 @@ fn shuffled_roles_destroy_a_structured_fit_and_not_a_bag() {
     let p = planted(24, 4, 3, 6, 200, 0x99);
     let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
     let rep = shuffled_role_control(input(&p), &cfg, 0xFEED, 0.05).unwrap();
+    assert_eq!(
+        rep.mode,
+        RoleShuffleMode::WithinState,
+        "a multi-binding corpus must still resolve to the original arm"
+    );
+    assert!(!rep.vacuous && rep.moved > 0);
     assert!(
         rep.degraded,
         "permuting roles must cost a structured fit (ratio {}, {:e} -> {:e})",
@@ -494,3 +545,123 @@ fn bad_ids_and_lengths_are_refused() {
     ));
 }
 
+// ---------------------------------------------------------------------------
+// Issue 710 — the role control must report whether it COULD have failed
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_single_binding_corpus_is_not_condemned_by_a_vacuous_control() {
+    // The retrieval shape: one role, one filler per state. `K = m·d < dim`, so
+    // the fit is not saturated and a broken pairing has somewhere to show up.
+    let p = planted_retrieval(32, 3, 6, 8, 240, 0x710);
+    assert!(p.bindings.iter().all(|b| b.len() == 1));
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+
+    // The within-state arm is a provable identity here; the cross-state one
+    // is not, so that is the arm the resolver must pick.
+    assert!(role_shuffle_is_vacuous(
+        &p.bindings,
+        RoleShuffleMode::WithinState
+    ));
+    assert!(!role_shuffle_is_vacuous(
+        &p.bindings,
+        RoleShuffleMode::CrossState
+    ));
+    assert_eq!(
+        role_shuffle_mode_for(&p.bindings),
+        RoleShuffleMode::CrossState
+    );
+
+    // Pinning the vacuous arm must SAY it is vacuous, not hand back a
+    // `degraded: false` that reads as "roles carry nothing".
+    let vac =
+        shuffled_role_control_with(input(&p), &cfg, 0xFEED, 0.05, RoleShuffleMode::WithinState)
+            .unwrap();
+    assert!(
+        vac.vacuous,
+        "a within-state shuffle of 1-element lists is id"
+    );
+    assert_eq!(vac.moved, 0);
+    assert_eq!(vac.r_shuffled, vac.r_true, "identical input, identical fit");
+    assert!(!vac.degraded);
+
+    // The resolved arm can fail — and does, on a corpus that IS a TPR.
+    let rep = shuffled_role_control(input(&p), &cfg, 0xFEED, 0.05).unwrap();
+    println!(
+        "710: within-state ratio {:.4} vacuous {} moved {} | cross-state ratio {:.4} vacuous {} moved {}",
+        vac.ratio, vac.vacuous, vac.moved, rep.ratio, rep.vacuous, rep.moved
+    );
+    assert_eq!(rep.mode, RoleShuffleMode::CrossState);
+    assert!(!rep.vacuous);
+    assert!(rep.moved > 0, "the drawn permutation must move a role");
+    assert!(
+        rep.degraded,
+        "breaking the pairing across states must cost a planted fit \
+         (ratio {}, {:e} -> {:e})",
+        rep.ratio, rep.r_true, rep.r_shuffled
+    );
+}
+
+#[test]
+fn a_corpus_with_one_role_label_is_vacuous_on_both_arms() {
+    // Nothing to permute: swapping equal labels is the identity whatever the
+    // draw, so no arm rescues this and the report must say so rather than
+    // certify "roles carry nothing".
+    let p = planted_retrieval(16, 3, 1, 5, 96, 0x711);
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+    for mode in [RoleShuffleMode::WithinState, RoleShuffleMode::CrossState] {
+        assert!(role_shuffle_is_vacuous(&p.bindings, mode), "{mode:?}");
+    }
+    let rep = shuffled_role_control(input(&p), &cfg, 0xFEED, 0.05).unwrap();
+    assert!(rep.vacuous, "one role label leaves no permutation to draw");
+    assert_eq!(rep.moved, 0);
+    assert!(!rep.degraded);
+}
+
+#[test]
+fn the_role_control_is_deterministic_in_its_seed() {
+    let p = planted_retrieval(32, 3, 6, 8, 160, 0x712);
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+    let a = shuffled_role_control(input(&p), &cfg, 0x5EED, 0.05).unwrap();
+    let b = shuffled_role_control(input(&p), &cfg, 0x5EED, 0.05).unwrap();
+    assert_eq!(a, b, "same seed must reproduce the whole report");
+}
+
+#[test]
+fn the_bow_router_reports_when_its_null_is_its_input() {
+    // Issue 710 T4: at `arity == 1` with all-zero roles the "null" the router
+    // fits IS the full fit, so `ratio == 1.0` is arithmetic, not evidence.
+    let mut p = planted(16, 3, 2, 5, 96, 0x713);
+    let flat = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: 1 });
+    for b in &mut p.bindings {
+        b.roles.iter_mut().for_each(|r| *r = 0);
+    }
+    let rep = bow_router(input(&p), &flat, 0.05).unwrap();
+    assert!(rep.vacuous, "the bag-of-fillers hypothesis was the input");
+    assert!(!rep.structured);
+
+    // A real arity-2 corpus is not vacuous and the router can answer.
+    let q = planted(16, 3, 2, 5, 96, 0x713);
+    let cfg = AlsConfig::new(q.d, TprScheme::Orthogonal { arity: q.m });
+    assert!(!bow_router(input(&q), &cfg, 0.05).unwrap().vacuous);
+}
+
+#[test]
+fn candidate_pool_coverage_prices_an_unanswerable_pool() {
+    // Issue 710 T4: `withheld_pair_top1`'s doc says to check the pool; this is
+    // the thing that checks it.
+    let p = planted_retrieval(16, 3, 4, 6, 48, 0x714);
+    assert_eq!(
+        candidate_pool_coverage(&p.bindings, &p.bindings),
+        1.0,
+        "a pool containing every truth is fully answerable"
+    );
+    let half = &p.bindings[..p.bindings.len() / 2];
+    let cov = candidate_pool_coverage(&p.bindings, half);
+    assert!(
+        cov < 1.0,
+        "a pool missing truths must not read as answerable (cov {cov})"
+    );
+    assert_eq!(candidate_pool_coverage(&p.bindings, &[]), 0.0);
+    assert_eq!(candidate_pool_coverage(&[], &p.bindings), 0.0);
+}

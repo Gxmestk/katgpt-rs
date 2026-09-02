@@ -178,7 +178,9 @@ impl AtomicNull {
         let mut table: BTreeMap<BindKey, (Vec<f32>, u32)> = BTreeMap::new();
         for (s, b) in bindings.iter().enumerate() {
             let e = &states[s * dim..(s + 1) * dim];
-            let slot = table.entry(bind_key(b)).or_insert_with(|| (vec![0.0; dim], 0));
+            let slot = table
+                .entry(bind_key(b))
+                .or_insert_with(|| (vec![0.0; dim], 0));
             for (acc, &v) in slot.0.iter_mut().zip(e.iter()) {
                 *acc += v;
             }
@@ -268,6 +270,26 @@ fn l2(a: &[f32], b: &[f32]) -> f32 {
 /// setting). It must contain each state's true binding set, or that state is
 /// unanswerable by construction and the score is a property of the pool, not
 /// of the primitive — check the pool before reading the number.
+/// Fraction of `truth` whose binding set is present in the shared `candidates`
+/// pool — the answerability check for [`withheld_pair_top1`].
+///
+/// A state whose true binding is absent from the pool **cannot** be scored
+/// correctly, so a top-1 number computed over such a pool is a property of the
+/// pool, not of the primitive. [`withheld_pair_top1`]'s doc has always said to
+/// check this; before Issue 710 T4 there was nothing to check it with, which
+/// is the [`AtomicNull::coverage`] discipline missing one function over.
+#[must_use]
+pub fn candidate_pool_coverage(truth: &[TprBindings], candidates: &[TprBindings]) -> f32 {
+    match truth.is_empty() {
+        true => 0.0,
+        false => {
+            let pool: std::collections::HashSet<_> = candidates.iter().map(bind_key).collect();
+            let hit = truth.iter().filter(|t| pool.contains(&bind_key(t))).count();
+            hit as f32 / truth.len() as f32
+        }
+    }
+}
+
 pub fn withheld_pair_top1(
     art: &TprArtifact,
     states: &[f32],
@@ -312,7 +334,15 @@ pub struct BowRouterReport {
     pub ratio: f32,
     /// `ratio > 1 + eps`: the family carries binding structure worth the
     /// structured machinery.
+    ///
+    /// **Read `vacuous` first** — same discipline as
+    /// [`ShuffledRoleReport::degraded`] (Issue 710 T4).
     pub structured: bool,
+    /// The null this router fits is **the same corpus and the same scheme**
+    /// as the full fit, so `ratio == 1.0` is arithmetic, not evidence. Happens
+    /// when the caller's scheme is already `arity == 1` and every role label is
+    /// already `0` — i.e. the bag-of-fillers hypothesis was the input.
+    pub vacuous: bool,
 }
 
 /// **T7** — is this state family structured at all?
@@ -327,6 +357,11 @@ pub fn bow_router(
     cfg: &AlsConfig,
     eps: f32,
 ) -> Result<BowRouterReport, TprError> {
+    let vacuous = cfg.scheme.arity() == 1
+        && input
+            .bindings
+            .iter()
+            .all(|b| b.roles.iter().all(|&p| p == 0));
     let (_full, full_rep) = als_fit(input, cfg)?;
     let flat: Vec<TprBindings> = input
         .bindings
@@ -363,6 +398,7 @@ pub fn bow_router(
         r_full,
         ratio,
         structured: ratio > 1.0 + eps,
+        vacuous,
     })
 }
 
@@ -379,6 +415,70 @@ fn fold_roles(bindings: &[TprBindings], n_slots: usize) -> Vec<TprBindings> {
         .collect()
 }
 
+/// **T6 (c) control** — which permutation the role control draws.
+///
+/// The two arms answer the same question ("is the role assignment
+/// load-bearing?") on corpora of different shape, and each is **vacuous** on
+/// the other's shape — see [`role_shuffle_is_vacuous`]. Pick with
+/// [`role_shuffle_mode_for`] (what [`shuffled_role_control`] does) or pin one
+/// explicitly with [`shuffled_role_control_with`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoleShuffleMode {
+    /// Permute each state's role list **within that state**. The original
+    /// arm — meaningful only when some state carries two bindings with
+    /// distinct roles, since a 1-element list has no non-identity permutation.
+    WithinState,
+    /// Permute the role assignment **across** states, fillers untouched. The
+    /// arm a retrieval corpus needs: one span carries one role and one filler,
+    /// so the pairing can only be broken globally (Issue 710).
+    CrossState,
+}
+
+/// Can this permutation arm produce a binding set different from its input?
+///
+/// A control whose permutation is a provable identity reports
+/// `r_shuffled == r_true`, `ratio == 1.0`, `degraded == false` — which is
+/// **indistinguishable from the real negative result** ("the specific role
+/// assignment is not load-bearing"). This is the [`AtomicNull::coverage`]
+/// discipline one function down: a control's report must carry whether the
+/// control *could have* failed.
+///
+/// - [`RoleShuffleMode::WithinState`] is vacuous when no state carries two
+///   **distinct** role labels — which includes every single-binding corpus
+///   (Issue 710: `for i in (1..1).rev()` is an empty loop).
+/// - [`RoleShuffleMode::CrossState`] is vacuous when the whole corpus uses
+///   fewer than two distinct role labels; swapping equal labels is an
+///   identity whatever the draw.
+#[must_use]
+pub fn role_shuffle_is_vacuous(bindings: &[TprBindings], mode: RoleShuffleMode) -> bool {
+    match mode {
+        RoleShuffleMode::WithinState => bindings
+            .iter()
+            .all(|b| b.roles.windows(2).all(|w| w[0] == w[1])),
+        RoleShuffleMode::CrossState => {
+            let mut roles = bindings.iter().flat_map(|b| b.roles.iter().copied());
+            match roles.next() {
+                None => true,
+                Some(first) => roles.all(|r| r == first),
+            }
+        }
+    }
+}
+
+/// The arm that is not vacuous on this corpus, preferring the within-state one.
+///
+/// Cross-state vacuity implies within-state vacuity, so when this returns
+/// [`RoleShuffleMode::CrossState`] and *that* is vacuous too, the corpus has
+/// no role structure to break at all and no arm can help — which the report's
+/// `vacuous` flag then says.
+#[must_use]
+pub fn role_shuffle_mode_for(bindings: &[TprBindings]) -> RoleShuffleMode {
+    match role_shuffle_is_vacuous(bindings, RoleShuffleMode::WithinState) {
+        true => RoleShuffleMode::CrossState,
+        false => RoleShuffleMode::WithinState,
+    }
+}
+
 /// **T6 (c) control** — role-shuffle report.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShuffledRoleReport {
@@ -390,48 +490,145 @@ pub struct ShuffledRoleReport {
     pub ratio: f32,
     /// `ratio > 1 + eps`: destroying the role assignment destroyed real
     /// structure, so the fit was reading roles rather than memorizing states.
+    ///
+    /// **Read `vacuous` first.** A `false` here from a vacuous control is a
+    /// no-op, not a negative result.
     pub degraded: bool,
+    /// Which arm actually ran (resolved, never a request).
+    pub mode: RoleShuffleMode,
+    /// The control **could not have failed** on this corpus — its permutation
+    /// is a provable identity, so `ratio == 1.0` and `degraded == false` carry
+    /// no information. See [`role_shuffle_is_vacuous`] (Issue 710).
+    pub vacuous: bool,
+    /// How many role slots the drawn permutation actually changed. `0` on a
+    /// non-vacuous corpus means every one of [`MAX_SHUFFLE_DRAWS`] draws came
+    /// back the identity — vanishingly unlikely, but reported rather than
+    /// assumed, because an identity draw would masquerade as a no-structure
+    /// verdict exactly like a vacuous arm does.
+    pub moved: usize,
 }
 
-/// **T6 (c) control** — permute each state's role labels and refit.
+/// Redraws allowed before a non-vacuous arm gives up on moving a role.
+pub const MAX_SHUFFLE_DRAWS: u32 = 8;
+
+/// SplitMix64 — the generator both arms draw from, so a permutation is
+/// reproducible from `(seed, mode, corpus)` alone.
+fn splitmix64(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// In-place Fisher-Yates over one contiguous run of role slots.
+fn shuffle_run(run: &mut [u16], state: &mut u64) {
+    for i in (1..run.len()).rev() {
+        let j = usize::try_from(splitmix64(state) % (i as u64 + 1)).expect("index fits usize");
+        run.swap(i, j);
+    }
+}
+
+/// Draw one permutation of the role assignment; fillers are never touched.
+///
+/// Both arms share the flatten → shuffle-runs → rebuild path; `mode` chooses
+/// only the run boundaries (one run per state, or one run for the corpus).
+/// Returns the permuted bindings and how many slots moved.
+fn permute_roles(
+    bindings: &[TprBindings],
+    mode: RoleShuffleMode,
+    seed: u64,
+) -> (Vec<TprBindings>, usize) {
+    let mut roles: Vec<u16> = bindings
+        .iter()
+        .flat_map(|b| b.roles.iter().copied())
+        .collect();
+    let original = roles.clone();
+    let mut state = seed | 1;
+    match mode {
+        RoleShuffleMode::CrossState => shuffle_run(&mut roles, &mut state),
+        RoleShuffleMode::WithinState => {
+            let mut cursor = 0usize;
+            for b in bindings {
+                let n = b.len();
+                shuffle_run(&mut roles[cursor..cursor + n], &mut state);
+                cursor += n;
+            }
+        }
+    }
+    let moved = original
+        .iter()
+        .zip(roles.iter())
+        .filter(|(a, b)| a != b)
+        .count();
+
+    let mut cursor = 0usize;
+    let permuted = bindings
+        .iter()
+        .map(|b| {
+            let n = b.len();
+            let slice = roles[cursor..cursor + n].to_vec();
+            cursor += n;
+            TprBindings {
+                roles: slice,
+                fillers: b.fillers.clone(),
+            }
+        })
+        .collect();
+    (permuted, moved)
+}
+
+/// **T6 (c) control** — permute the role labels and refit, on whichever arm is
+/// not vacuous for this corpus ([`role_shuffle_mode_for`]).
 ///
 /// The dual of [`bow_router`]: the router asks whether roles buy anything over
 /// a bag of fillers, this asks whether the SPECIFIC role assignment is
 /// load-bearing. A fit that scores the same on shuffled roles was never using
-/// them, whatever its residual says. The permutation is per-state and
-/// deterministic in `seed` (Fisher-Yates over SplitMix64), so the control is
-/// reproducible.
+/// them, whatever its residual says — **provided the shuffle could have moved
+/// something**, which `ShuffledRoleReport::vacuous` reports and which the
+/// pre-Issue-710 version of this function could not (it drew the within-state
+/// arm unconditionally, an empty loop on the single-binding corpora every
+/// retrieval consumer produces).
+///
+/// Multi-binding corpora resolve to [`RoleShuffleMode::WithinState`] and are
+/// bit-identical to that earlier behaviour.
 pub fn shuffled_role_control(
     input: AlsInput<'_>,
     cfg: &AlsConfig,
     seed: u64,
     eps: f32,
 ) -> Result<ShuffledRoleReport, TprError> {
+    let mode = role_shuffle_mode_for(input.bindings);
+    shuffled_role_control_with(input, cfg, seed, eps, mode)
+}
+
+/// [`shuffled_role_control`] with the permutation arm pinned by the caller.
+///
+/// Use this to assert a specific control rather than accept the resolved one
+/// (a benchmark comparing both arms on the same artifact, say). The report
+/// still carries `vacuous`, so pinning an arm cannot silently buy a no-op.
+pub fn shuffled_role_control_with(
+    input: AlsInput<'_>,
+    cfg: &AlsConfig,
+    seed: u64,
+    eps: f32,
+    mode: RoleShuffleMode,
+) -> Result<ShuffledRoleReport, TprError> {
     let (_, true_rep) = als_fit(input, cfg)?;
-    let mut state = seed | 1;
-    let mut next = move || {
-        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = state;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    };
-    let shuffled: Vec<TprBindings> = input
-        .bindings
-        .iter()
-        .map(|b| {
-            let mut roles = b.roles.clone();
-            let n = roles.len();
-            for i in (1..n).rev() {
-                let j = (next() % (i as u64 + 1)) as usize;
-                roles.swap(i, j);
-            }
-            TprBindings {
-                roles,
-                fillers: b.fillers.clone(),
-            }
-        })
-        .collect();
+    let vacuous = role_shuffle_is_vacuous(input.bindings, mode);
+
+    // Draw 0 uses `seed` unchanged, so a non-degenerate corpus reproduces the
+    // pre-710 permutation exactly; later draws exist only so an identity draw
+    // cannot be reported as "roles carry nothing".
+    let mut drawn = permute_roles(input.bindings, mode, seed);
+    let mut attempt = 1u32;
+    while !vacuous && drawn.1 == 0 && attempt < MAX_SHUFFLE_DRAWS {
+        let s = seed.wrapping_add(u64::from(attempt).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        drawn = permute_roles(input.bindings, mode, s);
+        attempt += 1;
+    }
+    let (shuffled, moved) = drawn;
+
     let shuf_input = AlsInput {
         dim: input.dim,
         n_fillers: input.n_fillers,
@@ -453,6 +650,9 @@ pub fn shuffled_role_control(
         r_shuffled,
         ratio,
         degraded: ratio > 1.0 + eps,
+        mode,
+        vacuous,
+        moved,
     })
 }
 

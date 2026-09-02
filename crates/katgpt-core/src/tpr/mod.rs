@@ -28,6 +28,32 @@
 //! **Kill switch:** `RIIR_TPR=0` in the environment makes every op return
 //! [`TprError::Disabled`] (the G3 gate) — read once and cached, so the check
 //! costs a relaxed atomic load in steady state.
+//!
+//! # Every control reports whether it could have failed
+//!
+//! A control whose permutation (or null, or candidate pool) is a provable
+//! identity returns the same numbers as a real negative result, so its pass is
+//! silent. [`AtomicNull::coverage`] was designed against this; the role control
+//! was not, and shipped a within-state shuffle that is an **empty loop** on
+//! single-binding corpora — the shape every retrieval consumer produces. It
+//! condemned riir-clippy's Issue 062 corpus (325 states, all `len() == 1`) at
+//! `ratio == 1.0` while [`bow_router`] called the same artifact structured.
+//!
+//! Fixed by making vacuity a reported quantity rather than something a
+//! consumer must infer from the source (Issue 710, closed + removed here):
+//!
+//! | instrument | vacuity signal | vacuous when |
+//! |---|---|---|
+//! | [`AtomicNull`] | [`AtomicNull::coverage`] | the dictionary has no entry for the candidates |
+//! | [`shuffled_role_control`] | [`ShuffledRoleReport::vacuous`] + `moved` | the drawn permutation is the identity ([`role_shuffle_is_vacuous`]) |
+//! | [`bow_router`] | [`BowRouterReport::vacuous`] | the `m = 1` null IS the caller's fit |
+//! | [`withheld_pair_top1`] | [`candidate_pool_coverage`] | a truth is absent from the shared pool |
+//!
+//! [`shuffled_role_control`] additionally *resolves* the arm
+//! ([`role_shuffle_mode_for`]): single-binding corpora get the cross-state
+//! permutation, which can fail (measured `ratio` 1.85e8 vs the within-state
+//! arm's 1.0 on the same planted corpus). Multi-binding corpora are
+//! bit-identical to the pre-710 behaviour.
 
 pub mod als;
 pub mod types;
@@ -42,8 +68,10 @@ pub use types::{
     TprBindings, TprError, TprScheme,
 };
 pub use validate::{
-    AtomicNull, BicSelection, BindingReport, BowRouterReport, ShuffledRoleReport, bic_select,
-    bow_router, shuffled_role_control, validate_bindings, withheld_pair_top1,
+    AtomicNull, BicSelection, BindingReport, BowRouterReport, MAX_SHUFFLE_DRAWS, RoleShuffleMode,
+    ShuffledRoleReport, bic_select, bow_router, candidate_pool_coverage, role_shuffle_is_vacuous,
+    role_shuffle_mode_for, shuffled_role_control, shuffled_role_control_with, validate_bindings,
+    withheld_pair_top1,
 };
 
 use crate::simd::{simd_dot_f32, simd_matvec};
