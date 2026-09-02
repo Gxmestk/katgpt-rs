@@ -59,9 +59,15 @@ const FUEL_PER_CALL: u64 = 50_000;
 
 /// Fuel multiplier for batch calls.
 /// Batch does N×M individual checks internally, each needing full fuel.
-/// With 4 players × 6 actions = 24 checks, the WASM loop overhead is
-/// modest since grid is parsed once. 2× is sufficient.
-const FUEL_BATCH_MULTIPLIER: u64 = 2;
+/// With 4 players × 7 actions = 28 checks, the WASM loop overhead is
+/// modest since grid is parsed once.
+///
+/// 2× was sized on wasmi 1.x per-IR-op metering against 4×6 checks; the
+/// wasmi 2.0 input-op metering probe (`fuel_calibration_probe`, measured
+/// worst batch_validate = 108,371 input-ops at 4 players × 16 max-range
+/// bombs) showed 2× (100K) UNDER the measured worst case, so the
+/// multiplier is 5 (250K budget, 2.31× headroom).
+const FUEL_BATCH_MULTIPLIER: u64 = 5;
 
 /// Return value indicating "valid" from WASM.
 const VALID: u32 = 1;
@@ -891,8 +897,12 @@ mod tests {
     fn fuel_constants_reasonable() {
         assert_eq!(FUEL_PER_CALL, 50_000);
         assert!(FUEL_BATCH_MULTIPLIER >= 2);
-        // Batch fuel: 50K × 2 = 100K, sufficient for 24 individual checks
-        assert!(FUEL_PER_CALL * FUEL_BATCH_MULTIPLIER >= 80_000);
+        // Batch fuel: 50K × 5 = 250K. Sized by `fuel_calibration_probe` on
+        // wasmi 2.0 input-op metering: worst measured batch_validate =
+        // 108,371 input-ops (4 players × 16 max-range bombs) — 2× (100K)
+        // was UNDER budget; 5× keeps ≥2.3× headroom.
+        assert_eq!(FUEL_BATCH_MULTIPLIER, 5);
+        assert!(FUEL_PER_CALL * FUEL_BATCH_MULTIPLIER >= 250_000);
     }
 
     #[test]
@@ -980,5 +990,169 @@ mod tests {
         check::<BomberWasmPruner>();
         check::<BatchResult>();
         check::<BatchRelevanceResult>();
+    }
+
+    /// Fuel calibration probe (wasmi 2.0 input-op metering model).
+    ///
+    /// wasmi 2.0 charges fuel per INPUT Wasm operator (Wasmtime-style) instead
+    /// of per internal IR op (wasmi 1.x), so absolute fuel numbers changed.
+    /// This probe measures actual consumption of the real bomber validator on
+    /// representative + worst-case states to validate `FUEL_PER_CALL` /
+    /// `FUEL_BATCH_MULTIPLIER`. Mirrors the exact call flow of `call_is_valid`
+    /// / `call_batch_validate` but with a huge probe fuel budget so the
+    /// measurement is not clamped by the production constants.
+    ///
+    /// `#[ignore]`: needs the riir-ai `bomber_validator.wasm` artifact, same
+    /// as `tests/bomber_wasm_ab.rs` (which documents how to build it).
+    #[test]
+    #[ignore = "fuel calibration — needs the riir-ai bomber_validator.wasm artifact"]
+    #[allow(clippy::assertions_on_constants)] // decision rule IS about the consts
+    fn fuel_calibration_probe() {
+        const WASM_ARTIFACT: &str = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../riir-ai/target/wasm32-unknown-unknown/release/examples/bomber_validator.wasm"
+        );
+        if !std::path::Path::new(WASM_ARTIFACT).exists() {
+            eprintln!("⚠ Skipping: artifact not found at {WASM_ARTIFACT}");
+            eprintln!("  Build it: cd riir-ai && cargo build --example bomber_validator --target wasm32-unknown-unknown --release");
+            return;
+        }
+
+        const PROBE_FUEL: u64 = u64::MAX / 4;
+
+        let wasm_bytes = std::fs::read(WASM_ARTIFACT).expect("read artifact");
+        let mut config = Config::default();
+        config.consume_fuel(true);
+        let engine = Engine::new(&config);
+        let module = Module::new(&engine, &wasm_bytes[..]).expect("compile");
+        let mut inner = BomberInner::new(&engine, &module).expect("instantiate");
+
+        // Representative + worst-case states: several arena seeds; bomb configs
+        // from empty up to the doc-comment worst case (16 bombs, max blast
+        // range, packed nearest the player to maximize BFS escape work).
+        let mut max_call = (0u64, String::new());
+        let mut max_batch = (0u64, String::new());
+        for seed in [1u64, 2, 3, 42] {
+            let grid = ArenaGrid::generate(seed);
+            let walkable: Vec<(i32, i32)> = (1..12)
+                .flat_map(|y| (1..12).map(move |x| (x, y)))
+                .filter(|&(x, y)| grid.is_walkable(x, y))
+                .collect();
+            assert!(!walkable.is_empty());
+
+            // Per-player sweep: every walkable position × all 7 actions.
+            for &(px, py) in &walkable {
+                // Worst-case bombs: 16 nearest walkable cells around the player.
+                let mut nearest = walkable
+                    .iter()
+                    .copied()
+                    .filter(|&(x, y)| (x, y) != (px, py))
+                    .map(|p| {
+                        (p, (p.0 - px).abs() + (p.1 - py).abs())
+                    })
+                    .collect::<Vec<_>>();
+                nearest.sort_by_key(|&(_, d)| d);
+                let worst_bombs: Vec<((i32, i32), u32, u32)> = nearest
+                    .iter()
+                    .take(16)
+                    .map(|&((x, y), _)| ((x, y), 3, 4))
+                    .collect();
+
+                let bombs: &[((i32, i32), u32, u32)] = &worst_bombs;
+                for action in 0..ACTION_COUNT {
+                        inner.store.set_fuel(PROBE_FUEL).expect("set_fuel");
+                        let (bytes, tokens) = inner
+                            .state_buf
+                            .serialize(&grid, px, py, 0, bombs);
+                        inner.write_state_buf(0, bytes).expect("write state");
+                        let is_valid_fn = inner.is_valid_fn;
+                        let _ = is_valid_fn.call(&mut inner.store, (0, action as u32, 0, tokens));
+                        let used = PROBE_FUEL - inner.store.get_fuel().expect("get_fuel");
+                        if used > max_call.0 {
+                            max_call = (
+                                used,
+                                format!(
+                                    "seed={seed} pos=({px},{py}) action={action} bombs={} (wasmi2 input-ops)",
+                                    bombs.len()
+                                ),
+                            );
+                        }
+                    }
+
+                // Batch: 4 players × 7 actions against the worst bomb config.
+                if inner.has_batch() {
+                    let players: Vec<(u8, i32, i32)> = walkable
+                        .iter()
+                        .take(4)
+                        .enumerate()
+                        .map(|(i, &(x, y))| (i as u8, x, y))
+                        .collect();
+                    inner.store.set_fuel(PROBE_FUEL).expect("set_fuel");
+                    let n = players.len().min(MAX_PLAYERS);
+                    let m = ACTION_COUNT;
+                    let (state_bytes, state_tokens) =
+                        inner.state_buf.serialize_grid(&grid, &worst_bombs);
+                    let players_off = align8(state_bytes);
+                    let players_bytes = n * 3 * 4;
+                    let actions_off = players_off + players_bytes;
+                    let results_off = actions_off + ACTION_COUNT * 4;
+                    inner.write_state_buf(0, state_bytes).expect("write state");
+                    let mut args_buf = [0u8; MAX_PLAYERS * 12 + ACTION_COUNT * 4];
+                    for (i, &(id, x, y)) in players.iter().take(n).enumerate() {
+                        let off = i * 12;
+                        args_buf[off..off + 4].copy_from_slice(&(id as u32).to_le_bytes());
+                        args_buf[off + 4..off + 8].copy_from_slice(&(x as u32).to_le_bytes());
+                        args_buf[off + 8..off + 12].copy_from_slice(&(y as u32).to_le_bytes());
+                    }
+                    args_buf[players_bytes..players_bytes + ACTION_COUNT * 4]
+                        .copy_from_slice(&ACTIONS_BYTES);
+                    inner
+                        .write_memory(players_off, &args_buf[..players_bytes + ACTION_COUNT * 4])
+                        .expect("write args");
+                    let batch_fn = inner.batch_is_valid_fn.expect("batch fn");
+                    let _ = batch_fn.call(
+                        &mut inner.store,
+                        (
+                            0,
+                            state_tokens,
+                            players_off as u32,
+                            n as u32,
+                            actions_off as u32,
+                            m as u32,
+                            results_off as u32,
+                        ),
+                    );
+                    let used = PROBE_FUEL - inner.store.get_fuel().expect("get_fuel");
+                    if used > max_batch.0 {
+                        max_batch = (
+                            used,
+                            format!(
+                                "seed={seed} players={n} bombs={} (wasmi2 input-ops)",
+                                worst_bombs.len()
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
+        println!("fuel_calibration_probe (wasmi 2.0, per-INPUT-op metering):");
+        println!("  max per-call is_valid consumed: {} [{}]", max_call.0, max_call.1);
+        println!("  max batch_validate consumed:    {} [{}]", max_batch.0, max_batch.1);
+        println!("  FUEL_PER_CALL = {FUEL_PER_CALL}, batch budget = {}", FUEL_PER_CALL * FUEL_BATCH_MULTIPLIER);
+
+        // Decision rule: production constants must keep ≥2× headroom over the
+        // measured worst case.
+        assert!(
+            max_call.0 * 2 <= FUEL_PER_CALL,
+            "FUEL_PER_CALL headroom <2×: worst measured {} vs budget {FUEL_PER_CALL} — raise the constant",
+            max_call.0
+        );
+        assert!(
+            max_batch.0 * 2 <= FUEL_PER_CALL * FUEL_BATCH_MULTIPLIER,
+            "batch budget headroom <2×: worst measured {} vs budget {} — raise FUEL_BATCH_MULTIPLIER",
+            max_batch.0,
+            FUEL_PER_CALL * FUEL_BATCH_MULTIPLIER
+        );
     }
 }
