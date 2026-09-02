@@ -121,6 +121,28 @@ Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}`. Ask: *is the value in 
 
 Before PASS on hardware-vocab papers: (1) identify technique stripped of substrate, (2) grep for software-SIMD analog, (3) PASS only if both confirm no analog.
 
+**External code repo (not a paper)?** Skip jina — §0.5 clones it into `.raw/` for full-tree grep.
+
+### 0.5 External-repo source access — clone into `.raw/` (ephemeral, `rm` when done)
+
+Papers distill fine over the wire (`https://r.jina.ai/...`). **External CODE repos do not** — distill verdicts, mining batches, and prior-art verification need full-tree `grep`, byte-accurate quotes, and multi-file reads that URL fetches cannot provide. When a research task needs an external repo's source:
+
+```bash
+# Clone (shallow by default; full history ONLY if the task mines git log)
+git clone --depth 1 https://github.com/<org>/<repo>.git .raw/<repo>
+# Pin provenance BEFORE reading anything into a verdict:
+git -C .raw/<repo> rev-parse HEAD   # record this sha + the license in the note
+```
+
+Rules (all mandatory):
+
+1. **Location:** `.raw/` at the root of the repo whose `.research/`/`.plans/` will hold the output (e.g. `katgpt-rs/.raw/ds4/`). `.raw` is ephemeral scratch — gitignored in every workspace repo, never committed, never a sibling repo.
+2. **Pin before verdict:** record `@ <full-sha>` + license (Apache-2.0/MIT/...) in the research note BEFORE deleting the clone — the sha is the provenance; the clone is throwaway. Every quote later cited must match the pinned sha (precedent: riir-clippy Batches 96–98 distills cite `antirez/ds4 @ 110afdd8…` with quotes "re-verified at mine time").
+3. **Read-only.** Do not modify files inside `.raw`. If a patch experiment is needed, copy the file out first; never let experiments dirty the clone mid-verdict.
+4. **No build-graph contamination:** never add a Cargo/path dep into `.raw` (BOUNDARY.md + standalone-dep gates), and never include `.raw` in codebase/pre-flight grep scopes — it is NOT shipped substrate, so grepping it inflates hit counts and makes a mining candidate read as "already ships".
+5. **Cleanup is part of the task:** when the verdict/note/plan is committed, `rm -rf .raw/<repo>` (or the whole `.raw/`). A finished research task with a live `.raw/` entry is an unfinished task. If a session dies mid-task, treat any stale `.raw/` entry as UNTRUSTED on resume — delete and re-clone at the pinned sha; never verdict against a clone whose commit you did not pin yourself.
+6. **Shallow unless history-mining:** `--depth 1` by default; full clone only when the task needs `git log`/diff archaeology (fix-pair mining, regression hunts) — and say so in the note. For very large repos where only a few files are read, `--filter=blob:none` fetches blobs on demand.
+
 ### 1. Distill fundamentally — fuse, don't direct-map
 
 Find the transferable primitive (the geometric/spectral/information-theoretic insight that works without the paper's training setup). **Then look for fusion opportunities**: cross-pollinate with existing notes/plans/shipped primitives to synthesize something novel.
