@@ -96,7 +96,7 @@ pub use types::{
 };
 pub use validate::{
     AtomicNull, BicSelection, BindingReport, BowRouterReport, FillerRoleSpread, MAX_SHUFFLE_DRAWS,
-    RoleShuffleMode, ShuffledRoleReport, WithheldPairReport, bic_select, bow_router,
+    ObservedPairs, RoleShuffleMode, ShuffledRoleReport, WithheldPairReport, bic_select, bow_router,
     candidate_pool_coverage, filler_role_spread, role_determined_by_filler,
     role_shuffle_is_vacuous, role_shuffle_mode_for, shuffled_role_control,
     shuffled_role_control_with, validate_bindings, withheld_pair_top1, withheld_pair_top1_report,

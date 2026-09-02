@@ -427,6 +427,11 @@ pub struct FillerRoleSpread {
     /// eight and read as healthy on the threshold while admitting almost no
     /// OOD test.
     pub multi_role_fillers: usize,
+    /// Distinct `(filler, role)` pairs — `mean`'s numerator, carried so a
+    /// consumer never has to reconstruct it as `fillers * mean` and then check
+    /// that both factors came from the same arm. Equal to
+    /// [`ObservedPairs::len`] on the same bindings.
+    pub distinct_pairs: usize,
 }
 
 impl FillerRoleSpread {
@@ -441,18 +446,91 @@ impl FillerRoleSpread {
     }
 }
 
+/// The distinct `(filler, role)` pairs a fit corpus actually contains.
+///
+/// **Why a consumer needs this even when the operation is exact.** A
+/// counterfactual — "what if this span's filler were `Y` instead?" — asks the
+/// artifact about the pair `(role_of_span, Y)`. `surgery_delta_into` will
+/// answer it *bit-additively* whether or not that pair was ever fitted, so an
+/// attribution built on it is clean, confident and zero-recompute on a pair the
+/// artifact has never seen. That is the third form of the Issue 710/711 shape
+/// and the least visible: 710 was a control that could not fail, 711 a control
+/// that could fail and measured the wrong question, and this is an operation
+/// that is *provably correct* and still answers a question the corpus cannot
+/// support.
+///
+/// Sorted `Vec` + binary search rather than a hash set: construction is the
+/// same single sort [`filler_role_spread`] already needed, lookup is
+/// `O(log n)` with no hashing, and the layout is one contiguous allocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ObservedPairs {
+    /// Sorted, deduped `(filler, role)` — filler first, matching the order
+    /// [`filler_role_spread`] groups by.
+    pairs: Vec<(u16, u16)>,
+}
+
+impl ObservedPairs {
+    /// Collect the pairs from a binding corpus. One sort, one dedup.
+    #[must_use]
+    pub fn from_bindings(bindings: &[TprBindings]) -> Self {
+        let mut pairs: Vec<(u16, u16)> = bindings
+            .iter()
+            .flat_map(|b| b.fillers.iter().copied().zip(b.roles.iter().copied()))
+            .collect();
+        pairs.sort_unstable();
+        pairs.dedup();
+        Self { pairs }
+    }
+
+    /// Was `(role, filler)` in the fit corpus?
+    ///
+    /// Argument order is `(role, filler)` to match [`TprBindings`] and the
+    /// prose, not the internal filler-first sort key.
+    #[must_use]
+    pub fn contains(&self, role: u16, filler: u16) -> bool {
+        self.pairs.binary_search(&(filler, role)).is_ok()
+    }
+
+    /// Distinct `(filler, role)` pairs — the numerator of
+    /// [`FillerRoleSpread::mean`], reported so a consumer never has to
+    /// re-derive it as `fillers * mean` and then wonder whether the two came
+    /// from the same arm.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.pairs.is_empty()
+    }
+
+    /// Fraction of `queries` whose pair occurs in the corpus.
+    ///
+    /// The number that gates publishing a counterfactual readout: report the
+    /// observed and unobserved populations **apart** rather than pooling them,
+    /// because the pooled figure reads as a measurement and the unobserved half
+    /// is a prediction.
+    #[must_use]
+    pub fn observed_fraction(&self, queries: &[(u16, u16)]) -> f32 {
+        match queries.is_empty() {
+            true => 0.0,
+            false => {
+                let hit = queries.iter().filter(|(r, f)| self.contains(*r, *f)).count();
+                hit as f32 / queries.len() as f32
+            }
+        }
+    }
+}
+
 /// Measure [`FillerRoleSpread`] over a binding corpus.
 ///
 /// One sort over the `(filler, role)` pairs — no hashing, one allocation, and
-/// the pair list doubles as the numerator of `mean` once deduped.
+/// the pair list doubles as the numerator of `mean` once deduped. Shares
+/// [`ObservedPairs`]'s construction rather than repeating the sort.
 #[must_use]
 pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
-    let mut pairs: Vec<(u16, u16)> = bindings
-        .iter()
-        .flat_map(|b| b.fillers.iter().copied().zip(b.roles.iter().copied()))
-        .collect();
-    pairs.sort_unstable();
-    pairs.dedup();
+    let pairs = ObservedPairs::from_bindings(bindings).pairs;
 
     let mut max = 0usize;
     let mut fillers = 0usize;
@@ -480,6 +558,7 @@ pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
         },
         fillers,
         multi_role_fillers,
+        distinct_pairs: pairs.len(),
     }
 }
 

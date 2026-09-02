@@ -906,3 +906,94 @@ fn the_withheld_pair_probe_reports_its_ceiling_and_withholds_on_a_degenerate_uni
     assert_eq!(none.coverage, 0.0);
     assert_eq!(none.per_answerable(), None);
 }
+
+#[test]
+fn observed_pairs_separates_a_counterfactual_the_fit_has_seen_from_one_it_has_not() {
+    // The third form of the 710/711 shape (riir-clippy Issue 062 T6): an
+    // operation that is PROVABLY correct and still answers a question the
+    // corpus cannot support. `surgery_delta_into` is bit-additive on any
+    // artifact, so a counterfactual attribution is clean and confident whether
+    // or not the pair it asks about was ever fitted. Nothing in the operation
+    // warns the caller; this is what warns the caller.
+    let p = planted_retrieval(24, 3, 5, 7, 120, 0x7114);
+    let obs = ObservedPairs::from_bindings(&p.bindings);
+    let spread = filler_role_spread(&p.bindings);
+
+    assert!(!obs.is_empty());
+    assert_eq!(
+        obs.len(),
+        spread.distinct_pairs,
+        "the report's numerator must be the same set the membership test uses"
+    );
+    // `mean` is that numerator over the fillers that appear — pinned as an
+    // identity so a consumer is never tempted to re-derive one from the other
+    // and pair factors from different arms.
+    assert!(
+        (spread.mean - spread.distinct_pairs as f32 / spread.fillers as f32).abs() < 1e-6,
+        "mean {} vs {}/{}",
+        spread.mean,
+        spread.distinct_pairs,
+        spread.fillers
+    );
+
+    // Every planted pair is observed.
+    for b in &p.bindings {
+        for (&r, &f) in b.roles.iter().zip(b.fillers.iter()) {
+            assert!(obs.contains(r, f), "planted pair ({r}, {f}) must be observed");
+        }
+    }
+    assert_eq!(obs.observed_fraction(&pairs_of(&p.bindings)), 1.0);
+
+    // A filler id past the vocabulary can occur in no pair, so a
+    // counterfactual naming it is outside the fit by construction — and
+    // `observed_fraction` prices a mixed batch rather than pooling it.
+    let unseen: Vec<(u16, u16)> = (0..p.m as u16).map(|r| (r, p.n_fillers as u16)).collect();
+    assert_eq!(obs.observed_fraction(&unseen), 0.0);
+    let mut mixed = pairs_of(&p.bindings);
+    mixed.extend_from_slice(&unseen);
+    let frac = obs.observed_fraction(&mixed);
+    assert!(frac > 0.0 && frac < 1.0, "mixed batch fraction {frac}");
+    assert_eq!(obs.observed_fraction(&[]), 0.0);
+}
+
+fn pairs_of(bindings: &[TprBindings]) -> Vec<(u16, u16)> {
+    bindings
+        .iter()
+        .flat_map(|b| b.roles.iter().copied().zip(b.fillers.iter().copied()))
+        .collect()
+}
+
+#[test]
+fn on_a_degenerate_corpus_every_counterfactual_role_is_unobserved() {
+    // `role = f(filler)`: each filler occurs with exactly one role, so the
+    // ONLY observed pair for a filler is its own. Every counterfactual that
+    // moves the role is therefore outside the fit — the regime where a T6
+    // attribution would be entirely prediction while reading as measurement.
+    let p = planted_retrieval(24, 3, 5, 7, 120, 0x7115);
+    let degen = roles_from_fillers(&p.bindings, p.m);
+    let obs = ObservedPairs::from_bindings(&degen);
+    let spread = filler_role_spread(&degen);
+    assert!(spread.role_determined_by_filler());
+    assert_eq!(obs.len(), spread.fillers, "one pair per filler, exactly");
+
+    let mut counterfactuals = 0usize;
+    let mut observed = 0usize;
+    for f in 0..p.n_fillers as u16 {
+        let own = f % p.m as u16;
+        assert!(obs.contains(own, f), "the filler's own role is observed");
+        for r in (0..p.m as u16).filter(|r| *r != own) {
+            counterfactuals += 1;
+            observed += usize::from(obs.contains(r, f));
+        }
+    }
+    assert_eq!(
+        observed, 0,
+        "{counterfactuals} role-moving counterfactuals, none of them fitted"
+    );
+    println!(
+        "062 T6: degenerate corpus — {} distinct pairs over {} fillers, \
+         {counterfactuals} role-moving counterfactuals, {observed} observed",
+        obs.len(),
+        spread.fillers
+    );
+}
