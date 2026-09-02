@@ -684,6 +684,17 @@ pub fn als_fit(
     let mut l21_w = vec![0.0f32; d];
 
     let mut sweeps = 0u32;
+    // Best-iterate guard (Issue 712): the monotone acceptance bar is scaled
+    // by the INITIAL ssr (correctly — near convergence the SSR's last digits
+    // are f32 noise), so a small-but-real uphill step near the floor can be
+    // accepted and shipped, violating the documented "artifact == trajectory
+    // minimum" invariant (measured: sweep 6→7 went 9.7272e-5 → 1.0247e-4,
+    // +5.2%, under the ssr_0·1e-9 = 1.23e-5 bar; bench_707 G1 `is_best` red).
+    // Track the best accepted iterate and restore it at loop exit — the
+    // shipped artifact is then the trajectory minimum BY CONSTRUCTION,
+    // independent of fp-path luck.
+    let mut best_ssr = prev;
+    let mut best_snap: Option<(Vec<f32>, TprScheme, Vec<f32>, Vec<f32>, Vec<f32>)> = None;
     for _ in 0..cfg.max_sweeps {
         sweeps += 1;
         // Snapshot for the descent guard: blocks 3–4 minimize the CORE-space
@@ -793,9 +804,22 @@ pub fn als_fit(
         let improved = prev - ssr;
         let converged = improved <= cfg.tol * prev.abs().max(1e-12);
         prev = ssr;
+        if ssr < best_ssr {
+            best_ssr = ssr;
+            best_snap =
+                Some((fillers.clone(), scheme.clone(), w.clone(), bias.clone(), cores.clone()));
+        }
         if converged {
             break;
         }
+    }
+    // Restore the best accepted iterate when the loop exited on a
+    // within-tolerance uphill step (Issue 712). Also covers the
+    // monotone-reject path: `snap` there is the last accepted state, which
+    // the best-tracking subsumes when an earlier sweep was strictly better.
+    if prev > best_ssr && let Some(best) = best_snap.take() {
+        (fillers, scheme, w, bias, cores) = best;
+        prev = best_ssr;
     }
 
     // L2,1 prune + exact refit.
