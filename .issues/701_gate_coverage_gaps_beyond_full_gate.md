@@ -197,6 +197,26 @@ outside the surveyed set's reach (riir-burner, katgpt-web — neither was in
 this workspace's checkout set), plus seal-game-editor (read-only repo,
 owner-owned — record-why-not only).
 
+**Addendum 2026-09-02 (third fan-out slice) — `riir-dapps` wired + default
+branch flipped.** `2a31a17` (its repo): `scripts/ci_feature_guard.sh`
+(L1 direction gate / L2 default tests / L3 clippy -D / L4 chain_backend /
+L5 all-features clippy -D / L6 all-features tests — 502 green at wiring),
+`scripts/standalone_dep_gate.sh` (3 entries pinned: riir-chain,
+riir-chain-sdk, riir-neuron-db — both siblings private, NO public sibling at
+all; injection-verified), `.github/workflows/rust.yml` (weekly Saturdays
+03:53 UTC; standalone job secret-free; feature-guard provisions both
+siblings via `SIBLING_REPOS_TOKEN`, fail-loud). **Its default branch moved
+`main` -> `develop` in the same landing** — `riir-dapps` existed at the
+2026-09-01 flip and was missed; main was strictly behind develop (no unique
+commits); AGENTS.md §Branch corrected in the same commit. The `cloudflare/`
+standalone crates (warm-tier-do, kat-service) are deliberately NOT gated by
+this workflow — own workspace roots, own deploy surfaces, own CI when they
+earn it. Baselines measured before wiring: default 111/0, chain_backend
+149/0, all-features 502/0 across 32 binaries; clippy clean both states.
+Remaining in R2: riir-train (active sibling lane — next cycle), riir-auth,
+riir-unity, out-of-checkout-set repos (riir-burner, katgpt-web),
+seal-game-editor (read-only — record-why-not only).
+
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
