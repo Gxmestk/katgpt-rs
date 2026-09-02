@@ -37,8 +37,8 @@ fn kinematics_g4_zero_alloc_steady_state() {
         let mut st = KinState::<4>::new(1.0).unwrap();
         let mut x = [0.0f32; 4];
         for t in 0..8u32 {
-            for ch in 0..4 {
-                x[ch] = 0.5 * t as f32 + 0.25 * ch as f32;
+            for (ch, v) in x.iter_mut().enumerate() {
+                *v = 0.5 * t as f32 + 0.25 * ch as f32;
             }
             st.observe_into(&x, t).unwrap();
         }
@@ -76,8 +76,8 @@ fn kinematics_g4_zero_alloc_steady_state() {
     let v2 = [-2.0f32, 0.0];
     for i in 0..CALLS {
         let t = i as u32;
-        for ch in 0..4 {
-            x[ch] = 0.5 * t as f32 + 0.125 * ch as f32;
+        for (ch, v) in x.iter_mut().enumerate() {
+            *v = 0.5 * t as f32 + 0.125 * ch as f32;
         }
         let vel_before = st.vel;
         st.observe_into(&x, t).unwrap();
