@@ -246,6 +246,20 @@ token, 2026-09-02). Provisioning the actual secret is an owner act (a
 fine-grained PAT scoped to the private siblings, ~90-day expiry, the
 riir-clippy rust.yml preamble's spec).
 
+**Addendum 2026-09-02 (fifth slice) — `riir-unity` closed with a boundary
+gate.** `57924db` (its repo): a Unity host has no compile/lint surface, so
+its gate enforces the contract that matters — `.github/workflows/
+no_rust_boundary.yml` (no Cargo.toml anywhere, no tracked .rs outside the
+codegen package, the codegen package stays untracked) — the AGENTS.md
+§Domain Boundary rules in CI. Verified green against the tree at wiring;
+weekly Sundays 04:11 UTC; default branch already develop. Unity
+build/test runs deliberately excluded (macOS runner + Editor license +
+live import; the Unity CLI owns that locally). R2 remainder: riir-train
+(active sibling lane on Issue 501 — next cycle when quiet), riir-auth
+(needs sibling provisioning like the above), out-of-checkout-set repos
+(riir-burner, katgpt-web), seal-game-editor (read-only, owner-owned —
+record-why-not only, never wired by an agent).
+
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
