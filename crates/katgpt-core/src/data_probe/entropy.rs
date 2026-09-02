@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn digamma_matches_known_values() {
         // ψ(1) = −γ, ψ(0.5) = −γ − 2 ln 2, ψ(6) = H(5) − γ (A&S 6.3.x table).
-        let gamma = 0.57721_56649_01532_86061_f64;
+        let gamma = 0.57721_56649_01532_9_f64;
         assert!(
             (digamma(1.0) - (-gamma)).abs() < 1e-12,
             "ψ(1) = {}",

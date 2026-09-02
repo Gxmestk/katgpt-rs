@@ -265,6 +265,15 @@ bake_precision = []
 # The root forwards this so bench_277_unified_surprise_bus reaches the method.
 temporal_deriv = []
 
+# Issue 708 P2 — population imbalance advisory latch on S2FCollapseDetector.
+# Empty tracking flag — gates `observe_population_imbalance` /
+# `population_imbalance_latched` (a per-trace latch the consumer feeds from
+# katgpt-core's `data_probe::imbalance` monitor, which the CALLER owns — this
+# crate takes no new dep). ADVISORY ONLY, zero behavior change; reset clears
+# it per trace. The root's `imbalance_monitor` feature forwards to both this
+# and katgpt-core/imbalance_monitor.
+population_collapse = []
+
 # Stage-specialized decode paths for speculative decoding (Plan 102). Empty
 # tracking flag — gates `should_skip_layer_stage` in hydra_budget.rs.
 # The root forwards this so bench_165_hydra_budget_goat reaches the function.

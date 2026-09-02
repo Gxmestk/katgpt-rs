@@ -111,6 +111,19 @@ pub mod cca;
 #[cfg(feature = "knn_entropy")]
 pub mod entropy;
 
+/// Two-channel imbalance collapse monitor (Issue 708 P2, Research 437 —
+/// arXiv:2608.29335 GenFirst): channel A = the KL entropy above (spread),
+/// channel B = strided-pair mean |cosine| (directional concentration);
+/// conjunctive z-score alarm against a warm-up-frozen baseline — deviation
+/// from baseline leads an absolute `h < τ_low` crossing (measured by
+/// `bench_708_imbalance_goat` on the bench_681 fixtures), with the
+/// isotropic-shrink scope boundary pinned in-module. Event-triggered
+/// reporting only — never a controller. Gated `imbalance_monitor`
+/// (implies `knn_entropy`); first consumer surface: the `population_collapse`
+/// advisory latch on katgpt-pruners' `S2FCollapseDetector`.
+#[cfg(feature = "imbalance_monitor")]
+pub mod imbalance;
+
 // ── Re-exports (always-on items) ────────────────────────────────────────
 
 pub use claim::{ClaimCard, Intervention, ValidityVerdict};

@@ -185,6 +185,21 @@ pub struct S2FCollapseDetector {
     /// Slow EMA coefficient for the derivative kernel. Default 0.03 (~10× ratio).
     #[cfg(all(feature = "collapse_aware_thinking", feature = "temporal_deriv"))]
     temporal_deriv_alpha_slow: f32,
+    // ── Issue 708 P2: population imbalance advisory latch ─────────
+    //
+    // The token-trace channels (hesitation ring, derivative fusion) see the
+    // TRACE surface; population-level collapse (beliefs/emotions/embeddings
+    // contracting onto a mode) is visible only to the two-channel monitor
+    // (katgpt-core `data_probe::imbalance`, feature `imbalance_monitor`) —
+    // which the CALLER runs, because it owns the populations. This latch is
+    // the thin integration point: the caller feeds the monitor's conjunctive
+    // alarm per audit cycle, the detector holds it for the trace lifetime so
+    // a population-side warning can modulate trace-side decisions without
+    // this crate depending on the monitor. ADVISORY ONLY — nothing here
+    // reads it automatically (no behavior change, ever); reset clears it
+    // per trace like every other per-trace signal.
+    #[cfg(feature = "population_collapse")]
+    population_imbalance_latched: bool,
 }
 
 impl S2FCollapseDetector {
@@ -242,6 +257,8 @@ impl S2FCollapseDetector {
             temporal_deriv_alpha_fast: Self::DEFAULT_TEMPORAL_DERIV_ALPHA_FAST,
             #[cfg(all(feature = "collapse_aware_thinking", feature = "temporal_deriv"))]
             temporal_deriv_alpha_slow: Self::DEFAULT_TEMPORAL_DERIV_ALPHA_SLOW,
+            #[cfg(feature = "population_collapse")]
+            population_imbalance_latched: false,
         }
     }
 
@@ -463,6 +480,36 @@ impl S2FCollapseDetector {
             && self.count_hesitation() < self.threshold
     }
 
+    // ── Issue 708 P2: population imbalance advisory latch ─────────
+
+    /// Feed one audit-cycle result from the population-level two-channel
+    /// imbalance monitor (katgpt-core `data_probe::imbalance` — the caller
+    /// owns both the populations and the monitor). A latching OR: once any
+    /// audit cycle reports an alarm the latch stays set until
+    /// [`reset`](CollapseDetector::reset) (per-trace signals clear, frozen
+    /// config survives — the TVP convention).
+    ///
+    /// ADVISORY ONLY: nothing in this detector reads the latch
+    /// automatically. Consumers (thinking controller, trace policy) decide
+    /// what a population-side collapse warning means for trace-side
+    /// decisions — event-triggered composition, never a closed loop
+    /// (Research 437 §transfer boundary).
+    #[cfg(feature = "population_collapse")]
+    #[inline]
+    pub fn observe_population_imbalance(&mut self, alarmed: bool) {
+        if alarmed {
+            self.population_imbalance_latched = true;
+        }
+    }
+
+    /// Whether any audit cycle since the last reset reported a population
+    /// imbalance alarm.
+    #[cfg(feature = "population_collapse")]
+    #[inline]
+    pub fn population_imbalance_latched(&self) -> bool {
+        self.population_imbalance_latched
+    }
+
     /// Freeze detector state to disk via `repr(C)` binary dump.
     pub fn freeze(&self, path: &Path) -> Result<(), String> {
         let frozen = CollapseDetectorFrozen {
@@ -590,6 +637,13 @@ impl CollapseDetector for S2FCollapseDetector {
                 kernel.reset();
             }
             self.last_entropy_derivative = 0.0;
+        }
+
+        // Issue 708 P2: the population imbalance latch is per-trace state —
+        // clear it with everything else.
+        #[cfg(feature = "population_collapse")]
+        {
+            self.population_imbalance_latched = false;
         }
     }
 
@@ -1515,6 +1569,58 @@ mod tests {
                 detector.derivative_collapse.is_some(),
                 "reset must keep the kernel Some(...) (preserves ablation state)"
             );
+        }
+    }
+
+    /// Issue 708 P2 — population imbalance advisory latch. Gated on the
+    /// production feature (the same single-gate shape as the TVP tests).
+    /// The latch is ADVISORY ONLY: feeding it must not move any collapse
+    /// decision, and reset clears it per trace.
+    #[cfg(feature = "population_collapse")]
+    mod population_collapse_latch {
+        use super::*;
+
+        #[test]
+        fn latch_sets_on_alarm_and_reads_back() {
+            let mut detector = make_detector(vec![42, 99], 3);
+            assert!(!detector.population_imbalance_latched());
+            // Non-alarm observations never latch.
+            detector.observe_population_imbalance(false);
+            assert!(!detector.population_imbalance_latched());
+            // One alarm latches (OR semantics across audit cycles).
+            detector.observe_population_imbalance(true);
+            assert!(detector.population_imbalance_latched());
+            detector.observe_population_imbalance(false);
+            assert!(detector.population_imbalance_latched(), "latch is sticky");
+        }
+
+        #[test]
+        fn reset_clears_the_latch() {
+            let mut detector = make_detector(vec![42, 99], 3);
+            detector.observe_population_imbalance(true);
+            assert!(detector.population_imbalance_latched());
+            detector.reset();
+            assert!(
+                !detector.population_imbalance_latched(),
+                "the latch is per-trace state — reset clears it"
+            );
+        }
+
+        #[test]
+        fn latch_is_advisory_only_no_behavior_change() {
+            let mut latched = make_detector(vec![42, 99], 3);
+            let mut plain = make_detector(vec![42, 99], 3);
+            latched.observe_population_imbalance(true);
+            // Identical token streams ⇒ identical collapse verdicts, the
+            // population latch must not leak into check_collapse.
+            let stream = [42u32, 42, 7, 42, 7, 7, 42, 7, 42, 7];
+            for (i, t) in stream.iter().enumerate() {
+                assert_eq!(
+                    latched.check_collapse(*t, i),
+                    plain.check_collapse(*t, i),
+                    "advisory latch changed the collapse decision at {i}"
+                );
+            }
         }
     }
 }
