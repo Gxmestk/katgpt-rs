@@ -157,9 +157,11 @@ crate (`.issues/703`'s shape). 32 members at time of writing.
       of Linux, so ~23 Linux-equivalent minutes per push with several agents
       pushing daily. Measurement recorded in the workflow preamble; the
       decision is not taken from here.
-- [ ] Read the wall-clock off that run — `full_gate.yml`'s preamble sets it as
-      the promotion criterion for per-push and says "do not guess". The two
-      vacuous runs' 2m30s is NOT that number and must not be quoted as it.
+- [x] Read the wall-clock off that run — **DONE 2026-09-02**: run
+      `33531570320` (push, success, 2026-09-01 16:24→16:26:33 UTC) is the
+      first verifying run: **2m17s, 297/72, 0 errors** — and the number is
+      quoted in `full_gate.yml`'s preamble as the per-push cost, which is
+      exactly where this condition said it must land.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
 Refs: `ad0b7b19` (the fix), `.issues/704` (made the gate live at all),

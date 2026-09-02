@@ -175,6 +175,28 @@ katgpt-rs patch set to `katgpt-device-verify` without re-pinning `EXPECTED`)
 and nobody could see it because nothing ran the gate — fixed `97e5161`. R2
 remains open for the 8 no-CI rows and the not-full coverage rows above.
 
+**Addendum 2026-09-02 (second fan-out slice) — `riir-viewbridge` wired.**
+`6098972` (its repo): `scripts/ci_feature_guard.sh` (6 layers — check, clippy
+-D default + net feature, tests with a 13-binary floor, wasm32 core check,
+net-feature tests incl. the real-QUIC loopback round-trips),
+`scripts/standalone_dep_gate.sh` (ONE escaping dep pinned: the optional
+`riir-net` path dep into private riir-ai; injection-verified), and
+`.github/workflows/rust.yml` (weekly Sundays 03:41 UTC — default branch is
+`develop`, verified via ls-remote symref, so the rot check audits the right
+branch; standalone job secret-free; feature-guard provisions riir-ai via
+`SIBLING_REPOS_TOKEN`, fail-loud when absent). Baselines measured before
+wiring, not assumed: clippy clean both feature states, 107 passed / 3 ignored
+across 13 test binaries, wasm32 green.ubuntu was correct for this repo where
+it was wrong for the isolation sweep: viewbridge has NO cfg(target_os)
+surface, so every layer compiles the same real code on Linux. The
+`SIBLING_REPOS_TOKEN` secret must exist for this repo (org-level or added
+once) — if absent, the feature-guard job fails LOUD with provisioning
+instructions rather than silently skipping, and the standalone job still runs.
+Remaining in R2: riir-dapps, riir-train, riir-auth, riir-unity, and the repos
+outside the surveyed set's reach (riir-burner, katgpt-web — neither was in
+this workspace's checkout set), plus seal-game-editor (read-only repo,
+owner-owned — record-why-not only).
+
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
