@@ -6,7 +6,6 @@
 katgpt-rs
 katgpt-web
 riir-ai
-riir-armageddon
 riir-auth
 riir-burner
 riir-chain
@@ -22,3 +21,4 @@ riir-unity
 riir-viewbridge
 seal-game-editor
 seal-remake
+seal-remake-unity
