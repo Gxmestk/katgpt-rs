@@ -36,7 +36,7 @@
 use katgpt_core::tpr::{
     AlsConfig, AlsInput, AtomicNull, TprArtifact, TprBindings, TprScheme, TprScratch, als_fit,
     bind_into, encode_into, project_into, state_from_core_into, surgery_delta_into, unbind_into,
-    validate_bindings, withheld_pair_top1,
+    validate_bindings, withheld_pair_top1_report,
 };
 use std::time::Instant;
 
@@ -562,7 +562,8 @@ fn run_g8() -> bool {
     }
     let null_id = null.top1(&id_s, &id_b, &id_pool);
     let null_ood = null.top1(&te_s, &te_b, &pool) * 100.0;
-    let tpr_ood = withheld_pair_top1(&art, &te_s, &te_b, &pool, &mut scratch).expect("ood") * 100.0;
+    let ood = withheld_pair_top1_report(&art, &te_s, &te_b, &pool, &mut scratch).expect("ood");
+    let tpr_ood = ood.top1 * 100.0;
     let chance = 100.0 / pool.len() as f32;
 
     println!("  null: ID coverage {:.1}% / ID top-1 {:.1}%", id_cov * 100.0, null_id * 100.0);
@@ -578,8 +579,33 @@ fn run_g8() -> bool {
         "  OOD top-1: TPR {tpr_ood:.1}%  vs  null {null_ood:.1}%  (chance {chance:.1}%, pool {})",
         pool.len()
     );
+    // Issue 711: that G8's corpus is "planted and healthy" was asserted in
+    // prose and is now MEASURED — the covariate the OOD number's
+    // interpretation depends on, plus the pool ceiling it must be read
+    // against. A degenerate universe would make the number above
+    // uninterpretable rather than wrong, so the gate refuses instead of
+    // reporting a margin it cannot read.
+    println!(
+        "  composition: roles/filler max={} mean={:.3} over {} filler(s); pool coverage {:.1}% \
+         -> {}",
+        ood.spread.max,
+        ood.spread.mean,
+        ood.spread.fillers,
+        ood.coverage * 100.0,
+        match ood.verdict() {
+            Some(v) => format!("verdict {:.1}%", v * 100.0),
+            None => "WITHHELD — role = f(filler), no unseen pair to generalize to".to_string(),
+        }
+    );
+    let readable = ood.verdict().is_some() && ood.coverage > 0.99;
+    if !readable {
+        println!(
+            "  G8 corpus is NOT interpretable (readable = false) — refusing rather \
+             than scoring an unreadable OOD number"
+        );
+    }
     let margin = tpr_ood - null_ood;
-    let pass = informative && margin >= G8_MARGIN_PP && tpr_ood > chance;
+    let pass = informative && readable && margin >= G8_MARGIN_PP && tpr_ood > chance;
     println!("  margin {margin:.1} pp (bar {G8_MARGIN_PP:.1} pp) → G8 {}", verdict(pass));
     pass
 }

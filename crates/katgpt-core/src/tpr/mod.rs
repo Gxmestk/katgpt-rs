@@ -72,6 +72,15 @@
 //! [`ShuffledRoleReport::spread`], and `verdict()` on either report returns
 //! `None` rather than an uninterpretable bool. `max`/`mean` are both carried
 //! so a *near*-degenerate corpus (1.02 roles per filler) is visible too.
+//!
+//! [`withheld_pair_top1`] is hit hardest — withholding a pair withholds the
+//! whole filler there, so its OOD arm becomes a different question rather than
+//! a harder one. [`withheld_pair_top1_report`] carries the covariate, the
+//! [`candidate_pool_coverage`] ceiling and the raw number together;
+//! [`WithheldPairReport::verdict`] withholds. The raw `f32` function is
+//! **unchanged**, so the Issue 707 G8 gate keeps its number and the refusal is
+//! available to any consumer that wants it — which is what made "should it
+//! REFUSE?" a non-question rather than an owner call.
 
 pub mod als;
 pub mod types;
@@ -87,10 +96,10 @@ pub use types::{
 };
 pub use validate::{
     AtomicNull, BicSelection, BindingReport, BowRouterReport, FillerRoleSpread, MAX_SHUFFLE_DRAWS,
-    RoleShuffleMode, ShuffledRoleReport, bic_select, bow_router, candidate_pool_coverage,
-    filler_role_spread, role_determined_by_filler, role_shuffle_is_vacuous, role_shuffle_mode_for,
-    shuffled_role_control, shuffled_role_control_with, validate_bindings,
-    withheld_pair_top1,
+    RoleShuffleMode, ShuffledRoleReport, WithheldPairReport, bic_select, bow_router,
+    candidate_pool_coverage, filler_role_spread, role_determined_by_filler,
+    role_shuffle_is_vacuous, role_shuffle_mode_for, shuffled_role_control,
+    shuffled_role_control_with, validate_bindings, withheld_pair_top1, withheld_pair_top1_report,
 };
 
 use crate::simd::{simd_dot_f32, simd_matvec};

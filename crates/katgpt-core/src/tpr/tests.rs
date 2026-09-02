@@ -792,3 +792,98 @@ fn a_structure_verdict_is_withheld_on_a_corpus_that_cannot_carry_it() {
         dbow.ratio, dbow.structured, dshuf.ratio, dshuf.degraded, dshuf.moved
     );
 }
+
+#[test]
+fn the_withheld_pair_probe_reports_its_ceiling_and_withholds_on_a_degenerate_universe() {
+    // Issue 711 T4. The raw `withheld_pair_top1` is deliberately untouched —
+    // the Issue 707 G8 gate keeps its number — so this pins the additive
+    // report instead: the ceiling the number must be read against, and the
+    // refusal on a universe where the question is not posed.
+    let p = planted_retrieval(24, 3, 5, 7, 90, 0x7113);
+    let cfg = AlsConfig::new(p.d, TprScheme::Orthogonal { arity: p.m });
+    let (art, _) = als_fit(input(&p), &cfg).unwrap();
+    let mut scratch = TprScratch::new(&art);
+
+    // Healthy universe, fully answerable pool.
+    let full = withheld_pair_top1_report(
+        &art,
+        &p.states,
+        &p.bindings,
+        &p.bindings,
+        &mut scratch,
+    )
+    .unwrap();
+    assert_eq!(full.coverage, 1.0);
+    assert!(!full.spread.role_determined_by_filler());
+    assert_eq!(
+        full.verdict(),
+        Some(full.top1),
+        "a healthy universe must still get an answer"
+    );
+    assert_eq!(full.per_answerable(), Some(full.top1), "coverage is 1.0");
+    assert_eq!(
+        full.top1,
+        withheld_pair_top1(&art, &p.states, &p.bindings, &p.bindings, &mut scratch).unwrap(),
+        "the report must not change the number the raw gate reads"
+    );
+
+    // Same universe, half a pool: the number is now bounded by the pool and
+    // the report says so instead of letting it be read against 1.0.
+    let half = &p.bindings[..p.bindings.len() / 2];
+    let thin =
+        withheld_pair_top1_report(&art, &p.states, &p.bindings, half, &mut scratch).unwrap();
+    assert!(thin.coverage < 1.0, "coverage {}", thin.coverage);
+    assert!(
+        thin.top1 <= thin.coverage + 1e-6,
+        "top1 {} cannot exceed its ceiling {}",
+        thin.top1,
+        thin.coverage
+    );
+    assert!(thin.per_answerable().unwrap() >= thin.top1);
+    assert!(
+        thin.verdict().is_some(),
+        "a thin pool is a ceiling, not a void — only role = f(filler) voids"
+    );
+
+    // Degenerate universe: role = f(filler), so withholding a pair withholds
+    // the whole filler and the OOD arm asks a different question.
+    let q = Planted {
+        dim: p.dim,
+        d: p.d,
+        m: p.m,
+        n_fillers: p.n_fillers,
+        states: p.states.clone(),
+        bindings: roles_from_fillers(&p.bindings, p.m),
+    };
+    let (dart, _) = als_fit(input(&q), &cfg).unwrap();
+    let mut dscratch = TprScratch::new(&dart);
+    let degen = withheld_pair_top1_report(
+        &dart,
+        &q.states,
+        &q.bindings,
+        &q.bindings,
+        &mut dscratch,
+    )
+    .unwrap();
+    assert_eq!(degen.coverage, 1.0, "the pool is still fully answerable");
+    assert!(degen.spread.role_determined_by_filler());
+    assert_eq!(degen.verdict(), None, "top1 {}", degen.top1);
+    println!(
+        "711 T4: healthy top1 {:.4} cov {:.4} verdict {:?} | thin top1 {:.4} cov {:.4} \
+         per-answerable {:.4} | degenerate top1 {:.4} verdict {:?}",
+        full.top1,
+        full.coverage,
+        full.verdict(),
+        thin.top1,
+        thin.coverage,
+        thin.per_answerable().unwrap(),
+        degen.top1,
+        degen.verdict()
+    );
+
+    // Two-sided on the pool axis too: an empty pool is unanswerable and
+    // `per_answerable` must refuse the division rather than return inf.
+    let none = withheld_pair_top1_report(&art, &p.states, &p.bindings, &[], &mut scratch).unwrap();
+    assert_eq!(none.coverage, 0.0);
+    assert_eq!(none.per_answerable(), None);
+}

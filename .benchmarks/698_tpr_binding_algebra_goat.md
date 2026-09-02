@@ -16,7 +16,7 @@ rule blocks promotion until a real consumer lands, not the gates.
 | G2 | surgery p99 < 1 µs at D ∈ {64, 256, 768}; projection ≤ 2× its two-GEMV floor; ALS ≤ GD wall-clock | 84 / 167 / **417 ns** p99; **1.31–1.34×** floor; ALS **11.2 ms** vs GD **28.5 s** | **PASS** |
 | G3 | opt-in + `RIIR_TPR=0` disables every op | `tpr` absent from the default list; child process with the var set refuses bind/unbind/surgery/project/encode | **PASS** |
 | G4 | zero steady-state allocations | **0** across 20 000 op quadruples | **PASS** |
-| G8 | withheld-pair top-1 beats the atomic-dictionary null by ≥ 20 pp | TPR **100.0%** vs null **0.0%** (chance 1.8%, pool 56) — null ID coverage 100%, ID top-1 100% | **PASS** |
+| G8 | withheld-pair top-1 beats the atomic-dictionary null by ≥ 20 pp **on an interpretable corpus** | TPR **100.0%** vs null **0.0%** (chance 1.8%, pool 56) — null ID coverage 100%, ID top-1 100%; composition roles/filler max **3** mean **2.000** over 8 fillers, pool coverage **100.0%** | **PASS** |
 
 Three consecutive runs: project ratio 1.33 / 1.34 / 1.31×, surgery p50 identical
 (42 / 125 / 333 ns). Nothing here is a single-run number.
@@ -108,3 +108,40 @@ Both would have shipped a wrong verdict, and neither was in the primitive:
   and over-complete role sets are unfitted.
 - G2 is M3 Max only. The layout wins are cache/dependency-structure wins, so
   they should carry, but that is a prediction, not a measurement.
+
+## G8's corpus is now MEASURED healthy, not asserted healthy (Issue 711 T4)
+
+G8 compares a withheld-`(role, filler)`-pair OOD top-1 against an atomic null.
+Two things can make that number unreadable rather than wrong, and until
+`4af2b3cf` neither was measured here:
+
+1. **The pool** — a truth absent from the shared candidate pool cannot be
+   scored correctly, so `top1` is bounded by `candidate_pool_coverage` and must
+   be read against *that*, not against `1.0`. This is the failure that already
+   bit this gate once (§"the pool had been built from ONE state's bindings").
+2. **The composition covariate** — when every filler is seen with exactly one
+   role, withholding a *pair* withholds the whole filler, so the OOD arm is not
+   a harder version of the ID arm but a **different question**. `withheld_pair_top1`
+   is the probe this hits hardest.
+
+`withheld_pair_top1_report` returns both beside the number, and G8 now gates on
+`readable = verdict().is_some() && coverage > 0.99` in addition to the margin.
+Measured on the planted corpus: roles/filler **max 3, mean 2.000 over 8
+fillers**, pool coverage **100.0%** → G8 PASS with margin 100.0 pp. The prose
+claim "G8's corpus is planted and healthy" is now a printed quantity.
+
+**The guard was canaried, not assumed.** Forcing the coverage threshold to
+`> 1.5` makes the gate print `G8 corpus is NOT interpretable (readable =
+false)` and exit non-zero with `G8 FAIL` / `Issue 707 GOAT gate: FAIL` — so the
+new condition is wired to the verdict rather than printed beside it. Restored
+immediately; a guard that has never been observed to fire has not been tested.
+
+**Why the raw API did not change.** `withheld_pair_top1` still returns a bare
+`f32`. The Issue 711 T4 question was framed as "should the probe REFUSE?", with
+refusing described as honest but a breaking change to a gate this GOAT depends
+on. The additive shape makes it neither: the number stays available to a
+consumer that has already checked its corpus, the refusal is available to one
+that has not, and the *gate* — which owns its own corpus — takes the strict
+reading. Same resolution T1–T3 used for `bow_router` / `shuffled_role_control`
+(`verdict() -> Option<_>` beside the raw bool), so the four instruments now
+answer the interpretability question the same way.

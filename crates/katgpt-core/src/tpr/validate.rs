@@ -290,6 +290,75 @@ pub fn candidate_pool_coverage(truth: &[TprBindings], candidates: &[TprBindings]
     }
 }
 
+/// **T4 (Issue 711)** — [`withheld_pair_top1`] with the two quantities its
+/// number cannot be read without.
+///
+/// The raw function keeps returning a bare `f32`, so no existing gate breaks;
+/// this is the same additive shape `{Bow,Shuffled}Report::verdict` uses, and
+/// it is what makes the "should the gate REFUSE?" question moot rather than
+/// decided — the honest refusal is available to whoever wants it, and the
+/// number is still available to whoever has already checked the corpus.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WithheldPairReport {
+    /// The raw top-1 fraction from [`withheld_pair_top1`].
+    pub top1: f32,
+    /// [`candidate_pool_coverage`] — and therefore the **ceiling** `top1`
+    /// could have reached. Read `top1` against this, never against `1.0`.
+    pub coverage: f32,
+    /// Composition covariate over the retrieval universe (`truth` ∪
+    /// `candidates`), NOT over `truth` alone: the question is whether
+    /// withholding a *pair* also withholds its whole filler, and that is a
+    /// property of the pool the pair is scored in.
+    pub spread: FillerRoleSpread,
+}
+
+impl WithheldPairReport {
+    /// `top1`, but only on a corpus that can carry it.
+    ///
+    /// `None` when the role is a deterministic function of the filler across
+    /// the retrieval universe. This probe is hit hardest by that: withholding
+    /// a pair then withholds the filler entirely, so the OOD arm is not a
+    /// harder version of the ID arm — it is a different question, and its
+    /// number answers neither (Issue 711).
+    #[must_use]
+    pub fn verdict(&self) -> Option<f32> {
+        match self.spread.role_determined_by_filler() {
+            true => None,
+            false => Some(self.top1),
+        }
+    }
+
+    /// `top1` rescaled onto the answerable subset — what the primitive scored
+    /// on the states it *could* have scored. `None` on an unanswerable pool.
+    #[must_use]
+    pub fn per_answerable(&self) -> Option<f32> {
+        match self.coverage > 0.0 {
+            true => Some(self.top1 / self.coverage),
+            false => None,
+        }
+    }
+}
+
+/// [`withheld_pair_top1`] plus its answerability ceiling and its composition
+/// covariate, measured on the same inputs in one call (Issue 711 T4).
+pub fn withheld_pair_top1_report(
+    art: &TprArtifact,
+    states: &[f32],
+    truth: &[TprBindings],
+    candidates: &[TprBindings],
+    scratch: &mut TprScratch,
+) -> Result<WithheldPairReport, TprError> {
+    let top1 = withheld_pair_top1(art, states, truth, candidates, scratch)?;
+    // One pass over the union, so a pair present only in the pool still counts
+    // toward the filler's role set — the pool is the universe being scored in.
+    let universe: Vec<TprBindings> = truth.iter().chain(candidates.iter()).cloned().collect();
+    Ok(WithheldPairReport {
+        top1,
+        coverage: candidate_pool_coverage(truth, candidates),
+        spread: filler_role_spread(&universe),
+    })
+}
+
 pub fn withheld_pair_top1(
     art: &TprArtifact,
     states: &[f32],
