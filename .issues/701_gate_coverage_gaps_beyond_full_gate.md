@@ -365,6 +365,52 @@ Consequences for R3b:
 
 Not attempted: the remaining ~76 sites across four crates in one sweep.
 
+### R3b second slice (2026-09-02, Windows/4090 box, default-features axis)
+
+A `cargo clippy --fix --workspace --all-targets` pass (default features) was
+attempted on this box. Three process findings, one of them serious:
+
+- **The pass aborted at a pre-existing Windows-broken target** —
+  `katgpt-backend`'s example `bench_mtp_metal_batch_floor` (E0432 `metal`
+  unresolved; the macOS-only example class the earlier sweep left for the M3).
+  Fixes already applied to earlier-compiled targets survive; later targets were
+  never reached.
+- **One of the three auto-applied fixes was UNSAFE and was reverted.**
+  clippy's `manual_map` collapsed `src/transformer/variants.rs:483`'s
+  cfg-dependent match — the `None` arm holds the `loop_stability_fix`
+  conditional-gate fallback (T8), but in the OFF build it reads `None => None`,
+  so the rewrite `…convex_gate_at(tau).map(|g| g)` **silently deleted the
+  ON-build feature path**. This is the cfg-blind auto-fix hazard in the wild:
+  a fix that is semantics-preserving in the compiled config is not necessarily
+  semantics-preserving across the feature matrix. Reverted, then rewritten by
+  hand as a cfg-split binding (the `injected` house pattern ten lines above),
+  which is lint-clean in BOTH states. Proof the path survived: `cargo test -p
+  katgpt-rs --lib --features loop_stability_fix` = 204/0 (the feature's own
+  spec tests, which would fail on the deleted fallback, pass).
+- **The 118/119 surface is not reachable from this box.** Under default
+  features on Windows the same measurement reports **6 distinct clippy
+  findings**, not 119 — the histogram's bulk lives in all-features code, much
+  of it `cfg(target_os = "macos")`-gated, which compiles to NOTHING here and is
+  therefore invisible to every lint. An all-features auto-fix sweep here is
+  the Issue-P16 hazard class (macOS-gated files break invisibly to a Windows
+  compile gate). **The full-surface R3b heal remains M3-bound.**
+
+What this slice closed (default-features Windows axis, before → after):
+
+| finding | disposition |
+|---|---|
+| `manual_map` + `needless_match`, `src/transformer/variants.rs:483` | auto-fix REVERTED as unsafe; manual cfg-split rewrite landed; clippy-clean under default AND `--features loop_stability_fix` |
+| `needless_late_init`, `bench_680…goat.rs:345` | auto-applied, kept (late init collapsed) |
+| `needless_range_loop` ×2, `bench_680…goat.rs:249/293` | MaybeIncorrect for cargo --fix; rewritten by hand to `x.iter_mut().enumerate()` (index used only in the value expression) |
+| unused `use core::cmp::Ordering`, `subspace_phase_gate.rs` test mod | rustc auto-applied, kept |
+| `if_same_then_else`, `rule_extractor.rs:180` | NOT touched — already owner-documented (semantic duplication, not a heal class) |
+
+**6 → 1**; the 1 is the documented owner site. Validation: `bench_680` target
+3 passed / 0 failed / 1 ignored (real runs, not a vacuous green); root lib
+201/0 default and 204/0 feature-on; `katgpt-core --lib` 1992/0/7i; clippy on
+`katgpt-rs` clean in both feature states (sole residue = the `slod:745`
+owner-documented site).
+
 ## Closing conditions
 
 - [x] R1a: a per-feature-isolation check runs on a stated cadence with its

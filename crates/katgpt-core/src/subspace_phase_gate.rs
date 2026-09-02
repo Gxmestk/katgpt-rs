@@ -932,7 +932,6 @@ fn one_sided_jacobi_svd_into(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::cmp::Ordering;
 
     #[test]
     fn participation_ratio_flat_spectrum() {

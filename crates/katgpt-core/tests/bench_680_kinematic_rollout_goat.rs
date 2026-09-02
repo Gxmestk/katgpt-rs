@@ -246,8 +246,8 @@ fn g2_ns_cost_table() {
     let mut st = KinState::<4>::new(1.0).unwrap();
     let mut x = [0.0f32; 4];
     for t in 0..8u32 {
-        for ch in 0..4 {
-            x[ch] = 0.5 * t as f32 + 0.25 * ch as f32;
+        for (ch, slot) in x.iter_mut().enumerate() {
+            *slot = 0.5 * t as f32 + 0.25 * ch as f32;
         }
         st.observe_into(&x, t).unwrap();
     }
@@ -290,8 +290,8 @@ fn g2_ns_cost_table() {
     for i in 0..N {
         let mut s = KinState::<4>::new(1.0).unwrap();
         for t in 0..8u32 {
-            for ch in 0..4 {
-                x[ch] = 0.5 * t as f32 + 0.01 * i as f32 + 0.25 * ch as f32;
+            for (ch, slot) in x.iter_mut().enumerate() {
+                *slot = 0.5 * t as f32 + 0.01 * i as f32 + 0.25 * ch as f32;
             }
             s.observe_into(&x, t).unwrap();
         }
@@ -342,11 +342,11 @@ fn g2_ns_cost_table() {
         ..RegimeConfig::default()
     });
     let prev_vel = [0.0f32; 2];
-    let snap;
+
     // Warm one snapshot.
     let f0 = &fix.frames[10];
     st2.observe_into(&f0.pos, f0.tick).unwrap();
-    snap = RegimeSnapshot::from_state(&st2, &prev_vel, 0.25, f0.extent, -0.01);
+    let snap = RegimeSnapshot::from_state(&st2, &prev_vel, 0.25, f0.extent, -0.01);
     let ns_regime = best_of_3(500_000, || {
         black_box(clf.classify(black_box(&snap)));
     });

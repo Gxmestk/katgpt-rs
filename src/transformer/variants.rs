@@ -480,23 +480,17 @@ cache.advance_pos(pos);
             // argument apply identically to any g ∈ [0, 1]. Schedule absent
             // AND conditional absent → the additive path below, byte-
             // identical to pre-T3 behavior (data-driven branches, no cfg).
-            let adaptive_g = match residual_gate.convex_gate_at(tau) {
-                Some(g) => Some(g),
-                None => {
-                    #[cfg(feature = "loop_stability_fix")]
-                    {
-                        residual_gate.conditional_gate_at(
-                            tau,
-                            &ctx.prev_h[..n],
-                            &ctx.prev_prev_h[..n],
-                        )
-                    }
-                    #[cfg(not(feature = "loop_stability_fix"))]
-                    {
-                        None
-                    }
-                }
-            };
+            // T8 gate source, cfg-split the same way as `injected` above —
+            // a cfg-dependent match arm reads as `None => None` in the OFF
+            // build, where clippy's manual_map/needless_match auto-fix would
+            // silently delete the ON-build conditional-gate fallback
+            // (Issue 701 R3b slice: the auto-applied rewrite was reverted).
+            #[cfg(feature = "loop_stability_fix")]
+            let adaptive_g = residual_gate.convex_gate_at(tau).or_else(|| {
+                residual_gate.conditional_gate_at(tau, &ctx.prev_h[..n], &ctx.prev_prev_h[..n])
+            });
+            #[cfg(not(feature = "loop_stability_fix"))]
+            let adaptive_g = residual_gate.convex_gate_at(tau);
             if let Some(g) = adaptive_g {
                 // Two-pass scalar blend: h ← (1 − g)·h̃, hidden ← g·src,
                 // h += hidden. Op order pinned by the T3 spec test
