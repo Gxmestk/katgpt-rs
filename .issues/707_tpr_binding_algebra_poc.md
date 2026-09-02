@@ -34,6 +34,8 @@ Ship the modelless TPR (Tensor Product Representation) algebra as an opt-in `tpr
 ## Deferred — training-track items (unblock conditions; per Research 527 §2 rows 9–10)
 
 > **First real-world consumer (F5):** riir-clippy `.issues/62` — TPR × healer corpus fusion. Its T1 (withheld-pair OOD bench) has NO dependency on this primitive and produces the OOD baseline that gates its Phase 2; its T4 (structured retrieval) is the designated real consumer for this issue's T-G8 intervention battery — the healer corpus beats a synthetic micro-model as the G8 validation dataset.
+>
+> **First consumer by priority (F6, #1 surface):** riir-ai `.issues/847` — quest_grammar role-move variants over S-V-O (paper Fig 7.4C: the agreement cascade is `SealGrammarAnnotation.verb_forms`; `GrammarValidator` is the downstream re-validation). Its T1 (withheld-(noun, slot)-pair OOD bench) is likewise ungated; its T3–T6 (surgery variant ops + cascade re-validation) consume this issue's T1–T5.
 
 - [-] **T8** OOD withheld-pair eval protocol + L2,1 arm A/B for trained artifacts (edge_lora / hypernet / KG-embedding tables / direction tables). Unblock: next training run touching any matrix that must compose systematically; protocol is cheap and should land as a pinned bench then. Consumers span riir-train, riir-ai (quest_grammar training), riir-clippy.
 - [-] **T9** TPR-surrogate interpretability of our own artifacts (riir-clippy drafter first; Bench-694 markov-head wrong-contract question as the concrete hook). Unblock: owner approves a small offline analysis window; never a runtime path.
