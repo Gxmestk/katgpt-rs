@@ -15,13 +15,23 @@ twice: **worktree mtimes cluster by editing episode.** A 204-file rustfmt sweep
 lands in a 3-second window; a session's own edits land in the window it was
 running. Two clusters in one staged set means two episodes.
 
-Two independent signals are reported, and neither subsumes the other:
+Three independent signals are reported, and none subsumes another:
 
   1. **mtime clusters** — single-linkage over the staged files' mtimes. More
      than one cluster is the "you staged someone else's episode" shape.
   2. **also-dirty** — a staged path that ALSO has unstaged changes. That is a
      concurrent editor writing into the same file *right now*, which mtime
      clustering cannot see (their write may land in your window).
+  3. **stale-vs-HEAD** — a file whose mtime PREDATES the commit that last
+     touched its path. The worktree copy was written against an older version,
+     so committing it reverts whatever landed since. Measured live: a 20:04:39
+     rustfmt sweep of `tpr/als.rs` sat dirty while `0ef7f078` landed an Issue
+     712 correctness fix in the same file at 21:07:13 — committing the sweep
+     would have silently reverted it. Both other signals are blind to this:
+     the sweep is ONE episode and its files are not also-dirty.
+
+Signal 3 audits the dirty set too, not just the staged set, because the hazard
+exists before anything is staged.
 
 Usage:  scripts/staged_set_audit.py [repo_path]
 """
@@ -69,6 +79,81 @@ def selftest() -> None:
     assert len(cluster([0.0, 8.0, 16.0, 20.0], gap=10)) == 1, "single-linkage chains"
     # Unsorted input must not change the answer.
     assert len(cluster([100.0, 0.0, 101.0], gap=10)) == 2, "sorted internally"
+    # Signal 3's confirmation stage. Without these the containment check can
+    # degrade to "nothing is ever missing" and print a clean pass over a copy
+    # that reverts a landed fix — which is the exact bug it exists to catch.
+    assert substantive("    let mut best_snap: Option<Vec<f32>> = None;"), "real line"
+    assert not substantive("}"), "a brace is not evidence"
+    assert not substantive("    );"), "nor is a close-paren"
+    assert not substantive(""), "nor is a blank"
+
+
+TRIVIAL = {"", "}", "{", "};", ")", ");", "),", "]", "};", "*/", "/*", "//"}
+
+
+def substantive(line: str) -> bool:
+    """Is this line specific enough that its absence means something?
+
+    A `}` added by one commit and absent from a stale copy proves nothing — the
+    copy has plenty of other `}`. Line-set containment is only evidence on
+    lines that are unlikely to recur.
+    """
+    t = line.strip()
+    return len(t) > 8 and t not in TRIVIAL
+
+
+def reverted_lines(repo: Path, path: str, sha: str) -> list[str]:
+    """Substantive lines `sha` ADDED to `path` that the worktree copy lacks.
+
+    This is the exact form of "committing this reverts what landed since": if
+    the newest commit on a path added lines the worktree file does not contain,
+    committing that file removes them. Set containment, not a diff, because the
+    stale copy may also have moved things around — position is not the claim,
+    presence is.
+    """
+    show = git(repo, "show", "--format=", "--unified=0", sha, "--", path)
+    added = [
+        ln[1:]
+        for ln in show.splitlines()
+        if ln.startswith("+") and not ln.startswith("+++")
+    ]
+    have = {ln.strip() for ln in (repo / path).read_text(errors="replace").splitlines()}
+    return [ln for ln in added if substantive(ln) and ln.strip() not in have]
+
+
+def stale_vs_head(repo: Path, paths: list[str]) -> list[tuple[str, float, float, int]]:
+    """Paths whose worktree copy would REVERT the newest commit touching them.
+
+    Two stages, because each alone is wrong:
+
+    - **mtime < commit time** is the cheap filter, and on its own it
+      false-positives on the commonest shape there is: you edit a file at
+      21:03 and commit it at 21:04, so the commit that last touched the path
+      IS your own edit. Measured — this flagged two such files here.
+    - **line containment** is the confirmation and is what the warning
+      actually claims. Only lines the newest commit ADDED and the worktree
+      copy LACKS are evidence.
+
+    A path with no HEAD history (newly added) cannot be stale. mtime after the
+    commit is the safe direction: a checkout stamps now, so a fresh file always
+    looks current.
+    """
+    out: list[tuple[str, float, float, int]] = []
+    for p in paths:
+        f = repo / p
+        if not f.is_file():
+            continue
+        head = git(repo, "log", "-1", "--format=%ct %H", "HEAD", "--", p).split()
+        if len(head) != 2:
+            continue
+        commit_t, sha = float(head[0]), head[1]
+        mtime = f.stat().st_mtime
+        if mtime >= commit_t:
+            continue
+        lost = reverted_lines(repo, p, sha)
+        if lost:
+            out.append((p, mtime, commit_t, len(lost)))
+    return out
 
 
 def git(repo: Path, *args: str) -> str:
@@ -82,11 +167,12 @@ def main() -> int:
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
 
     staged = [p for p in git(repo, "diff", "--cached", "--name-only").splitlines() if p]
-    if not staged:
-        print("staged-set audit: nothing staged")
-        return 0
-
     also_dirty = {p for p in git(repo, "diff", "--name-only").splitlines() if p}
+    # Signal 3 applies to the DIRTY set too, so "nothing staged" is not an
+    # early exit — the revert hazard exists before anything is staged.
+    if not staged and not also_dirty:
+        print("staged-set audit: nothing staged, working tree clean")
+        return 0
     # A staged deletion has no worktree file to stat; it belongs to no episode.
     timed: list[tuple[float, str]] = []
     missing: list[str] = []
@@ -102,7 +188,10 @@ def main() -> int:
     for t, p in timed:
         by_stamp.setdefault(t, []).append(p)
 
-    print(f"staged-set audit: {len(staged)} staged path(s) in {repo.name}")
+    print(
+        f"staged-set audit: {len(staged)} staged + {len(also_dirty)} dirty path(s) "
+        f"in {repo.name}"
+    )
     if missing:
         print(f"  {len(missing)} deleted/absent (no mtime, no episode): {', '.join(missing[:4])}")
 
@@ -127,14 +216,29 @@ def main() -> int:
         for p in overlap[:6]:
             print(f"      {p}")
 
+    stale = stale_vs_head(repo, sorted(set(staged) | also_dirty))
+    if stale:
+        print(
+            f"  STALE-vs-HEAD: {len(stale)} path(s) LACK lines the newest commit on their "
+            "own path added — committing these reverts what landed since"
+        )
+        for p, mt, ct, n in stale[:8]:
+            w = _dt.datetime.fromtimestamp(mt).strftime("%H:%M:%S")
+            c = _dt.datetime.fromtimestamp(ct).strftime("%H:%M:%S")
+            print(f"      {p}  (written {w}, HEAD touched it {c}, {n} line(s) would be lost)")
+        if len(stale) > 8:
+            print(f"      … {len(stale) - 8} more")
+
     match len(groups) > 1:
-        case True:
+        case True if staged:
             print(
                 f"  REVIEW: {len(groups)} editing episodes in one staged set. If you did not "
                 "write the older one(s), unstage them — see AGENTS.md on `git add -A`."
             )
-        case False:
+        case _ if staged:
             print("  ✓ one editing episode")
+        case _:
+            print("  (nothing staged — episode clustering not applicable)")
     # Report, never a gate: the refusing version is Issue 709 T3's owner call.
     return 0
 

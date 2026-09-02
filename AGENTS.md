@@ -234,21 +234,42 @@ scripts/staged_set_audit.py            # any repo: pass its path as $1
 
 Also a **report, not a gate** (always exit 0). The refusing pre-commit hook is
 deliberately NOT shipped — it trades a real class of loss against friction on
-every legitimate multi-file commit, which is an owner call (`.issues/709` T3).
-Measuring the signal is not, because it is the technique that caught this by
-hand twice: **worktree mtimes cluster by editing episode.** A 204-file rustfmt
-sweep lands in a 3-second window; your own edits land in the window you were
-running. Two clusters in one staged set means two episodes, and the older one
-is probably not yours. It reports a second, independent signal too — a staged
-path that *still* has unstaged changes, which is a concurrent editor writing
-into the same file right now and which mtime clustering cannot see.
+every legitimate multi-file commit, which is an owner call (`.issues/709` T3b).
+Measuring the signal is not. Three signals, none subsuming another:
+
+1. **mtime clusters** — the technique that caught this by hand twice:
+   **worktree mtimes cluster by editing episode.** A 204-file rustfmt sweep
+   lands in a 3-second window; your own edits land in the window you were
+   running. Two clusters in one staged set means two episodes, and the older
+   one is probably not yours.
+2. **also-dirty** — a staged path that *still* has unstaged changes: a
+   concurrent editor writing into the same file right now, which mtime
+   clustering cannot see because their write may land inside your window.
+3. **stale-vs-HEAD** — a dirty-or-staged file that LACKS substantive lines the
+   newest commit on its own path added. Committing it reverts them. Both other
+   signals are blind to this: a whole-repo sweep is *one* episode and its files
+   are not also-dirty. Found live on the first run — `tpr/als.rs`, written
+   20:04:39 in a rustfmt sweep, while `0ef7f078` landed a 22-line Issue 712
+   correctness fix in the same file at 21:08. It audits the **dirty** set too,
+   because the hazard exists before anything is staged.
+
+Signal 3 is two-stage on purpose. `mtime < commit time` alone false-positives
+on the commonest shape there is — you edit at 21:03 and commit at 21:04, so the
+newest commit on that path is your own edit; it flagged two such files on the
+first run. Line-set **containment** is the confirmation and is what the warning
+claims, restricted to lines specific enough that their absence is evidence (a
+`}` proves nothing). A workspace sweep over all 19 contract repos returned
+exactly one hazard, with two other repos dirty-but-clean — so it is not
+always-on.
 
 Single-linkage, not fixed-width bins: a session editing continuously for an
 hour is one episode because no two consecutive edits are `GAP_SECONDS` apart.
 Fixed bins would split it and false-positive on exactly the sessions doing the
-most work. A `selftest()` pins six shapes on every invocation, including that
-chaining case — without it the clustering could degrade to "1 episode, always"
-and print a confident single-episode verdict indistinguishable from a real one.
+most work. A `selftest()` pins ten shapes on every invocation — the chaining
+case and signal 3's line-specificity predicate — because both failure modes are
+silent: the clustering degrades to "1 episode, always" and the containment
+check to "nothing is ever missing", each printing a confident pass
+indistinguishable from a real one.
 
 When you must commit into a file a sibling is editing, commit **your blob**
 rather than the worktree's: build HEAD's version + your edit, `git hash-object

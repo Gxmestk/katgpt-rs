@@ -65,6 +65,19 @@ three carried the same 00:29 timestamp as a batch of genuine sibling edits).
   sibling's 20:04:39 rustfmt sweep beside a 21:07:17 file of mine reported
   `2 editing episodes` + REVIEW; staging mine alone reported `✓ one editing
   episode`. Two-sided, so neither a dead nor an always-on verdict passes.
+
+  A **third signal** was added after the first run found a hazard the other two
+  are structurally blind to: a dirty-or-staged file that LACKS substantive lines
+  the newest commit on its own path added, i.e. committing it reverts them. A
+  whole-repo sweep is ONE episode and its files are not also-dirty, so neither
+  earlier signal can see it. Live: `tpr/als.rs` sat dirty from the 20:04:39
+  rustfmt sweep while `0ef7f078` landed a 22-line Issue 712 correctness fix in
+  the same file at 21:08 — committing the sweep would have silently reverted it.
+  Two-stage, because `mtime < commit time` alone flags the commonest shape there
+  is (edit at 21:03, commit at 21:04 → the newest commit on that path is your
+  own edit; it false-positived on two files), so line-set containment is the
+  confirmation. Swept all 19 contract repos: exactly one hazard, two other repos
+  dirty-but-clean — not always-on.
   Documented in AGENTS.md beside the `hash-object` + `update-index` recipe for
   committing your blob out of a file a sibling is editing.
 - [-] **T3b** The **refusing** pre-commit hook. Still an owner call, and
