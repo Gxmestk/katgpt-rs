@@ -104,6 +104,13 @@ pub mod gaussianity;
 #[cfg(feature = "svd_cca")]
 pub mod cca;
 
+/// kNN differential-entropy estimator (Kozachenko–Leonenko) — the
+/// uncertainty/entropy axis beside the dispersion proxies above; the P2
+/// imbalance-collapse monitor's channel A (Issue 708, Research 437).
+/// Gated `knn_entropy` (opt-in — classic prior-art import, no consumer yet).
+#[cfg(feature = "knn_entropy")]
+pub mod entropy;
+
 // ── Re-exports (always-on items) ────────────────────────────────────────
 
 pub use claim::{ClaimCard, Intervention, ValidityVerdict};

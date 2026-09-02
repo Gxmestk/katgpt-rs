@@ -109,6 +109,10 @@ pub mod data_probe {
     pub mod geometry {
         pub use katgpt_core::data_probe::geometry::*;
     }
+    #[cfg(feature = "knn_entropy")]
+    pub mod entropy {
+        pub use katgpt_core::data_probe::entropy::*;
+    }
     #[cfg(feature = "sink_aware_attn")]
     pub mod sink_classify {
         pub use katgpt_core::data_probe::{
