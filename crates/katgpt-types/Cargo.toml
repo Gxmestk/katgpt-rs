@@ -97,6 +97,14 @@ ternary_group_scale = ["binary_plasma"]
 # ternary_group_scale for GROUP_SIZE + the `from_group`/`to_group` repack.
 ternary_trit_pack = ["ternary_group_scale"]
 
+# Issue 845 (riir-ai) / arXiv:2609.00363: snap group scales to the nearest power
+# of two at quantize time so scale application is EXACT on every backend
+# (multiply/divide by 2^k is an exponent shift) — cross-backend bit-identity at
+# the scale-application sites becomes REQUIRED, not measured. Requantizes from
+# f32 parents (never reinterprets stored payloads). Implies ternary_group_scale
+# (the construction it constrains).
+pot_scales = ["ternary_group_scale"]
+
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []
 

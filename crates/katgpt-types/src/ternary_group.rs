@@ -273,6 +273,44 @@ impl TernaryGroupWeights {
     /// carry     = adjusted - q * scale
     /// ```
     pub fn quantize_from_f32(weights: &[f32], rows: usize, cols: usize) -> Self {
+        Self::quantize_with_scale_rule(weights, rows, cols, false)
+    }
+
+    /// Quantize with **power-of-two** group scales (Issue 845; arXiv:2609.00363).
+    ///
+    /// The identical carry-compensation pipeline to [`Self::quantize_from_f32`]
+    /// with ONE insertion: the group's mean-abs scale is snapped to the nearest
+    /// power of two BEFORE the f16 store and the threshold/carry loop. This is
+    /// requantize-from-parents in the strongest sense — the payload is
+    /// re-derived from the f32 parents under the snapped scale; stored payloads
+    /// are never reinterpreted (the paper's +157% artifact was exactly that
+    /// reinterpretation).
+    ///
+    /// Why: multiplication or division by a power of two is an exact exponent
+    /// shift, so every scale-application site (CPU reference and every GPU
+    /// kernel) contributes ZERO rounding under this arm — cross-backend
+    /// bit-identity at the scale sites becomes REQUIRED rather than measured.
+    /// PoT values are additionally exact in f16 (the snap clamps the exponent
+    /// into [-14, 15]), so the native arm's scale-storage rounding disappears.
+    ///
+    /// Cost class: the snapped scale sits within ×√2 of the ideal mean-abs and
+    /// the carry loop absorbs most of the difference — measured in
+    /// `pot_tests::snr_native_vs_pot`, GPU-side budget tracked in riir-ai
+    /// `.issues/845`.
+    #[cfg(feature = "pot_scales")]
+    pub fn quantize_from_f32_pot(weights: &[f32], rows: usize, cols: usize) -> Self {
+        Self::quantize_with_scale_rule(weights, rows, cols, true)
+    }
+
+    /// Shared quantization core. `snap_scales_to_pow2 = false` reproduces the
+    /// legacy pipeline bit-for-bit: the snap insertion sits between the mean-abs
+    /// computation and the f16 store and is skipped entirely in the native arm.
+    fn quantize_with_scale_rule(
+        weights: &[f32],
+        rows: usize,
+        cols: usize,
+        snap_scales_to_pow2: bool,
+    ) -> Self {
         assert_eq!(weights.len(), rows * cols, "weights slice must be rows*cols");
         let mut out = Self::new(rows, cols);
 
@@ -289,7 +327,10 @@ impl TernaryGroupWeights {
                 // scale = mean(|group|); guard the all-zero group so the
                 // threshold stays finite and quantization yields all zeros.
                 let abs_sum: f32 = group.iter().map(|v| v.abs()).sum();
-                let scale = if abs_sum > 0.0 { abs_sum / group.len() as f32 } else { 1.0 };
+                let mut scale = if abs_sum > 0.0 { abs_sum / group.len() as f32 } else { 1.0 };
+                if snap_scales_to_pow2 {
+                    scale = snap_f32_to_pow2(scale);
+                }
                 out.group_scale[group_base + g] = f16::from_f32(scale);
                 // Quantize against the f16-rounded scale the kernel will
                 // actually apply, not the f32 ideal — otherwise the carry
@@ -344,6 +385,20 @@ impl TernaryGroupWeights {
         total
     }
 
+    /// True iff every stored group scale is exactly a positive normal power of
+    /// two (the `pot_scales` construction invariant; 1.0 — the all-zero-group
+    /// convention — counts). Assert this before claiming required-equality at
+    /// the scale-application sites (Issue 845 G1).
+    #[cfg(feature = "pot_scales")]
+    pub fn all_scales_are_pow2(&self) -> bool {
+        self.group_scale.iter().all(|&s| {
+            let b = s.to_f32().to_bits();
+            // Positive sign, zero mantissa, non-zero exponent → exactly 2^k.
+            // The snap's clamp confines k to [-14, 15] (f16-normal range).
+            b & 0x807F_FFFF == 0 && ((b >> 23) & 0xFF) != 0
+        })
+    }
+
     /// Bytes of weight payload (bit-planes + scales), excluding `Vec` overhead.
     ///
     /// `2 bits/weight + 16 bits per GROUP_SIZE weights` = 2.125 bits/weight at
@@ -387,6 +442,35 @@ impl TernaryGroupWeights {
         }
         blocks.shrink_to_fit();
         blocks
+    }
+}
+
+/// Snap a positive f32 to the nearest power of two, clamped into the
+/// f16-normal PoT range `[2^-14, 2^15]` (the quantized scale is stored f16 —
+/// Issue 845).
+///
+/// Exact by construction: `floor(log2 x)` is read from the exponent field (no
+/// libm call), `x / 2^e` is an exact PoT division landing in `[1, 2)` for
+/// in-range inputs, and the nearest-in-log-space choice is the sign of
+/// `ratio² - 2` (the √2 boundary itself sits within 1 ULP of that comparison —
+/// either neighbor is a legal "nearest"). Inputs outside the clamp range snap
+/// to the range edge, so the result is always exactly representable in f16.
+///
+/// Non-finite / non-positive input returns 1.0: the quantizer only ever passes
+/// a positive mean-abs (all-zero groups are guarded to 1.0 upstream), and
+/// 1.0 = 2^0 is the PoT identity.
+#[cfg(feature = "ternary_group_scale")]
+fn snap_f32_to_pow2(x: f32) -> f32 {
+    if !x.is_finite() || x <= 0.0 {
+        return 1.0;
+    }
+    let e = (((x.to_bits() >> 23) & 0xFF) as i32 - 127).clamp(-14, 15);
+    let unit = f32::from_bits(((e + 127) as u32) << 23); // 2^e, exact
+    let ratio = x / unit; // exact PoT ÷ PoT
+    if e < 15 && ratio * ratio >= 2.0 {
+        unit + unit // 2^(e+1), exact
+    } else {
+        unit
     }
 }
 
@@ -647,6 +731,231 @@ mod tests {
                     "pos & neg != 0 after conversion"
                 );
             }
+        }
+    }
+}
+
+#[cfg(all(test, feature = "pot_scales"))]
+mod pot_tests {
+    use super::*;
+
+    /// Deterministic pseudo-random f32 in [-1, 1) (same LCG as `mod tests`).
+    fn pseudo(seed: &mut u64) -> f32 {
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((*seed >> 33) as f32 / (1u64 << 31) as f32) - 1.0
+    }
+
+    fn pow2i(k: i32) -> f32 {
+        f32::from_bits(((k + 127) as u32) << 23)
+    }
+
+    /// `snap` keeps exact PoT inputs and picks the log-nearest neighbor.
+    #[test]
+    fn snap_nearest_pow2() {
+        for k in -14..=15 {
+            assert_eq!(super::snap_f32_to_pow2(pow2i(k)), pow2i(k), "2^{k}");
+        }
+        // 3.0: log2 = 1.585 — log-nearer to 4 than to 2.
+        assert_eq!(super::snap_f32_to_pow2(3.0), 4.0);
+        // 2.8: log2 = 1.485 — log-nearer to 2.
+        assert_eq!(super::snap_f32_to_pow2(2.8), 2.0);
+        // 0.6: log2 ≈ -0.737 — log-nearer to 0.5.
+        assert_eq!(super::snap_f32_to_pow2(0.6), 0.5);
+        // 0.55: log2 ≈ -0.862 — log-nearer to 0.5? |−0.862−(−1)| = 0.138 vs
+        // |0 − (−0.862)| = 0.862 → 0.5. And 0.75: log2 ≈ −0.415 → 1.0.
+        assert_eq!(super::snap_f32_to_pow2(0.75), 1.0);
+        // The √2 boundary is a legal-either-way ULP zone — both neighbors are
+        // "nearest"; assert membership, not direction.
+        let sqrt2 = 2.0f32.sqrt();
+        let s = super::snap_f32_to_pow2(sqrt2);
+        assert!(s == 1.0 || s == 2.0, "√2 boundary snapped to {s}");
+    }
+
+    /// Out-of-range inputs clamp to the f16-normal PoT range; degenerate
+    /// inputs fall back to the PoT identity 1.0.
+    #[test]
+    fn snap_clamps_and_degenerate() {
+        assert_eq!(super::snap_f32_to_pow2(1e-40), pow2i(-14));
+        assert_eq!(super::snap_f32_to_pow2(1e-20), pow2i(-14));
+        assert_eq!(super::snap_f32_to_pow2(1e30), pow2i(15));
+        // Non-finite is the defensive fallback (1.0 = PoT identity), matching
+        // the doc contract — only finite positive mean-abs values reach snap.
+        assert_eq!(super::snap_f32_to_pow2(f32::INFINITY), 1.0);
+        assert_eq!(super::snap_f32_to_pow2(0.0), 1.0);
+        assert_eq!(super::snap_f32_to_pow2(-2.0), 1.0);
+        assert_eq!(super::snap_f32_to_pow2(f32::NAN), 1.0);
+    }
+
+    /// PoT is exact in f16 across the entire clamp range — the construction's
+    /// "scale storage adds no rounding" claim.
+    #[test]
+    fn f16_pot_roundtrip_exact() {
+        for k in -14..=15 {
+            let v = pow2i(k);
+            assert_eq!(f16::from_f32(v).to_f32(), v, "2^{k} must be f16-exact");
+        }
+    }
+
+    /// The PoT arm's output satisfies the construction invariant on every
+    /// scale regime.
+    #[test]
+    fn pot_quantize_all_scales_pow2() {
+        for (scale_up, seed) in [(pow2i(-8), 0xA1), (1.0, 0xB2), (pow2i(10), 0xC3)] {
+            let mut s = seed;
+            let src: Vec<f32> = (0..2 * 512).map(|_| pseudo(&mut s) * scale_up).collect();
+            let w = TernaryGroupWeights::quantize_from_f32_pot(&src, 2, 512);
+            assert!(w.invariant_holds());
+            assert!(
+                w.all_scales_are_pow2(),
+                "scale_up={scale_up}: all group scales must be PoT"
+            );
+        }
+    }
+
+    /// Scale covariance: quantizing `w·2^k` yields BIT-IDENTICAL payloads and
+    /// exactly-×2^k scales. Every intermediate scales by exact PoT factors
+    /// (summands, the ÷len mean, the snap, threshold, carry), and IEEE correct
+    /// rounding commutes with exact PoT scaling — so the native arm's f16
+    /// scale rounding is the ONLY thing that breaks this property, and the PoT
+    /// arm restores it. Practical consequence: pre-scaling a weight tensor at
+    /// export no longer perturbs the quantized payload.
+    #[test]
+    fn pot_is_scale_covariant_for_pow2_rescaling() {
+        // cols=300 exercises a partial trailing group (44 weights, len not a
+        // PoT — the ÷len mean still scales exactly).
+        let (rows, cols) = (3usize, 300usize);
+        let mut s = 0x845_u64;
+        let base: Vec<f32> = (0..rows * cols).map(|_| pseudo(&mut s)).collect();
+        let q1 = TernaryGroupWeights::quantize_from_f32_pot(&base, rows, cols);
+
+        for k in -6i32..=6 {
+            let two_k = pow2i(k);
+            let scaled: Vec<f32> = base.iter().map(|&v| v * two_k).collect();
+            let qk = TernaryGroupWeights::quantize_from_f32_pot(&scaled, rows, cols);
+            assert_eq!(qk.pos_bits, q1.pos_bits, "k={k}: payload must not move");
+            assert_eq!(qk.neg_bits, q1.neg_bits, "k={k}: payload must not move");
+            for r in 0..rows {
+                for g in 0..q1.groups_per_row {
+                    let expected = q1.scale_at(r, g) * two_k;
+                    assert_eq!(
+                        qk.scale_at(r, g),
+                        expected,
+                        "k={k} r={r} g={g}: scale must shift by exactly 2^{k}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// All-zero group keeps the 1.0 convention, which is itself PoT.
+    #[test]
+    fn zero_group_stays_pot() {
+        let mut src = vec![0.0f32; 128];
+        let mut s = 0x77_u64;
+        src.extend((0..128).map(|_| pseudo(&mut s)));
+        let w = TernaryGroupWeights::quantize_from_f32_pot(&src, 1, 256);
+        assert_eq!(w.scale_at(0, 0), 1.0, "all-zero group keeps the 1.0 guard");
+        assert!(w.all_scales_are_pow2());
+        for c in 0..128 {
+            assert_eq!(w.get(0, c), 0, "all-zero group quantizes to all zeros");
+        }
+    }
+
+    /// Sanity: the native arm's scales are genuinely NOT all PoT — the two
+    /// arms are different constructions, not a rename.
+    #[test]
+    fn native_arm_scales_are_not_all_pot() {
+        let mut s = 0x999_u64;
+        let src: Vec<f32> = (0..4 * 512).map(|_| pseudo(&mut s)).collect();
+        let native = TernaryGroupWeights::quantize_from_f32(&src, 4, 512);
+        assert!(
+            !native.all_scales_are_pow2(),
+            "random mean-abs scales are never all PoT — arms must differ"
+        );
+    }
+
+    /// Relative Frobenius error of the dequantized weights vs the f32 parents.
+    /// f64 accumulation keeps the measurement stable.
+    fn rel_frobenius_err(src: &[f32], q: &TernaryGroupWeights, rows: usize, cols: usize) -> f32 {
+        let mut num = 0.0f64;
+        let mut den = 0.0f64;
+        for r in 0..rows {
+            for c in 0..cols {
+                let w = src[r * cols + c] as f64;
+                let d = (q.get(r, c) as f32 * q.scale_at(r, c / GROUP_SIZE)) as f64;
+                let e = w - d;
+                num += e * e;
+                den += w * w;
+            }
+        }
+        ((num.sqrt()) / (den.sqrt())) as f32
+    }
+
+    /// Weight-space SNR cost of the PoT arm vs the native arm across
+    /// deterministic distributions — the CPU half of Issue 845's G2 (the real
+    /// budget is ppl on the GPU surfaces, measured in the GPU window).
+    ///
+    /// Naive worst case: the snap moves the scale by ≤ √2, so a compensation-
+    /// free error model bounds the ratio by √2 ≈ 1.414. The carry-compensation
+    /// loop absorbs most of it; the pinned bound below (1.35) sits between the
+    /// naive worst case and the measured envelope.
+    #[test]
+    fn snr_native_vs_pot() {
+        let (rows, cols) = (4usize, 512usize);
+
+        let mut cases: Vec<(&str, Vec<f32>)> = Vec::new();
+
+        // Uniform [-1, 1).
+        let mut s = 0x1111_u64;
+        cases.push(("uniform", (0..rows * cols).map(|_| pseudo(&mut s)).collect()));
+
+        // Gaussian-ish (sum of three uniforms → bell-shaped).
+        let mut s = 0x2222_u64;
+        cases.push((
+            "gaussish",
+            (0..rows * cols)
+                .map(|_| (pseudo(&mut s) + pseudo(&mut s) + pseudo(&mut s)) / 3.0)
+                .collect(),
+        ));
+
+        // Sparse: ~70% exact zeros, exercising magnitude-varied groups.
+        // (pseudo is negative-only: [-1, 0).)
+        let mut s = 0x3333_u64;
+        cases.push((
+            "sparse70",
+            (0..rows * cols)
+                .map(|_| if pseudo(&mut s) > -0.7 { 0.0 } else { pseudo(&mut s) })
+                .collect(),
+        ));
+
+        // Row-scaled: each row carries a different PoT magnitude (mixed
+        // per-row regimes in one tensor).
+        let mut s = 0x4444_u64;
+        cases.push((
+            "row-scaled",
+            (0..rows * cols)
+                .map(|i| {
+                    let r = i / cols;
+                    pseudo(&mut s) * pow2i(r as i32 - 2)
+                })
+                .collect(),
+        ));
+
+        println!("| distribution | native rel-err | PoT rel-err | ratio |");
+        println!("|---|---|---|---|");
+        for (name, src) in &cases {
+            let native = TernaryGroupWeights::quantize_from_f32(src, rows, cols);
+            let pot = TernaryGroupWeights::quantize_from_f32_pot(src, rows, cols);
+            let e_n = rel_frobenius_err(src, &native, rows, cols);
+            let e_p = rel_frobenius_err(src, &pot, rows, cols);
+            println!("| {name} | {e_n:.6} | {e_p:.6} | {:.4} |", e_p / e_n);
+            assert!(
+                e_p <= e_n * 1.35 + 1e-7,
+                "{name}: PoT error {e_p} exceeds 1.35x native {e_n} — the carry \
+                 loop should absorb the ≤√2 snap factor"
+            );
         }
     }
 }
