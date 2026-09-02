@@ -131,13 +131,23 @@ to 1. Run it rather than re-reading trigger blocks by hand.
 
 "Can fire" is still not "does fire". A workflow reachable only by
 `workflow_dispatch` is a button, not a schedule, and three sibling repos
-(`riir-chain`, `riir-dao`, `riir-neuron-db`) carry their whole Rust compile/lint
-surface in exactly such a file — each by a *documented* main-only owner call
-whose `push` is inert anyway, because `main` carries no copy of the workflow.
-The report crosses the two axes rather than printing them side by side, which is
-how that state stayed invisible: the coverage table credited the command and the
-reachability table listed the trigger, and nothing multiplied them together
-(`.issues/706`).
+(`riir-chain`, `riir-dao`, `riir-neuron-db`) carried their whole Rust
+compile/lint surface in exactly such a file — each by a *documented* main-only
+owner call whose `push` is inert anyway, because `main` carries no copy of the
+workflow. The report crosses the two axes rather than printing them side by
+side, which is how that state stayed invisible: the coverage table credited the
+command and the reachability table listed the trigger, and nothing multiplied
+them together. RESOLVED 2026-09-02 (`.issues/706` closed + removed) — all
+three now carry the `riir-clippy`-shape weekly `schedule`, the one trigger
+that fires from the default branch while `main` stays frozen, with the
+no-develop-push owner call untouched (`riir-chain` `b4a9b6e7` Tue 04:13 UTC,
+`riir-neuron-db` `9d041d1` 04:29, `riir-dao` `9848811` 04:43 — whose workflow
+also stopped hand-mirroring its guard layers and runs
+`scripts/ci_feature_guard.sh`). The dormancy was not hypothetical: the same
+day, `riir-neuron-db`'s standalone-dep gate was found RED nine days stale
+(`29af2b0` changed the katgpt-rs patch set to `katgpt-device-verify` without
+re-pinning `EXPECTED`; fixed `97e5161`) — invisible for exactly this reason,
+because nothing ran the gate.
 
 ### The docs gate — same discipline, opposite cadence
 

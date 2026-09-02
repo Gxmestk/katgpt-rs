@@ -159,6 +159,21 @@ were active in several at the time of writing. `scripts/full_gate.sh` is written
 to be portable — the only katgpt-rs-specific parts are the macOS platform layer
 and the AGENTS.md parity check.
 
+**Addendum 2026-09-02 — the three `hand_only` rows are closed.** The delegated
+idle worker applied `.issues/706`'s recommendation (1): the `riir-clippy`-shape
+weekly `schedule`, which fires from the default branch (`develop` since the
+`.issues/704` flip) while `main` stays frozen and the no-develop-push owner
+call stands. `riir-chain` `b4a9b6e7` (Tue 04:13 UTC), `riir-neuron-db`
+`9d041d1` (04:29), `riir-dao` `9848811` (04:43 — whose workflow also stopped
+hand-mirroring its guard layers and runs `scripts/ci_feature_guard.sh`; with
+one feature total, default + `advisory_transport` IS the full matrix, so the
+dao's "partial" coverage verdict above was a static-scoring artifact, not a
+real gap). The dormancy had already cost a real red: `riir-neuron-db`'s
+standalone-dep gate pin went stale nine days earlier (`29af2b0` changed the
+katgpt-rs patch set to `katgpt-device-verify` without re-pinning `EXPECTED`)
+and nobody could see it because nothing ran the gate — fixed `97e5161`. R2
+remains open for the 8 no-CI rows and the not-full coverage rows above.
+
 ## R3 — the warning surface is not gated
 
 The gate reports the warning count as information and gates only on errors.
@@ -207,6 +222,24 @@ fix the code. Order that works:
 2. Re-measure. The residual should be ~30-40, mostly judgement calls.
 3. Then decide `-D warnings` wholesale vs a named `-D` subset of the settled
    lints — with the histogram above as the before-picture.
+
+### Baseline moved: 118 -> 119 after a 52-edit heal sweep
+
+Re-measured 2026-09-01 after sibling commit `91891c2c` healed 26 files / 52
+edits: **119 findings across 20 targets**, i.e. +1. Fifty-two mechanical edits
+reduced this surface by nothing and added one, which is consistent with the
+finding below — the healer's lint set and this gate's lint set barely intersect.
+Take it as confirmation that R3b cannot be delegated to a heal sweep.
+
+Two process facts from that run, both of which cost time:
+
+- `scripts/full_gate.sh` **deleted the log on success**, including when the
+  caller had named a path via `$FULL_GATE_LOG`. The count survives in the
+  summary; the histogram behind it does not, and it is R3b's only input. Fixed
+  in `613c88d3` — a named path is now honoured on pass.
+- A warm re-run **did** reproduce the full diagnostics (119/20, log intact), so
+  the histogram was recoverable without a second cold run. Worth recording
+  because the opposite is often true of `cargo clippy` and was assumed here.
 
 ### R3b first slice, measured 2026-09-01 — the healer does not target this surface
 
