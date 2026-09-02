@@ -2047,7 +2047,11 @@ pub use katgpt_types::depth_invariance::{
     // class: `--all-features` compiles the union, where some other consumer
     // always brings `linalg` in.
     feature = "velocity_field_ensemble",
-    feature = "hebbian_kernel_memory"
+    feature = "hebbian_kernel_memory",
+    // Issue 707: `tpr::als` consumes `ridge_solve_direct_f32` / `cholesky_f32`
+    // / `chol_solve_f32` for its four closed-form ALS blocks and the cached
+    // projection factor — same rule, joined at birth rather than late.
+    feature = "tpr"
 ))]
 pub mod linalg;
 
@@ -2810,6 +2814,19 @@ pub mod kinematics;
 // 691 verdict.
 #[cfg(feature = "stale_residual")]
 pub mod stale_residual;
+
+// TPR (Tensor Product Representation) binding algebra — the modelless rank-m
+// generalization of the single-direction-vector latent ops (Issue 707,
+// Research 527, arXiv:2608.29530 McCoy/Soulos/Linzen/Smolensky 2026). Four
+// zero-alloc runtime ops (bind / unbind / constituent surgery / structural
+// projection) over a frozen BLAKE3-committed artifact, fitted offline by
+// closed-form ridge-ALS (no gradient descent anywhere). Ships its own GOAT
+// instruments: the atomic-dictionary null, the withheld-pair OOD eval, the
+// BoW structure router and BIC scheme selection. Sibling to the R299 Clifford
+// wedge (`linalg::geometric_product`) and the R491/R389 steering families.
+// Opt-in pending the Issue 707 gates + a consumer (no-default-consumer rule).
+#[cfg(feature = "tpr")]
+pub mod tpr;
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,

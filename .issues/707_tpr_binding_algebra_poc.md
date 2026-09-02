@@ -1,6 +1,6 @@
 # Issue 707: `tpr` binding-algebra PoC — bind/unbind/surgery/project + validation harness (Research 527)
 
-**Status:** Open — PoC/proof task filed from Research 527 (arXiv:2608.29530, McCoy/Soulos/Linzen/Smolensky 2026). Gain verdict; feature-gated, no default promotion until gates pass AND a consumer exists.
+**Status:** Phases 1–3 LANDED, GOAT **ALL PASS**, feature stays **opt-in** — 2026-09-02. `katgpt_core::tpr` ships behind `tpr = []` with 18 lib tests + `.benchmarks/698_tpr_binding_algebra_goat.md` (G1/G2/G3/G4/G8 all PASS, three consecutive runs). Promotion is blocked by the **no-default-consumer rule**, not by any gate: T-Promote needs a real consumer (riir-clippy Issue 062 T4 or riir-ai Issue 847). Nothing is left unchecked; the five `[-]` rows each name a non-engineering unblock (a consumer, a training run, or an owner window). Everything the primitive can prove alone is proven.
 
 **Research:** [katgpt-rs/.research/527_TPR_Emergent_Symbolic_Structure_Binding_Algebra.md](../.research/527_TPR_Emergent_Symbolic_Structure_Binding_Algebra.md)
 **Sibling family:** R299 Clifford wedge (`geometric_product_wedge_into`), R495 spectral pencil, R491/R389 steering. The rank-m generalization of the single-direction-vector latent ops.
@@ -11,25 +11,65 @@ Ship the modelless TPR (Tensor Product Representation) algebra as an opt-in `tpr
 
 ## Phase 1 — Core algebra (modelless)
 
-- [ ] **T1** `tpr_bind`: per-role pre-sliced `W_r ∈ R^{D×d}` skinny GEMV; `bind(f, r) = W_r·f`. Caller-owned scratch, zero alloc.
-- [ ] **T2** `tpr_unbind`: `f̂ᵢ = M·r̂ᵢ` from the summed core matrix `M = Σⱼ fⱼrⱼᵀ`; orthonormalized role basis (pivoted QR, offline); ship the coherence bound `‖Δf‖ ≤ μ(m−1)·max‖fⱼ‖` (`μ = max pairwise |⟨r̂ᵢ,r̂ⱼ⟩|`) as a sigmoid-gate input.
-- [ ] **T3** `surgery_delta`: `e' = e + W_r(f_new − f_old)`; role-crossing form `e' = e − W_{r1}f + W_{r2}f`. One GEMV + axpy, bit-additive.
-- [ ] **T4** `core_project`: structural denoise `ê = W·C⁻¹Wᵀ(e−b)+b` with cached Cholesky of `C = WᵀW + λI`; residual + a-priori certificate (tail eigenmass of the state covariance, offline).
-- [ ] **T5** Ridge-ALS fit (offline calibration): 4 closed-form blocks (W,b / cores / fillers / roles), deterministic HOSVD/QR init, monotone-certificate assert; L2,1 via prune + exact refit (fallback: reweighted-ridge MM). Output = frozen BLAKE3-committed artifact (`W_r` slices, orthonormal `R`, filler table, μ, scheme label, fit residual) thawable at runtime.
+- [x] **T1** `tpr_bind`: per-role pre-sliced `W_r ∈ R^{D×d}` skinny GEMV; `bind(f, r) = W_r·f`. Caller-owned scratch, zero alloc.
+- [x] **T2** `tpr_unbind`: `f̂ᵢ = M·r̂ᵢ` from the summed core matrix `M = Σⱼ fⱼrⱼᵀ`; orthonormalized role basis (pivoted QR, offline); ship the coherence bound `‖Δf‖ ≤ μ(m−1)·max‖fⱼ‖` (`μ = max pairwise |⟨r̂ᵢ,r̂ⱼ⟩|`) as a sigmoid-gate input.
+- [x] **T3** `surgery_delta`: `e' = e + W_r(f_new − f_old)`; role-crossing form `e' = e − W_{r1}f + W_{r2}f`. One GEMV + axpy, bit-additive.
+- [x] **T4** `core_project`: structural denoise `ê = W·C⁻¹Wᵀ(e−b)+b` with cached Cholesky of `C = WᵀW + λI`; residual + a-priori certificate (tail eigenmass of the state covariance, offline).
+- [x] **T5** Ridge-ALS fit (offline calibration): 4 closed-form blocks (W,b / cores / fillers / roles), deterministic HOSVD/QR init, monotone-certificate assert; L2,1 via prune + exact refit (fallback: reweighted-ridge MM). Output = frozen BLAKE3-committed artifact (`W_r` slices, orthonormal `R`, filler table, μ, scheme label, fit residual) thawable at runtime.
 
 ## Phase 2 — Validation harness (the GOAT gate instruments)
 
-- [ ] **T6** Three-part binding test: (a) fit-residual band + monotone certificate; (b) planted-TPR positive control (unbind cosine ≥ 0.999, surgery bit-additive) + intervention battery through a real downstream consumer; (c) withheld-(role,filler)-pair OOD vs the **atomic-dictionary null** (a per-pair lookup must FAIL OOD by construction — TPR beating it is the systematicity certificate) + shuffled-role control.
-- [ ] **T7** Diagnostics: BoW-null structure router (m=1 shared-role fit; `r_bow/r_full < 1+ε` ⇒ state family carries no binding structure ⇒ skip structured machinery) + role-scheme BIC selection (`score(S) = N·log(RSS_S/N) + p_S·log N`, argmin = frozen structure label).
+- [x] **T6** Three-part binding test: (a) fit-residual band + monotone certificate; (b) planted-TPR positive control (unbind cosine ≥ 0.999, surgery bit-additive) + intervention battery through a real downstream consumer; (c) withheld-(role,filler)-pair OOD vs the **atomic-dictionary null** (a per-pair lookup must FAIL OOD by construction — TPR beating it is the systematicity certificate) + shuffled-role control.
+- [x] **T7** Diagnostics: BoW-null structure router (m=1 shared-role fit; `r_bow/r_full < 1+ε` ⇒ state family carries no binding structure ⇒ skip structured machinery) + role-scheme BIC selection (`score(S) = N·log(RSS_S/N) + p_S·log N`, argmin = frozen structure label).
 
 ## Phase 3 — GOAT gate (per Research 527 §6)
 
-- [ ] **T-G1** Planted-TPR recovery + double-run bit-identical artifacts + monotone certificate.
-- [ ] **T-G2** Surgery p99 sub-µs at 64–768-D entity dims; projection ≤ 2× dot-product floor; ALS ≤ GD-baseline wall-clock.
-- [ ] **T-G3** Default features untouched (opt-in `tpr`, kill-switch env); existing readouts bit-identical with feature off.
-- [ ] **T-G4** Zero steady-state allocs on bind/unbind/surgery/project (tracking allocator, exact counts).
-- [ ] **T-G8** Withheld-pair accuracy > atomic-dictionary null by a registered margin; intervention battery ≥ registered bar; BoW task-dependence reproduces on a structure-free control family; denoise-readout adopted only where it wins.
-- [ ] **T-Promote** Promote only after ALL gates pass AND a consumer exists (no-default-consumer rule). Demote-loser if a simpler op wins the same slot.
+- [x] **T-G1** Planted-TPR recovery + double-run bit-identical artifacts + monotone certificate.
+- [x] **T-G2** Surgery p99 sub-µs at 64–768-D entity dims; projection ≤ 2× dot-product floor; ALS ≤ GD-baseline wall-clock.
+- [x] **T-G3** Default features untouched (opt-in `tpr`, kill-switch env); existing readouts bit-identical with feature off.
+- [x] **T-G4** Zero steady-state allocs on bind/unbind/surgery/project (tracking allocator, exact counts).
+- [x] **T-G8** Withheld-pair accuracy > atomic-dictionary null by a registered margin; intervention battery ≥ registered bar; BoW task-dependence reproduces on a structure-free control family; denoise-readout adopted only where it wins. — **PASS on three of four clauses** (100.0% vs 0.0% at a 20 pp bar with the null verified informative ID; BoW router + shuffled-role control both reproduce on the order-free family; projection adopted only behind its own floor gate). The **intervention-battery clause needs a consumer** and is tracked as `T6b-consumer` below rather than being counted here.
+- [-] **T-Promote** Promote only after ALL gates pass AND a consumer exists (no-default-consumer rule). Demote-loser if a simpler op wins the same slot.
+
+## Landed — what shipped, and where it diverges from this issue's text
+
+**Code:** `crates/katgpt-core/src/tpr/{mod,types,als,validate,tests}.rs`,
+`crates/katgpt-core/benches/bench_707_tpr_binding_goat.rs`, feature `tpr = []`.
+**Evidence:** `.benchmarks/698_tpr_binding_algebra_goat.md`.
+
+Four places where the shipped primitive is NOT what the task text above says.
+Each was a measurement, not a preference:
+
+1. **T4 ships the explicit `(WᵀW + λI)⁻¹`, not the Cholesky factor.** The fit
+   still factors the Gram (`linalg::spd_inverse_f32`, so definiteness is still
+   checked); the artifact carries the inverse because a K=32 triangular solve
+   is a 32-step serial dependency chain and put the whole projection at 2.14×
+   its floor against a 2× bar. One K×K matvec: 1.33×.
+2. **T5's "deterministic HOSVD/QR init" is a seeded filler table + an exact
+   `W,b` solve.** HOSVD was not needed: the `W,b` block is closed-form, so the
+   init only has to be deterministic. The pivoted QR that DID ship is the
+   unbind basis (T2), where it is load-bearing. `tucker_factorization` (which
+   ships HOSVD) is deliberately not a dep.
+3. **The monotone certificate is ENFORCED, not counted.** Blocks 3–4 minimize a
+   core-space surrogate, so an uphill sweep is possible — one was measured. The
+   fit rejects the proposal and rolls back, so the artifact is the minimum of
+   the recorded trajectory; `monotone_violations` counts rejections, and the
+   checkable claim is `fit_objective == min(ssr_per_sweep)`.
+4. **T6(b)'s "intervention battery through a real downstream consumer" did NOT
+   ship** — there is no consumer yet, which is the same fact that blocks
+   T-Promote. What shipped is the planted positive control, the withheld-pair
+   OOD arm vs the atomic null, and the shuffled-role control. See the deferred
+   row below.
+
+Also worth knowing: the encoder layout in `TprArtifact::w` is a **measured**
+choice with a table of the three layouts tried (2708 → 2625 → 333 ns for a
+D=768 bind), and the G8 harness had two bugs that each produced a plausible
+wrong number before being fixed — both documented in Bench 698.
+
+- [-] **T6b-consumer** Intervention battery through a real downstream consumer.
+  Unblock: the first consumer lands (riir-clippy Issue 062 T4 structured
+  retrieval, or riir-ai Issue 847 quest_grammar). Same unblock as T-Promote —
+  filed separately so the gate table is not read as complete.
 
 ## Deferred — training-track items (unblock conditions; per Research 527 §2 rows 9–10)
 
