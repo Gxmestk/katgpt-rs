@@ -78,8 +78,39 @@ three carried the same 00:29 timestamp as a batch of genuine sibling edits).
   own edit; it false-positived on two files), so line-set containment is the
   confirmation. Swept all 19 contract repos: exactly one hazard, two other repos
   dirty-but-clean — not always-on.
+
+  **The signal beat its own author's attribution.** The sweep's owner had
+  already reasoned "those dirty files are a sibling's work" and moved on —
+  wrong twice over: they *were* the author, and one of the files carried a
+  pending revert of someone else's landed fix. So this is not only a
+  did-you-stage-someone-else's-work check; it catches a session **mis-attributing
+  its own** churn away from itself, which no amount of care about `git add -A`
+  would have found. Note also that `git log --author` cannot help at all here:
+  every concurrent session commits as the same git user, so authorship does not
+  distinguish sessions and mtime is the only signal that does.
+
+  **Resolved 2026-09-02** by the owner (`katgpt-rs-be`), not from here. Cause:
+  `cargo fmt -p katgpt-core -- <files>` — everything after `--` goes to rustfmt
+  as *options*, not as a file selection, so each of three runs formatted the
+  whole package. 189 of 204 reverted, `als.rs` included; audit now reports 0
+  stale, and `cargo test -p katgpt-core --features tpr --lib tpr::` passes 27/27
+  with the Issue 712 guard intact.
   Documented in AGENTS.md beside the `hash-object` + `update-index` recipe for
   committing your blob out of a file a sibling is editing.
+- [-] **T3c** Add the **rustfmt round-trip** as a fourth signal:
+  `git show HEAD:$f | rustfmt --edition 2024 --emit stdout | diff - $f`. If
+  identical, the worktree copy is exactly "HEAD, formatted" and *provably*
+  carries zero content, so reverting it cannot lose anyone's work. It splits
+  "dirty because churn" from "dirty because work" with no mtime heuristic and
+  no false positives from line re-wrapping — which an `--ignore-all-space` diff
+  cannot do (measured: it called 214/215 files non-whitespace in another repo,
+  because rustfmt re-wraps tokens *across* lines). This is what made the
+  204-file revert provably rather than probably safe: 188 pure churn, 16 real,
+  and `als.rs` matched the round-trip of `0ef7f078^` — i.e. the pre-guard
+  version formatted, carrying nothing of its own. **Unblock:** none; it is
+  Rust-only and needs a toolchain in PATH, so it is a separate signal rather
+  than a replacement for the three that ship. Recorded in the script's own
+  docstring so the recipe is not lost. Credit: `katgpt-rs-be`.
 - [-] **T3b** The **refusing** pre-commit hook. Still an owner call, and
   deliberately not shipped: it trades a real class of loss against friction on
   every legitimate multi-file commit, the cheaper habit (`git -C <repo> add

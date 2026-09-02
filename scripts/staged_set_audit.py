@@ -33,6 +33,31 @@ Three independent signals are reported, and none subsumes another:
 Signal 3 audits the dirty set too, not just the staged set, because the hazard
 exists before anything is staged.
 
+**Do not reach for `git log --author` first.** It is the obvious instinct and it
+cannot work here: every concurrent session commits as the same git user, so
+authorship does not distinguish "mine" from "a sibling's" at all. mtime is the
+only signal that separates sessions, which is why signal 1 exists.
+
+Nor can a whitespace-ignoring diff separate a reformat from a revert on its own.
+On the `tpr/als.rs` case above, `git diff -w` reported 9 insertions / 30
+deletions — but some of those deletions are rustfmt genuinely re-wrapping tokens
+ACROSS lines (an import list, a fn signature), which `-w` cannot collapse. The
+unambiguous evidence is the specific identifiers the newest commit introduced,
+which is exactly what signal 3 reports back (`best_ssr` 5 occurrences at HEAD,
+0 in the stale copy). Grep those, don't read the diffstat.
+
+**A fourth signal is proposed but NOT implemented here** (Issue 709 T3c): the
+rustfmt round-trip. `git show HEAD:$f | rustfmt --edition 2024 --emit stdout |
+diff - $f` — if identical, the worktree copy is exactly "HEAD, formatted" and
+provably carries zero content, so reverting it cannot lose anyone's work. It
+splits "dirty because churn" from "dirty because work" with no mtime heuristic
+and no false positives from line re-wrapping, which is what an
+`--ignore-all-space` diff cannot do (it called 214/215 files non-whitespace in
+one measured case). It is what made the 204-file revert here *provably* safe
+rather than probably safe: 188 pure churn, 16 real. It is Rust-only and needs
+a toolchain, hence a separate signal rather than a replacement for these
+three.
+
 Usage:  scripts/staged_set_audit.py [repo_path]
 """
 
@@ -86,6 +111,13 @@ def selftest() -> None:
     assert not substantive("}"), "a brace is not evidence"
     assert not substantive("    );"), "nor is a close-paren"
     assert not substantive(""), "nor is a blank"
+    # Sample ORDER is part of the report's usefulness: comments last, so the
+    # printed evidence is an identifier to grep rather than the commit's prose.
+    assert is_comment("  // Best-iterate guard (Issue 712)"), "rust comment"
+    assert not is_comment("    let mut best_ssr = prev;"), "code is not a comment"
+    assert sorted(["// why", "let x = 1;"], key=is_comment)[0] == "let x = 1;", (
+        "code sorts first"
+    )
 
 
 TRIVIAL = {"", "}", "{", "};", ")", ");", "),", "]", "};", "*/", "/*", "//"}
@@ -100,6 +132,13 @@ def substantive(line: str) -> bool:
     """
     t = line.strip()
     return len(t) > 8 and t not in TRIVIAL
+
+
+COMMENT_PREFIXES = ("//", "#", "/*", "*", "--", "%")
+
+
+def is_comment(line: str) -> bool:
+    return line.strip().startswith(COMMENT_PREFIXES)
 
 
 def reverted_lines(repo: Path, path: str, sha: str) -> list[str]:
@@ -118,10 +157,17 @@ def reverted_lines(repo: Path, path: str, sha: str) -> list[str]:
         if ln.startswith("+") and not ln.startswith("+++")
     ]
     have = {ln.strip() for ln in (repo / path).read_text(errors="replace").splitlines()}
-    return [ln for ln in added if substantive(ln) and ln.strip() not in have]
+    lost = [ln for ln in added if substantive(ln) and ln.strip() not in have]
+    # Code before comments, order otherwise preserved. A commit's first
+    # added lines are usually its explanatory comment block, and prose is
+    # the weakest evidence in the set — an identifier like `best_ssr`
+    # settles reformat-vs-revert with one grep, a comment does not.
+    return sorted(lost, key=is_comment)
 
 
-def stale_vs_head(repo: Path, paths: list[str]) -> list[tuple[str, float, float, int]]:
+def stale_vs_head(
+    repo: Path, paths: list[str]
+) -> list[tuple[str, float, float, list[str]]]:
     """Paths whose worktree copy would REVERT the newest commit touching them.
 
     Two stages, because each alone is wrong:
@@ -138,7 +184,7 @@ def stale_vs_head(repo: Path, paths: list[str]) -> list[tuple[str, float, float,
     commit is the safe direction: a checkout stamps now, so a fresh file always
     looks current.
     """
-    out: list[tuple[str, float, float, int]] = []
+    out: list[tuple[str, float, float, list[str]]] = []
     for p in paths:
         f = repo / p
         if not f.is_file():
@@ -152,7 +198,7 @@ def stale_vs_head(repo: Path, paths: list[str]) -> list[tuple[str, float, float,
             continue
         lost = reverted_lines(repo, p, sha)
         if lost:
-            out.append((p, mtime, commit_t, len(lost)))
+            out.append((p, mtime, commit_t, lost))
     return out
 
 
@@ -222,10 +268,20 @@ def main() -> int:
             f"  STALE-vs-HEAD: {len(stale)} path(s) LACK lines the newest commit on their "
             "own path added — committing these reverts what landed since"
         )
-        for p, mt, ct, n in stale[:8]:
+        for p, mt, ct, lost in stale[:8]:
             w = _dt.datetime.fromtimestamp(mt).strftime("%H:%M:%S")
             c = _dt.datetime.fromtimestamp(ct).strftime("%H:%M:%S")
-            print(f"      {p}  (written {w}, HEAD touched it {c}, {n} line(s) would be lost)")
+            print(
+                f"      {p}  (written {w}, HEAD touched it {c}, "
+                f"{len(lost)} line(s) would be lost)"
+            )
+            # Print the evidence, not only its count: these lines ARE the
+            # grep that settles reformat-vs-revert, and a diffstat cannot
+            # (rustfmt re-wraps tokens across lines, so `-w` still shows
+            # deletions). Reconstructed by hand once already; don't make the
+            # next reader do it.
+            for ln in lost[:2]:
+                print(f"        would lose: {ln.strip()[:96]}")
         if len(stale) > 8:
             print(f"      … {len(stale) - 8} more")
 
