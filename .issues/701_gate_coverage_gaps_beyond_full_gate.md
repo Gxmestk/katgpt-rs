@@ -1,7 +1,8 @@
 # Issue 701 — the three surfaces `scripts/full_gate.sh` still does NOT cover
 
-Status: **OPEN — 2 of 6 closing conditions done** (R1a `4c12c4e8`/`baf300fa`;
-R3a measured). R2 re-measured 2026-09-01 and its answer changed: not "11 of 12"
+Status: **OPEN — 3 of 6 closing conditions done** (R1a `4c12c4e8`/`baf300fa`;
+R1b-cadence `feature_isolation_weekly.yml` 2026-09-02; R3a measured). R2
+re-measured 2026-09-01 and its answer changed: not "11 of 12"
 but **1 of 18**, because the survey itself had the Issue 703 defect. Filed
 alongside the gate itself so its limits are
 recorded rather than implied. `scripts/full_gate.sh` closes the
@@ -294,12 +295,25 @@ Not attempted: the remaining ~76 sites across four crates in one sweep.
       joining the `cfg(any(...))` that gates `pub mod linalg`. Full numbers,
       the per-package table and the category error behind the old estimate:
       `.benchmarks/696_default_on_feature_isolation_sweep.md`.
-- [ ] R1b-cadence: wire it, and at what cadence — the only part still open, and
-      it is a billing call rather than a measurement. At 4.1 min the cost
-      question no longer gates the decision on any plausible runner multiplier,
-      and this gate has no `cfg(target_os)` surface so it can run on ubuntu
-      (unlike the full gate). Recommendation: weekly `--scope default-on` on
-      ubuntu. It catches a class NOTHING else does — `--all-features` compiles
+- [x] R1b-cadence: wire it, and at what cadence — **DONE 2026-09-02** as
+      `.github/workflows/feature_isolation_weekly.yml`: Mondays 04:47 UTC
+      (after full_gate's Monday 04:17 slot; off-hour; clear of the siblings'
+      Tuesday weekly slots), `--scope default-on`, `workflow_dispatch` for
+      manual runs, `cancel-in-progress: false` (the schedule is the rot
+      check). Local pre-push verification: the script's `--list` walk
+      reproduced the Bench-696 population exactly (228 pairs / 197 unique
+      names) and the scope self-test passed on the current tree; YAML parsed.
+      **Platform deviation from the recommendation below, recorded:** macOS,
+      not ubuntu. The recommendation's "this gate has no `cfg(target_os)`
+      surface" is true of the SCRIPT and false of the CODE it compiles — the
+      device backends are `cfg(all(target_os = "macos", feature = ...))`, so on
+      a Linux runner a device-backed flag switches on and compiles to NOTHING:
+      the vacuous green feature_isolation.yml's preamble rejects. Whether any
+      of the 228 default-on pairs is device-backed was not worth resolving
+      when the decision does not need it — at 4.1 min warm the
+      runner-multiplier cost is immaterial either way, so the sweep runs where
+      every isolation claim is a claim about real compiled code.
+      It catches a class NOTHING else does — `--all-features` compiles
       the union where some other consumer always supplies `linalg`, and the
       per-PR gate is diff-bounded so it never looks at a flag whose own
       definition did not change. Both flags above were invisible to every

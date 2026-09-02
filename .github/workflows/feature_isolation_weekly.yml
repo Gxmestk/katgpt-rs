@@ -1,0 +1,67 @@
+# Weekly default-on feature-isolation sweep — Issue 701 R1b-cadence.
+#
+# The PR gate (feature_isolation.yml) is diff-bounded: it only ever checks a
+# flag whose DEFINITION the diff touches, so it never looks at a flag whose own
+# definition did not change. This sweep covers EVERY default-on (package, flag)
+# pair on a fixed cadence regardless of diffs. Measured 2026-09-01
+# (.benchmarks/696_default_on_feature_isolation_sweep.md): all 228 default-on
+# pairs built in isolation in 4.1 min (mean 1.08s, median 0.50s) warm on an
+# M3 Max, and the sweep's first run found 2 REAL failures
+# (`katgpt-core/hebbian_kernel_memory` + `velocity_field_ensemble` both consumed
+# `linalg::ridge_solve` without joining the `cfg(any(...))` gating `pub mod
+# linalg`) that no existing gate could see — `--all-features` compiles the
+# union where some other consumer always supplies `linalg`.
+#
+# ── Why macos-latest, and not the ubuntu the issue recommended ───────────────
+# .issues/701 recommended ubuntu because the SCRIPT has no cfg(target_os)
+# surface. True of the script; not of the code it compiles. The device backends
+# are `cfg(all(target_os = "macos", feature = ...))`: on a Linux runner such a
+# flag switches ON and compiles to NOTHING, and an isolation sweep that reports
+# "builds alone" about a file it compiled empty is exactly the vacuous green
+# feature_isolation.yml's preamble rejects. Whether any of the 228 default-on
+# pairs is device-backed was not worth resolving when the decision does not
+# need it: at 4.1 min warm the runner-multiplier cost is immaterial either way,
+# so the sweep runs on the one platform where every isolation claim is a claim
+# about real compiled code. Deviation recorded in .issues/701 (R1b-cadence).
+#
+# ── Cost honesty ─────────────────────────────────────────────────────────────
+# 4.1 min WARM on fast local hardware. A cold runner pays the full
+# --no-default-features dependency baseline first (60s + ~11 GiB locally), so
+# rust-cache is load-bearing and the timeout is generous.
+#
+# ── Non-vacuity is in the script ─────────────────────────────────────────────
+# main() runs the scope self-test before anything else: an empty default-on
+# scope (manifest walk finds nothing) FAILS rather than passing, and run_scope
+# prints the pair count so a silently-shrunken scope is visible in the log.
+name: Feature isolation (weekly default-on)
+
+on:
+  schedule:
+    # Mondays 04:47 UTC — after full_gate's Monday 04:17 slot (never two
+    # macOS gates at once on this account), off-the-hour for the runner queue,
+    # and clear of the siblings' Tuesday 04:1x-04:4x weekly slots.
+    - cron: '47 4 * * 1'
+  workflow_dispatch:
+
+# The schedule is the rot check — never cancel a scheduled run mid-flight.
+concurrency:
+  group: feature-isolation-weekly
+  cancel-in-progress: false
+
+jobs:
+  default-on-isolation:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: feature-isolation
+          cache-on-failure: true
+
+      - name: Default-on isolation sweep (all pairs, diff-independent)
+        run: python3 scripts/feature_isolation_gate.py --scope default-on
