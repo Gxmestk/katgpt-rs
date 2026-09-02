@@ -416,6 +416,17 @@ pub struct FillerRoleSpread {
     /// `AlsInput::n_fillers`: an unused filler id would drag the mean toward 0
     /// and make a degenerate corpus look worse than degenerate.
     pub fillers: usize,
+    /// Fillers seen with **two or more** distinct roles.
+    ///
+    /// This is the population a withheld-`(role, filler)`-pair test can draw
+    /// from at all: withholding a pair from a single-role filler withholds the
+    /// filler entirely, which is the Issue 711 regime where the OOD arm asks a
+    /// different question rather than a harder one. `max` and `mean` say how
+    /// degenerate a corpus is; this says how much of it is *testable*, and the
+    /// two come apart — a corpus can carry `max = 4` on two fillers out of
+    /// eight and read as healthy on the threshold while admitting almost no
+    /// OOD test.
+    pub multi_role_fillers: usize,
 }
 
 impl FillerRoleSpread {
@@ -445,6 +456,7 @@ pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
 
     let mut max = 0usize;
     let mut fillers = 0usize;
+    let mut multi_role_fillers = 0usize;
     let mut i = 0usize;
     while i < pairs.len() {
         let f = pairs[i].0;
@@ -452,8 +464,12 @@ pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
         while i < pairs.len() && pairs[i].0 == f {
             i += 1;
         }
+        let roles = i - start;
         fillers += 1;
-        max = max.max(i - start);
+        max = max.max(roles);
+        if roles >= 2 {
+            multi_role_fillers += 1;
+        }
     }
     FillerRoleSpread {
         max,
@@ -463,6 +479,7 @@ pub fn filler_role_spread(bindings: &[TprBindings]) -> FillerRoleSpread {
             k => pairs.len() as f32 / k as f32,
         },
         fillers,
+        multi_role_fillers,
     }
 }
 

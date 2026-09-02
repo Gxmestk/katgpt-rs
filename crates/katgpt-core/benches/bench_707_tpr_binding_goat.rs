@@ -586,11 +586,12 @@ fn run_g8() -> bool {
     // uninterpretable rather than wrong, so the gate refuses instead of
     // reporting a margin it cannot read.
     println!(
-        "  composition: roles/filler max={} mean={:.3} over {} filler(s); pool coverage {:.1}% \
-         -> {}",
+        "  composition: roles/filler max={} mean={:.3} over {} filler(s), {} testable; \
+         pool coverage {:.1}% -> {}",
         ood.spread.max,
         ood.spread.mean,
         ood.spread.fillers,
+        ood.spread.multi_role_fillers,
         ood.coverage * 100.0,
         match ood.verdict() {
             Some(v) => format!("verdict {:.1}%", v * 100.0),

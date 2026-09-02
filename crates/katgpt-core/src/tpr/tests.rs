@@ -700,6 +700,10 @@ fn the_composition_covariate_separates_a_degenerate_corpus_from_a_healthy_one() 
     );
     assert!(healthy.max > 1 && healthy.mean > 1.0);
     assert_eq!(healthy.fillers, p.n_fillers, "every planted filler appears");
+    assert_eq!(
+        healthy.multi_role_fillers, healthy.fillers,
+        "every filler here carries several roles, so all of them are testable"
+    );
     assert!(!role_determined_by_filler(&p.bindings));
 
     // Degenerate: role = filler % m. Same states, same fillers, same counts.
@@ -713,6 +717,10 @@ fn the_composition_covariate_separates_a_degenerate_corpus_from_a_healthy_one() 
     assert_eq!(spread.max, 1);
     assert_eq!(spread.mean, 1.0);
     assert_eq!(spread.fillers, healthy.fillers, "same filler population");
+    assert_eq!(
+        spread.multi_role_fillers, 0,
+        "no filler admits a withheld pair — withholding one withholds the filler"
+    );
     assert!(role_determined_by_filler(&degen));
     println!(
         "711: healthy max {} mean {:.3} | degenerate max {} mean {:.3}",
@@ -744,6 +752,17 @@ fn the_covariate_is_reported_and_not_only_its_threshold() {
         spread.mean < 1.2,
         "and the mean must still say how thin that is (mean {:.4})",
         spread.mean
+    );
+    // The point of carrying the population separately: `max` clears the
+    // threshold on the strength of ONE filler, so a withheld-pair test has
+    // exactly one filler to draw from. `max` alone cannot say that.
+    assert_eq!(
+        spread.multi_role_fillers, 1,
+        "one tipped filler is the entire testable population"
+    );
+    println!(
+        "711: near-degenerate max {} mean {:.4} testable fillers {}/{}",
+        spread.max, spread.mean, spread.multi_role_fillers, spread.fillers
     );
 }
 
