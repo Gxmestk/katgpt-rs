@@ -107,7 +107,15 @@ as it must be. Two of the 26 are the ones fixed here.
   on a fresh `CARGO_TARGET_DIR` (394 units, 622 MB) — roughly **8%** on a
   >13 min weekly gate. Cheap because `check` does no codegen; a release
   *clippy* pass costs multiples of this and buys almost nothing extra here.
-  (The registry cache was warm; CI pays download time it already pays.)
+
+  **Both numbers are M3 Max / 16-core, and the CI runner is not.** The 8%
+  figure is a ratio of two local measurements, which is the honest way to
+  read it — the gate's own >13 min is also a local figure, so the ratio
+  survives a slower box better than either absolute does. A GitHub macOS
+  runner has ~1/4 the cores, so expect minutes rather than 65 s in absolute
+  terms. Stated because a local number quoted as a CI cost is a claim about a
+  machine that was never measured. (The registry cache was warm locally; CI
+  pays download time it already pays for Layer 3.)
 
   **Its first in-situ run found a bug in itself, which is why it was run.**
   The first cut counted `Compiling`/`Checking` lines, the way Layer 3 does, and
