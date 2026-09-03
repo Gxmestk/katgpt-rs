@@ -203,15 +203,30 @@ paragraph said "the three" for one commit after the fourth was added):
   A gate that skipped in CI instead would be the vacuous green it exists to
   catch. Mark a deliberately narrow block `<!-- repo-set-ok: <reason> -->`.
 - `cfg_gated_floor_gate.py` (Issue 713 T4) is the GATE over the report below,
-  katgpt-rs-scoped, with four pins in `scripts/cfg_gated_floors.txt`. The one
+  katgpt-rs-scoped, with its pins in `scripts/cfg_gated_floors.txt` (the count
+  is deliberately not written here — see the docs-gate preamble above). The one
   that earns its keep is `max_load_bearing = 0`: a new `*_goat.rs` gated on a
   default-off feature with no `required-features` row reds the push that adds
-  it, before its green zero is cited as evidence. **Two of the four pins are
+  it, before its green zero is cited as evidence. **Some of the pins are
   FLOORS**, on the population the auditor claims to have scanned, because a
   ceiling cannot fail once the instrument goes blind and reports zero. The
-  hazard here was not the pins but the **trigger list** — `docs_gate.yml`'s
-  `paths` filter carried no `.rs` glob at all, so the gate could not have fired
-  on the only push it exists for.
+  first hazard found here was not the pins but the **trigger list** —
+  `docs_gate.yml`'s `paths` filter carried no `.rs` glob at all, so the gate
+  could not have fired on the only push it exists for.
+
+  The **second** was worse and is the one to remember: `max_load_bearing = 0`
+  is only as wide as `is_load_bearing`'s **vocabulary**, and a token-set gap is
+  indistinguishable from a clean repo. T4c (2026-09-03, `2272b262`) found the
+  set knew `goat`/`gate`/`g<N>`/`drill`/`proof`/… and did **not** know the
+  `*_correctness` / `*_alloc_check` / `*_determinism` / `*_equivalence` /
+  `*_floor` / `*_grad_check` dialect. Seven tokens added — each measured
+  against all 2,157 workspace test+bench target names first, which is why
+  `budget`, `check` and `calibration` were **rejected** — and 17 more
+  load-bearing katgpt-rs targets appeared, including 8 `*_alloc_check` G4
+  budgets and a Report-the-Floor UQ gate. All 17 armed and RUN in release:
+  45 assertions, 45 pass, 0 fail — silently *unverified*, not broken, same as
+  `.issues/714` T3. Found sideways, by adding tests to one such file, not by
+  auditing the gate. Re-run the corpus token table when a new dialect appears.
 - `bench_doc_audit.py` runs a `selftest()` on every invocation pinning the line
   shapes its tokenizer must recognise. Without it a regex regression is silent:
   the audit recognises fewer labels and still prints "0 mismatches". That is how
@@ -297,6 +312,13 @@ plural; `regate` — a compound). It now reproduces the table exactly, per repo.
 Two independently-built classifiers agreeing is what licenses the
 `max_load_bearing = 0` pin; a false negative would have made that pin a
 permanent green. Run the script.
+
+**And do not read that agreement as more than it is.** The two classifiers
+agreed, and they agreed on the wrong *population* — T4c widened the token set
+and 17 more katgpt-rs targets appeared. Agreement licenses the pin against a
+classifier **bug**; nothing licenses it against a classifier being
+congenitally **narrow**. The defence is the corpus-wide candidate-token table
+in `.issues/713` T4c, not a second opinion.
 
 The verdict half is `scripts/cfg_gated_floor_gate.py`, a docs-gate check. The
 report and the gate are deliberately separate files: the report must stay
