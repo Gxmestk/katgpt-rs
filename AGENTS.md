@@ -268,9 +268,17 @@ Adding the rows is safe and does **not** red an existing CI: `cargo test
 changes is that naming the target without its features errors with exit 101
 instead of reporting a green zero. That was verified, not assumed, before the
 katgpt-rs batch landed (`180be9c5`, 39 GOAT gates, SILENT-NOW 102 → 63, baseline re-measured with the
-corrected auditor rather than inferred from the delta) — and
-the very first gate to actually run under its features came back **red**, which
-is the whole argument for the instrument in one line.
+corrected auditor rather than inferred from the delta).
+
+**Run the armed gates with `--release`.** All 39 pass there. A first sweep
+without it reported four reds and nearly filed two of them as perf
+regressions: a latency gate in a debug build measures an unoptimised binary,
+and `fast_bpe_goat` is 388 s in debug against 15.6 s in release. Re-measuring
+three times on a quiet box gave a sub-1% spread and made the wrong number look
+*more* trustworthy — ruling out the confounder you thought of says nothing
+about the one you didn't. Arming the gates still paid: it surfaced
+`.issues/714`, an alloc gate counting a sibling test's allocations, which
+reproduces in release.
 
 ### Before committing in a shared worktree — `scripts/staged_set_audit.py`
 
