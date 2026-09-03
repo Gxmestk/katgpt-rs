@@ -1,0 +1,49 @@
+# Committed pins for scripts/cfg_gated_floor_gate.py — Issue 713 T4.
+#
+# katgpt-rs ONLY, and deliberately so. docs_gate.yml runs on ubuntu-latest with
+# a single checkout; the siblings are private and simply are not there. A
+# cross-repo version of this gate would derive an empty population and print a
+# confident green over zero repos, which is the same defect the whole issue is
+# about. That is also why scripts/docs_drift_sweep.py is excluded from
+# docs_gate.sh's CHECKS. Sibling coverage is Issue 713 T3, an owner call in
+# each owning repo, and the workstation instrument for it is
+# `scripts/cfg_gated_target_audit.py` with no arguments.
+#
+# Format:  <key>  <value>
+#
+# FOUR pins, and they are two-sided ON PURPOSE
+# --------------------------------------------
+# A ceiling alone is a gate that cannot fail once the instrument dies: an
+# auditor whose regex stops recognising `#![cfg(...)]` reports SILENT-NOW 0,
+# which passes every ceiling ever written. So two of the four pins are FLOORS
+# on the population the auditor claims to have looked at. This is Issue 705's
+# lesson (the full gate's first two CI runs passed over ZERO compiled units)
+# applied before it happens rather than after.
+#
+#   max_load_bearing   the sharp one. Targets whose filename says their green
+#                      IS the evidence for a promotion (goat / gate / g<N> /
+#                      drill / proof / invariant / guard / conservation /
+#                      safety / security / audit). T2 armed all 39 of
+#                      katgpt-rs's, so the correct value is 0 and any new
+#                      unarmed one reds per-push. This is the pin worth having.
+#   max_silent_now     the ratchet. Every remaining default-off gated target
+#                      with no required-features row. Exact, not slack: the fix
+#                      is a three-line Cargo.toml row that the report prints
+#                      verbatim, and slack in a ratchet is just a slower
+#                      version of no ratchet. Arming more targets lowers the
+#                      real count; the gate then says so and asks to be
+#                      re-pinned, it does NOT fail.
+#   min_targets        blindness floor. Generous by design — it exists to catch
+#   min_gated          "the auditor stopped seeing anything", not to police
+#                      churn. Pinning the exact observed count here would red
+#                      on every legitimate test-file removal and then be
+#                      ignored, which docs_drift_floors.txt's header already
+#                      argues at length. Set at roughly 75% of observed.
+#
+# Observed 2026-09-03: 921 targets, 541 gated, 376 covered, 63 SILENT-NOW,
+# 0 load-bearing SILENT-NOW, 100 latent, 1 platform, 1 any().
+
+max_load_bearing	0
+max_silent_now	63
+min_targets	700
+min_gated	400

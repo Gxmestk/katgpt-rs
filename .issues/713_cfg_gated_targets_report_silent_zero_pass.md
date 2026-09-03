@@ -1,9 +1,13 @@
 # Issue 713 — 430 cargo targets can report a green `0 passed` having run nothing
 
 **Status:** T1 **LANDED** (instrument + measurement, 2026-09-03). T2 **LANDED**
-(39 katgpt-rs load-bearing targets armed, `180be9c5` + `1e4a52a`). T2b RUNNING
-(the armed gates' actual verdicts). T3–T5 are owner calls in sibling repos,
-deliberately not made here.
+(39 katgpt-rs load-bearing targets armed, `180be9c5` + `1e4a52a`). T2b **RAN** —
+all 39 pass in release; the debug reds were retracted (`83cb1d56`). T2c
+WITHDRAWN. T4 + T4b **LANDED** — `cfg_gated_floor_gate.py` is now a
+`docs_gate.sh` check with four two-sided pins, canaried, and the load-bearing
+classifier ships in the auditor. **T3 is an owner call in each sibling repo**,
+deliberately not made here. T5 (21 platform-cfg targets) and T6 (the
+all-`#[ignore]` axis) remain open and unmeasured by design.
 
 > **CORRECTED 2026-09-03, same day, by the fix itself.** The first published
 > figures were **over-counted**: the auditor keyed a declared target by its
@@ -215,17 +219,95 @@ shapes are pinned, and two matter specifically:
   no perf findings. See the correction above. Filing them is exactly what the
   correction prevented.
 
+- [x] **T4b (fell out of T4) — the load-bearing classifier now ships in the
+  auditor, and building it found SIX targets the published table's ad-hoc grep
+  and my first token matcher disagreed about.**
+
+  The load-bearing column in the table above was produced by a one-off
+  substring grep. T4 needed the classification *inside* the auditor (the gate
+  must not re-derive it — a second copy of a classifier is a second thing to
+  keep in step, and the one that drifts is silently the more permissive one).
+  Written independently, the token matcher returned **87**, not 93.
+
+  Substring matching is wrong in the noisy direction: `gate` claims
+  `aggregate`, `delegate`, `propagate`, `mitigate`, `investigate`. So the
+  matcher splits on `[^a-z0-9]+` — which must include `.`, for the
+  `bench_256_kv_outer.goat.rs` dialect. But **five of the six disagreements
+  were real misses in the token matcher**, not false positives in the grep:
+
+  | target | shape the token matcher dropped |
+  |---|---|
+  | `block_producer_g16f_cost.rs` | G\<N\> with a variant suffix (`g16f`) |
+  | `kat_promotion_g2p.rs` | same (`g2p`) |
+  | `kat_stake_client_g2s.rs` | same (`g2s`) |
+  | `kat_vote_client_g9gov.rs` | same (`g9gov`) |
+  | `prod_l3_sigkill_drills.rs` | plural (`drills`) |
+  | `t40_fixer_regate_harness.rs` | compound (`regate`) — **kept as a named token** |
+
+  Fixed by `^g\d+[a-z0-9]*$` for the ordinals, depluralising the stem rather
+  than hand-listing plurals (`drills` was the miss that showed hand-listing
+  fails), and adding `regate` as an **explicit compound** — trading one named
+  token for the five false positives a substring rule would re-admit is the
+  right way round. All six are pinned in `selftest()`, along with eight
+  substring false positives asserted NOT load-bearing.
+
+  With those, the auditor reproduces the published table **exactly**: 40 / 18 /
+  15 / 13 / 4 / 3 = **93**, per repo identical. Two independently-built
+  classifiers agreeing is worth more than either one's number, and the
+  agreement is what licenses `max_load_bearing = 0` as a pin — a false negative
+  in the classifier would have turned that pin into a permanent green.
+
 - [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
   katgpt-rs (done in T2). Read the numbers from the table, not from here.
   Deliberately NOT done from here: adding `required-features` converts a silent
   green into a **loud red** wherever CI invokes those targets by name without
   the features, which is the point, but it is the owning repo's call when to
   take that. The report names every path and prints the exact row to add.
-- [ ] **T4** Decide whether this becomes a `docs_gate.sh` `CHECKS` entry for
-  katgpt-rs only (it has a single checkout in CI, so the cross-repo sweep would
-  derive an empty population and print a confident green over zero repos — the
-  same reason `docs_drift_sweep.py` is deliberately excluded). A committed
-  floor file, in the `docs_drift_floors.txt` idiom, is the shape that works.
+- [x] **T4 LANDED 2026-09-03 — yes, katgpt-rs-scoped, with a committed pin
+  file.** `scripts/cfg_gated_floor_gate.py` + `scripts/cfg_gated_floors.txt`,
+  wired into `docs_gate.sh`'s `CHECKS` (now 5/5 green).
+
+  **The auditor stays a report and the gate is a separate file.** The auditor
+  must be runnable over the 18 siblings whose owners have not taken T3; an
+  auditor that exits 1 on those is an auditor nobody runs. The verdict lives in
+  a katgpt-rs-scoped consumer of its `--json`.
+
+  **Four pins, two-sided.** A ceiling alone cannot fail once the instrument
+  dies — an auditor whose regex stops recognising `#![cfg(...)]` reports
+  SILENT-NOW 0 and passes every ceiling ever written. That is `.issues/705`
+  (the full gate's first two CI runs passed over ZERO compiled units), and it
+  is designed against here rather than discovered later:
+
+  | pin | value | direction |
+  |---|---|---|
+  | `max_load_bearing` | **0** | ceiling — the sharp one |
+  | `max_silent_now` | 63 | ceiling — the ratchet |
+  | `min_targets` | 700 | **floor** — blindness |
+  | `min_gated` | 400 | **floor** — blindness |
+
+  The floors are generous (~75% of observed) on purpose: they exist to catch
+  "the auditor stopped seeing anything", not to police churn. An exact floor
+  reds on every legitimate test-file removal and is then ignored, which
+  `docs_drift_floors.txt`'s header already argues at length.
+
+  **Canaried, not assumed.** A temporary `tests/zz_713_canary_probe_goat.rs`
+  gated on a nonexistent feature made the gate red on both ceilings
+  (`load-bearing 1 > 0`, `SILENT-NOW 64 > 63`, exit 1) and green again on
+  removal. The verdict logic is *also* driven over every boundary by
+  `selftest()` with synthetic measurements — including the all-zeroes blind
+  report, which satisfies both ceilings and must fail on both floors — because
+  a gate whose failing direction is only reachable via the real corpus is a
+  gate whose failing direction is never exercised.
+
+  **The trigger list was the real hazard.** `docs_gate.yml`'s `paths` filter
+  listed docs and manifests and **no `.rs` at all**, so the gate could not have
+  fired on the one push it exists for: the push that ADDS an unarmed
+  `*_goat.rs`. Six target-source globs plus the three new script/pin paths were
+  added to **both** hand-duplicated lists (23 entries each, asserted identical;
+  Actions does not support YAML anchors and a local `safe_load` resolves them,
+  so they cannot be shared). This is `.issues/704`/`706` one level in — a
+  workflow is identical on disk whether or not it can see the change it gates.
+  Cost measured before widening: **0.20 / 0.20 / 0.18 s** over 921 targets.
 - [ ] **T6 (new axis, observed during T2b — NOT yet measured)** A **second**
   way a target prints a green zero, found by the sweep rather than by the
   auditor: `test_120_vpd_arena_goat` runs under its features and reports

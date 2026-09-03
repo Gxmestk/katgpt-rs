@@ -170,7 +170,8 @@ The original three existed before that wiring and **nothing invoked any of
 them**; two were red on `develop`, both on false positives against docs that
 were correct. Treat an uninvoked assertion as unknown, not as passing.
 
-Two of the checks are worth knowing about specifically:
+Some of the checks are worth knowing about specifically (no count here — this
+paragraph said "the three" for one commit after the fourth was added):
 
 - `skill_repo_set_gate.py` (Issue 703) fails on a `SKILL.md` command block that
   types the repo set by hand instead of deriving it. It reads sibling repos,
@@ -179,6 +180,16 @@ Two of the checks are worth knowing about specifically:
   run) from its **population** (12 `SKILL.md` locally, 8 in CI) and prints both.
   A gate that skipped in CI instead would be the vacuous green it exists to
   catch. Mark a deliberately narrow block `<!-- repo-set-ok: <reason> -->`.
+- `cfg_gated_floor_gate.py` (Issue 713 T4) is the GATE over the report below,
+  katgpt-rs-scoped, with four pins in `scripts/cfg_gated_floors.txt`. The one
+  that earns its keep is `max_load_bearing = 0`: a new `*_goat.rs` gated on a
+  default-off feature with no `required-features` row reds the push that adds
+  it, before its green zero is cited as evidence. **Two of the four pins are
+  FLOORS**, on the population the auditor claims to have scanned, because a
+  ceiling cannot fail once the instrument goes blind and reports zero. The
+  hazard here was not the pins but the **trigger list** — `docs_gate.yml`'s
+  `paths` filter carried no `.rs` glob at all, so the gate could not have fired
+  on the only push it exists for.
 - `bench_doc_audit.py` runs a `selftest()` on every invocation pinning the line
   shapes its tokenizer must recognise. Without it a regex regression is silent:
   the audit recognises fewer labels and still prints "0 mismatches". That is how
@@ -253,10 +264,22 @@ it is **382 SILENT-NOW / 320 latent** across 19 repos, a large minority of them
 load-bearing by name (`goat`, `gate`, `g<N>`, `drill`, `proof`, …). Full record
 and the per-repo table: `.issues/713`.
 
-Do not re-type those numbers from here — `.issues/713` carries a same-day
-correction (the first cut over-counted by 48, keying declared targets by name
-against the filename stem, so a row with an explicit `path` read as
-undeclared). Run the script.
+Do not re-type those numbers from here — `.issues/713` carries **two** same-day
+corrections. The first cut over-counted by 48, keying declared targets by name
+against the filename stem, so a row with an explicit `path` read as undeclared.
+The second was in the *load-bearing* classifier built for T4: a token matcher
+written independently returned 87 where the published table's ad-hoc substring
+grep said 93, and **five of the six disagreements were the token matcher's
+misses** (`g16f`/`g2p`/`g9gov` — G\<N\> with a variant suffix; `drills` — a
+plural; `regate` — a compound). It now reproduces the table exactly, per repo.
+Two independently-built classifiers agreeing is what licenses the
+`max_load_bearing = 0` pin; a false negative would have made that pin a
+permanent green. Run the script.
+
+The verdict half is `scripts/cfg_gated_floor_gate.py`, a docs-gate check. The
+report and the gate are deliberately separate files: the report must stay
+runnable over the siblings whose owners have not taken Issue 713 T3, and a
+report that exits 1 on them is a report nobody runs.
 
 It was fixed one target at a time twice in one week — riir-train `5821cba9`
 (11 real assertions reporting as a green suite having run none) and riir-clippy

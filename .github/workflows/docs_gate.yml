@@ -10,14 +10,17 @@
 # Opposite reasoning, same care. The full gate must run on macOS because the
 # device backends are `cfg(all(target_os = "macos", feature = ...))` and compile
 # to NOTHING elsewhere, so a Linux run would report a vacuous green. This gate
-# is pure Python over Cargo manifests and markdown — no cfg surface at all — so
-# platform cannot change its verdict, and macOS minutes bill at a multiple.
+# is pure Python over Cargo manifests, markdown, and (since Issue 713) the FIRST
+# ATTRIBUTE of each target source file — no cfg surface at all, because it READS
+# `#![cfg(...)]` as text rather than being subject to it — so platform cannot
+# change its verdict, and macOS minutes bill at a multiple.
 # Don't "align" this with the full gate's runner.
 #
 # ── Why per-push, when full_gate.yml is weekly ──────────────────────────────
-# Measured: ~3s for the original three (0.1 + 1.4 + 1.5) and ~0.03s (12 SKILL.md, no build dirs walked)
-# for the skill repo-set gate, against >13 min for the full
-# gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
+# Measured: ~3s for the original three (0.1 + 1.4 + 1.5), ~0.03s (12 SKILL.md,
+# no build dirs walked) for the skill repo-set gate, and ~0.2s (3 runs: 0.20 /
+# 0.20 / 0.18, 921 targets read) for the cfg-gated floor gate, against >13 min
+# for the full gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
 # pruned — pathlib's rglob("Cargo.toml") descended into target/ (117 GB, ~1.3M
 # entries) and filtered afterwards, at four call sites per run. Doc drift is
 # also introduced per-commit and is cheapest to catch in the commit that
@@ -44,6 +47,20 @@ on:
       - 'scripts/skill_repo_set_gate.py'
       - 'scripts/repo_set.txt'
       - '.agents/skills/**/SKILL.md'
+      # Issue 713: the cfg-gated floor gate's input is TARGET SOURCE, not docs.
+      # Without these six globs the gate could not fire on the one push it
+      # exists for — the push that ADDS an unarmed `*_goat.rs`. A trigger list
+      # that omits the check's own input is `.issues/704`/`706` one level in:
+      # the workflow is identical on disk whether or not it can see the change.
+      - 'tests/**/*.rs'
+      - 'benches/**/*.rs'
+      - 'examples/**/*.rs'
+      - 'crates/**/tests/**/*.rs'
+      - 'crates/**/benches/**/*.rs'
+      - 'crates/**/examples/**/*.rs'
+      - 'scripts/cfg_gated_target_audit.py'
+      - 'scripts/cfg_gated_floor_gate.py'
+      - 'scripts/cfg_gated_floors.txt'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   pull_request:
@@ -60,6 +77,20 @@ on:
       - 'scripts/skill_repo_set_gate.py'
       - 'scripts/repo_set.txt'
       - '.agents/skills/**/SKILL.md'
+      # Issue 713: the cfg-gated floor gate's input is TARGET SOURCE, not docs.
+      # Without these six globs the gate could not fire on the one push it
+      # exists for — the push that ADDS an unarmed `*_goat.rs`. A trigger list
+      # that omits the check's own input is `.issues/704`/`706` one level in:
+      # the workflow is identical on disk whether or not it can see the change.
+      - 'tests/**/*.rs'
+      - 'benches/**/*.rs'
+      - 'examples/**/*.rs'
+      - 'crates/**/tests/**/*.rs'
+      - 'crates/**/benches/**/*.rs'
+      - 'crates/**/examples/**/*.rs'
+      - 'scripts/cfg_gated_target_audit.py'
+      - 'scripts/cfg_gated_floor_gate.py'
+      - 'scripts/cfg_gated_floors.txt'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   workflow_dispatch:
@@ -79,5 +110,5 @@ jobs:
 
       # No toolchain, no cache, no cargo: the checks parse manifests as TOML and
       # docs as text. tomllib is stdlib from 3.11, which ubuntu-latest ships.
-      - name: Docs gate (flag counts, bench-doc labels, Cargo comments, skill repo sets)
+      - name: Docs gate (flag counts, bench-doc labels, Cargo comments, skill repo sets, cfg-gated targets)
         run: ./scripts/docs_gate.sh

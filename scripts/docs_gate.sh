@@ -36,6 +36,16 @@
 # out loud that it saw 8 of 12. A gate that skipped instead would be the
 # vacuous green it exists to catch.
 #
+# cfg_gated_floor_gate.py (added 2026-09-03, Issue 713) is katgpt-rs-SCOPED on
+# purpose, unlike the sibling-reading check above it. Its instrument
+# (cfg_gated_target_audit.py) audits any repo, but CI has a single checkout, so
+# a cross-repo version would derive an empty population and print a confident
+# green over zero repos — the same defect it exists to catch, which is also why
+# docs_drift_sweep.py is deliberately absent from CHECKS. Sibling coverage is
+# Issue 713 T3, an owner call per repo. Its pins are two-sided (two ceilings +
+# two blindness floors) because a ceiling cannot fail once the auditor goes
+# blind and reports zero; see scripts/cfg_gated_floors.txt.
+#
 # Runs every check even after one fails — the same reason full_gate.sh passes
 # --keep-going: stopping at the first failure under-reports the drift.
 set -uo pipefail
@@ -48,6 +58,7 @@ CHECKS=(
     "scripts/bench_doc_audit.py:(default-on|opt-in) labels in .benchmarks + .docs vs Cargo defaults"
     "scripts/cargo_comment_audit.py:inline Cargo.toml comments vs the default closure"
     "scripts/skill_repo_set_gate.py:hand-typed repo sets in SKILL.md command blocks (Issue 703)"
+    "scripts/cfg_gated_floor_gate.py:#![cfg]-gated targets that report a green 0-pass (Issue 713)"
 )
 
 if ! command -v python3 >/dev/null 2>&1; then

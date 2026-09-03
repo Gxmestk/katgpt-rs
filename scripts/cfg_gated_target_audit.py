@@ -76,6 +76,66 @@ INNER_CFG = re.compile(r"^\s*#!\s*\[\s*cfg\s*\(", re.MULTILINE)
 
 FEATURE_IN_CFG = re.compile(r'feature\s*=\s*"([^"]+)"')
 
+# A target whose filename says its green IS the evidence for a promotion or a
+# claim. This vocabulary is COMMITTED here rather than derived from the corpus:
+# deriving "which names look load-bearing" from the files present is the
+# vocabulary-vs-population trap (Issue 703) — a repo that renames its gates
+# would shrink the class into a confident zero.
+#
+# Matched on TOKENS, never as substrings. A substring match on "gate" claims
+# `aggregate`, `delegate`, `propagate`, `mitigate` and `investigate`; on "g<N>"
+# it claims nothing useful at all. Both directions are pinned in selftest().
+LOAD_BEARING_TOKENS = frozenset(
+    {
+        "goat",
+        "gate",
+        "gates",
+        "drill",
+        "invariant",
+        "invariants",
+        "guard",
+        "pin",
+        "proof",
+        "conservation",
+        "safety",
+        "security",
+        "audit",
+        # An explicit compound, not a substring rule. riir-clippy's
+        # `t40_fixer_regate_harness` is a re-gate harness, and the only way a
+        # token matcher sees it is by naming it — a substring rule for "gate"
+        # would re-admit aggregate/delegate/propagate/mitigate/investigate,
+        # which is the false-positive class that makes the column unreadable.
+        # Trading one named compound for five false positives is the right way
+        # round; add compounds here as they are found.
+        "regate",
+    }
+)
+
+# `g1`..`g<N>`, optionally with a variant suffix — the GOAT sub-gate naming
+# convention (G1 correctness, G2 perf, G3 no-regression, G4 alloc-free) as it
+# is actually written across the workspace: `g16f`, `g2p`, `g2s`, `g9gov` are
+# all real target names. A bare `g` is not one; the leading digit is required.
+GATE_ORDINAL = re.compile(r"^g\d+[a-z0-9]*$")
+
+# Token separators used across the workspace's target filenames: `_`, `-`, and
+# `.` (the `bench_256_kv_outer.goat.rs` dialect, which is why `.` is here).
+TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
+
+
+def is_load_bearing(*names: str) -> bool:
+    """Does any name carry a load-bearing TOKEN? Substring matches excluded."""
+    for name in names:
+        for tok in TOKEN_SPLIT.split(name.lower()):
+            # Depluralise rather than listing every plural: `gates`, `drills`,
+            # `guards`, `proofs`, `audits` all appear, and a hand-listed set
+            # misses whichever one is coined next. `drills` was a real miss.
+            stem = tok[:-1] if tok.endswith("s") and len(tok) > 2 else tok
+            if tok in LOAD_BEARING_TOKENS or stem in LOAD_BEARING_TOKENS:
+                return True
+            if GATE_ORDINAL.match(tok):
+                return True
+    return False
+
 
 @dataclass
 class Finding:
@@ -95,6 +155,11 @@ class Finding:
     # and reports a green 0-pass. That is the severity split, and without it
     # the headline count pools two populations an order of magnitude apart.
     default_on: bool = False
+    # Does the filename say this target's green is evidence? Reported apart
+    # because the severity is not the same: a silent zero on `scratch_probe`
+    # costs a reader's time, and a silent zero on `plan414_..._goat` is a
+    # promotion decision made over no measurement.
+    load_bearing: bool = False
 
 
 @dataclass
@@ -114,6 +179,10 @@ class RepoReport:
     def silent_latent(self) -> list[Finding]:
         """Findings that zero only under `--no-default-features`."""
         return [f for f in self.findings if f.default_on]
+
+    def silent_now_load_bearing(self) -> list[Finding]:
+        """The severe class, restricted to targets whose green is evidence."""
+        return [f for f in self.silent_now() if f.load_bearing]
 
 
 def cfg_body(text: str) -> str | None:
@@ -233,6 +302,7 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
                 predicates=preds,
                 declared=key in declared,
                 reason="",
+                load_bearing=is_load_bearing(f.name, name),
             )
 
             if has_rf:
@@ -364,9 +434,51 @@ def selftest() -> None:
     # silently downgrade every finding in a crate with no feature table.
     assert default_closure({}) == set(), "empty feature table produced defaults"
 
+    # The load-bearing classifier, BOTH directions. A false negative shrinks
+    # the class that `cfg_gated_floor_gate.py` pins at zero — i.e. it turns
+    # that gate into a permanent green — and a false positive from a substring
+    # match ("aggregate" contains "gate") makes the class unreadable and so
+    # ignored. Neither shows up in the totals.
+    for name in (
+        "plan414_hla_committed_belief_probe_goat.rs",
+        "bench_256_kv_outer.goat.rs",     # the dotted dialect: `.` is a separator
+        "test_g3_no_regression.rs",       # g<N> ordinal
+        "seal_halt_drill.rs",
+        "kv_conservation_check.rs",
+        "feature_isolation_gate.rs",
+        # The six the first cut got WRONG, found by diffing this classifier
+        # against the substring grep that produced Issue 713's published
+        # load-bearing table (87 vs 93). Every one is a real target; they are
+        # pinned here because they are the shapes a "reasonable" token matcher
+        # drops.
+        "block_producer_g16f_cost.rs",      # G<N> with a variant suffix
+        "kat_promotion_g2p.rs",
+        "kat_stake_client_g2s.rs",
+        "kat_vote_client_g9gov.rs",
+        "t40_fixer_regate_harness.rs",      # a named compound, not a substring
+        "prod_l3_sigkill_drills.rs",        # plural
+    ):
+        assert is_load_bearing(name), f"load-bearing name missed: {name}"
+    for name in (
+        "aggregate_stats.rs",             # contains "gate"
+        "delegate_router.rs",
+        "propagate_bounds.rs",
+        "investigate_latency.rs",
+        "mitigate_drift.rs",
+        "g_probe.rs",                     # bare `g` is not a G<N> ordinal
+        "spinning_up.rs",                 # contains "pin"
+        "audition_pool.rs",               # contains "audit"
+    ):
+        assert not is_load_bearing(name), f"substring false positive: {name}"
+
 
 def main(argv: list[str]) -> int:
     selftest()
+
+    argv = list(argv)
+    as_json = "--json" in argv
+    if as_json:
+        argv.remove("--json")
 
     if len(argv) > 1:
         repos = [Path(a).resolve() for a in argv[1:]]
@@ -376,10 +488,42 @@ def main(argv: list[str]) -> int:
         repos = derive_repos(here.parent)
         scope = "derived (BOUNDARY.md + .git)"
 
+    if as_json:
+        # Machine-readable, for `cfg_gated_floor_gate.py`. The consumer must
+        # not re-derive any of this: a second copy of the classifier is a
+        # second thing to keep in step, and the one that drifts is silently the
+        # more permissive one.
+        import json
+
+        print(
+            json.dumps(
+                {
+                    r.repo: {
+                        "scanned": r.scanned,
+                        "gated": r.gated,
+                        "covered": r.covered,
+                        "silent_now": len(r.silent_now()),
+                        "silent_now_load_bearing": len(r.silent_now_load_bearing()),
+                        "load_bearing_paths": sorted(
+                            f.path for f in r.silent_now_load_bearing()
+                        ),
+                        "latent": len(r.silent_latent()),
+                        "platform": len(r.unexpressible),
+                        "any_of": len(r.any_of),
+                    }
+                    for r in (audit(x) for x in repos)
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+
     print(f"cfg-gated target audit — {len(repos)} repo(s), population {scope}\n")
     header = (
         f"{'repo':<24} {'targets':>8} {'#![cfg]':>8} {'w/ req-f':>9} "
-        f"{'SILENT-NOW':>11} {'latent':>7} {'platform':>9} {'any()':>6}"
+        f"{'SILENT-NOW':>11} {'load-bear':>10} {'latent':>7} {'platform':>9} "
+        f"{'any()':>6}"
     )
     print(header)
     print("-" * len(header))
@@ -392,7 +536,8 @@ def main(argv: list[str]) -> int:
         latent += len(rep.silent_latent())
         print(
             f"{rep.repo:<24} {rep.scanned:>8} {rep.gated:>8} {rep.covered:>9} "
-            f"{len(rep.silent_now()):>11} {len(rep.silent_latent()):>7} "
+            f"{len(rep.silent_now()):>11} {len(rep.silent_now_load_bearing()):>10} "
+            f"{len(rep.silent_latent()):>7} "
             f"{len(rep.unexpressible):>9} {len(rep.any_of):>6}"
         )
 
@@ -408,7 +553,8 @@ def main(argv: list[str]) -> int:
         for f in sorted(rep.silent_now(), key=lambda x: x.path):
             feats = ", ".join(f.features)
             plat = f" +[{', '.join(f.predicates)}]" if f.predicates else ""
-            print(f"    {f.path}")
+            mark = "  [LOAD-BEARING]" if f.load_bearing else ""
+            print(f"    {f.path}{mark}")
             print(f"      cfg: feature = {feats}{plat}  —  {f.reason}")
             print(
                 f'      fix: [[{f.kind}]] / name = "{f.name}" / '
