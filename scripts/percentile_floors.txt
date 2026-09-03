@@ -1,0 +1,25 @@
+# Pins for scripts/percentile_floor_gate.py — katgpt-rs scope only.
+#
+# Re-pin DELIBERATELY, in the commit that changes the measured value, with the
+# reason in the commit message. A pin that drifts behind reality is a pin
+# nobody trusts.
+#
+# The three CEILINGS are the verdict: a new percentile site whose index lands
+# on n-1 reds the push that adds it, before its number is quoted in a
+# .benchmarks table as though it were a tail.
+max_degenerate = 0
+max_degenerate_asserted = 0
+max_weak_asserted = 0
+
+# The FLOOR is not redundant with them, and it is the pin that earns its keep.
+#
+# `max_degenerate = 0` is green over whatever the auditor's vocabulary can
+# NAME, so a tokenizer regression takes the population to ~0 and every ceiling
+# passes — indistinguishable from a clean repo. That is exactly how the
+# katgpt-rs `cfg_gated_floor_gate.py` hazard worked (AGENTS.md: "a ceiling
+# cannot fail once the instrument goes blind and reports zero").
+#
+# Deliberately slack against normal churn (measured 40; deleting a bench or
+# two must not red the gate) and tight against blindness (a vocabulary or
+# scoping regression drops it by an order of magnitude, not by two).
+min_sites_scanned = 30

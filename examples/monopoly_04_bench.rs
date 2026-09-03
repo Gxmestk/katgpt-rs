@@ -119,11 +119,27 @@ fn main() {
 
     // ── Latency Distribution ──
     game_times.sort();
+    // `scripts/percentile_index_audit.py`: `xs[n * 99 / 100]` is `xs[n - 1]`
+    // -- the MAX -- for every n <= 100, and BENCH_GAMES is 100, so the printed
+    // p99 WAS the max. p90 is fine (support 10); p99 is nearest-rank with its
+    // support printed, because at this sample count it rests on 2 games.
     let p50 = game_times[BENCH_GAMES * 50 / 100];
-    let p90 = game_times[BENCH_GAMES * 90 / 100];
-    let p99 = game_times[BENCH_GAMES * 99 / 100];
+    let (p90, p90_s) = nearest_rank(&game_times, 0.90);
+    let (p99, p99_s) = nearest_rank(&game_times, 0.99);
     println!("─── Latency Distribution ────────────────────────────────────────");
     println!("  p50: {p50}µs ({:.2}ms)", p50 as f64 / 1000.0);
-    println!("  p90: {p90}µs ({:.2}ms)", p90 as f64 / 1000.0);
-    println!("  p99: {p99}µs ({:.2}ms)", p99 as f64 / 1000.0);
+    println!("  p90: {p90}µs ({:.2}ms)  [support {p90_s}]", p90 as f64 / 1000.0);
+    println!("  p99: {p99}µs ({:.2}ms)  [support {p99_s}]", p99 as f64 / 1000.0);
+}
+
+/// Nearest-rank quantile of a **sorted** slice, plus its **tail support** —
+/// the count of samples at or above the returned rank.
+///
+/// `ceil(p * n) - 1`, not `floor(p * n)`: the latter lands on `n - 1` for
+/// every `n <= 1 / (1 - p)`, returning the maximum under a percentile's name.
+fn nearest_rank(sorted: &[u128], p: f64) -> (u128, usize) {
+    let n = sorted.len();
+    assert!(n > 0, "nearest_rank on an empty sample set");
+    let idx = ((p * n as f64).ceil() as usize).clamp(1, n) - 1;
+    (sorted[idx], n - idx)
 }

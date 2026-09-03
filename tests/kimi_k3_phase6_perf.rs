@@ -178,14 +178,20 @@ fn g2b_per_layer_timing_breakdown() {
     }
 
     latencies_us.sort();
+    // `scripts/percentile_index_audit.py`: `xs[(N * 99) / 100]` is `xs[N - 1]`
+    // for every N <= 100, so at N = 16 the printed "p99" was simply the max --
+    // one of 16 samples. No tail quantile is recoverable at this count: a
+    // support of 10 would need `ceil(p * 16) - 1 <= 6`, i.e. p <= 0.44. So
+    // report the max under its own name rather than dress one sample up as a
+    // percentile.
     let p50 = latencies_us[N / 2];
-    let p99 = latencies_us[(N * 99) / 100];
+    let max = latencies_us[N - 1];
     let mean: f64 = latencies_us.iter().sum::<u128>() as f64 / N as f64;
 
     eprintln!();
     eprintln!("   Per-token latency (N={N}):");
     eprintln!("     p50  : {p50:>6} µs");
-    eprintln!("     p99  : {p99:>6} µs");
+    eprintln!("     max  : {max:>6} µs  (N={N} supports no tail quantile)");
     eprintln!("     mean : {mean:>6.1} µs");
     eprintln!();
     eprintln!("   Architectural cost profile (8 layers):");

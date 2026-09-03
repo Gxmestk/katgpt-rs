@@ -68,6 +68,7 @@ CHECKS=(
     "scripts/skill_repo_set_gate.py:hand-typed repo sets in SKILL.md command blocks (Issue 703)"
     "scripts/cfg_gated_floor_gate.py:#![cfg]-gated targets that report a green 0-pass (Issue 713)"
     "scripts/orphaned_attr_gate.py:a #[cfg] separated from its item by a blank line (a08376a0)"
+    "scripts/percentile_floor_gate.py:a percentile index that lands on n-1 and so reports the MAX"
 )
 
 if ! command -v python3 >/dev/null 2>&1; then

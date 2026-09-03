@@ -232,6 +232,22 @@ paragraph said "the three" for one commit after the fourth was added):
   the audit recognises fewer labels and still prints "0 mismatches". That is how
   26 riir-chain benchmark docs audited as clean while being unreadable
   (`.docs/10_audits/sibling_doc_drift_auditors.md`).
+- `percentile_floor_gate.py` is the GATE over
+  `percentile_index_audit.py` (pins in `scripts/percentile_floors.txt`),
+  katgpt-rs-scoped like the cfg-gated one and separate from its report for the
+  same reason. What it buys: a new site whose percentile index lands on `n - 1`
+  reds the push that adds it, **before** that number is quoted in a
+  `.benchmarks/` table as though it were a tail — print-only or asserted, a
+  misleading number in a benchmark doc is the input to somebody's
+  promote/demote decision. It imports the report rather than re-implementing
+  the tokenizer, and runs the report's `selftest()` first, exiting **2** if the
+  instrument itself is untrustworthy — a distinct outcome from a moved pin.
+  `min_sites_scanned` is a **FLOOR** for the reason spelled out in that file:
+  the three ceilings are green over whatever the vocabulary can NAME, so a
+  tokenizer regression takes the population to ~0 and every ceiling passes,
+  indistinguishable from a clean repo. Canaried in both directions before
+  landing (a planted degenerate site → exit 1; the floor raised above the
+  measured population → exit 1).
 
 ### The docs gate covers ONE repo — two more tiers cover the rest
 
