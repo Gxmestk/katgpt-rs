@@ -40,10 +40,31 @@
 #                      ignored, which docs_drift_floors.txt's header already
 #                      argues at length. Set at roughly 75% of observed.
 #
+#   max_reasonless_ignores   Issue 713 T6's SECOND axis, and the one pin that
+#                            axis defensibly supports. A target where EVERY test
+#                            is #[ignore]d prints `ok. 0 passed` forever, which
+#                            is legitimate for a slow or hardware-gated test —
+#                            so the COUNT is not gateable. What is gateable is
+#                            that the source SAYS WHY: an `#[ignore]` with no
+#                            reason string leaves no reader able to tell a
+#                            deliberate manual-only test from one parked during
+#                            a refactor and forgotten. 27 such ignores across 8
+#                            targets were given their file's OWN documented
+#                            reason on 2026-09-03; the reason now appears in
+#                            cargo's output, where the reader actually is.
+#   min_ignore_targets       the matching blindness floor. Same argument as
+#                            min_targets: the reasonless pin is a ceiling of
+#                            zero, and a parser that stops recognising
+#                            `#[test]` satisfies it perfectly.
+#
 # Observed 2026-09-03: 921 targets, 541 gated, 376 covered, 63 SILENT-NOW,
-# 0 load-bearing SILENT-NOW, 100 latent, 1 platform, 1 any().
+# 0 load-bearing SILENT-NOW, 100 latent, 2 platform (0 positive), 1 any();
+# 653 ignore-scanned targets, 460 with tests, 19 ALL-IGNORED (3 load-bearing),
+# 0 reasonless.
 
 max_load_bearing	0
 max_silent_now	63
 min_targets	700
 min_gated	400
+max_reasonless_ignores	0
+min_ignore_targets	400

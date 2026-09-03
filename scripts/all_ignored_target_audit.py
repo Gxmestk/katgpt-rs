@@ -482,6 +482,11 @@ def selftest() -> None:
 def main(argv: list[str]) -> int:
     selftest()
 
+    argv = list(argv)
+    as_json = "--json" in argv
+    if as_json:
+        argv.remove("--json")
+
     if len(argv) > 1:
         repos = [Path(a).resolve() for a in argv[1:]]
         scope = "argument"
@@ -489,6 +494,33 @@ def main(argv: list[str]) -> int:
         here = Path(__file__).resolve().parent.parent
         repos = derive_repos(here.parent)
         scope = "derived (BOUNDARY.md + .git)"
+
+    if as_json:
+        # Machine-readable, for `cfg_gated_floor_gate.py`'s reasonless pin. The
+        # consumer must not re-derive any of this — a second copy of the parser
+        # is a second thing to keep in step.
+        import json
+
+        out = {}
+        for r in (audit(x) for x in repos):
+            reasonless = [
+                t.path for t in r.all_ignored if any(not x.strip() for x in t.reasons)
+            ]
+            out[r.repo] = {
+                "scanned": r.scanned,
+                "with_tests": r.with_tests,
+                "all_ignored": len(r.all_ignored),
+                "all_ignored_load_bearing": sum(
+                    1 for t in r.all_ignored if t.load_bearing
+                ),
+                "reasonless_targets": len(reasonless),
+                "reasonless_paths": sorted(reasonless),
+                "partial": r.partial,
+                "no_tests": len(r.no_tests),
+                "ambiguous": r.ambiguous,
+            }
+        print(json.dumps(out, indent=2, sort_keys=True))
+        return 0
 
     print(f"all-ignored target audit — {len(repos)} repo(s), population {scope}\n")
     header = (

@@ -43,9 +43,17 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AUDITOR = REPO_ROOT / "scripts" / "cfg_gated_target_audit.py"
+IGNORE_AUDITOR = REPO_ROOT / "scripts" / "all_ignored_target_audit.py"
 PINS_FILE = REPO_ROOT / "scripts" / "cfg_gated_floors.txt"
 
-REQUIRED_PINS = ("max_load_bearing", "max_silent_now", "min_targets", "min_gated")
+REQUIRED_PINS = (
+    "max_load_bearing",
+    "max_silent_now",
+    "min_targets",
+    "min_gated",
+    "max_reasonless_ignores",
+    "min_ignore_targets",
+)
 
 
 def read_pins() -> dict[str, int]:
@@ -105,23 +113,51 @@ def check(m: dict[str, int], pins: dict[str, int]) -> list[str]:
             f"{pins['min_gated']} — the gate-recognition regex has gone blind. "
             "SILENT-NOW would read 0 for the wrong reason."
         )
+
+    # Issue 713 T6's axis. `#[ignore]` itself is NOT gated — it is the correct
+    # marker for a slow or hardware-gated test — but a reasonless one is: it
+    # leaves no reader able to tell a deliberate manual-only test from one
+    # parked during a refactor and forgotten. Ceiling + its own blindness floor,
+    # for the same reason as every other pair here.
+    rl = m["reasonless_targets"]
+    if rl > pins["max_reasonless_ignores"]:
+        fail.append(
+            f"{rl} target(s) where EVERY test is #[ignore]d carry at least one "
+            f"#[ignore] with NO reason string (pinned "
+            f"{pins['max_reasonless_ignores']}). Such a target prints "
+            "`ok. 0 passed` forever and says nothing about why. Add "
+            '`#[ignore = "..."]` — cargo prints the string in its output. Run '
+            "scripts/all_ignored_target_audit.py . for the paths."
+        )
+    if m["ignore_scanned"] < pins["min_ignore_targets"]:
+        fail.append(
+            f"the ignore audit scanned only {m['ignore_scanned']} targets, floor "
+            f"{pins['min_ignore_targets']} — its `#[test]` recogniser has gone "
+            "blind, and a reasonless-ignore ceiling of zero is then satisfied "
+            "perfectly by seeing nothing."
+        )
     return fail
 
 
-def measure() -> dict[str, int]:
-    """Shell out to the auditor. Its selftest() runs, and its failure is ours."""
+def run_auditor(script: Path) -> dict:
+    """Shell out. The auditor's selftest() runs, and its failure is ours."""
     proc = subprocess.run(
-        [sys.executable, str(AUDITOR), "--json", str(REPO_ROOT)],
+        [sys.executable, str(script), "--json", str(REPO_ROOT)],
         capture_output=True,
         text=True,
     )
     if proc.returncode != 0:
         raise SystemExit(
-            f"✗ {AUDITOR.name} failed (exit {proc.returncode}) — its selftest() or "
+            f"✗ {script.name} failed (exit {proc.returncode}) — its selftest() or "
             f"its parse is broken, so there is no measurement to gate on:\n"
             f"{proc.stderr.strip()}"
         )
-    data = json.loads(proc.stdout)
+    return json.loads(proc.stdout)
+
+
+def measure() -> dict[str, int]:
+    """Both auditors, merged into one measurement dict."""
+    data = run_auditor(AUDITOR)
     # Keyed by directory NAME, and the checkout directory is not guaranteed to
     # be `katgpt-rs` (a fork, a worktree, a rename). Exactly one repo was
     # requested, so exactly one row is the correct answer regardless of what it
@@ -131,7 +167,18 @@ def measure() -> dict[str, int]:
             f"✗ auditor returned {len(data)} rows for one repo ({list(data)}) — "
             "refusing to report a verdict over an ambiguous population"
         )
-    return next(iter(data.values()))
+    m = dict(next(iter(data.values())))
+
+    ig = run_auditor(IGNORE_AUDITOR)
+    if len(ig) != 1:
+        raise SystemExit(
+            f"✗ ignore auditor returned {len(ig)} rows for one repo ({list(ig)})"
+        )
+    igm = next(iter(ig.values()))
+    m["reasonless_targets"] = igm["reasonless_targets"]
+    m["ignore_scanned"] = igm["scanned"]
+    m["all_ignored"] = igm["all_ignored"]
+    return m
 
 
 def selftest() -> None:
@@ -148,11 +195,15 @@ def selftest() -> None:
         "min_targets": 700,
         "min_gated": 400,
     }
+    pins["max_reasonless_ignores"] = 0
+    pins["min_ignore_targets"] = 400
     ok = {
         "scanned": 921,
         "gated": 541,
         "silent_now": 63,
         "silent_now_load_bearing": 0,
+        "reasonless_targets": 0,
+        "ignore_scanned": 653,
     }
     assert check(ok, pins) == [], "the observed measurement must pass"
 
@@ -163,8 +214,17 @@ def selftest() -> None:
 
     # Floors: the blind-instrument case. This is the one that matters — a
     # report of all zeroes satisfies both ceilings.
-    blind = {"scanned": 0, "gated": 0, "silent_now": 0, "silent_now_load_bearing": 0}
-    assert len(check(blind, pins)) == 2, "a blind auditor passed the gate"
+    assert check({**ok, "reasonless_targets": 1}, pins), "a reasonless ignore passed"
+
+    blind = {
+        "scanned": 0,
+        "gated": 0,
+        "silent_now": 0,
+        "silent_now_load_bearing": 0,
+        "reasonless_targets": 0,
+        "ignore_scanned": 0,
+    }
+    assert len(check(blind, pins)) == 3, "a blind auditor passed the gate"
 
     # A shrunken-but-nonzero population must still red, or the floor is only
     # catching total death and not degradation.
@@ -179,7 +239,9 @@ def main() -> int:
     print(
         f"cfg-gated target floor gate — {REPO_ROOT.name}: "
         f"{m['scanned']} targets, {m['gated']} #![cfg]-gated, {m['covered']} covered, "
-        f"SILENT-NOW {m['silent_now']} (load-bearing {m['silent_now_load_bearing']})"
+        f"SILENT-NOW {m['silent_now']} (load-bearing {m['silent_now_load_bearing']}), "
+        f"{m['all_ignored']} all-#[ignore]d target(s), "
+        f"{m['reasonless_targets']} of them reasonless"
     )
 
     fail = check(m, pins)

@@ -60,7 +60,7 @@ fn bench_ns_inv_sqrt(r: usize, n_iters: u8, warmup: usize, rounds: usize) -> f64
 }
 
 #[test]
-#[ignore]
+#[ignore = "performance measurement for ns_inv_sqrt_psd_into at r=32/64; run with --release --ignored"]
 fn issue043_perf_r32_r64() {
     // r=32 (typical LoRA rank)
     let us32 = bench_ns_inv_sqrt(32, 7, 10, 5);

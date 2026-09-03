@@ -405,6 +405,46 @@ shapes are pinned, and two matter specifically:
   since `26d055c6`. Fixed in `a08376a0`, class gated at zero by
   `scripts/orphaned_attr_gate.py`.
 
+  **T6 now carries the one pin its axis defensibly supports.** Not the count —
+  `#[ignore]` is correct for a slow or hardware-gated test — but *whether the
+  source says why*. **27 reasonless `#[ignore]`s across 8 katgpt-rs targets**
+  were given their own file's **documented** reason, which in every case
+  already existed in a doc comment far from the attribute, where a reader of
+  cargo's output never sees it:
+
+  ```
+  test go_integration::board_state_is_consistent ... ignored, requires a
+  running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored
+  ```
+
+  No reason was invented. Where a file documented none (`issue043`,
+  `test_120`), the reason states what the file demonstrably **is** — measured,
+  not guessed: `velocity_field_disagreement_uq_floor.rs` got *"prints a
+  comparison table (0 assertions, 41 println)"* because that is what a count of
+  its assertions returned. A wrong reason is worse than none: it stops the next
+  reader checking.
+
+  Pinned at **0** in `cfg_gated_floors.txt` (`max_reasonless_ignores`, with
+  `min_ignore_targets` as its blindness floor — a ceiling of zero is satisfied
+  perfectly by a parser that sees nothing). Canaried: a bare `#[ignore]` in a
+  throwaway target reds the gate and its removal greens it.
+
+  **A third silent-zero shape was measured and is NOT worth an instrument.**
+  A load-bearing target with **zero verdict expressions** (`assert*!`,
+  `panic!`, `unreachable!`, `.expect`, `.unwrap`) can never fail even when it
+  runs. katgpt-rs: **2** — `bench_483_lt2_loop_stable_goat` and
+  `bench_octopus_goat`, both self-described measurement benchmarks (the
+  latter's `#[ignore]` reason literally says *"pure measurement benchmark (no
+  assertions)"*). Measured rather than assumed, and the answer is small and
+  benign, so it gets a sentence here instead of a gate.
+
+  **`#![cfg(test)]` on an integration target is confirmed a NO-OP** by
+  execution, not by reasoning about cargo's flags: `cargo test -p katgpt-core
+  --features personality_composition --test
+  personality_composition_integration_check` → `1 passed`. cargo passes
+  `--test`, so `cfg(test)` holds. That closes the 8-target `cfg(test)` class
+  in T5 as decorative.
+
   **NO-TESTS (31 workspace-wide) is reported apart** — a file under `tests/`
   with no test attribute and cargo's own harness. `harness = false` targets are
   excluded: a custom-harness target legitimately has no `#[test]` and its exit

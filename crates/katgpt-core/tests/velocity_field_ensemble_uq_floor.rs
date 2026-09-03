@@ -208,7 +208,7 @@ impl UqPrimitiveUnderTest for VfeForecastAdapter {
 /// default `cargo test` — invoke explicitly with `--ignored` (the test prints
 /// a verdict table that should be captured to `.benchmarks/376_uq_floor.md`).
 #[test]
-#[ignore]
+#[ignore = "prints a VFE-vs-conformal-floor comparison table; run with --release --ignored"]
 fn vfe_vs_conformal_floor_ar1() {
     // Build the test corpus: N_TRAIN + N_TEST steps of AR(1).
     let full = generate_ar1(N_TRAIN + N_TEST, PHI, SIGMA, SEED);

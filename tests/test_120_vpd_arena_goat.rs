@@ -123,7 +123,7 @@ fn goat_config() -> BomberArenaConfig {
 // feedback signals (per-tick outcome attribution, multi-round memory).
 
 #[test]
-#[ignore]
+#[ignore = "arena proof over 1000 Bomber games per test — minutes, not seconds; run with --release --ignored"]
 fn test_goat_vpd_geq_sdar_arena() {
     let config = goat_config();
     let base_seed: u64 = 0;
@@ -165,7 +165,7 @@ fn test_goat_vpd_geq_sdar_arena() {
 // Same seed sequence ensures identical maps — only AI config differs.
 
 #[test]
-#[ignore]
+#[ignore = "arena proof over 1000 Bomber games per test — minutes, not seconds; run with --release --ignored"]
 fn test_goat_dynamic_prior_geq_fixed() {
     let config = goat_config();
     let base_seed: u64 = 10_000;
@@ -205,7 +205,7 @@ fn test_goat_dynamic_prior_geq_fixed() {
 // Same seed sequence ensures identical maps — only frequency differs.
 
 #[test]
-#[ignore]
+#[ignore = "arena proof over 1000 Bomber games per test — minutes, not seconds; run with --release --ignored"]
 fn test_goat_frequency_f5_optimal() {
     let config = goat_config();
     let base_seed: u64 = 20_000;

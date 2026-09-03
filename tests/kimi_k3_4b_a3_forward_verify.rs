@@ -65,7 +65,7 @@ fn approx_param_count(config: &KimiK3ModelConfig) -> usize {
 }
 
 #[test]
-#[ignore]
+#[ignore = "allocates ~17.7 GB and runs a single-token forward at 4B (slow in debug); run with --release --ignored"]
 fn a3_4b_forward_pass_finite_logits() {
     if skip_requested() {
         eprintln!("skipping: KIMI_K3_4B_SKIP=1");
@@ -185,7 +185,7 @@ fn a3_4b_forward_pass_finite_logits() {
 /// caches + scratch + block state all fit. The expected MLA KV cache at 256K
 /// is ~1.81 GB (3 MLA layers × 576 bytes/token × 262144 tokens).
 #[test]
-#[ignore]
+#[ignore = "allocates ~17.7 GB and runs a single-token forward at 4B (slow in debug); run with --release --ignored"]
 fn a5_4b_256k_kv_cache_allocates() {
     if skip_requested() {
         eprintln!("skipping: KIMI_K3_4B_SKIP=1");

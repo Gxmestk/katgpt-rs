@@ -109,12 +109,27 @@ as it must be. Two of the 26 are the ones fixed here.
   *clippy* pass costs multiples of this and buys almost nothing extra here.
   (The registry cache was warm; CI pays download time it already pays.)
 
-  **Canaried over three real logs**, since a gate's failing path is the half
-  that never runs: the release-clippy log that found the two breaks →
-  `FAILED` (277 units, 3 errors); the cold post-fix log → `PASSED` (394 units,
-  0 errors); an empty log → `INCONCLUSIVE`, not a pass. Layer 6 carries its own
-  ANSI strip, because colour codes ahead of every `^`-anchor zeroed every
-  counter in this gate's first two CI runs (`.issues/705`).
+  **Its first in-situ run found a bug in itself, which is why it was run.**
+  The first cut counted `Compiling`/`Checking` lines, the way Layer 3 does, and
+  reported **INCONCLUSIVE** on a tree whose release artifacts were already
+  warm: cargo compiled 0 units and printed nothing. *Freshness must not decide
+  a liveness verdict.* Log-replay canaries had all passed — the flaw was only
+  visible when the layer ran against a real warm tree.
+
+  Fixed by measuring `--message-format=json` `compiler-artifact` records, which
+  cargo emits for **fresh** units too. Measured on the same warm tree:
+  **3 `Checking` lines vs 1,423 artifacts.** The JSON census is also immune to
+  the ANSI-colour trap that zeroed every `^`-anchored counter in this gate's
+  first two CI runs (`.issues/705`) — the keys carry no colour codes, so no
+  strip step is needed rather than one being carefully maintained.
+
+  **Canaried two-sided on the real warm tree**, not on synthetic logs:
+
+  | arm | artifacts | errors | verdict |
+  |---|---|---|---|
+  | fixed tree, warm | 1,423 | 0 | **PASSED** |
+  | one of the two breaks reintroduced | 1,422 | 1 | **FAILED**, with the rendered `E0432` |
+  | restored | 1,423 | 0 | **PASSED**, tree clean |
 - [ ] **T3 (owner call, sibling repos)** 19 repos, none of which run a release
   pass either. Whether each wants one is its owner's call, the same shape as
   `.issues/713` T3.

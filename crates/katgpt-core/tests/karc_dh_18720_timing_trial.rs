@@ -59,7 +59,7 @@ fn random_spd_gram(state: &mut u64, a_out: &mut [f64], n: usize) {
 }
 
 #[test]
-#[ignore]
+#[ignore = "~1 hour wall-time measurement at d_h=18720, not a unit test; run with --release --ignored"]
 fn dh_18720_parallel_timing() {
     use std::time::Instant;
 

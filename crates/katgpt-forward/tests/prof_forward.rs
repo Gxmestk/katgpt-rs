@@ -108,7 +108,7 @@ fn run_decode_loop(
 }
 
 #[test]
-#[ignore]
+#[ignore = "profiling harness — per-phase cost measurement, not a pass/fail test; run with --release --ignored"]
 fn prof_forward_phase_breakdown() {
     let config = medium_config();
     println!();
@@ -185,7 +185,7 @@ fn forward_f16_once(
 }
 
 #[test]
-#[ignore]
+#[ignore = "profiling harness — per-phase cost measurement, not a pass/fail test; run with --release --ignored"]
 fn g1_f16_approximate_correctness() {
     let config = medium_config();
     let mut rng = katgpt_types::Rng::new(42);
@@ -239,7 +239,7 @@ fn g1_f16_approximate_correctness() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "profiling harness — per-phase cost measurement, not a pass/fail test; run with --release --ignored"]
 fn g2_f16_speedup_vs_f32() {
     // Test at both medium (fits in L3) and large (exceeds L3) configs.
     // The f16 win only materializes when the model exceeds cache — the
@@ -326,7 +326,7 @@ fn g2_f16_speedup_vs_f32() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "profiling harness — per-phase cost measurement, not a pass/fail test; run with --release --ignored"]
 fn g1_g2_f16_combined_report() {
     // Combined report for convenience — runs both G1 and G2 in one test.
     g1_f16_approximate_correctness();

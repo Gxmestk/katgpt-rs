@@ -87,7 +87,7 @@ mod go_integration {
     // ── Basic API Tests ────────────────────────────────────────
 
     #[test]
-    #[ignore] // Requires running AutoGo server
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn list_agents_returns_nonempty() {
         let client = client();
         let agents = client.list_agents().expect("list_agents failed");
@@ -96,7 +96,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn list_agents_includes_random() {
         let client = client();
         let agents = client.list_agents().expect("list_agents failed");
@@ -107,7 +107,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn new_game_9x9_black() {
         let client = client();
         let state = client
@@ -127,7 +127,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn new_game_9x9_white_triggers_ai_first() {
         let client = client();
         let state = client
@@ -152,7 +152,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn make_move_returns_updated_state() {
         let client = client();
         let state = client
@@ -180,7 +180,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn get_game_returns_same_state() {
         let client = client();
         let state = client
@@ -195,7 +195,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn pass_move_increments_consecutive_passes() {
         let client = client();
         let state = client
@@ -212,7 +212,7 @@ mod go_integration {
     // ── Full Game Flow Tests ───────────────────────────────────
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn random_game_9x9_completes() {
         let client = client();
         let (final_state, moves) = play_random_game(&client, 9, "black", "random");
@@ -232,7 +232,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn random_game_white_also_completes() {
         let client = client();
         let (final_state, moves) = play_random_game(&client, 9, "white", "random");
@@ -250,7 +250,7 @@ mod go_integration {
     // ── Multi-Game Stress Test ─────────────────────────────────
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn ten_random_games_all_complete() {
         let client = client();
         let mut completed = 0usize;
@@ -284,7 +284,7 @@ mod go_integration {
     // ── Latency Measurement (T8) ──────────────────────────────
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn measure_api_latency() {
         let client = client();
         let num_games = 5;
@@ -354,7 +354,7 @@ mod go_integration {
     // ── Board State Validation ─────────────────────────────────
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn board_state_is_consistent() {
         let client = client();
         let state = client
@@ -393,7 +393,7 @@ mod go_integration {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "requires a running AutoGo server (scripts/autogo_server.sh); run with --features go --ignored"]
     fn game_result_format_is_valid() {
         let client = client();
         let (final_state, _) = play_random_game(&client, 9, "black", "random");

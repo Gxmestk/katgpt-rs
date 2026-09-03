@@ -512,7 +512,7 @@ fn compute_kappa_sum_factor(schedule: Schedule, n_steps: usize) -> f32 {
 /// training halves. The VFD score varies with y² (high when |y| is large).
 /// λ is grid-search-calibrated on training CRPS (includes λ=0 baseline).
 #[test]
-#[ignore]
+#[ignore = "prints a VFD-vs-conformal-floor comparison table (0 assertions, 41 println); run with --release --ignored"]
 fn vfd_vs_floor_ar1() {
     // Generate full corpus.
     let full = generate_ar1(N_TRAIN + N_TEST, AR1_PHI, AR1_SIGMA, SEED);
@@ -610,7 +610,7 @@ fn vfd_vs_floor_ar1() {
 /// markov-switching process between the two modes. VFD score is constant
 /// (constant disagreement between attractors).
 #[test]
-#[ignore]
+#[ignore = "prints a VFD-vs-conformal-floor comparison table (0 assertions, 41 println); run with --release --ignored"]
 fn vfd_vs_floor_bimodal() {
     let mode = 2.0_f32;
     let sigma = 0.5_f32;

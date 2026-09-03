@@ -299,33 +299,42 @@ fi
 #
 # Liveness, not just an error count (.issues/705): a run that compiles nothing
 # reports zero errors, which reads exactly like a pass.
-REL_ARGS=(cargo check --workspace --all-targets --all-features --keep-going --release)
+# --message-format=json, and that is the load-bearing choice here. The first
+# cut counted "Compiling"/"Checking" lines like Layer 3 does, and reported
+# INCONCLUSIVE on its very first in-situ run: the release tree was already warm,
+# so cargo compiled 0 units and printed nothing. Freshness must not decide a
+# liveness verdict. `compiler-artifact` records ARE emitted for fresh units â
+# measured on the same warm tree, 3 "Checking" lines vs 1,423 artifacts.
+#
+# It also makes this layer immune to the ANSI-colour trap that zeroed every
+# ^-anchored counter in this gate's first two CI runs (.issues/705): JSON keys
+# carry no colour codes.
+REL_ARGS=(cargo check --workspace --all-targets --all-features --keep-going --release
+    --message-format=json)
 echo "▸ Layer 6: profile axis — ${REL_ARGS[*]}"
 REL_LOG="$(mktemp -t full_gate_release)"
 "${REL_ARGS[@]}" > "$REL_LOG" 2>&1 || true
-# Same ANSI strip as Layer 3: colour codes ahead of every ^-anchor zeroed every
-# counter in this gate's first two CI runs (.issues/705).
-REL_CLEAN="$(mktemp -t full_gate_release_clean)"
-sed $'s/\033\[[0-9;]*m//g' "$REL_LOG" > "$REL_CLEAN"
-REL_UNITS=$({ grep -cE '^[[:space:]]*(Compiling|Checking) ' "$REL_CLEAN" || true; })
-REL_ERRS=$({ grep -cE '^error(\[|:)' "$REL_CLEAN" || true; })
+REL_UNITS=$({ grep -c '"reason":"compiler-artifact"' "$REL_LOG" || true; })
+REL_ERRS=$({ grep -c '"level":"error"' "$REL_LOG" || true; })
 
 if [ "$REL_UNITS" -eq 0 ]; then
-    echo "✗ full gate INCONCLUSIVE — the release pass compiled 0 units, so it"
-    echo "  verified NOTHING about the debug_assertions-off configuration."
-    echo "  log: $REL_CLEAN"
+    echo "✗ full gate INCONCLUSIVE — the release pass produced 0"
+    echo "  compiler-artifact records, so it verified NOTHING about the"
+    echo "  debug_assertions-off configuration. Unlike a zero unit count this is NOT"
+    echo "  explained by a warm target dir: artifacts are reported for fresh units"
+    echo "  too. Cargo did not run."
+    echo "  log: $REL_LOG"
     exit 1
 fi
 if [ "$REL_ERRS" -ne 0 ]; then
     echo "✗ full gate FAILED — $REL_ERRS error diagnostic(s) in the RELEASE profile"
     echo "  (the dev-profile pass above was clean: this is the debug_assertions axis)"
-    grep -E '^error(\[|:)' "$REL_CLEAN" | sort | uniq -c | sed 's/^/    /'
-    grep -A3 -m1 -E '^error(\[|:)' "$REL_CLEAN" | sed 's/^/    /'
-    echo "  log: $REL_CLEAN"
+    { grep -o '"rendered":"error[^"]*' "$REL_LOG" | sort -u | head -10 | sed 's/^/    /'; } || true
+    echo "  log: $REL_LOG"
     exit 1
 fi
-rm -f "$REL_LOG" "$REL_CLEAN"
-echo "  ✓ release profile clean ($REL_UNITS unit(s) compiled)"
+rm -f "$REL_LOG"
+echo "  ✓ release profile clean ($REL_UNITS compiler-artifact record(s))"
 
 # UNITS is printed on every pass, not just when it is interesting: the number
 # that would have exposed the vacuous CI green was never on screen.
