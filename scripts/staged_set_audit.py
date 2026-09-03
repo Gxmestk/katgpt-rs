@@ -130,6 +130,16 @@ def selftest() -> None:
     # that verdict authorises a revert, so its failure mode is destructive
     # while every other signal here only over- or under-warns.
     assert fmt_roundtrip(Path("."), "README.md")[0] == "skip", "non-Rust is skip"
+    # Signal 3 must not be gated on freshness. A file regenerated AFTER its
+    # commit has a newer mtime and is precisely the append-only-evidence
+    # truncation case, so any reintroduced `mtime >= commit_t: continue`
+    # would silently restore that blind spot.
+    import inspect as _inspect
+
+    _src = _inspect.getsource(stale_vs_head)
+    assert "mtime >= commit_t" not in _src.replace("# ", ""), (
+        "signal 3 must not pre-filter on mtime"
+    )
     assert sorted(["// why", "let x = 1;"], key=is_comment)[0] == "let x = 1;", (
         "code sorts first"
     )
@@ -229,19 +239,28 @@ def stale_vs_head(
 ) -> list[tuple[str, float, float, list[str]]]:
     """Paths whose worktree copy would REVERT the newest commit touching them.
 
-    Two stages, because each alone is wrong:
+    **Line containment is the whole test.** Only lines the newest commit on a
+    path ADDED, and the worktree copy LACKS, are evidence — restricted to lines
+    specific enough that their absence means something (a `}` proves nothing).
 
-    - **mtime < commit time** is the cheap filter, and on its own it
-      false-positives on the commonest shape there is: you edit a file at
-      21:03 and commit it at 21:04, so the commit that last touched the path
-      IS your own edit. Measured — this flagged two such files here.
-    - **line containment** is the confirmation and is what the warning
-      actually claims. Only lines the newest commit ADDED and the worktree
-      copy LACKS are evidence.
+    This once had an `mtime < commit_time` pre-filter, added because that
+    comparison alone false-positives on the commonest shape there is: you edit
+    at 21:03 and commit at 21:04, so the newest commit on that path is your own
+    edit. **Removed 2026-09-03 — it was redundant AND blinding.** Redundant
+    because containment already cleared both of those false positives on its
+    own; blinding because a file *regenerated after* its commit has a NEWER
+    mtime and was skipped before containment ever ran.
 
-    A path with no HEAD history (newly added) cannot be stale. mtime after the
-    commit is the safe direction: a checkout stamps now, so a fresh file always
-    looks current.
+    That blind spot was live, not hypothetical: a tracked benchmark
+    contamination log in `riir-ai` had been overwritten by a later, clean
+    sample — 33 committed lines of evidence (concurrent cargo builds, Zed at
+    160% CPU) replaced by one line reading as a clean run. mtime 03:33 against
+    a 15:39 commit the previous day, so the pre-filter excluded it and the
+    audit reported the tree clean. Append-only evidence artifacts are exactly
+    the files this check exists for and exactly the ones a freshness heuristic
+    cannot see.
+
+    A path with no HEAD history (newly added) cannot be stale.
     """
     out: list[tuple[str, float, float, list[str]]] = []
     for p in paths:
@@ -253,8 +272,7 @@ def stale_vs_head(
             continue
         commit_t, sha = float(head[0]), head[1]
         mtime = f.stat().st_mtime
-        if mtime >= commit_t:
-            continue
+        # No freshness pre-filter: see the docstring. Containment decides.
         lost = reverted_lines(repo, p, sha)
         if lost:
             out.append((p, mtime, commit_t, lost))
