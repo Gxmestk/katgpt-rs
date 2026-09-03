@@ -1,10 +1,13 @@
-# Issue 718 — CI compiles every gate in this repo and EXECUTES none
+# Issue 718 — CI compiles every gate and EXECUTES none (katgpt-rs, riir-train, riir-game-sdk)
 
-**Status:** OPEN — T1 DONE, **T2 WITHDRAWN on measurement (its premise was
+**Status:** OPEN — T1 + T4 DONE, **T2 WITHDRAWN on measurement (its premise was
 false — no Rust selftest population exists; the 9 Python auditor selftests
-are already run per-push, and T2 collapses into T3)**, filed 2026-09-03. T3 (a full test job) is an
-owner cost call. Found sideways, while closing a *different* instance of the
-same class in seal-remake (`seal-remake` `e1ead85`).
+are already run per-push, and T2 collapses into T3)**, filed 2026-09-03.
+T4's sweep found **two more repos in the same state — riir-train (15,147
+`#[test]` sites) and riir-game-sdk (1,035, via a cron that has never
+fired)** — so this is a workspace pattern, not a katgpt-rs defect. Only T3
+remains and it is an OWNER COST CALL. Found sideways, while closing a
+*different* instance of the same class in seal-remake (`e1ead85`).
 
 ## The measurement
 
@@ -164,13 +167,59 @@ Two mechanisms, one class:
   Actions actually bills than wall-clock is. **Not run here on purpose:**
   starting a second heavy cargo job alongside the one already running would
   have contaminated both and degraded the shared box for other sessions.
-- [ ] **T4 — sweep the other 17 contract repos for both mechanisms.**
-  `scripts/ci_gate_coverage.py` answers "does anything automatically start
-  the compile/lint surface" and deliberately does not ask "does anything
-  execute a test" — the two questions have different answers, as this issue
-  shows. Extend it (or add a sibling report) to cross **compile coverage ×
-  test execution**, the way it already crosses coverage × reachability. A
-  report, not a gate, for the reason the others are.
+- [x] **T4 — sweep every contract repo. DONE — `scripts/ci_test_execution_report.py`.**
+  A report, not a gate (always exit 0); population derived (BOUNDARY.md +
+  a `.git` dir), vocabulary committed as data, `selftest()` on every
+  invocation exiting 2 rather than printing. It imports
+  `ci_gate_coverage.py`'s reachability machinery rather than duplicating it.
+
+  **katgpt-rs is not alone. Three repos are COMPILE-ONLY — 31,841 `#[test]`
+  sites compiled by CI and executed by nothing automatic:**
+
+  | repo | `#[test]` sites | why nothing runs them |
+  |---|---:|---|
+  | riir-ai | 16,724 | — EXECUTES (`rust.yml`) |
+  | **katgpt-rs** | **15,659** | no CI runs `cargo test` at all; all 6 `full_gate.sh` layers are clippy/check |
+  | **riir-train** | **15,147** | 5 automatic compile commands, zero test runs |
+  | **riir-game-sdk** | **1,035** | its ONLY test run is `nightly.yml`, which **cannot fire** |
+  | riir-chain / riir-clippy / riir-neuron-db / riir-mmorpg-examples / riir-dapps / riir-deployer / riir-auth / riir-viewbridge / riir-dao / riir-burner / seal-remake | 6,848 → 19 | EXECUTES |
+  | seal-game-editor | 2,101 | NO-CARGO (0 workflows) — read-only repo, report only |
+  | riir-unity, seal-remake-unity | 0 | NOTHING-TO-RUN, so compile-only is correct |
+  | katgpt-web | 4 | UNMEASURED — no remote refs to read a default branch from |
+
+  **`riir-game-sdk` is a fresh instance of Issue 706's class and was missed
+  by that sweep.** Verified directly, not inferred: its default branch is
+  `main`, `nightly.yml` lives only on `origin/develop`, and
+  `schedule`/`workflow_dispatch` fire only from the DEFAULT branch — so its
+  daily `30 17 * * *` cron has **never fired**. 706 fixed three repos by
+  adding a schedule that fires from the default branch; this one has the
+  schedule and the wrong branch, which is why it did not match. Needs an
+  owner action in that repo (it is also the repo that ships the vessel
+  packer `seal-remake` Issue 001 depends on).
+
+  **Two defects in the report were found by disagreement, and both changed a
+  verdict** — recorded because each is a trap for the next reader:
+
+  1. **`reachable_triggers` MIXES live triggers with negative `-<trigger>`
+     markers** for declared-but-dead ones, so a workflow whose every trigger
+     is dead returns NON-EMPTY. A naive `if not trig` read
+     `riir-game-sdk/nightly.yml` as live and reported the repo EXECUTES.
+     `ci_gate_coverage.py` had it right; the newer instrument was wrong.
+     Resolved by `live_and_automatic()`, which also refuses to count
+     `pull_request?` (policy git cannot see) or a lone `workflow_dispatch`
+     (a button, 706).
+  2. **Half this workspace's guard scripts announce their layers with the
+     command name** — `echo "── L4: cargo test (default features) ──"`,
+     `layer "4/4 cargo test --workspace …"`, `fail "cargo test …"`. A
+     token-only matcher credits every one as an executed test, and a repo
+     whose only match was a label would read EXECUTES while running nothing.
+     A label's `cargo` is always inside a quoted string and a real
+     invocation's never is — except inside `$(...)`, which IS command
+     context even when the substitution sits in quotes (riir-chain's
+     `out="$(cargo test …)"` is a real run). Both shapes pinned.
+
+  `--no-run` / `--list` are classified as **COMPILE, not run**, and pinned:
+  `cargo test --no-run` matches the token and executes nothing.
 
 ## Gates
 
@@ -179,7 +228,7 @@ Two mechanisms, one class:
 | G1 | T1's AGENTS.md row exists and the docs gate stays green |
 | G2 | ~~T2's selftest lane FAILS on a target that reports `ok. 0 passed`~~ — VOID, T2 withdrawn. If T3 lands a test job the criterion transfers to it: a target reporting `ok. 0 passed` must FAIL, canaried by making one report zero rather than argued (the `seal-remake` `layer 3b` shape) |
 | G3 | ~~T2's population is derived~~ — VOID with T2. Transfers to T3 and to T4 unchanged: derived from the tree, never typed |
-| G4 | T4's report distinguishes "compiles, not executed" from "not compiled" — pooling them reproduces the pooled-total mistake `.docs/10_audits/cfg_gated_silent_zero_pass.md` corrects twice |
+| G4 | **MET** — the report prints `#[test]` sites beside every verdict, so COMPILE-ONLY over 15,659 sites and NOTHING-TO-RUN over 0 are never the same row; `--no-run` is classified as a compile |
 
 ## Honest caveats
 
