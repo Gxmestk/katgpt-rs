@@ -1,6 +1,6 @@
 # Issue 719: Conditioning-consistency audit PoC — per-junction KL + Pinsker TV gate for semantic context compression
 
-**Status:** T1 LANDED (opt-in `cond_audit`, T2–T4 trigger-gated, no consumer, no GOAT claim) — `.benchmarks/700_cond_audit_poc.md`, commit `COND_AUDIT_COMMIT`
+**Status:** T1 LANDED (opt-in `cond_audit`, T2–T4 trigger-gated, no consumer, no GOAT claim) — `.benchmarks/700_cond_audit_poc.md`, commit `995dea6d`
 
 **Source:** arXiv:2609.00865 "MemoryWalker" (Research 528, 2026-09-03). The modelless extract: at any serving site that conditions on a *semantically compressed* context (window, eviction, summarization, budget packing), a two-forward pair (compressed-conditioned vs full-context teacher) yields a per-junction forward-KL whose **unconditional** Pinsker bound `TV <= sqrt(eps_KL/2)` is a proven behavioral-gap verdict between context regimes. No instrument in the stack computes a KL/TV distance between conditioning regimes today (grepped 2026-09-03, Research 528 §4).
 
