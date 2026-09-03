@@ -18,9 +18,10 @@
 #
 # ── Why per-push, when full_gate.yml is weekly ──────────────────────────────
 # Measured: ~3s for the original three (0.1 + 1.4 + 1.5), ~0.03s (12 SKILL.md,
-# no build dirs walked) for the skill repo-set gate, and ~0.2s (3 runs: 0.20 /
-# 0.20 / 0.18, 921 targets read) for the cfg-gated floor gate, against >13 min
-# for the full gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
+# no build dirs walked) for the skill repo-set gate, ~0.2s (3 runs: 0.20 /
+# 0.20 / 0.18, 921 targets read) for the cfg-gated floor gate, and ~0.5s (warm;
+# 1.56s cold) for the orphaned-attribute gate, against >13 min for the full
+# gate. It was ~556s before scripts/bench_doc_audit.py's manifest walk was
 # pruned — pathlib's rglob("Cargo.toml") descended into target/ (117 GB, ~1.3M
 # entries) and filtered afterwards, at four call sites per run. Doc drift is
 # also introduced per-commit and is cheapest to catch in the commit that
@@ -61,6 +62,10 @@ on:
       - 'scripts/cfg_gated_target_audit.py'
       - 'scripts/cfg_gated_floor_gate.py'
       - 'scripts/cfg_gated_floors.txt'
+      # The orphaned-attribute gate reads ALL Rust source, not just targets.
+      - 'src/**/*.rs'
+      - 'crates/**/src/**/*.rs'
+      - 'scripts/orphaned_attr_gate.py'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   pull_request:
@@ -91,6 +96,10 @@ on:
       - 'scripts/cfg_gated_target_audit.py'
       - 'scripts/cfg_gated_floor_gate.py'
       - 'scripts/cfg_gated_floors.txt'
+      # The orphaned-attribute gate reads ALL Rust source, not just targets.
+      - 'src/**/*.rs'
+      - 'crates/**/src/**/*.rs'
+      - 'scripts/orphaned_attr_gate.py'
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   workflow_dispatch:
@@ -110,5 +119,5 @@ jobs:
 
       # No toolchain, no cache, no cargo: the checks parse manifests as TOML and
       # docs as text. tomllib is stdlib from 3.11, which ubuntu-latest ships.
-      - name: Docs gate (flag counts, bench-doc labels, Cargo comments, skill repo sets, cfg-gated targets)
+      - name: Docs gate (flag counts, bench-doc labels, Cargo comments, skill repo sets, cfg-gated targets, orphaned attrs)
         run: ./scripts/docs_gate.sh

@@ -46,6 +46,14 @@
 # two blindness floors) because a ceiling cannot fail once the auditor goes
 # blind and reports zero; see scripts/cfg_gated_floors.txt.
 #
+# orphaned_attr_gate.py (added 2026-09-03) is pinned at ZERO, with no floor to
+# negotiate: the shape it forbids -- an OUTER #[cfg] separated from its item by
+# a blank line, which Rust still binds to that item -- was measured at zero
+# sites across all 19 contract repos. It exists because that shape sat in
+# katgpt-pruners for two days and broke every RELEASE build of `sdar_gate`
+# (26d055c6 -> a08376a0), while the commit that introduced it validated in
+# debug and reported 597/0.
+#
 # Runs every check even after one fails — the same reason full_gate.sh passes
 # --keep-going: stopping at the first failure under-reports the drift.
 set -uo pipefail
@@ -59,6 +67,7 @@ CHECKS=(
     "scripts/cargo_comment_audit.py:inline Cargo.toml comments vs the default closure"
     "scripts/skill_repo_set_gate.py:hand-typed repo sets in SKILL.md command blocks (Issue 703)"
     "scripts/cfg_gated_floor_gate.py:#![cfg]-gated targets that report a green 0-pass (Issue 713)"
+    "scripts/orphaned_attr_gate.py:a #[cfg] separated from its item by a blank line (a08376a0)"
 )
 
 if ! command -v python3 >/dev/null 2>&1; then

@@ -6,8 +6,10 @@ all 39 pass in release; the debug reds were retracted (`83cb1d56`). T2c
 WITHDRAWN. T4 + T4b **LANDED** — `cfg_gated_floor_gate.py` is now a
 `docs_gate.sh` check with four two-sided pins, canaried, and the load-bearing
 classifier ships in the auditor. **T3 is an owner call in each sibling repo**,
-deliberately not made here. T5 (21 platform-cfg targets) and T6 (the
-all-`#[ignore]` axis) remain open and unmeasured by design.
+deliberately not made here. T6 **MEASURED** — 244 all-`#[ignore]`d
+targets across 19 repos (60 load-bearing); it stays a report, and it found the
+release-build break in `.issues/715`. T5 (21 platform-cfg targets) remains
+open.
 
 > **CORRECTED 2026-09-03, same day, by the fix itself.** The first published
 > figures were **over-counted**: the auditor keyed a declared target by its
@@ -308,21 +310,103 @@ shapes are pinned, and two matter specifically:
   so they cannot be shared). This is `.issues/704`/`706` one level in — a
   workflow is identical on disk whether or not it can see the change it gates.
   Cost measured before widening: **0.20 / 0.20 / 0.18 s** over 921 targets.
-- [ ] **T6 (new axis, observed during T2b — NOT yet measured)** A **second**
-  way a target prints a green zero, found by the sweep rather than by the
-  auditor: `test_120_vpd_arena_goat` runs under its features and reports
-  `ok. 0 passed; 0 failed; 3 ignored`. Every test in it is `#[ignore]`d.
+- [x] **T6 MEASURED 2026-09-03 — `scripts/all_ignored_target_audit.py`. 244
+  targets across 19 repos can never print anything but `ok. 0 passed`, 60 of
+  them load-bearing by name. Still a REPORT, and here that is a stronger claim
+  than usual.**
 
-  This is **not automatically a defect** — `#[ignore]` is the correct marker
-  for a slow or hardware-gated test, and that is why it must not be folded into
-  the SILENT-NOW count. But the reader-facing output is the same lie: a green
-  `ok` over zero executed assertions, on a target named `_goat`.
+  The second axis, found by the T2b sweep rather than by the auditor:
+  `test_120_vpd_arena_goat` runs under its features and prints `ok. 0 passed;
+  0 failed; 3 ignored`. Every test in it is `#[ignore]`d. This is **not** the
+  Issue 713 shape — its `#![cfg]` is satisfied, the binary is not empty — and
+  `required-features` cannot address it. The reader-facing output is the same
+  lie.
 
-  The distinction worth measuring is between a target with *some* ignored tests
-  (normal) and one where **every** test is ignored, so the binary can never
-  report anything but zero. The latter is the same shape as this issue one
-  level in, and nothing counts it. Deliberately left unmeasured rather than
-  guessed at.
+  **Deliberately NOT folded into SILENT-NOW.** That count's whole value is that
+  every member is fixable by a three-line manifest row. `#[ignore]` is the
+  *correct* marker for a slow or hardware-gated test, so no pin is defensible
+  here; the measurement is the deliverable.
+
+  | repo | targets | w/ tests | **ALL-IGNORED** | load-bear | partial | no-tests |
+  |---|---|---|---|---|---|---|
+  | katgpt-rs | 653 | 460 | **19** | 3 | 14 | 13 |
+  | riir-ai | 770 | 613 | **197** | 51 | 29 | 9 |
+  | riir-chain | 148 | 130 | **5** | 0 | 14 | 1 |
+  | riir-clippy | 68 | 63 | **3** | 0 | 2 | 0 |
+  | riir-mmorpg-examples | 35 | 35 | **2** | 0 | 2 | 0 |
+  | riir-neuron-db | 77 | 38 | **1** | 1 | 1 | 0 |
+  | riir-train | 274 | 245 | **17** | 5 | 25 | 8 |
+
+  **The reasons are the diagnosis; the count is not.** 443 ignored tests over
+  180 distinct reason strings:
+
+  | n | reason |
+  |---|---|
+  | **65** | **(NO REASON GIVEN)** |
+  | 48 | requires a GPU; run explicitly with `--release` |
+  | 25 | pure measurement benchmark (no assertions), slow in debug |
+  | 11 | PoC bench — requires Gemma GGUF |
+  | 11 | benchmark — run with `--ignored` |
+  | 8 | requires Gemma 2 2B GGUF + tokenizer.model |
+  | 8 | requires the 7.1 GB model + GPU |
+  | 7 | **GOAT gate — run with `--ignored`** |
+
+  Most of the mass is legitimate and self-documenting (GPU, 7.1 GB weights,
+  slow measurement). Two rows are not: **65 ignored tests whose source says
+  nothing about why** — no reader can distinguish a deliberate manual-only test
+  from one parked during a refactor and forgotten — and **7 that call
+  themselves a GOAT gate** while running only if someone remembers `--ignored`.
+  If any part of this becomes a pin later, "an empty `#[ignore]` reason on a
+  load-bearing target" is the defensible one, not the count.
+
+  **The instrument had to be built twice, and cargo settled it both times.**
+  A file-wide `#[ignore]`-vs-`#[test]` count is not good enough:
+
+  1. `bench_octopus_goat` has **9** `#[test]` attributes; cargo prints **8
+     ignored**. Three tests are individually `#[cfg(feature = ...)]`-gated and
+     one gating feature is default-off. So attributes are now associated
+     **per test** (contiguous attribute blocks) and resolved against the
+     crate's default closure.
+  2. `bench_block_diagonal_goat` then read **9** where cargo said **8**. Its
+     whole-file gate is `#![cfg(any(planar_quant, iso_quant, hybrid_oct_pq))]`,
+     already satisfied by `planar_quant` — and unioning in *all* of a whole-file
+     gate's features wrongly enabled `iso_quant`, counting a per-item
+     `iso_quant` test as compiled. Fixed by resolving three cases separately
+     (satisfied gate → add nothing; unsatisfied `all()`/single → add its
+     features; unsatisfied `any()` → **ambiguous**, reported as its own class
+     rather than guessed).
+
+  All three load-bearing katgpt-rs rows now match cargo **by execution**:
+
+  | target | auditor | cargo |
+  |---|---|---|
+  | `bench_octopus_goat` | 9 in source, 8 compiled, 8 ignored | `ok. 0 passed; 8 ignored` |
+  | `bench_block_diagonal_goat` | 11 in source, 8 compiled, 8 ignored | `ok. 0 passed; 8 ignored` |
+  | `test_120_vpd_arena_goat` | 3, 3, 3 | `ok. 0 passed; 3 ignored` |
+
+  Note what the first two are: **not feature-gated at all**. A plain
+  `cargo test` compiles and runs them, and they print a green zero
+  unconditionally — no flag to notice, which is arguably worse than the Issue
+  713 shape.
+
+  **The bias runs BOTH ways**, and the first draft of this file claimed
+  otherwise: macro-generated tests (`test_case`, `rstest`) are invisible to an
+  attribute count (toward false positives), and unresolvable `cfg` predicates
+  (`not(...)`, platform gates) resolve to compiled (toward false negatives).
+  Every row is a hypothesis to check by running the target — the cheapest
+  verification there is, since these targets execute nothing.
+
+  **It also found a two-day release-build break: `.issues/715`.** Confirming
+  `test_120`'s `3 ignored` required *executing* it under its own features, and
+  it would not compile — an orphaned `#[cfg(debug_assertions)]` bound across a
+  blank line to the wrong import, breaking every release build of `sdar_gate`
+  since `26d055c6`. Fixed in `a08376a0`, class gated at zero by
+  `scripts/orphaned_attr_gate.py`.
+
+  **NO-TESTS (31 workspace-wide) is reported apart** — a file under `tests/`
+  with no test attribute and cargo's own harness. `harness = false` targets are
+  excluded: a custom-harness target legitimately has no `#[test]` and its exit
+  code is its verdict, and including them would make the report mostly noise.
 
 - [ ] **T5** The 21 platform-`cfg` targets are correctly gated and unfixable by
   `required-features`. Whether they need a *different* instrument (a per-target
