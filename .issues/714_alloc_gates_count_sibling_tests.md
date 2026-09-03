@@ -128,9 +128,17 @@ Constraints the fix must respect:
   The negative arm is the one that matters: it proves the counter is still
   capable of failing. A counter that had silently become a no-op would have
   turned all 37 alloc gates green over zero measurement.
-- [ ] **T3** Once T2 lands, the 13 unmeasured at-risk gates get a real verdict
-  for the first time. Any that then fail are separate findings, not T2
-  regressions — the same rule Issue 713 T2 set.
+- [x] **T3 RAN 2026-09-03 — all 37 binaries, on a quiet box.** Every one that
+  is a test target passes: **35 pass, 0 fail.** The two non-results are
+  `bench_331_babel_codec_goat` and `bench_360_engram_staging_goat`, which carry
+  `fn main()` and no `#[test]` — program-style targets that emit no
+  `test result:` line. Not a defect and not affected by this change.
+
+  So the T2 refactor is confirmed non-breaking across every consumer of the
+  macro, and the 13 previously-unmeasured at-risk gates now have a verdict:
+  **all green.** None of them was silently broken; they were silently
+  *unverified*, which is the distinction this issue exists to draw and the
+  reason T2's negative arm mattered more than its positive one.
 
 ## Related
 
