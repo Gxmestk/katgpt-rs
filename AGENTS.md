@@ -147,7 +147,24 @@ command, not about the code.
 Don't run it by hand — `scripts/full_gate.sh` is the assertion (it also refuses
 to report a pass off macOS, where the `target_os = "macos"` device backends
 compile to nothing even with `--all-features`, and checks that this document
-still quotes the command it runs). `.github/workflows/full_gate.yml` **declares** a
+still quotes the command it runs).
+
+**And the inverse holds, with nothing to enforce it.** That caveat protects the
+`target_os = "macos"` backends by refusing to *report* off macOS. Running **on**
+macOS silently drops every `not(target_os = "macos")` backend, `--all-features`
+included — so the command above, which is run on the M3 by policy, is
+structurally incapable of compiling them. Measured 2026-09-03 by parsing
+`riir-gpu/src/lib.rs`'s module **declarations** (a file can mention the cfg
+without being gated on it): **9 modules, 25,212 lines**, headed by
+`qwen38_dense_cudarc` at 8,599. It is not theoretical — `riir-ai` `6bf51b592`
+landed a CUDA-only lib that did not compile (`E0599`) and it stood for **7h45m**
+until a 4090 re-pin happened to need a CUDA build; nothing else in the workspace
+builds that code. Record and the open axis: `riir-ai` `.issues/857`.
+
+This is the same shape as `.docs/10_audits/cfg_gated_silent_zero_pass.md` one axis over — there a
+`#![cfg]`-gated test compiles to an empty binary and reports a green zero; here
+a `cfg(not(target_os))` module compiles to nothing and reports a green build.
+**A platform is part of the claim, exactly as the profile is.** `.github/workflows/full_gate.yml` **declares** a
 weekly cron and a manual dispatch; per-push is deliberately not enabled — see
 that file's preamble for the measured cost and the promotion criterion. That
 preamble also carries the liveness-sentinel record from `.issues/705` — the
