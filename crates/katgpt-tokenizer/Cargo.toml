@@ -36,3 +36,31 @@ datrie_vocab = ["toast_tokenizer"]
 # Zero external deps (the four substrate-independent techniques ship in pure
 # stable Rust with `core::arch::*` intrinsics + inline asm).
 fast_bpe = []
+
+# ── Issue 713 T2: `required-features` on `#![cfg]`-gated GOAT gates ─────────
+#
+# Every target below opens with a whole-file `#![cfg(feature = ...)]`. Without
+# the row, `cargo test --test <name>` compiles it to an EMPTY binary and prints
+# `running 0 tests` / `ok. 0 passed` with exit 0 — indistinguishable from a real
+# pass, on the gates whose green IS the evidence for a promotion.
+#
+# The `#![cfg]` protects the COUNT. This protects the READER. Both are needed.
+#
+# `cargo test --workspace` is UNAFFECTED: cargo silently skips a target whose
+# required-features are off, so this cannot red an existing workspace CI. What
+# changes is that naming the target without its features now errors (exit 101)
+# instead of reporting a green zero.
+#
+# Measured population + the instrument: `.issues/713`, scripts/cfg_gated_target_audit.py
+
+[[test]]
+name = "fast_bpe_goat"
+required-features = ["fast_bpe"]
+
+[[test]]
+name = "fast_bpe_goat_g4_alloc"
+required-features = ["fast_bpe"]
+
+[[test]]
+name = "fast_bpe_goat_pretok"
+required-features = ["fast_bpe"]

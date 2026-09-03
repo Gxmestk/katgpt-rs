@@ -2908,3 +2908,131 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
+
+# ── Issue 713 T2: `required-features` on `#![cfg]`-gated GOAT gates ─────────
+#
+# Every target below opens with a whole-file `#![cfg(feature = ...)]`. Without
+# the row, `cargo test --test <name>` compiles it to an EMPTY binary and prints
+# `running 0 tests` / `ok. 0 passed` with exit 0 — indistinguishable from a real
+# pass, on the gates whose green IS the evidence for a promotion.
+#
+# The `#![cfg]` protects the COUNT. This protects the READER. Both are needed.
+#
+# `cargo test --workspace` is UNAFFECTED: cargo silently skips a target whose
+# required-features are off, so this cannot red an existing workspace CI. What
+# changes is that naming the target without its features now errors (exit 101)
+# instead of reporting a green zero.
+#
+# Measured population + the instrument: `.issues/713`, scripts/cfg_gated_target_audit.py
+
+[[test]]
+name = "bench_023_adaptive_gamma.goat"
+required-features = ["adaptive_gamma_forecast"]
+
+[[test]]
+name = "bench_145_binary_plasma_goat"
+required-features = ["binary_plasma"]
+
+[[test]]
+name = "bench_166_flashar_consensus_goat"
+required-features = ["flashar_consensus"]
+
+[[test]]
+name = "bench_168_recfm_goat"
+required-features = ["recfm", "spechop", "tf_loop"]
+
+[[test]]
+name = "bench_189_osc_kv_goat"
+required-features = ["osc_kv"]
+
+[[test]]
+name = "bench_228_vocab_channel_goat"
+required-features = ["vocab_channel_pruner"]
+
+[[test]]
+name = "bench_236_bake_precision_goat"
+required-features = ["bake_precision"]
+
+[[test]]
+name = "bench_241_spectral_threat_goat"
+required-features = ["spectral_threat"]
+
+[[test]]
+name = "bench_256_adaptive_k.goat"
+required-features = ["msa_adaptive_k"]
+
+[[test]]
+name = "bench_256_kv_outer.goat"
+required-features = ["msa_kv_outer"]
+
+[[test]]
+name = "bench_256_per_group.goat"
+required-features = ["msa_per_group"]
+
+[[test]]
+name = "bench_291_d2f_3sr_warm_start_goat"
+required-features = ["d2f_3sr_warm_start"]
+
+[[test]]
+name = "bench_committee_boost_goat"
+required-features = ["committee_boost"]
+
+[[test]]
+name = "bomber_dreamer_goat"
+required-features = ["bomber", "dreamer"]
+
+[[test]]
+name = "fpcg_goat_gate"
+required-features = ["fpcg_selector"]
+
+[[test]]
+name = "goat_111_mech_attribution"
+required-features = ["mech_attribution"]
+
+[[test]]
+name = "goat_225_rat_bridge"
+required-features = ["rat_plus_bridge"]
+
+[[test]]
+name = "kimi_k3_g4_alloc_free"
+required-features = ["kimi_k3_loader"]
+
+[[test]]
+name = "prefix_scheduler_goat"
+required-features = ["hardware_aware_scheduler"]
+
+[[test]]
+name = "test_120_toast_renyi_goat"
+required-features = ["toast_tokenizer"]
+
+[[test]]
+name = "test_120_vpd_arena_goat"
+required-features = ["bomber", "g_zero", "vpd_em_distill"]
+
+[[test]]
+name = "test_120_vpd_em_goat"
+required-features = ["vpd_em_distill"]
+
+[[test]]
+name = "test_123_asymmetric_kv_goat"
+required-features = ["asymmetric_kv"]
+
+[[test]]
+name = "test_126_rt_turbo_goat"
+required-features = ["rt_turbo"]
+
+[[test]]
+name = "test_131_spechop_goat"
+required-features = ["spechop"]
+
+[[test]]
+name = "test_139_ega_goat"
+required-features = ["ega_attn"]
+
+[[test]]
+name = "test_147_shard_kv_goat"
+required-features = ["shard_kv"]
+
+[[test]]
+name = "test_diffusion_sampler_goat"
+required-features = ["tri_mode"]
