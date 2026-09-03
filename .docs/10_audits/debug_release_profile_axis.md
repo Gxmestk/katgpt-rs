@@ -88,7 +88,79 @@ ANSI-colour trap that zeroed every anchored counter in `.issues/705`. Canaried
 two-sided on the real tree: 1,423 / 0 → PASSED; one break reintroduced → 1,422
 / 1 → FAILED with the rendered `E0432`; restored → PASSED.
 
-### 716 T3 — open owner call
+### 716 T3 — MEASURED across 6 siblings (2026-09-03). One repo is RED.
 
-None of the 19 repos runs a release pass. Whether each wants one is its owner's
-call; the katgpt-rs Layer 6 is the reference shape.
+No longer an open owner call in the abstract: the sweep was run. Same literal
+command per repo, sequential, each in its own scratch `CARGO_TARGET_DIR`
+removed afterwards (the box was at 100% disk when this started):
+
+```
+cargo check --workspace --all-targets --all-features --keep-going --release
+```
+
+and, wherever release was non-zero, the identical command **without**
+`--release` — because an error count alone cannot tell a profile break from a
+plain all-features break.
+
+| repo | units (rel) | rel errs | dev errs | REL-only | DEV-only | verdict |
+|---|---|---|---|---|---|---|
+| riir-neuron-db | 214 | 0 | — | — | — | clean |
+| riir-clippy | 530 | 0 | — | — | — | clean |
+| riir-game-sdk | 854 | 0 | — | — | — | clean |
+| riir-chain | 678 | 12 | 12 | **0** | 0 | all-features break, profile-NEUTRAL |
+| riir-train | 1139 | 30 | 31 | **0** | **1** | profile break, DEV-only |
+| riir-ai | 1766 | 282 | 6 | **30** | 1 | **RELEASE BROKEN** |
+
+Counts are raw diagnostics; REL-only / DEV-only are **distinct** `(package,
+target, message)` triples, which is the column that means anything — riir-chain's
+12-vs-12 is the same six triples twice over, i.e. the profile changed nothing
+and its errors are a pre-existing `--all-features` break (`riir_ffi` unresolved
+in three `riir-chaind` tests). Filed with its owner, not here.
+
+**The axis cuts BOTH ways, which this repo had not yet recorded.** Every prior
+finding was release-only. riir-train's single DEV-only error is a
+`#[global_allocator]` conflict in `xhc_train_phase7` — visible **only in debug**,
+because the allocator katgpt-rs installs is itself `debug_assertions`-gated. So
+"run it in release" is not a safe blanket instruction either; it is a second
+configuration, not a better one. riir-ai carries the same shape in
+`riir-games-quest`'s `issue847_tpr_goat`.
+
+**riir-ai is the find.** 282 release diagnostics against 6 in dev, and the
+release run produced **1,364 artifacts to dev's 1,757** — so the release figure
+is an *undercount*: `--keep-going` still cannot build a failed unit's dependents.
+232 of the 282 are one class, and its mechanism is **verified, not inferred** —
+same package selection, both profiles:
+
+```
+cargo check -p riir-games-civ --all-features --lib --tests            → 0
+cargo check -p riir-games-civ --all-features --lib --tests --release  → 232
+```
+
+all of them `katgpt_core::alloc::get_alloc_stats`, which this very document
+records as `debug_assertions`-only **by design**. It is Issue 716 T1's exact
+class, reproduced in a consumer at 232 call sites in a single crate, and it
+means riir-games-civ's alloc assertions can never run in the profile
+`.docs/10_audits/cfg_gated_silent_zero_pass.md` tells everyone to run gates in.
+
+The remaining riir-gpu classes are **real but NOT root-caused**, and the
+distinction is worth keeping. A first probe (`-p riir-gpu --all-features
+--bench …`) returned 0 errors in *both* profiles and looked like a refutation;
+it changed **two** variables at once, package selection and profile, so it
+refuted nothing. The decisive check was to ask the logs whether those targets
+were *built* in the dev run rather than whether they were silent in it:
+
+| target | dev | release |
+|---|---|---|
+| `bench_734_arm6_mma_cuda_ab` | built ✓ | errored ✗ |
+| `bench_734_arm10_mma_v2_ab` | built ✓ | errored ✗ |
+| `bench_606_t3c_dot4i8_probe` | built ✓ | errored ✗ |
+
+Silence is not success — a target absent from an error list may simply never
+have been attempted. These reproduce only under workspace-wide feature
+unification, so their cause is the profile axis *interacting* with AGENTS.md's
+third axis (`-p` vs `--workspace` at the same nominal features). Filed for
+root-cause with the owner: **riir-ai `.issues/855`**.
+
+The three clean repos are a real result too, not an absence of one: each
+compiled hundreds of units in release with zero diagnostics, so their gates can
+be run in the profile the perf rule requires.

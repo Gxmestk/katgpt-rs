@@ -118,26 +118,67 @@ default-off-gated ones report a green zero every time anyone names them.
    its own ambiguous class rather than guessed. Executing `test_120_vpd_arena_goat`
    to confirm its count is what found Issue 715's two-day release break.
 
-## T3 — the open owner call, per sibling (re-measured with the widened classifier)
+## T3 — DONE across every contract repo (2026-09-03). Load-bearing zero is now real.
 
-| repo | targets | gated | SILENT-NOW | **load-bearing** | latent |
-|---|---|---|---|---|---|
-| riir-ai | 930 | 560 | 122 | **41** | 179 |
-| riir-clippy | 84 | 54 | 34 | **18** | 15 |
-| riir-chain | 170 | 133 | 48 | **16** | 19 |
-| riir-train | 487 | 302 | 36 | **15** | 3 |
-| riir-game-sdk | 62 | 40 | 37 | **5** | 0 |
-| riir-neuron-db | 86 | 53 | 11 | **3** | 2 |
-| katgpt-rs | 921 | 541 | 44 | **0** | 100 |
-| 12 others | 158 | 58 | 31 | **0** | 4 |
+No longer an owner call pending per sibling: the sweep was taken. **97 targets
+armed across 6 repos**, every one classified LOAD-BEARING by
+`scripts/cfg_gated_target_audit.py` — a name carrying `goat` / `gate` / `g<N>` /
+`drill` / `proof` / `correctness` / `alloc_check` / `determinism` /
+`equivalence` / `floor` / `grad_check`, i.e. a promotion or a safety claim rests
+on its verdict.
 
-T4c's widening added 17 load-bearing rows in katgpt-rs and only 5 across all
-siblings — the dialect it taught the classifier is mostly this repo's own naming
-convention. Owners should still **run the script** rather than trust this
-table. Adding `required-features` rows does not red an existing `cargo test
---workspace` (it skips targets whose features are off); it turns naming the
-target without its features into a loud exit 101, which is the point and the
-owning repo's call when to take.
+| repo | load-bearing before | after | commit |
+|---|---|---|---|
+| riir-ai | 40 | **0** | `e1fa3858f` |
+| riir-clippy | 18 | **0** | `883d536` |
+| riir-chain | 16 | **0** | `0da394c9` |
+| riir-train | 15 | **0** | `f998d552` |
+| riir-game-sdk | 5 | **0** | `aa5d8af` + `e160e34` |
+| riir-neuron-db | 3 | **0** | `6839a3b` |
+| katgpt-rs | 0 | **0** | `180be9c5` (earlier) |
+
+SILENT-NOW does **not** go to zero and should not: the residual 233 are targets
+whose green zero nobody cites as evidence. Arming those is churn. The column
+that mattered was always the load-bearing one.
+
+**Verified, not assumed** — the two failure modes here are symmetric, and both
+are silent. A row naming the wrong feature *keeps* the green zero; a row naming
+a feature that merely compiles the file could still gate nothing.
+
+1. **The row fires.** All 97 error with exit 101 and `requires the features: …`
+   when named without them. The one apparent miss was instructive rather than
+   real: `riir-chain-engine-bridge` is a **workspace-`exclude`d** crate, so
+   `-p <name>` reports "did not match any packages" — the same rc=101, a
+   completely different reason. Re-verified via its own manifest path. An
+   exit code is not a diagnosis.
+2. **The row names features that arm the gate, not features that silence it.**
+   One armed target per repo re-run WITH its features in `--release`:
+
+   | repo | target | result |
+   |---|---|---|
+   | riir-neuron-db | `lifecycle_goat_gates` | 3 passed |
+   | riir-clippy | `sec_boundary_gate` | 2 passed |
+   | riir-chain | `sufficiency_gates` | 12 passed |
+   | riir-train | `schur_correctness` | 5 passed |
+   | riir-ai | `rrf_fusion_goat` | 6 passed |
+
+   Non-zero and green in every case — which is the whole point, since a
+   *zero* here would mean the row had swapped one silent pass for another.
+
+**Safety, checked before the batch rather than after:** this cannot red an
+existing CI. `cargo test --workspace` silently SKIPS a target whose
+required-features are off. riir-chain was the sharpest case — 9 of its 16
+targets are also named explicitly in `scripts/test_gate.sh` rows carrying pinned
+counts, and every one of those rows already passes a feature set that is a
+superset of the row now declared, so no pinned count moves.
+
+**One manifest was committed as a blob, not a worktree add.** A concurrent
+session had an uncommitted `game_budgets` row in
+`riir-game-sdk/crates/riir-e2e/Cargo.toml`. The commit is HEAD + my four rows
+(`git hash-object -w` + `git update-index --cacheinfo`); their row stays
+uncommitted and the worktree carries both, so nothing of theirs was swept and
+nothing of mine reverts when they commit. Their own comment in that file had
+explicitly deferred these four to this sweep.
 
 ## Why this is not `feature_isolation_gate.py` or `ci_feature_guard.sh`
 

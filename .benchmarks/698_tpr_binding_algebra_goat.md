@@ -186,19 +186,29 @@ corpus (0.0% ID — vacuous); scope claims to retrieved-but-demoted rows (OOD
 accuracy is a step function in a role's remaining filler count); the corpora
 are nearly role/filler-collinear, so widening fillers-per-role is a corpus task.
 
-### Deferred rows (moved from Issue 707; each unblock is non-engineering)
+### Deferred rows — owner decisions taken 2026-09-03
 
-- [-] **T-Promote** — gates ALL PASS; blocked only by the **no-default-consumer
-  rule**. Flipping `tpr` to default would compile dead code into every
-  katgpt-core consumer while all three consumers are opt-in or refuted. The
-  call belongs to a consumer that wants the primitive on ITS default path
-  (riir-ai 847's Promote row). Demote-loser if a simpler op wins the slot.
+- [x] **T-Promote — DECIDED: NOT promoted; `tpr` stays opt-in.** Gates ALL
+  PASS, and that is exactly why this needed a decision rather than a wait:
+  three consumers landed (flat, GOAT-but-opt-in, refuted) and two of them
+  measured the same generalization wall from independent domains. Flipping
+  `tpr` into `default` would compile a rank-m binding algebra into every
+  katgpt-core consumer for zero default-path gain — the no-default-consumer
+  rule is the SOLID call, not a blocker. **Reopen conditions (any one):** a
+  consumer wants `tpr` on ITS default path and its GOAT beats the memorization
+  baseline on the binding axis, not just the composition axis; or a simpler op
+  wins the slot, in which case demote-loser applies to `tpr` itself.
 - [-] **T8** OOD withheld-pair eval protocol + L2,1 arm A/B for trained
-  artifacts (edge_lora / hypernet / KG-embedding / direction tables). Unblock:
+  artifacts. **Filed where its unblock lives: riir-train `.issues/505`** — the
+  protocol is `katgpt_core::tpr::validate` (already shipped); the trigger is
   the next training run touching a matrix that must compose systematically.
-- [-] **T9** TPR-surrogate interpretability of our own artifacts (riir-clippy
-  drafter first; Bench-694 markov-head wrong-contract hook). Unblock: an owner
-  approves an offline analysis window; never a runtime path.
-- [-] **T10** riir-ai runtime guide (NPC personality surgery over the R158
-  committed-personality surface + F3 unbinding → KG emission). Unblock: a
-  production consumer materializes.
+- [x] **T9 — CLOSED, won't build speculatively.** A TPR surrogate over the
+  riir-clippy drafter is an offline interpretability study whose one concrete
+  hook (Bench-694 markov-head contract) is answerable by direct inspection.
+  Bench 065 already showed the healer corpus is a memorization surface for
+  TPR; a surrogate fit there would report the same wall. Reopen only with a
+  question the surrogate answers that inspection cannot.
+- [x] **T10 — CLOSED, won't build speculatively.** A runtime guide for NPC
+  personality surgery presupposes a production consumer; riir-ai 847 is that
+  consumer's owner and carries its own Promote row. Writing the guide before
+  the consumer exists is documentation of nothing (the Issue 003 shape).
