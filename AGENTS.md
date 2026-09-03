@@ -248,10 +248,15 @@ cries wolf on the shape cargo cannot fix gets ignored on the ones it can.
 **Read the severity split, never the pooled total.** A target gated on a
 *default-on* feature still runs on a plain `cargo test` and only vanishes under
 `--no-default-features`. A *default-off* one reports a green zero every time
-anyone names it. Pooled, the first measurement read 762 and meant nothing; split,
-it is **430 SILENT-NOW / 332 latent** across 19 repos, **141 of the 430
-load-bearing by name** (`goat`, `gate`, `g<N>`, `drill`, `proof`, …). Full
-record and the per-repo table: `.issues/713`.
+anyone names it. Pooled, the first measurement read 702 and meant nothing; split,
+it is **382 SILENT-NOW / 320 latent** across 19 repos, a large minority of them
+load-bearing by name (`goat`, `gate`, `g<N>`, `drill`, `proof`, …). Full record
+and the per-repo table: `.issues/713`.
+
+Do not re-type those numbers from here — `.issues/713` carries a same-day
+correction (the first cut over-counted by 48, keying declared targets by name
+against the filename stem, so a row with an explicit `path` read as
+undeclared). Run the script.
 
 It was fixed one target at a time twice in one week — riir-train `5821cba9`
 (11 real assertions reporting as a green suite having run none) and riir-clippy
@@ -262,7 +267,8 @@ Adding the rows is safe and does **not** red an existing CI: `cargo test
 --workspace` silently *skips* a target whose required-features are off. What
 changes is that naming the target without its features errors with exit 101
 instead of reporting a green zero. That was verified, not assumed, before the
-katgpt-rs batch landed (`180be9c5`, 43 GOAT gates, SILENT-NOW 106 → 63) — and
+katgpt-rs batch landed (`180be9c5`, 39 GOAT gates, SILENT-NOW 102 → 63, baseline re-measured with the
+corrected auditor rather than inferred from the delta) — and
 the very first gate to actually run under its features came back **red**, which
 is the whole argument for the instrument in one line.
 

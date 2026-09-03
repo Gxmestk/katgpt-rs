@@ -2926,10 +2926,6 @@ debug = false
 # Measured population + the instrument: `.issues/713`, scripts/cfg_gated_target_audit.py
 
 [[test]]
-name = "bench_023_adaptive_gamma.goat"
-required-features = ["adaptive_gamma_forecast"]
-
-[[test]]
 name = "bench_145_binary_plasma_goat"
 required-features = ["binary_plasma"]
 
@@ -2956,18 +2952,6 @@ required-features = ["bake_precision"]
 [[test]]
 name = "bench_241_spectral_threat_goat"
 required-features = ["spectral_threat"]
-
-[[test]]
-name = "bench_256_adaptive_k.goat"
-required-features = ["msa_adaptive_k"]
-
-[[test]]
-name = "bench_256_kv_outer.goat"
-required-features = ["msa_kv_outer"]
-
-[[test]]
-name = "bench_256_per_group.goat"
-required-features = ["msa_per_group"]
 
 [[test]]
 name = "bench_291_d2f_3sr_warm_start_goat"

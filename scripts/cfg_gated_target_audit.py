@@ -163,12 +163,42 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
     except (tomllib.TOMLDecodeError, OSError):
         return
 
-    # Declared targets, by (kind, name) -> required-features present?
-    declared: dict[tuple[str, str], bool] = {}
-    for kind in ("test", "bench", "example"):
+    # Declared targets, keyed by the FILE they build, not by their name.
+    #
+    # Keying on `(kind, name)` and matching it against the filename stem is
+    # wrong, and wrong in the direction that manufactures findings: a row may
+    # carry an explicit `path`, and then its `name` need not resemble the
+    # file's stem at all. katgpt-rs's four `*.goat.rs` targets are declared as
+    # `bench_256_kv_outer_goat` (underscored) pointing at
+    # `bench_256_kv_outer.goat.rs` (dotted) with `required-features` already
+    # present — a stem match reports all four as defects, and "fixing" them
+    # adds a SECOND target for the same file, which cargo warns about and which
+    # breaks `--test <name>` resolution.
+    #
+    # So resolve every row to an absolute path (explicit `path`, else the
+    # conventional `<dir>/<name>.rs`) and key on that. `name` is kept only for
+    # the suggested fix line.
+    declared: dict[Path, bool] = {}
+    declared_name: dict[Path, str] = {}
+    crate_dir = manifest.parent
+    for kind, dirname in (("test", "tests"), ("bench", "benches"), ("example", "examples")):
         for row in data.get(kind, []) or []:
-            if isinstance(row, dict) and "name" in row:
-                declared[(kind, row["name"])] = bool(row.get("required-features"))
+            if not isinstance(row, dict):
+                continue
+            rel = row.get("path") or (
+                f"{dirname}/{row['name']}.rs" if "name" in row else None
+            )
+            if rel is None:
+                continue
+            resolved = (crate_dir / rel).resolve()
+            # A file may legitimately back two rows (different feature sets).
+            # Covered if ANY row declares required-features — the question is
+            # whether a reader can be silently fooled, and one guarded row is
+            # enough to make the omission visible.
+            declared[resolved] = declared.get(resolved, False) or bool(
+                row.get("required-features")
+            )
+            declared_name.setdefault(resolved, row.get("name", ""))
 
     defaults = default_closure(data.get("features", {}) or {})
     crate = manifest.parent
@@ -187,10 +217,11 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
                 continue
             rep.gated += 1
 
-            name = f.stem
+            key = f.resolve()
+            name = declared_name.get(key) or f.stem
             feats = sorted(set(FEATURE_IN_CFG.findall(body)))
             preds = sorted({p for p in NON_FEATURE_PREDICATES if p in body})
-            has_rf = declared.get((kind, name))
+            has_rf = declared.get(key)
 
             base = Finding(
                 repo=rep.repo,
@@ -200,7 +231,7 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
                 path=str(f.relative_to(repo)),
                 features=feats,
                 predicates=preds,
-                declared=(kind, name) in declared,
+                declared=key in declared,
                 reason="",
             )
 
@@ -306,6 +337,28 @@ def selftest() -> None:
     assert got == {"a", "b"}, f"default closure = {got}, want {{a, b}}"
     assert "off" not in got, "a non-default feature entered the closure"
     assert "other/x" not in got, "a dependency feature entered the OWN-crate closure"
+    # Path resolution: a row with an explicit `path` must claim THAT file, not
+    # the file whose stem matches its name. This is the false positive that
+    # shipped in the first cut — it reported four already-guarded katgpt-rs
+    # targets as defects, and "fixing" them added a duplicate target per file.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "tests").mkdir()
+        (root / "tests" / "a.goat.rs").write_text('#![cfg(feature = "x")]\n')
+        (root / "Cargo.toml").write_text(
+            '[package]\nname = "p"\nversion = "0.0.0"\n\n'
+            "[features]\nx = []\n\n"
+            '[[test]]\nname = "a_goat"\npath = "tests/a.goat.rs"\n'
+            'required-features = ["x"]\n'
+        )
+        r = RepoReport(repo="p")
+        scan_manifest(root, root / "Cargo.toml", r)
+        assert r.gated == 1, f"gate not seen: {r.gated}"
+        assert r.covered == 1, "a path-declared, required-features row read as UNCOVERED"
+        assert not r.findings, f"false positive: {[f.path for f in r.findings]}"
+
     # An empty/absent [features] table means NOTHING is default-on, so every
     # gated target is severe rather than latent. The wrong way round would
     # silently downgrade every finding in a crate with no feature table.

@@ -1,8 +1,30 @@
 # Issue 713 — 430 cargo targets can report a green `0 passed` having run nothing
 
-**Status:** T1 **LANDED** (instrument + measurement, 2026-09-03). T2 open
-(katgpt-rs's own 43 load-bearing targets). T3–T5 are owner calls in sibling
-repos, deliberately not made here.
+**Status:** T1 **LANDED** (instrument + measurement, 2026-09-03). T2 **LANDED**
+(39 katgpt-rs load-bearing targets armed, `180be9c5` + `1e4a52a`). T2b RUNNING
+(the armed gates' actual verdicts). T3–T5 are owner calls in sibling repos,
+deliberately not made here.
+
+> **CORRECTED 2026-09-03, same day, by the fix itself.** The first published
+> figures were **over-counted**: the auditor keyed a declared target by its
+> `name` matched against the file's stem, so a row carrying an explicit `path`
+> under a different name read as undeclared. katgpt-rs's four `*.goat.rs`
+> targets are declared as `bench_256_kv_outer_goat` (underscored) pointing at
+> `bench_256_kv_outer.goat.rs` (dotted), **with `required-features` already
+> present**. All four were reported as defects, and "fixing" them added a
+> SECOND target for the same file — which cargo warns about and which breaks
+> `--test <name>` resolution. Found because the sweep in T2b returned
+> `NO-RESULT-LINE` on exactly those four and nothing else.
+>
+> The corrected numbers are below and every figure in this issue is the
+> corrected one. **SILENT-NOW 430 → 382; `w/ req-f` 956 → 1,016; latent
+> 332 → 320.** The classifier still partitions (1,016 + 382 + 320 + 21 + 1 =
+> 1,740), which is exactly why the partition assertion was worth stating: it
+> held under a wrong classifier, so it proves the classes are exhaustive and
+> **not** that each one is right.
+>
+> `selftest()` now builds a temp crate with a `path`-declared target and
+> asserts it reads as covered. The bug is pinned, not just fixed.
 
 **Instrument:** `scripts/cfg_gated_target_audit.py` — a **report, not a gate**
 (exit 0 always), same discipline as `ci_gate_coverage.py` and
@@ -46,17 +68,17 @@ them one at a time is how it stayed invisible; this measures the population.
 |---|---|
 | targets scanned | 2,897 |
 | carrying a whole-file `#![cfg]` | 1,740 |
-| of those, declaring `required-features` | 956 |
-| **SILENT-NOW** — zeroes on a plain `cargo test` | **430** |
-| latent — zeroes only under `--no-default-features` | 332 |
+| of those, declaring `required-features` | 1,016 |
+| **SILENT-NOW** — zeroes on a plain `cargo test` | **382** |
+| latent — zeroes only under `--no-default-features` | 320 |
 | platform `cfg` — `required-features` *cannot* express | 21 |
 | `any(...)` of features — cargo's `required-features` is AND-only | 1 |
 
-The last five rows **partition** the 1,740: 956 + 430 + 332 + 21 + 1 = 1,740.
+The last five rows **partition** the 1,740: 1,016 + 382 + 320 + 21 + 1 = 1,740.
 Stated because a classifier that silently drops a case reports a smaller
 defect count and looks like good news.
 
-**The severity split is the point.** Pooled at 762 the number is unreadable: a
+**The severity split is the point.** Pooled at 702 the number is unreadable: a
 target gated on a **default-on** feature still runs on a plain `cargo test` and
 only vanishes under `--no-default-features`, which is a real but much rarer
 hazard. A target gated on a **default-off** feature reports a green zero *every
@@ -75,18 +97,19 @@ gets ignored on the 430 it can.
 
 | repo | targets | `#![cfg]` | w/ req-f | **SILENT-NOW** | latent |
 |---|---|---|---|---|---|
-| riir-ai | 930 | 560 | 239 | **125** | 190 |
-| katgpt-rs | 921 | 541 | 332 | **106** | 101 |
+| riir-ai | 930 | 560 | 253 | **122** | 179 |
+| katgpt-rs | 921 | 541 | 376 | **63** | 100 |
 | riir-chain | 170 | 133 | 66 | **48** | 19 |
 | riir-game-sdk | 62 | 40 | 1 | **37** | 0 |
-| riir-train | 487 | 302 | 260 | **38** | 3 |
+| riir-train | 487 | 302 | 262 | **36** | 3 |
 | riir-clippy | 83 | 53 | 4 | **34** | 15 |
 | riir-dapps | 30 | 25 | 0 | **25** | 0 |
 | riir-neuron-db | 86 | 53 | 37 | **11** | 2 |
 | riir-mmorpg-examples | 39 | 31 | 17 | **4** | 2 |
-| riir-dao / riir-viewbridge | 7 / 8 | 1 / 1 | 0 / 0 | **1 / 1** | 0 / 0 |
+| riir-dao | 7 | 1 | 0 | **1** | 0 |
+| riir-viewbridge | 8 | 1 | 0 | **1** | 0 |
 
-### 141 of the 430 are load-bearing by name
+### 93 of the 382 are load-bearing by name
 
 Targets whose filename says `goat`, `gate`, `g<N>`, `drill`, `invariant`,
 `guard`, `pin`, `proof`, `conservation`, `safety`, `security` or `audit` — the
@@ -94,11 +117,10 @@ ones whose green is the evidence for a promotion or a claim:
 
 | repo | load-bearing SILENT-NOW |
 |---|---|
-| katgpt-rs | 43 |
-| riir-ai | 43 |
+| riir-ai | 40 |
 | riir-clippy | 18 |
 | riir-chain | 15 |
-| riir-train | 15 |
+| riir-train | 13 |
 | riir-game-sdk | 4 |
 | riir-neuron-db | 3 |
 
@@ -134,13 +156,19 @@ shapes are pinned, and two matter specifically:
 
 - [x] **T1** Build the instrument, derive the population, verify the claim by
   execution in ≥2 repos, and verify the fixed side too. LANDED 2026-09-03.
-- [ ] **T2** Fix katgpt-rs's **43 load-bearing** SILENT-NOW targets: add the
+- [x] **T2 LANDED 2026-09-03** — armed **39** katgpt-rs load-bearing SILENT-NOW
+  targets (`180be9c5`; 43 rows added, 4 reverted as the false positives above).
+  Baseline verified by running the FIXED auditor against the pre-fix commit in
+  a throwaway worktree rather than inferring it from the delta: **102 → 63**.
+  Original text follows.
+
+  Fix katgpt-rs's load-bearing SILENT-NOW targets: add the
   `[[test]]` / `[[bench]]` rows with `required-features`. Two-sided verify each
   batch — errors without the features, and the same test count with them.
   **The count must not move.** A target that starts failing once it actually
   runs is a separate finding and gets its own issue, not a silent revert.
-- [ ] **T3 (owner call, sibling repos)** riir-ai 43 / riir-clippy 18 /
-  riir-chain 15 / riir-train 15 / riir-game-sdk 4 / riir-neuron-db 3.
+- [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
+  katgpt-rs (done in T2). Read the numbers from the table, not from here.
   Deliberately NOT done from here: adding `required-features` converts a silent
   green into a **loud red** wherever CI invokes those targets by name without
   the features, which is the point, but it is the owning repo's call when to
