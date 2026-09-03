@@ -176,21 +176,21 @@ impl RuleExtractor {
         let mut rules: Vec<ExtractedRule> = paths
             .into_iter()
             .filter_map(|path| {
-                // A rule needs at least 2 nodes: conditions + action.
-                if path.nodes.len() < 2 {
-                    None
-                } else if path.score < self.min_score {
-                    None
-                } else {
-                    let action = path.nodes[path.nodes.len() - 1];
-                    let conditions = path.nodes[..path.nodes.len() - 1].to_vec();
-                    Some(ExtractedRule {
-                        conditions,
-                        action,
-                        score: path.score,
-                        support: 1,
-                    })
+                // Two distinct rejection reasons, one outcome: a rule needs at
+                // least 2 nodes (conditions + action) AND must clear the score
+                // threshold. One early return rather than two `None` arms, so
+                // `if_same_then_else` is answered instead of silenced.
+                if path.nodes.len() < 2 || path.score < self.min_score {
+                    return None;
                 }
+                let action = path.nodes[path.nodes.len() - 1];
+                let conditions = path.nodes[..path.nodes.len() - 1].to_vec();
+                Some(ExtractedRule {
+                    conditions,
+                    action,
+                    score: path.score,
+                    support: 1,
+                })
             })
             .collect();
 
