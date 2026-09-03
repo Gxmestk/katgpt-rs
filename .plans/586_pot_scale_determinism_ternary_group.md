@@ -1,6 +1,14 @@
 # Plan 586 — Issue 845 CPU scaffold: PoT-scale determinism for the ternary group tier
 
-**Status:** IN PROGRESS — CPU-side half of riir-ai `.issues/845` (GPU-window-gated G1/G3 stay armed there).
+**Status:** RESOLVED-SCOPED (2026-09-02) — CPU half landed katgpt-rs `91a9cdaf`; the GPU
+G1/G2/G3 gates ran + PASSED same day in the 4090-exclusive window (Vulkan wgpu<spirv>; gate
+`crates/riir-gpu/tests/issue845_pot_scale_gpu_g1.rs`, feature `ternary_gemv`, katgpt-types
+dev-dep carries `pot_scales`). Record: riir-ai AGENTS.md Issue 845 resolved-row (issue file
+removed at close). Structural scoping: f32-accumulator fold-invariance is out of reach on this
+surface — the integer-dot follow-up landed as riir-ai Issue 850 /
+[Bench 850](../riir-ai/.benchmarks/850_integer_dot_pot_slice.md) (all four gates PASS).
+`pot_scales` stays opt-in (no consumer). Reconciled 2026-09-03 (the status had still read
+"GPU-window-gated stay armed" a day after the gates passed).
 
 Source: arXiv:2609.00363 (verified full-text, riir-clippy `.research/116`) — requantizing
 quant scales to nearest powers of two makes scale application exact on every backend
@@ -53,10 +61,11 @@ no longer perturbs the quantized payload.
       pot_scales 159 ✓ incl. 8 new pot_tests). SNR table (uniform/gaussish/sparse70/
       row-scaled): PoT rel-err ratio 0.988–1.012 vs native — the carry loop absorbs
       essentially all of the ≤√2 snap factor, far inside the pinned 1.35 bound.
-- [ ] Commit + push (katgpt-rs develop)
-- [ ] riir-ai `.issues/845` updated: CPU-half landed, this plan + commit referenced; G1/G3
-      stay armed for the GPU-exclusive window
-- [ ] riir-clippy queue snapshot updated (lever state: CPU half DONE)
+- [x] Commit + push (katgpt-rs develop) — `91a9cdaf`
+- [x] riir-ai `.issues/845` updated: CPU-half landed, this plan + commit referenced — then
+      RESOLVED-SCOPED same day (GPU gate PASSED; issue file removed at close, record = the
+      AGENTS.md resolved-row)
+- [x] riir-clippy queue snapshot updated (lever state: resolved-scoped, 2026-09-03 entry)
 
 ## Deferred (this plan)
 
@@ -64,7 +73,12 @@ no longer perturbs the quantized payload.
       window; the trit quantizer must mirror the same scale rule or the cross-tier
       `quantize_is_bit_identical_to_the_bit_plane_tier` contract would need a PoT-aware
       reformulation.
-- [-] Q8KV snap-at-quantize slice — unblock: group-tier G1 PASS + B55/Issue 716 owner
-      coordination (the issue's own entry rule).
-- [-] GPU G1/G2/G3 gates — unblock: GPU-exclusive 4090 window (sibling L4 eval running at
-      plan time; per the Issue 649 exclusivity rule these cannot run under contention).
+- [-] Q8KV snap-at-quantize slice — unblock: B55/Issue 716 owner coordination (the issue's
+      own entry rule). Measurement update 2026-09-02 (Issue 850 T4): the dequant product is
+      exact for ANY f16-stored scale on the shipped q8kv layout — the live PoT discriminator
+      is the f16 STORAGE site only; scope any future slice to that site.
+- [x] GPU G1/G2/G3 gates — DONE 2026-09-02 in the 4090-exclusive window: scale-site fold
+      invariance (PoT) 0 diffs on 3 Bonsai shapes (native control fires 41/930/3704 —
+      non-vacuous); PoT-shift covariance 0 violations on both dispatch paths; G2 cost worst
+      1.113× ≤ the 1.35 bound; G3 GPU-vs-CPU band 2.563e-7 ≤ 1e-3. Full record: riir-ai
+      AGENTS.md Issue 845 row.
