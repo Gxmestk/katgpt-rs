@@ -452,7 +452,6 @@ where
 #[allow(clippy::type_complexity)] // Test bindings use the verbose pair-of-pairs type for readability.
 mod tests {
     use super::*;
-    use crate::alloc::{get_alloc_stats, reset_alloc_stats};
 
     // ─── Test encoders ────────────────────────────────────────────────────
 
@@ -940,8 +939,20 @@ mod tests {
 
     // ─── G4 — Alloc-free steady state (CountingAllocator) ─────────────────
 
+    // `crate::alloc`'s tracking machinery is `#[cfg(debug_assertions)]` by
+    // design — in release the binary installs the plain `System` allocator and
+    // there is nothing to measure. So this test cannot merely be `#[ignore]`d
+    // in release: its imports would not resolve, which is what broke
+    // `cargo test --release -p katgpt-core --lib` outright (Issue 716).
+    //
+    // Deliberately NOT solved with release no-op stubs returning 0: a
+    // zero-alloc assertion would then PASS vacuously, which is the Issue
+    // 705/714 failure — an instrument that cannot fail is not passing.
+    #[cfg(debug_assertions)]
     #[test]
     fn g4_audit_confounders_zero_alloc_steady_state() {
+        use crate::alloc::{get_alloc_stats, reset_alloc_stats};
+
         // The CountingAllocator is process-wide and only installed under
         // debug_assertions via the test binary's #[global_allocator]
         // (lib.rs `static TEST_GLOBAL_ALLOC`). If for some reason it's NOT

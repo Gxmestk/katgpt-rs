@@ -996,6 +996,12 @@ mod tests {
     /// G4: zero allocations in steady state (the gaussianity pattern — the
     /// lib test binary installs `alloc::TrackingAllocator` under
     /// cfg(test, debug_assertions); skip with a message if absent).
+    // See the note on `latent_confounder_audit`'s twin: `crate::alloc` is
+    // `#[cfg(debug_assertions)]` by design, so in release these imports do not
+    // resolve and the whole lib-test target fails to compile (Issue 716). The
+    // doc comment above says "skip with a message if absent", which was the
+    // intent — but an unconditional `use` is a compile error, not a skip.
+    #[cfg(debug_assertions)]
     #[test]
     fn g4_zero_alloc_steady_state() {
         use crate::alloc::{get_alloc_stats, reset_alloc_stats};

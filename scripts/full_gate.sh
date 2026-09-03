@@ -40,6 +40,8 @@
 #                            so loudly.
 #   3. the gate itself     → clippy, workspace, all targets, all features
 #   4. zero errors         → any `error` line or unbuildable target is a finding
+#   6. profile axis        → the same tree with debug_assertions OFF; the four
+#                            axes below all run in the DEV profile (.issues/716)
 #   5. doc/script parity   → AGENTS.md must quote the same command this script
 #                            runs; a gate whose spec has drifted from its
 #                            implementation is a gate nobody is running
@@ -278,6 +280,52 @@ if ! grep -qF "$GATE_CMD" AGENTS.md; then
     echo "  expected to find: $GATE_CMD"
     exit 1
 fi
+
+# ── Layer 6: the profile axis ───────────────────────────────────────────────
+# Everything above runs in the DEV profile, so `debug_assertions` is always ON
+# and every item behind `#[cfg(debug_assertions)]` — plus everything that
+# DEPENDS on one — is compiled only in the configuration where it works. That
+# was the gate's fourth blind spot, and it was not hypothetical: measured
+# 2026-09-03, adding --release produced 2 errors and `cargo test --release -p
+# katgpt-core --lib` did not compile AT ALL (.issues/716).
+#
+# `check`, deliberately, not `clippy`: this axis is about COMPILATION with
+# debug_assertions off. The lint surface is already covered by Layer 3, and
+# clippy's lints do not vary by profile except on the small `cfg(not(
+# debug_assertions))` surface — a residual noted rather than paid for.
+#
+# NOT folded into GATE_ARGS: Layer 5 asserts AGENTS.md quotes that string
+# verbatim, and this is a different question with a different command.
+#
+# Liveness, not just an error count (.issues/705): a run that compiles nothing
+# reports zero errors, which reads exactly like a pass.
+REL_ARGS=(cargo check --workspace --all-targets --all-features --keep-going --release)
+echo "▸ Layer 6: profile axis — ${REL_ARGS[*]}"
+REL_LOG="$(mktemp -t full_gate_release)"
+"${REL_ARGS[@]}" > "$REL_LOG" 2>&1 || true
+# Same ANSI strip as Layer 3: colour codes ahead of every ^-anchor zeroed every
+# counter in this gate's first two CI runs (.issues/705).
+REL_CLEAN="$(mktemp -t full_gate_release_clean)"
+sed $'s/\033\[[0-9;]*m//g' "$REL_LOG" > "$REL_CLEAN"
+REL_UNITS=$({ grep -cE '^[[:space:]]*(Compiling|Checking) ' "$REL_CLEAN" || true; })
+REL_ERRS=$({ grep -cE '^error(\[|:)' "$REL_CLEAN" || true; })
+
+if [ "$REL_UNITS" -eq 0 ]; then
+    echo "✗ full gate INCONCLUSIVE — the release pass compiled 0 units, so it"
+    echo "  verified NOTHING about the debug_assertions-off configuration."
+    echo "  log: $REL_CLEAN"
+    exit 1
+fi
+if [ "$REL_ERRS" -ne 0 ]; then
+    echo "✗ full gate FAILED — $REL_ERRS error diagnostic(s) in the RELEASE profile"
+    echo "  (the dev-profile pass above was clean: this is the debug_assertions axis)"
+    grep -E '^error(\[|:)' "$REL_CLEAN" | sort | uniq -c | sed 's/^/    /'
+    grep -A3 -m1 -E '^error(\[|:)' "$REL_CLEAN" | sed 's/^/    /'
+    echo "  log: $REL_CLEAN"
+    exit 1
+fi
+rm -f "$REL_LOG" "$REL_CLEAN"
+echo "  ✓ release profile clean ($REL_UNITS unit(s) compiled)"
 
 # UNITS is printed on every pass, not just when it is interesting: the number
 # that would have exposed the vacuous CI green was never on screen.

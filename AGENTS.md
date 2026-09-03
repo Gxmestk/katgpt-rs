@@ -85,6 +85,7 @@ axes, and a green result says nothing about what it compiled to nothing:
 | default vs `--all-features` | non-default gated code compiles to **nothing** |
 | `-p <crate>` vs `--workspace` | *at the same default features*: a crate's own non-default feature can be switched on by the ROOT crate's defaults once the root is in the selected set |
 | no `--all-targets` | skips every test / bench / example — which is where gated code lives |
+| dev vs `--release` | `debug_assertions` is always **ON**, so every item behind `#[cfg(debug_assertions)]` — and everything that depends on one — is only ever compiled in the configuration where it works (`.issues/716`) |
 
 The third axis is the least obvious. `cargo test -p katgpt-backend --lib`
 compiled clean while `cargo test --workspace --lib` failed, because `gpu.rs` is
@@ -92,6 +93,21 @@ behind `katgpt-backend/gpu_inference` and the chain
 `katgpt-rs/default -> async_qdq_overlap -> inference_router -> gpu_inference`
 only fires when the root crate is selected. It also silently *shrinks* coverage:
 four crates reporting "0 tests" per-crate contributed 704 under `--workspace`.
+
+The **fifth** row is the newest and the command below does **not** close it —
+it runs in the dev profile. Measured 2026-09-03: adding `--release` produced
+**2 errors** and `cargo test --release -p katgpt-core --lib` did not compile at
+all, which is the very command `.issues/713` T2b tells everyone to use. Two
+`#[cfg(test)]` blocks imported `crate::alloc`'s counters, which are
+`debug_assertions`-only *by design*. Fixed in `.issues/716` T1; the axis itself
+is T2.
+
+Read that together with `.issues/713` T2b and `.issues/715`, because the three
+point in different directions and that is the lesson: debug **manufactured**
+four false perf reds (713), debug **hid** a two-day release build break (715),
+and the full gate compiles `debug_assertions` code only in the profile where it
+works (716). **Neither profile is the safe default — the profile is part of the
+claim.**
 
 So before claiming a repo-wide green, run:
 
