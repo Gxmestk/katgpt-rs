@@ -1,4 +1,14 @@
-# Issue 720 — the root crate registers a `#[global_allocator]` **as a library**, so every downstream alloc gate is either a conflict or a silent zero
+# Issue 721 — the root crate registers a `#[global_allocator]` **as a library**, so every downstream alloc gate is either a conflict or a silent zero
+
+> **Renumber note (2026-09-03):** originally filed as 720 at `b1340fe8` (20:41);
+> a concurrent session dual-allocated 720 sixteen minutes later (`a119bb0a`,
+> the convergence-cadence gate — which read `.highwater` before the first
+> bump landed, or skipped the write-time re-scan). Tie-breaker per the
+> Bench-677/697 + Issue-087 precedents: baked-refs wins — the cadence issue
+> carries 5 live committed references (Research 529 ×3, riir-ai 858 ×2) vs
+> zero for this one, so IT keeps 720 and this file renumbered → 721
+> (highwater+1, highwater bumped). No external file referenced this issue at
+> renumber time — the cheapest possible moment to move it.
 
 **Status:** OPEN — measured, not yet fixed. The fix has real cross-repo blast
 radius and is an owner call on sequencing, not on whether. Found 2026-09-03
@@ -85,10 +95,11 @@ removing the root static changes nothing for it.
 
 ## Tasks
 
-- [ ] **T1** — audit the five files above: does each install an allocator
+- [x] **T1** — audit the five files above: does each install an allocator
       (directly or via a linked `tests/common`), and does each assert on the
       counter? Any that asserts without one is a live vacuous gate, independent
-      of T2/T3, and should be fixed first.
+      of T2/T3, and should be fixed first. *(DONE 2026-09-03 — see the audit
+      table below.)*
 - [ ] **T2** — the non-negotiable half, cheap and independent of the rest:
       every consumer that asserts on `get_alloc_stats()` gets a **liveness
       sentinel** — force a known heap allocation, assert the counter saw it,
@@ -104,6 +115,45 @@ removing the root static changes nothing for it.
 - [ ] **T4** — `riir-train-engine/tests/xhc_train_phase7.rs` needs *something*
       today; it is the one known live conflict. If T3 is deferred, it needs the
       five-term feature guard plus a sentinel. Prefer T3.
+
+## T1 audit — DONE 2026-09-03, one gap found + fixed
+
+| # | file | installs an allocator? | asserts on the counter? | verdict |
+|---|---|---|---|---|
+| 1 | `katgpt-rs/examples/kimi_k3_hello_world.rs` | via the root-lib static (debug) | **no — print-only**, honest in BOTH profiles (release prints the "not measured" notice, never a zero-alloc claim) | fine; T3 consequence only |
+| 2 | `riir-ai/crates/riir-poc/src/behavior_gate_poc.rs` `g4_alloc_steady_state` | **NO — nothing does** (see environment finding) | artifact half: `assert!(first > 0)` sentinel (loud red without allocator); **greedy half: NO sentinel** — `assert_eq!(gfirst, gsecond)` passes vacuously at 0==0 | **gap → FIXED** (greedy-half sentinel added, riir-ai commit) |
+| 3 | `riir-ai/crates/riir-games-civ/src/civ/map_tick/mod.rs` | n/a | **no — diagnostic, not a gate**: `trace_phase!` asserts nothing; release fallback reports `None` + one-time notice, never a fabricated 0 (explicitly documented in-source, 855 Class 1) | fine |
+| 4 | `riir-train-gpu/tests/bench_558_issue490_t2_incremental_staging_goat.rs` | served via the katgpt-rs shim under the kimi features | `assert!(joint_allocs > 0)` sentinel present | fine |
+| 5 | `riir-train-gpu/tests/bench_490_anchor_accumulation_goat.rs` | served via the katgpt-rs shim under the kimi features | `assert!(legacy_allocs > 0)` sentinel present | fine |
+
+**The environment finding (row 2, the part the issue's own text missed):**
+riir-poc deps ONLY `katgpt-core` (a path into the katgpt-rs repo, but the
+CORE crate — whose own static is `cfg(all(test, debug_assertions))` on
+katgpt-core itself, inert when consumed as a lib) and its dev-deps are
+`katgpt-attn` / `katgpt-claim` / `katgpt-moka-wasm` — never the root crate.
+No `#[global_allocator]` exists anywhere in `riir-poc/src/`. So the
+riir-poc lib-test binary has NO tracking allocator at all, and
+`g4_alloc_steady_state` — if run — always reds at the artifact-half sentinel
+(`0 > 0`). That is LOUD, never silently vacuous, but it means the gate has
+probably never passed in its current environment; it is `#[ignore]`d, and
+nothing in any pinned suite runs it (the Issue 713/718 coverage class).
+Giving the test a working allocator is T3-shaped (per-target registration),
+not T2 — recorded here so whoever picks up T3 knows riir-poc is a consumer
+the root static never served in the first place.
+
+**The fix shipped (row 2):** a greedy-half liveness sentinel before the
+equality asserts (riir-ai `crates/riir-poc/src/behavior_gate_poc.rs`):
+
+```rust
+assert!(
+    gfirst > 0,
+    "greedy-decode liveness: counters saw 0 allocations — is a TrackingAllocator installed in this test binary?"
+);
+```
+
+so the T2 doctrine ("force a known allocation, assert the counter saw it,
+BEFORE the measurement") now covers BOTH halves of that gate, and weakening
+the artifact half can no longer silently re-vacuous the greedy half.
 
 ## Related
 
