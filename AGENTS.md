@@ -224,6 +224,48 @@ and a data-borne mention in `riir-chain`'s scheduled `toolchain_drift.yml` was
 enough to vouch for a dispatch-only `rust.yml`. A weak automatic gate must not
 speak for a strong manual one.
 
+### A green test count can be a count of nothing — `scripts/cfg_gated_target_audit.py`
+
+A test file opening with `#![cfg(feature = "x")]` compiles to an **empty
+binary** when `x` is off. Cargo prints `running 0 tests` / `ok. 0 passed` and
+**exits 0**, which is byte-for-byte a real pass. The `#![cfg]` protects the
+**count**; `required-features` protects the **reader**. Both are needed, and
+only the second one is visible to whoever reads the output.
+
+Do not answer "how much of this is affected" by reading manifests. Run:
+
+```bash
+scripts/cfg_gated_target_audit.py            # all contract repos (derived)
+scripts/cfg_gated_target_audit.py ../riir-ai # or one, by path
+```
+
+A **report, not a gate** (always exit 0), for the same two reasons
+`ci_gate_coverage.py` is: a `cfg` on `target_os` / `miri` genuinely cannot be
+expressed as `required-features`, and neither can an `any(...)` of features
+(cargo's is AND-only). Those are reported as their own classes — a report that
+cries wolf on the shape cargo cannot fix gets ignored on the ones it can.
+
+**Read the severity split, never the pooled total.** A target gated on a
+*default-on* feature still runs on a plain `cargo test` and only vanishes under
+`--no-default-features`. A *default-off* one reports a green zero every time
+anyone names it. Pooled, the first measurement read 762 and meant nothing; split,
+it is **430 SILENT-NOW / 332 latent** across 19 repos, **141 of the 430
+load-bearing by name** (`goat`, `gate`, `g<N>`, `drill`, `proof`, …). Full
+record and the per-repo table: `.issues/713`.
+
+It was fixed one target at a time twice in one week — riir-train `5821cba9`
+(11 real assertions reporting as a green suite having run none) and riir-clippy
+`19beece` — before anyone asked how many there were. Fixing them one at a time
+is how it stayed invisible.
+
+Adding the rows is safe and does **not** red an existing CI: `cargo test
+--workspace` silently *skips* a target whose required-features are off. What
+changes is that naming the target without its features errors with exit 101
+instead of reporting a green zero. That was verified, not assumed, before the
+katgpt-rs batch landed (`180be9c5`, 43 GOAT gates, SILENT-NOW 106 → 63) — and
+the very first gate to actually run under its features came back **red**, which
+is the whole argument for the instrument in one line.
+
 ### Before committing in a shared worktree — `scripts/staged_set_audit.py`
 
 Several agent sessions write into one worktree routinely, and `git add -A` from
