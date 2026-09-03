@@ -1,6 +1,22 @@
 # Issue 714 — alloc gates count their SIBLING tests' allocations
 
-**Status:** T1 **MEASURED + ROOT-CAUSED 2026-09-03.** T2 (the fix) open.
+**Status:** T1 **MEASURED + ROOT-CAUSED**, T2 **LANDED** 2026-09-03. T3 open.
+
+> **T2's code landed inside a SIBLING's commit, `62911111` ("docs: doc-sync
+> run 2026-09-03"), not under a message describing it.** My two files were
+> staged when a concurrent session in this worktree committed, and a
+> whole-index commit takes the whole index. Nothing was lost — HEAD carries
+> `ThreadCounter`, `assert_counter_is_live`, and plan414's canary wiring
+> exactly as verified — but `git log` now attributes an allocator change to a
+> docs run, and the two-sided verification below would have been unrecorded.
+> This issue is that record.
+>
+> Deliberately **not** repaired by rewriting history: `62911111` is already on
+> `origin/develop` and four sessions are active in this worktree. This is
+> `.issues/709`'s shape, and `staged_set_audit.py` is the instrument for it —
+> it ran clean on my own staged pair minutes before, which is the honest
+> limit of that tool: it audits what YOU are about to commit, not what someone
+> else is about to commit around you.
 Found by Issue 713's sweep, which is the first time several of these gates had
 ever executed.
 
@@ -96,9 +112,22 @@ Constraints the fix must respect:
 ## Tasks
 
 - [x] **T1** Root-cause + measure exposure. DONE 2026-09-03.
-- [ ] **T2** Thread-local counter behind the existing `ALLOC_COUNT` surface,
-  plus the liveness canary above. Verify `plan414` parallel-green 3×, and
-  re-run the other 13 at-risk binaries.
+- [x] **T2 LANDED 2026-09-03** (code in `62911111`, see the status note).
+  `ThreadCounter` wears the `AtomicUsize` API (`load` / `fetch_add` / `store`,
+  `Ordering` accepted and ignored) so all 37 call sites compile untouched;
+  the TLS slot is `const`-initialised and read with `try_with`.
+  `assert_counter_is_live()` added and wired into plan414's G4.
+
+  **Verified two-sided, by execution:**
+
+  | arm | result |
+  |---|---|
+  | plan414 `g4_zero_alloc`, PARALLEL (default) | **ok, 3 runs of 3** (was 6 allocs/1000) |
+  | same gate, body deliberately allocating | **FAILED — exactly 1000 allocs in 1000 calls** |
+
+  The negative arm is the one that matters: it proves the counter is still
+  capable of failing. A counter that had silently become a no-op would have
+  turned all 37 alloc gates green over zero measurement.
 - [ ] **T3** Once T2 lands, the 13 unmeasured at-risk gates get a real verdict
   for the first time. Any that then fail are separate findings, not T2
   regressions — the same rule Issue 713 T2 set.
