@@ -167,35 +167,53 @@ shapes are pinned, and two matter specifically:
   batch — errors without the features, and the same test count with them.
   **The count must not move.** A target that starts failing once it actually
   runs is a separate finding and gets its own issue, not a silent revert.
-- [x] **T2b RAN 2026-09-03 — the armed gates' actual verdicts.** All 39 newly
-  armed katgpt-rs gates executed under their features for the first time.
-  **35 green, 4 red.** (The 4 `NO-RESULT-LINE` rows in the raw log are the
-  dotted-name false positives, corrected above — they were always fine.)
+- [x] **T2b RAN 2026-09-03 — all 39 armed gates PASS. One real defect found,
+  and it was not a perf one.**
 
-  Every feature involved is **opt-in**, verified against each manifest's
-  `default` closure, so **none of these reds ships in the default build.**
-  That is the reassuring half. The other half is that four verdicts were
-  invisible for as long as the targets have existed.
+  > **CORRECTION, and it retracts the first version of this row.** T2b's first
+  > pass reported four reds and called two of them "real" perf findings after
+  > re-measuring them three times on a quiet box. **All four pass.** The sweep
+  > script ran `cargo test` without `--release`, and a latency gate in a debug
+  > build measures an unoptimised binary. `fast_bpe_goat` takes **388 s in
+  > debug and 15.6 s in release** — that is the size of the error.
+  >
+  > I had even tested and rejected the load-flakiness hypothesis, correctly, by
+  > re-measuring quietly three times and getting a sub-1% spread. That made the
+  > false reading *more* convincing, not less: a stable wrong number looks
+  > exactly like a real finding. Ruling out the confounder I thought of did
+  > nothing about the one I hadn't. **`bench_668` was one commit away from
+  > being filed as a 4.3× perf regression that does not exist.**
+  >
+  > A related gate-hygiene note, which is why this was easy to fall into:
+  > `plan414`'s G5 documents itself *"release mode only — debug builds are
+  > unoptimized"*. `bench_668`'s and `fast_bpe_goat`'s latency gates carry no
+  > such marker and no `debug_assertions` guard, so in debug they fail
+  > confidently instead of skipping or saying why.
 
-  The reds are **not one finding** and must not be reported as one:
+  Final verdict, **in release**:
 
-  | gate | feature | verdict | class |
-  |---|---|---|---|
-  | `plan414_hla_committed_belief_probe_goat` | `hla_committed_belief_probe` | 6 allocs/1000, expected 0 | **harness defect — `.issues/714`, FIXED**, gate now green |
-  | `bench_668_effective_degree_goat` | `effective_degree` | 2145/2166/2163 ns/path vs a **500 ns** bound | **real** — 3 quiet runs, tightly clustered, 4.3× over |
-  | `fast_bpe_goat` | `fast_bpe` | 2311× vs its own `≤1000×` bound | **real** — a *documented* regression whose documented bound no longer holds |
-  | `bench_145_binary_plasma_goat` | `binary_plasma` | binary only 1.05× vs `≥1.2×` | **NOT a regression** — a *promotion* gate returning its designed NO ("Ternary stays as plasma"). The feature is opt-in and unpromoted, so gate and reality agree |
+  | gate | debug (wrong) | **release (correct)** |
+  |---|---|---|
+  | `bench_668_effective_degree_goat` | 2145 ns vs 500 ns bound | **ok, 7 passed** |
+  | `fast_bpe_goat` | 2311× vs ≤1000× bound | **ok, 8 passed** |
+  | `bench_145_binary_plasma_goat` | 1.05× vs ≥1.2× | **ok, 5 passed** |
+  | `plan414_hla_committed_belief_probe_goat` | 6 allocs/1000 | **ok** (after `.issues/714`) |
 
-  **The load-flakiness hypothesis was tested and rejected, not assumed.** The
-  first readings came off a box running four other agent sessions plus this
-  sweep, and a latency gate under load is the canonical false red. So each
-  was re-measured on a quiet box, three times: `bench_668` returned
-  2145 / 2166 / 2163 ns — a spread of under 1%, which is not contention.
+  **`.issues/714` survives this correction intact and is the real find.**
+  Re-tested at the pre-fix commit, **in release**, three runs: `8`, `3`, `3`
+  allocs in 1000 calls — failing, and failing with a *varying* count, which is
+  the signature of a concurrent contributor rather than a code path that
+  allocates. Post-fix it is green. So the alloc-counter race is real in the
+  optimised build and has nothing to do with the debug error above.
 
-- [ ] **T2c** File the two genuine perf findings (`bench_668`'s 4.3× miss,
-  `fast_bpe`'s documented-bound drift) as their own issues. They are *not*
-  713's business — 713's claim is that the verdicts were invisible, and that
-  claim is now discharged.
+  So Issue 713's own claim lands where it should: not "the armed gates were
+  broken" — they were not — but **"the verdicts were invisible."** Arming them
+  surfaced one genuine harness defect that had made an alloc gate report a
+  number it had not measured.
+
+- [ ] ~~**T2c** File the two genuine perf findings~~ **WITHDRAWN** — there are
+  no perf findings. See the correction above. Filing them is exactly what the
+  correction prevented.
 
 - [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
   katgpt-rs (done in T2). Read the numbers from the table, not from here.
