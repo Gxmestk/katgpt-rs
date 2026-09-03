@@ -121,25 +121,27 @@ removing the root static changes nothing for it.
 | # | file | installs an allocator? | asserts on the counter? | verdict |
 |---|---|---|---|---|
 | 1 | `katgpt-rs/examples/kimi_k3_hello_world.rs` | via the root-lib static (debug) | **no — print-only**, honest in BOTH profiles (release prints the "not measured" notice, never a zero-alloc claim) | fine; T3 consequence only |
-| 2 | `riir-ai/crates/riir-poc/src/behavior_gate_poc.rs` `g4_alloc_steady_state` | **NO — nothing does** (see environment finding) | artifact half: `assert!(first > 0)` sentinel (loud red without allocator); **greedy half: NO sentinel** — `assert_eq!(gfirst, gsecond)` passes vacuously at 0==0 | **gap → FIXED** (greedy-half sentinel added, riir-ai commit) |
+| 2 | `riir-ai/crates/riir-poc/src/behavior_gate_poc.rs` `g4_alloc_steady_state` | **via the root-lib static** (riir-poc deps the katgpt-rs ROOT crate — line 150; see the corrected finding below) | artifact half: `assert!(first > 0)` sentinel (loud red without allocator); **greedy half: NO sentinel** — `assert_eq!(gfirst, gsecond)` passes vacuously at 0==0 | **gap → FIXED** (greedy-half sentinel added, riir-ai commit) |
 | 3 | `riir-ai/crates/riir-games-civ/src/civ/map_tick/mod.rs` | n/a | **no — diagnostic, not a gate**: `trace_phase!` asserts nothing; release fallback reports `None` + one-time notice, never a fabricated 0 (explicitly documented in-source, 855 Class 1) | fine |
 | 4 | `riir-train-gpu/tests/bench_558_issue490_t2_incremental_staging_goat.rs` | served via the katgpt-rs shim under the kimi features | `assert!(joint_allocs > 0)` sentinel present | fine |
 | 5 | `riir-train-gpu/tests/bench_490_anchor_accumulation_goat.rs` | served via the katgpt-rs shim under the kimi features | `assert!(legacy_allocs > 0)` sentinel present | fine |
 
-**The environment finding (row 2, the part the issue's own text missed):**
-riir-poc deps ONLY `katgpt-core` (a path into the katgpt-rs repo, but the
-CORE crate — whose own static is `cfg(all(test, debug_assertions))` on
-katgpt-core itself, inert when consumed as a lib) and its dev-deps are
-`katgpt-attn` / `katgpt-claim` / `katgpt-moka-wasm` — never the root crate.
-No `#[global_allocator]` exists anywhere in `riir-poc/src/`. So the
-riir-poc lib-test binary has NO tracking allocator at all, and
-`g4_alloc_steady_state` — if run — always reds at the artifact-half sentinel
-(`0 > 0`). That is LOUD, never silently vacuous, but it means the gate has
-probably never passed in its current environment; it is `#[ignore]`d, and
-nothing in any pinned suite runs it (the Issue 713/718 coverage class).
-Giving the test a working allocator is T3-shaped (per-target registration),
-not T2 — recorded here so whoever picks up T3 knows riir-poc is a consumer
-the root static never served in the first place.
+**The environment finding (row 2) — CORRECTED 2026-09-03, second pass:** the
+first pass claimed riir-poc never links an allocator. **Wrong** — the audit's
+own grep was truncated (`head -5`) and missed line 150 of riir-poc's
+Cargo.toml: `katgpt-rs = { path = "../../../katgpt-rs", default-features =
+false, features = ["dllm", "flashar_consensus", "bandit", "ropd_rubric"] }`
+— a NORMAL dep on the ROOT crate. So the root static DOES install in the
+riir-poc debug lib-test binary, the counters ARE live, and
+`g4_alloc_steady_state` is runnable today (the exact same serving shape as
+row 1). This is the katgpt-rs Issue 724 Phase 1 lesson re-hit: an unanchored
+(or here, truncated) dep-line grep misattributed the dep graph. **Consequence
+for T3:** riir-poc is a root-static consumer — when the registration moves
+out of the root lib, this gate reds (both halves, loudly, thanks to the
+sentinels) until riir-poc installs its own per-target allocator. That is the
+designed T3 failure mode, not a defect. The grep lesson generalizes: classify
+dep edges with `grep -n "^<crate>\s*="` (anchored, untruncated), never a
+name substring with a head limit.
 
 **The fix shipped (row 2):** a greedy-half liveness sentinel before the
 equality asserts (riir-ai `crates/riir-poc/src/behavior_gate_poc.rs`):
