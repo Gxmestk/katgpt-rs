@@ -148,7 +148,7 @@ transformer_attn_res = []
 # changes is that naming the target without its features now errors (exit 101)
 # instead of reporting a green zero.
 #
-# Measured population + the instrument: `.issues/713`, scripts/cfg_gated_target_audit.py
+# Measured population + the instrument: `.docs/10_audits/cfg_gated_silent_zero_pass.md` (Issue 713, closed + removed 2026-09-03), scripts/cfg_gated_target_audit.py
 
 [[test]]
 name = "attn_res_g1_spec_match"

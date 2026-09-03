@@ -15,7 +15,7 @@ McCoy et al. show that the vector representations of MLPs, GRUs, Transformers, a
 
 **Distilled for katgpt-rs (modelless, inference-time):** the entire payload is algebra, not optimization. The DISCOVER fit is multilinear least squares ⇒ **ridge-ALS closed form** (4 block solves, monotone-certifiable, no autodiff). What ships: `tpr_bind` / `tpr_unbind` (with a computable coherence-error bound feeding a sigmoid gate) / `surgery_delta` (one skinny GEMV + axpy) / `core_project` (Eckart–Young-optimal structural denoise) / the **BoW-null structure router** / the **role-scheme BIC diagnostic** / the three-part **binding-validation harness** (fit residual, surgery causality, withheld-pair OOD vs the atomic-dictionary null). All frozen-artifact (BLAKE3-committed, freeze/thaw-compatible), zero-alloc on the hot path, latent-only (sync boundary untouched).
 
-**Verdict: Gain** (not Super-GOAT — Q1 fails: TPR/DISCOVER/surgery are published prior art; the fusion and the runtime primitive family are the contribution). PoC filed as `.issues/707`.
+**Verdict: Gain** (not Super-GOAT — Q1 fails: TPR/DISCOVER/surgery are published prior art; the fusion and the runtime primitive family are the contribution). PoC shipped as `katgpt_core::tpr` behind opt-in `tpr` — Issue 707 closed + removed 2026-09-03 (`1f7a96d4` landing; GOAT ALL PASS, consumer ledger and deferred rows in `.benchmarks/698_tpr_binding_algebra_goat.md`).
 
 ---
 

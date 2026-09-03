@@ -452,7 +452,7 @@ fn t3_1_g2_perf_batch_acquisition_and_expansion_at_crowd_scale() {
 //
 // Release-only, like the rest of this file — a debug build measures an
 // unoptimised binary and has manufactured false perf reds in this repo before
-// (`.issues/713` T2b).
+// (`.docs/10_audits/cfg_gated_silent_zero_pass.md` T2b).
 mod t53_dual_perf {
     use katgpt_core::certified_frontier::{DualPosteriorBuffer, PosteriorBuffer};
     use std::hint::black_box;

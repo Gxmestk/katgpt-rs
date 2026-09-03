@@ -199,7 +199,7 @@ observation sequence, so the near-duplicate-feature floor the primal needs
       Arming the two `certified_frontier` test targets on the way (they were
       auto-discovered with no `[[test]]` row, so naming either without the
       feature reported a green `0 passed`) exposed a **classifier** defect in
-      Issue 713's load-bearing token set — see `.issues/713` T4c.
+      Issue 713's load-bearing token set — see `.docs/10_audits/cfg_gated_silent_zero_pass.md` T4c.
 
 ## Risk register
 

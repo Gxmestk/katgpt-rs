@@ -85,7 +85,7 @@ axes, and a green result says nothing about what it compiled to nothing:
 | default vs `--all-features` | non-default gated code compiles to **nothing** |
 | `-p <crate>` vs `--workspace` | *at the same default features*: a crate's own non-default feature can be switched on by the ROOT crate's defaults once the root is in the selected set |
 | no `--all-targets` | skips every test / bench / example — which is where gated code lives |
-| dev vs `--release` | `debug_assertions` is always **ON**, so every item behind `#[cfg(debug_assertions)]` — and everything that depends on one — is only ever compiled in the configuration where it works (`.issues/716`) |
+| dev vs `--release` | `debug_assertions` is always **ON**, so every item behind `#[cfg(debug_assertions)]` — and everything that depends on one — is only ever compiled in the configuration where it works (`.docs/10_audits/debug_release_profile_axis.md`) |
 
 The third axis is the least obvious. `cargo test -p katgpt-backend --lib`
 compiled clean while `cargo test --workspace --lib` failed, because `gpu.rs` is
@@ -97,12 +97,12 @@ four crates reporting "0 tests" per-crate contributed 704 under `--workspace`.
 The **fifth** row is the newest and the command below does **not** close it —
 it runs in the dev profile. Measured 2026-09-03: adding `--release` produced
 **2 errors** and `cargo test --release -p katgpt-core --lib` did not compile at
-all, which is the very command `.issues/713` T2b tells everyone to use. Two
+all, which is the very command `.docs/10_audits/cfg_gated_silent_zero_pass.md` T2b tells everyone to use. Two
 `#[cfg(test)]` blocks imported `crate::alloc`'s counters, which are
-`debug_assertions`-only *by design*. Fixed in `.issues/716` T1; the axis itself
+`debug_assertions`-only *by design*. Fixed in `.docs/10_audits/debug_release_profile_axis.md` T1; the axis itself
 is T2.
 
-Read that together with `.issues/713` T2b and `.issues/715`, because the three
+Read that together with `.docs/10_audits/cfg_gated_silent_zero_pass.md` T2b and `.docs/10_audits/debug_release_profile_axis.md`, because the three
 point in different directions and that is the lesson: debug **manufactured**
 four false perf reds (713), debug **hid** a two-day release build break (715),
 and the full gate compiles `debug_assertions` code only in the profile where it
@@ -225,13 +225,13 @@ paragraph said "the three" for one commit after the fourth was added):
   load-bearing katgpt-rs targets appeared, including 8 `*_alloc_check` G4
   budgets and a Report-the-Floor UQ gate. All 17 armed and RUN in release:
   45 assertions, 45 pass, 0 fail — silently *unverified*, not broken, same as
-  `.issues/714` T3. Found sideways, by adding tests to one such file, not by
+  `.docs/10_audits/alloc_gate_per_thread_counter.md` T3. Found sideways, by adding tests to one such file, not by
   auditing the gate. Re-run the corpus token table when a new dialect appears.
 - `bench_doc_audit.py` runs a `selftest()` on every invocation pinning the line
   shapes its tokenizer must recognise. Without it a regex regression is silent:
   the audit recognises fewer labels and still prints "0 mismatches". That is how
   26 riir-chain benchmark docs audited as clean while being unreadable
-  (`.issues/702`).
+  (`.docs/10_audits/sibling_doc_drift_auditors.md`).
 
 ### The docs gate covers ONE repo — two more tiers cover the rest
 
@@ -299,9 +299,9 @@ cries wolf on the shape cargo cannot fix gets ignored on the ones it can.
 anyone names it. Pooled, the first measurement read 702 and meant nothing; split,
 it is **382 SILENT-NOW / 320 latent** across 19 repos, a large minority of them
 load-bearing by name (`goat`, `gate`, `g<N>`, `drill`, `proof`, …). Full record
-and the per-repo table: `.issues/713`.
+and the per-repo table: `.docs/10_audits/cfg_gated_silent_zero_pass.md`.
 
-Do not re-type those numbers from here — `.issues/713` carries **two** same-day
+Do not re-type those numbers from here — `.docs/10_audits/cfg_gated_silent_zero_pass.md` carries **two** same-day
 corrections. The first cut over-counted by 48, keying declared targets by name
 against the filename stem, so a row with an explicit `path` read as undeclared.
 The second was in the *load-bearing* classifier built for T4: a token matcher
@@ -318,7 +318,7 @@ agreed, and they agreed on the wrong *population* — T4c widened the token set
 and 17 more katgpt-rs targets appeared. Agreement licenses the pin against a
 classifier **bug**; nothing licenses it against a classifier being
 congenitally **narrow**. The defence is the corpus-wide candidate-token table
-in `.issues/713` T4c, not a second opinion.
+in `.docs/10_audits/cfg_gated_silent_zero_pass.md` T4c, not a second opinion.
 
 The verdict half is `scripts/cfg_gated_floor_gate.py`, a docs-gate check. The
 report and the gate are deliberately separate files: the report must stay
@@ -344,7 +344,7 @@ and `fast_bpe_goat` is 388 s in debug against 15.6 s in release. Re-measuring
 three times on a quiet box gave a sub-1% spread and made the wrong number look
 *more* trustworthy — ruling out the confounder you thought of says nothing
 about the one you didn't. Arming the gates still paid: it surfaced
-`.issues/714`, an alloc gate counting a sibling test's allocations, which
+`.docs/10_audits/alloc_gate_per_thread_counter.md`, an alloc gate counting a sibling test's allocations, which
 reproduces in release.
 
 ### Before committing in a shared worktree — `scripts/staged_set_audit.py`

@@ -2,6 +2,7 @@
 
 Status: **living** (last re-verified clean 2026-07-18, Issue 180 session 16)
 Origin: [Issue 180](../../.issues/180_remaining_doc_path_drift.md) (now removed per noise-reduction rule)
+Design record of the 2026-09-01 rewrite (dialect tokenizer, `(package, feature)` reachability closure, `on by transitive default`, sibling cadence): [`sibling_doc_drift_auditors.md`](sibling_doc_drift_auditors.md) (Issue 702, closed + removed)
 
 ## What these auditors catch
 

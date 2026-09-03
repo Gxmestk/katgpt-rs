@@ -6,7 +6,7 @@ rule blocks promotion until a real consumer lands, not the gates.
 
 **Instrument:** `crates/katgpt-core/benches/bench_707_tpr_binding_goat.rs`
 (`cargo bench -p katgpt-core --no-default-features --features tpr --bench bench_707_tpr_binding_goat`)
-**Primitive:** `katgpt_core::tpr` (`.issues/707`, `.research/527`, arXiv:2608.29530)
+**Primitive:** `katgpt_core::tpr` (Issue 707 — closed + removed 2026-09-03, its record is the last section of this file; `.research/527`, arXiv:2608.29530)
 
 ## Verdict
 
@@ -145,3 +145,60 @@ that has not, and the *gate* — which owns its own corpus — takes the strict
 reading. Same resolution T1–T3 used for `bow_router` / `shuffled_role_control`
 (`verdict() -> Option<_>` beside the raw bool), so the four instruments now
 answer the interpretability question the same way.
+
+## Issue 707 — closed + removed 2026-09-03; this is its record
+
+The PoC issue (`.issues/707`, last revision `b7913d79`; recover with
+`git log --all -- '.issues/707_*.md'`) shipped everything the primitive can
+prove alone: Phases 1–3 landed in `1f7a96d4`, the harness hardening in
+`e079dc7c` / `4af2b3cf` / `8c7ca74b` (Issue 710/711), and all four T-G8 clauses
+carry measured evidence — the intervention-battery clause through riir-ai's
+real `quest_grammar` consumer (`c4222f983`, Bench 852). Every task row was `[x]`
+except the owner-gated deferrals below, which move here so the gate table is
+not read as complete.
+
+### Where the shipped primitive diverges from the issue's task text (all measured)
+
+1. **T4 ships the explicit `(WᵀW + λI)⁻¹`, not the Cholesky factor.** A K=32
+   triangular solve is a serial chain and put projection at 2.14× its floor
+   against a 2× bar; one K×K matvec: 1.33×. Definiteness is still checked at
+   fit (`linalg::spd_inverse_f32`).
+2. **T5's "HOSVD/QR init" is a seeded filler table + an exact `W,b` solve.**
+   The pivoted QR that did ship is the unbind basis (T2), where it is
+   load-bearing. `tucker_factorization` is deliberately not a dep.
+3. **The monotone certificate is ENFORCED, not counted.** An uphill ALS sweep is
+   possible (one was measured); the fit rejects and rolls back, so
+   `fit_objective == min(ssr_per_sweep)` is the checkable claim.
+
+### Consumer ledger — three landed, none default-path
+
+| consumer | verdict | what it taught the primitive |
+|---|---|---|
+| riir-clippy Issue 062 → Bench 063 (2026-09-02) | **FLAT** — `bow_router` 1.14 / `cross_state` 1.07 on the 256-D control vs `r_bow < r_full` in the 8-D space the reranker scores in; re-scoped to a scalar bridge | Issue 710: `shuffled_role_control` could not fail on a single-binding corpus. Fixed `af3bca25` — vacuity is a reported quantity on all four instruments |
+| riir-ai Issue 847 Phase 2 → Bench 852 (`c4222f983`, 2026-09-02) | **GOAT 10/10**, opt-in `quest_tpr` — surgery additivity 1.788e-7, validator cascade 12/12 + 8/8 + 4/4 refused + 2/2, withheld-pair composition 8/8 vs 0/8 memorization | the binding-level boundary: withheld-(filler, role) does **not** extrapolate (0/2 at 0.90) — construction generalizes novel combinations of *seen* bindings, not novel bindings |
+| riir-clippy Issue 062 T4 → Bench 065 (`cd6c068`, 2026-09-03) | **REFUTED** — ID top-1 21.1 → 46.8 → 63.3 → 81.1% across the `d` grid while OOD stays at chance; margin 0.0 pp vs the 20 pp G8 bar on a readable instrument | corroborates 847's wall from an independent domain and harness. Not a weakening of G8 — G8 is a *planted positive control*; this is the negative real-corpus companion it lacked |
+
+**Two consumers, two domains, two harnesses, same wall.** That bounds what any
+future default-path consumer may claim. riir-clippy's Bench 062 measured the
+OOD baseline T-G8 had to beat and three constraints on it: use `rustc_errors`
+(79.1% ID / 0.0% OOD) as the informative atomic-null arm, never the healer
+corpus (0.0% ID — vacuous); scope claims to retrieved-but-demoted rows (OOD
+accuracy is a step function in a role's remaining filler count); the corpora
+are nearly role/filler-collinear, so widening fillers-per-role is a corpus task.
+
+### Deferred rows (moved from Issue 707; each unblock is non-engineering)
+
+- [-] **T-Promote** — gates ALL PASS; blocked only by the **no-default-consumer
+  rule**. Flipping `tpr` to default would compile dead code into every
+  katgpt-core consumer while all three consumers are opt-in or refuted. The
+  call belongs to a consumer that wants the primitive on ITS default path
+  (riir-ai 847's Promote row). Demote-loser if a simpler op wins the slot.
+- [-] **T8** OOD withheld-pair eval protocol + L2,1 arm A/B for trained
+  artifacts (edge_lora / hypernet / KG-embedding / direction tables). Unblock:
+  the next training run touching a matrix that must compose systematically.
+- [-] **T9** TPR-surrogate interpretability of our own artifacts (riir-clippy
+  drafter first; Bench-694 markov-head wrong-contract hook). Unblock: an owner
+  approves an offline analysis window; never a runtime path.
+- [-] **T10** riir-ai runtime guide (NPC personality surgery over the R158
+  committed-personality surface + F3 unbinding → KG emission). Unblock: a
+  production consumer materializes.

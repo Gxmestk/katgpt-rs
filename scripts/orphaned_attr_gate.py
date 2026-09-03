@@ -22,7 +22,7 @@ two days (fixed in `a08376a0`):
   5 errors: `debug_assertions` is off in release, so the import vanished while
   its five usages stayed unconditional.
 - `26d055c6`'s own validation was a DEBUG run (`lib 597/0`), where
-  `debug_assertions` is on and the import exists. That is `.issues/713` T2b's
+  `debug_assertions` is on and the import exists. That is `.docs/10_audits/cfg_gated_silent_zero_pass.md` T2b's
   lesson with the sign flipped — there, debug manufactured four false perf
   reds; here, debug hid a real build break.
 - `7e34ccef` then deleted the blank line, which made the wrong binding look
@@ -44,7 +44,7 @@ conventionally followed by a blank line. Narrowing to OUTER `#[cfg]` /
 
 katgpt-rs only, same reasoning as `cfg_gated_floor_gate.py`: CI has a single
 checkout. Pass a repo path to audit a sibling; adopting it there is an owner
-call, like `.issues/713` T3.
+call, like `.docs/10_audits/cfg_gated_silent_zero_pass.md` T3.
 """
 
 from __future__ import annotations

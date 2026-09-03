@@ -2825,7 +2825,8 @@ pub mod stale_residual;
 // instruments: the atomic-dictionary null, the withheld-pair OOD eval, the
 // BoW structure router and BIC scheme selection. Sibling to the R299 Clifford
 // wedge (`linalg::geometric_product`) and the R491/R389 steering families.
-// Opt-in pending the Issue 707 gates + a consumer (no-default-consumer rule).
+// Opt-in: the Issue 707 gates ALL PASS (Bench 698); promotion waits on a
+// consumer that wants it on ITS default path (no-default-consumer rule).
 #[cfg(feature = "tpr")]
 pub mod tpr;
 

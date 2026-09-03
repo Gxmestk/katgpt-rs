@@ -109,7 +109,7 @@ LOAD_BEARING_TOKENS = frozenset(
         # a whole naming dialect.
         #
         # Each of these was measured across all 2,157 workspace test/bench
-        # targets before being added (see the token table in `.issues/713`),
+        # targets before being added (see the token table in `.docs/10_audits/cfg_gated_silent_zero_pass.md`),
         # and every one names a property the file exists to FAIL on:
         "alloc",         # G4 in this repo's GOAT convention: `*_alloc_check`
         "correctness",   # G1

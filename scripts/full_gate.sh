@@ -41,7 +41,7 @@
 #   3. the gate itself     → clippy, workspace, all targets, all features
 #   4. zero errors         → any `error` line or unbuildable target is a finding
 #   6. profile axis        → the same tree with debug_assertions OFF; the four
-#                            axes below all run in the DEV profile (.issues/716)
+#                            axes below all run in the DEV profile (.docs/10_audits/debug_release_profile_axis.md)
 #   5. doc/script parity   → AGENTS.md must quote the same command this script
 #                            runs; a gate whose spec has drifted from its
 #                            implementation is a gate nobody is running
@@ -287,7 +287,7 @@ fi
 # DEPENDS on one — is compiled only in the configuration where it works. That
 # was the gate's fourth blind spot, and it was not hypothetical: measured
 # 2026-09-03, adding --release produced 2 errors and `cargo test --release -p
-# katgpt-core --lib` did not compile AT ALL (.issues/716).
+# katgpt-core --lib` did not compile AT ALL (.docs/10_audits/debug_release_profile_axis.md).
 #
 # `check`, deliberately, not `clippy`: this axis is about COMPILATION with
 # debug_assertions off. The lint surface is already covered by Layer 3, and
