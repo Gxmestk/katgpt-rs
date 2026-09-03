@@ -321,7 +321,31 @@ shapes are pinned, and two matter specifically:
   scope and T3's owners' call.
 
 - [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
-  katgpt-rs (done in T2). Read the numbers from the table, not from here.
+  katgpt-rs (done in T2 + T4c). Read the numbers from the table, not from here.
+
+  **Re-measured 2026-09-03 after T4c widened the classifier** — these are the
+  numbers a sibling owner should work from, because the older table was
+  computed with the narrow token set:
+
+  | repo | targets | gated | SILENT-NOW | **load-bearing** | latent |
+  |---|---|---|---|---|---|
+  | riir-ai | 930 | 560 | 122 | **41** | 179 |
+  | riir-clippy | 84 | 54 | 34 | **18** | 15 |
+  | riir-chain | 170 | 133 | 48 | **16** | 19 |
+  | riir-train | 487 | 302 | 36 | **15** | 3 |
+  | riir-game-sdk | 62 | 40 | 37 | **5** | 0 |
+  | riir-neuron-db | 86 | 53 | 11 | **3** | 2 |
+  | katgpt-rs | 921 | 541 | 44 | **0** | 100 |
+  | 12 others | 158 | 58 | 31 | **0** | 4 |
+  | **total** | **2 898** | **1 741** | **363** | **98** | **320** |
+
+  T4c added **17** load-bearing rows in katgpt-rs and only **5** across all
+  siblings (riir-ai +1, riir-chain +1, riir-train +2, riir-game-sdk +1), and
+  that asymmetry is not an artefact: the dialect it taught the classifier is
+  mostly *this repo's own naming convention* — 32 of the 36 `*_alloc_check`
+  hits and 10 of the 15 `conformal_floor_*` hits are katgpt-rs. A sibling owner
+  should therefore expect the widening to matter less to them than it did here,
+  and should still run the script rather than trusting this sentence.
   Deliberately NOT done from here: adding `required-features` converts a silent
   green into a **loud red** wherever CI invokes those targets by name without
   the features, which is the point, but it is the owning repo's call when to
