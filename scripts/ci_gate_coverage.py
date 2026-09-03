@@ -77,6 +77,12 @@ def _git(root: Path, repo: str, *args: str) -> str:
 
 
 def default_branch(root: Path, repo: str) -> str:
+    # origin/HEAD is a LOCAL symref that does not follow server-side default
+    # flips (caught live 2026-09-03: riir-dapps, flipped 09-02, still reported
+    # main -> a phantom UNREACHABLE row). Refresh it from the remote first;
+    # --atomic-update is not a thing for set-head, and a repo with no remote
+    # (or offline) keeps its last-known value — reported as-is, never guessed.
+    _git(root, repo, "remote", "set-head", "origin", "-a")
     ref = _git(root, repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
     return ref.split("/", 1)[1] if "/" in ref else (ref or "?")
 
