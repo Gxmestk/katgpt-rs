@@ -80,6 +80,11 @@ fn g4_zero_alloc() {
     let _ =
         committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut warmup_rng);
 
+    // Issue 714: the counter is per-THREAD now, so this gate no longer counts
+    // its sibling `g5_latency`. It must still be able to count at all — a
+    // dead counter reports 0 for everything and makes this gate vacuous.
+    assert_counter_is_live();
+
     let before = ALLOC_COUNT.load(Ordering::SeqCst);
     for _ in 0..1000 {
         let _ = committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut rng);
