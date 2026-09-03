@@ -77,18 +77,18 @@ inference-only, so the serving model measures its own selection layer.
 
 Per T1.2's kill rule, no flag is created and nothing below ships:
 
-- [ ] **T2.1** `ConfidentErrorScorer` (katgpt-speculative): `feed(branch_id, neg_log_p, entropy_norm)` + `branch_score(branch_id) -> f32`; fixed-capacity, zero-alloc, deterministic.
-- [ ] **T2.2** parallel_probe integration: scorer fed from the verify/draft path; `should_prune()` composes `disagreement_streak OR confident_error_mass ≥ θ_ce`; θ_ce pinned from T1.4's ROC knee (frozen constant — the calibration law is the justification for NOT adding a vote-quality estimator).
-- [ ] **T2.3** No-consensus fallback: when the probe stops with no majority → select min-confident-error branch (or `Escalate` when min mass > θ_esc). **G4 gate: fallback selection beats {entropy-max, random, longest} on the no-majority stratum.**
-- [ ] **T2.4** `ConvergenceSelector` tiebreak mode (katgpt-core, behind the same feature): MajorityVote ties broken by lower confident-error mass; carries the G2 evidence in its doc.
-- [ ] **T2.5** `hint_regret` escalation input: confident-error mass as a triage signal beside the existing band gate (compositional; no behavior change without the feature).
+- [-] **T2.1** `ConfidentErrorScorer` (katgpt-speculative): `feed(branch_id, neg_log_p, entropy_norm)` + `branch_score(branch_id) -> f32`; fixed-capacity, zero-alloc, deterministic.
+- [-] **T2.2** parallel_probe integration: scorer fed from the verify/draft path; `should_prune()` composes `disagreement_streak OR confident_error_mass ≥ θ_ce`; θ_ce pinned from T1.4's ROC knee (frozen constant — the calibration law is the justification for NOT adding a vote-quality estimator).
+- [-] **T2.3** No-consensus fallback: when the probe stops with no majority → select min-confident-error branch (or `Escalate` when min mass > θ_esc). **G4 gate: fallback selection beats {entropy-max, random, longest} on the no-majority stratum.**
+- [-] **T2.4** `ConvergenceSelector` tiebreak mode (katgpt-core, behind the same feature): MajorityVote ties broken by lower confident-error mass; carries the G2 evidence in its doc.
+- [-] **T2.5** `hint_regret` escalation input: confident-error mass as a triage signal beside the existing band gate (compositional; no behavior change without the feature).
 
 ## Phase 3 — GOAT gate + verdict — DEAD (never entered)
 
-- [ ] **T3.1 G3 prune economics:** ≥2× verify-token savings at no Maj@K loss vs shipped pruning (bit-identical answer clustering across runs; determinism gate).
-- [ ] **T3.2 G5 no-regression:** flag-off behavior bit-identical on all existing parallel_probe + EqR tests; count-identical lib suites both states; clippy 0.
-- [ ] **T3.3 G4/G-det:** zero-alloc accumulators (tracking allocator), determinism across 3 runs.
-- [ ] **T3.4 Verdict:** all gates PASS → promote `asymmetric_consensus` to default in the selection path (demote any losing signal); any FAIL → honest negative in `.benchmarks/582_*` + R435 addendum; the measurement half (T1.2/T1.4) stands either way as the calibration record.
+- [-] **T3.1 G3 prune economics:** ≥2× verify-token savings at no Maj@K loss vs shipped pruning (bit-identical answer clustering across runs; determinism gate).
+- [-] **T3.2 G5 no-regression:** flag-off behavior bit-identical on all existing parallel_probe + EqR tests; count-identical lib suites both states; clippy 0.
+- [-] **T3.3 G4/G-det:** zero-alloc accumulators (tracking allocator), determinism across 3 runs.
+- [-] **T3.4 Verdict:** all gates PASS → promote `asymmetric_consensus` to default in the selection path (demote any losing signal); any FAIL → honest negative in `.benchmarks/582_*` + R435 addendum; the measurement half (T1.2/T1.4) stands either way as the calibration record.
 
 ## Non-goals
 

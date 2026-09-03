@@ -346,8 +346,16 @@ def main() -> int:
             "own path added — committing these reverts what landed since"
         )
         for p, mt, ct, lost in stale[:8]:
-            w = _dt.datetime.fromtimestamp(mt).strftime("%H:%M:%S")
-            c = _dt.datetime.fromtimestamp(ct).strftime("%H:%M:%S")
+            # Date-qualify whenever the two fall on different days. A bare
+            # `%H:%M:%S` made a commit from YESTERDAY at 17:01 read as
+            # happening AFTER a write today at 10:23 — i.e. in the future —
+            # which inverts the one relation the reader is checking. Misread
+            # exactly that way on 2026-09-03. Same day stays terse, because
+            # that is the common case and the date adds nothing there.
+            wd = _dt.datetime.fromtimestamp(mt)
+            cd = _dt.datetime.fromtimestamp(ct)
+            fmt = "%H:%M:%S" if wd.date() == cd.date() else "%Y-%m-%d %H:%M:%S"
+            w, c = wd.strftime(fmt), cd.strftime(fmt)
             print(
                 f"      {p}  (written {w}, HEAD touched it {c}, "
                 f"{len(lost)} line(s) would be lost)"

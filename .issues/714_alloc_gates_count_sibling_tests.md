@@ -1,6 +1,11 @@
 # Issue 714 — alloc gates count their SIBLING tests' allocations
 
-**Status:** T1 **MEASURED + ROOT-CAUSED**, T2 **LANDED** 2026-09-03. T3 open.
+**Status:** **CLOSED 2026-09-03 — all three tasks done.** T1 MEASURED +
+ROOT-CAUSED, T2 LANDED (code in `62911111`, see the note below), T3 **RAN**
+over all 37 binaries on a quiet box: **35 pass / 0 fail**, the 2 non-results
+being `fn main()` program-style targets. Kept rather than removed because the
+reusable part is the *distinction* T3 drew — the 13 at-risk gates were
+silently **unverified**, not silently broken.
 
 > **T2's code landed inside a SIBLING's commit, `62911111` ("docs: doc-sync
 > run 2026-09-03"), not under a message describing it.** My two files were
