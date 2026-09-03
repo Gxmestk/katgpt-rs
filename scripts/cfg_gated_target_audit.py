@@ -76,6 +76,21 @@ INNER_CFG = re.compile(r"^\s*#!\s*\[\s*cfg\s*\(", re.MULTILINE)
 
 FEATURE_IN_CFG = re.compile(r'feature\s*=\s*"([^"]+)"')
 
+# The PROFILE dimension, split by DIRECTION. Pooling the two would repeat the
+# exact error this file documents for platform gates ("the negated and positive
+# cases differ by the single token `not(`, and are OPPOSITE in severity"):
+#
+#   not(debug_assertions)  -> RELEASE-only. Silent under plain `cargo test`,
+#                             i.e. the default invocation. The severe one.
+#   debug_assertions       -> DEBUG-only. Runs by default and is silent under
+#                             `--release` — the profile the perf rule
+#                             (`.docs/10_audits/debug_release_profile_axis.md`) tells everyone to
+#                             run gates in. Less severe, not harmless.
+#
+# Matched on the parenthesised form so `not(all(debug_assertions, ...))` and a
+# bare `debug_assertions` elsewhere in the same cfg cannot be confused.
+NOT_DEBUG_ASSERTIONS = re.compile(r"not\s*\(\s*debug_assertions\s*\)")
+
 # A target whose filename says its green IS the evidence for a promotion or a
 # claim. This vocabulary is COMMITTED here rather than derived from the corpus:
 # deriving "which names look load-bearing" from the files present is the
@@ -185,6 +200,31 @@ class Finding:
     # costs a reader's time, and a silent zero on `plan414_..._goat` is a
     # promotion decision made over no measurement.
     load_bearing: bool = False
+    # PROFILE axis (riir-ai `.issues/855` Class 2, 2026-09-03). A
+    # `debug_assertions` term in the cfg is NOT another bucket — it is a second
+    # DIMENSION, and it is deliberately allowed to overlap every class above,
+    # `covered` included.
+    #
+    # Why it needs its own flag rather than sitting in `predicates`: every
+    # other non-feature predicate is silent only in a configuration somebody
+    # chose. `target_os` needs the wrong platform; `miri` needs miri;
+    # `--no-default-features` needs the flag typed. `not(debug_assertions)`
+    # is silent under `cargo test` — the DEFAULT invocation, on the right
+    # machine, with no flags. It is the one gate whose green zero is what
+    # everybody gets by default.
+    #
+    # And it survives the fix: adding a `required-features` row moves a target
+    # into `covered`, which reads as "protected". A profile-gated target is
+    # still a green zero in dev after that row lands. Measured: riir-gpu's
+    # three `bench_734_*`/`bench_606_*` targets reported 0 errors in dev and
+    # 6/8/4 in release, and a `compile_error!` planted in one of them did not
+    # fire in dev at all.
+    profile_gated: bool = False
+    # Direction WITHIN the profile dimension. `not(debug_assertions)` is silent
+    # under the DEFAULT invocation; a bare `debug_assertions` is silent under
+    # `--release`, which is the profile the perf rule mandates for gates. One
+    # number over both says nothing, same as for platform gates.
+    release_only: bool = False
 
 
 @dataclass
@@ -197,6 +237,9 @@ class RepoReport:
     platform_except: list[Finding] = field(default_factory=list)
     cfg_test: list[Finding] = field(default_factory=list)
     any_of: list[Finding] = field(default_factory=list)
+    # OVERLAPS every list above and `covered` — deliberately NOT part of the
+    # partition, so the partition assertion is unaffected.
+    profile: list[Finding] = field(default_factory=list)
     covered: int = 0
 
     def silent_now(self) -> list[Finding]:
@@ -341,6 +384,15 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
                 load_bearing=is_load_bearing(f.name, name),
             )
 
+            base.profile_gated = "debug_assertions" in preds
+            base.release_only = bool(NOT_DEBUG_ASSERTIONS.search(body))
+            if base.profile_gated:
+                # Recorded BEFORE the `has_rf` continue, on purpose: a covered
+                # target with a profile gate is exactly the case this axis
+                # exists to surface, and skipping it here would make the
+                # column read zero the moment somebody does the easy fix.
+                rep.profile.append(base)
+
             if has_rf:
                 rep.covered += 1
                 continue
@@ -455,6 +507,43 @@ def selftest() -> None:
     # A mixed gate IS a finding: the feature half is expressible.
     body = cfg_body('#![cfg(all(target_os = "macos", feature = "gpu"))]\n')
     assert FEATURE_IN_CFG.findall(body) == ["gpu"], "mixed gate lost its feature"
+
+    # The PROFILE dimension (riir-ai `.issues/855` Class 2). Pinned in both
+    # directions because both failure modes are silent: a matcher that stops
+    # seeing `debug_assertions` takes the column to a confident zero, and one
+    # that fires on any file mentioning the word makes it unreadable.
+    prof = cfg_body(
+        '#![cfg(all(feature = "a", feature = "b", not(debug_assertions)))]\n'
+    )
+    prof_preds = {p for p in NON_FEATURE_PREDICATES if re.search(rf"\b{p}\b", prof)}
+    assert "debug_assertions" in prof_preds, "profile term not recognised"
+    # DIRECTION, pinned separately. Pooling the two halves is the error this
+    # file already documents for platform gates, one axis over.
+    assert NOT_DEBUG_ASSERTIONS.search(prof), "release-only direction not detected"
+    assert not NOT_DEBUG_ASSERTIONS.search(
+        cfg_body('#![cfg(all(feature = "a", debug_assertions))]\n')
+    ), "a bare debug_assertions read as release-only — opposite severity"
+    # A `not(...)` around something ELSE must not make the file release-only.
+    assert not NOT_DEBUG_ASSERTIONS.search(
+        cfg_body('#![cfg(all(not(target_os = "macos"), debug_assertions))]\n')
+    ), "not(target_os) claimed by the profile-direction matcher"
+    # ...and it must NOT swallow the feature half: this shape is a `findings`
+    # entry (expressible) AND profile-gated. If the feature list were lost the
+    # target would silently move to the platform class and never be reported
+    # as needing a `required-features` row.
+    assert sorted(set(FEATURE_IN_CFG.findall(prof))) == ["a", "b"], (
+        "profile gate swallowed its features"
+    )
+    for clean in (
+        '#![cfg(all(feature = "a", target_os = "macos"))]\n',
+        '#![cfg(feature = "debug_assertions_helper")]\n',
+    ):
+        body = cfg_body(clean)
+        got = {p for p in NON_FEATURE_PREDICATES if re.search(rf"\b{p}\b", body)}
+        assert "debug_assertions" not in got, (
+            f"false profile positive on {clean!r} — a substring match would "
+            "make the PROFILE column unreadable"
+        )
 
     # The default closure is TRANSITIVE, and stops at the crate boundary.
     feats = {
@@ -621,6 +710,17 @@ def main(argv: list[str]) -> int:
                         "platform_except": len(r.platform_except),
                         "cfg_test": len(r.cfg_test),
                         "any_of": len(r.any_of),
+                        # Additive, and OVERLAPPING: `profile_gated` is not a
+                        # partition member, so existing consumers' sums are
+                        # unchanged.
+                        "profile_gated": len(r.profile),
+                        "profile_gated_release_only": sum(
+                            1 for f in r.profile if f.release_only
+                        ),
+                        "profile_gated_debug_only": sum(
+                            1 for f in r.profile if not f.release_only
+                        ),
+                        "profile_gated_paths": sorted(f.path for f in r.profile),
                     }
                     for r in (audit(x) for x in repos)
                 },
@@ -634,7 +734,7 @@ def main(argv: list[str]) -> int:
     header = (
         f"{'repo':<24} {'targets':>8} {'#![cfg]':>8} {'w/ req-f':>9} "
         f"{'SILENT-NOW':>11} {'load-bear':>10} {'latent':>7} {'plat-only':>10} "
-        f"{'plat-exc':>9} {'cfg(test)':>10} {'any()':>6}"
+        f"{'plat-exc':>9} {'cfg(test)':>10} {'any()':>6} {'PROFILE*':>9}"
     )
     print(header)
     print("-" * len(header))
@@ -650,14 +750,59 @@ def main(argv: list[str]) -> int:
             f"{len(rep.silent_now()):>11} {len(rep.silent_now_load_bearing()):>10} "
             f"{len(rep.silent_latent()):>7} "
             f"{len(rep.platform_only):>10} {len(rep.platform_except):>9} "
-            f"{len(rep.cfg_test):>10} {len(rep.any_of):>6}"
+            f"{len(rep.cfg_test):>10} {len(rep.any_of):>6} {len(rep.profile):>9}"
         )
+
+    profile_total = sum(len(r.profile) for r in reports)
+    profile_covered = sum(1 for r in reports for f in r.profile if f.declared)
+    profile_lb = sum(1 for r in reports for f in r.profile if f.load_bearing)
+    rel_only = [f for r in reports for f in r.profile if f.release_only]
+    dbg_only = [f for r in reports for f in r.profile if not f.release_only]
+    rel_lb = sum(1 for f in rel_only if f.load_bearing)
+    dbg_lb = sum(1 for f in dbg_only if f.load_bearing)
 
     print(
         f"\nSILENT-NOW {total}: a plain `cargo test --test <name>` compiles the file to\n"
         f"nothing and prints `0 passed` with exit 0. latent {latent}: every gating\n"
         f"feature is default-on, so it only vanishes under `--no-default-features`.\n"
     )
+
+    print(
+        f"PROFILE* {profile_total} ({profile_lb} load-bearing): the `*` is because this\n"
+        f"column OVERLAPS every other one — it is a second dimension, not a bucket, so\n"
+        f"do not add it into the partition. A `#![cfg(..., not(debug_assertions))]` file\n"
+        f"compiles to an EMPTY BINARY under `cargo test` — the default invocation, on the\n"
+        f"right machine, with no flags typed. Every other predicate in this report needs\n"
+        f"somebody to have CHOSEN the silent configuration (the wrong platform, miri,\n"
+        f"`--no-default-features`); this one is what everybody gets by default.\n"
+        f"It also SURVIVES the fix: {profile_covered} of the {profile_total} already have a\n"
+        f"`required-features` row and so count as `w/ req-f`, which reads as protected.\n"
+        f"It is not — the row makes NAMING the target honest, and cargo has no way to\n"
+        f"express a profile at all. First measured by riir-ai `.issues/855` Class 2:\n"
+        f"three riir-gpu targets, 0 errors in dev and 6/8/4 in release, with a planted\n"
+        f"`compile_error!` failing to fire in dev.\n"
+    )
+    print(
+        f"  Read the DIRECTION, never the pooled {profile_total} — the two halves are\n"
+        f"  opposite, and differ by the single token `not(`:\n"
+        f"    not(debug_assertions)  {len(rel_only):>4} ({rel_lb} load-bearing)  RELEASE-only:\n"
+        f"        a green zero on plain `cargo test`, the default invocation.\n"
+        f"    debug_assertions       {len(dbg_only):>4} ({dbg_lb} load-bearing)  DEBUG-only:\n"
+        f"        runs by default, green zero under `--release` — the profile the perf\n"
+        f"        rule mandates for gates, so these vanish exactly when someone follows it.\n"
+    )
+    for rep in reports:
+        if not rep.profile:
+            continue
+        print(f"  {rep.repo}")
+        for f in sorted(rep.profile, key=lambda x: (not x.release_only, x.path)):
+            mark = "  [LOAD-BEARING]" if f.load_bearing else ""
+            rf = "has req-f" if f.declared else "no [[%s]] row" % f.kind
+            direction = "release-only" if f.release_only else "DEBUG-only"
+            print(f"    [{direction}] {f.path}{mark}  ({rf})")
+        print()
+    if profile_total == 0:
+        print("  (none)\n")
     for rep in reports:
         if not rep.silent_now():
             continue

@@ -11,8 +11,13 @@
 #
 # Format:  <key>  <value>
 #
-# FOUR pins, and they are two-sided ON PURPOSE
-# --------------------------------------------
+# The pins are two-sided ON PURPOSE
+# ---------------------------------
+# (The COUNT is deliberately not written here. This header said "FOUR" while
+# the file carried six, and then eight — the same drift the docs gate exists to
+# catch, committed by the header describing the gate. `REQUIRED_PINS` in
+# cfg_gated_floor_gate.py is the list; it is derived from this file's keys and
+# fails on a missing one.)
 # A ceiling alone is a gate that cannot fail once the instrument dies: an
 # auditor whose regex stops recognising `#![cfg(...)]` reports SILENT-NOW 0,
 # which passes every ceiling ever written. So two of the four pins are FLOORS
@@ -83,3 +88,41 @@ min_targets	700
 min_gated	400
 max_reasonless_ignores	0
 min_ignore_targets	400
+
+# The PROFILE dimension (riir-ai `.issues/855` Class 2, added 2026-09-03). TWO
+# pins because the directions are opposite in severity — pooling them would
+# repeat the error the report itself documents for positive-vs-negated platform
+# gates, one axis over.
+#
+#   max_profile_release_only  the sharp one. `#![cfg(..., not(debug_assertions))]`
+#                             compiles to an EMPTY binary under plain
+#                             `cargo test` — the DEFAULT invocation, on the
+#                             right machine, with no flags typed. Every other
+#                             predicate in this report needs somebody to have
+#                             CHOSEN the silent configuration. And unlike
+#                             SILENT-NOW there is no fix to apply: cargo has no
+#                             profile predicate in `required-features`, so a
+#                             row moves the target into the "covered" column
+#                             while changing nothing. katgpt-rs has ZERO today,
+#                             so the correct value is 0. A release-only bench
+#                             is legitimate — raise the pin and say WHY.
+#   max_profile_debug_only    the ratchet. `#![cfg(..., debug_assertions)]`
+#                             vanishes under `--release`, the profile AGENTS.md
+#                             tells everyone to run gates in. katgpt-rs has
+#                             exactly ONE: tests/kimi_k3_g4_alloc_free.rs,
+#                             load-bearing, and CORRECT — the alloc counters
+#                             are debug-only by design and that file asserts
+#                             nothing else. What would not be correct is the
+#                             same file also carrying a wall-clock budget: no
+#                             single profile can observe both. riir-ai
+#                             `.issues/855` Class 3 is the worked split (an
+#                             alloc+timing G4 measuring 3 ms/cycle in debug
+#                             against 14.35 us in release — a 209x artefact on
+#                             a bar the code clears by 70x).
+#
+# Workspace context, for whoever raises these: 133 profile-gated targets over
+# 19 repos, 130 release-only and 3 debug-only — and ALL THREE debug-only ones
+# are load-bearing alloc gates. 130 of the 133 are riir-ai.
+
+max_profile_release_only	0
+max_profile_debug_only	1

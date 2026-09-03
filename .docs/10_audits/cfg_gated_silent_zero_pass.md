@@ -21,6 +21,69 @@ riir-clippy `19beece`.
 `scripts/cfg_gated_floor_gate.py` + `scripts/cfg_gated_floors.txt` (the gate,
 a `docs_gate.sh` check), `scripts/all_ignored_target_audit.py` (report).
 
+## The PROFILE dimension — a third kind, added 2026-09-03 (riir-ai `.issues/855` Class 2)
+
+The report modelled two kinds of gate: **feature**-expressible (fixable with a
+`required-features` row) and `target_os` / `miri` / `unix` / … (which cargo
+cannot express). `debug_assertions` sat in the second list, pooled with the
+platform predicates, and that pooling hid the worst case in the set.
+
+**It is not a third bucket, it is a second DIMENSION**, and it is reported as
+one — overlapping every existing class, `covered` included, so the partition
+assertion is untouched. Two properties make it different from everything else
+in `NON_FEATURE_PREDICATES`:
+
+1. **Every other predicate is silent only in a configuration somebody CHOSE.**
+   `target_os` needs the wrong platform; `miri` needs miri; a default-off
+   feature needs `--no-default-features` typed. `not(debug_assertions)` is
+   silent under **`cargo test`** — the default invocation, on the right
+   machine, with no flags.
+2. **It survives the fix.** Adding a `required-features` row moves a target
+   into the `w/ req-f` column, which reads as protected. A profile-gated target
+   is still a green zero in dev afterwards. Measured: **11 of the 133** already
+   have their row.
+
+### Read the DIRECTION, never the pooled total
+
+Pooling the two halves would repeat the exact error this report already
+documents for platform gates one axis over — they differ by the single token
+`not(` and are opposite in severity. Measured over all 19 contract repos:
+
+| shape | count | load-bearing | what it means |
+|---|---:|---:|---|
+| `not(debug_assertions)` | **130** | 26 | RELEASE-only: green zero on plain `cargo test` |
+| `debug_assertions` | **3** | **3** | DEBUG-only: green zero under `--release` |
+
+130 of the 133 are riir-ai, overwhelmingly `riir-gpu/tests/bench_*_g1.rs` —
+GPU benches deliberately release-gated, which is defensible. What is not
+defensible is that they are invisible to every dev-profile gate, which is how
+riir-ai `.issues/855` Class 2's 18 release diagnostics sat unnoticed.
+
+**The 3 debug-only ones are the sharper finding: all three are load-bearing,
+and all three already carry `required-features`.** They are
+`kimi_k3_g4_alloc_free.rs`, `steering_g5_zero_alloc.rs` and
+`probe_684_topology_hotpath_alloc.rs` — alloc gates, necessarily debug-only
+because the counters are. They vanish **exactly when someone follows
+`.docs/10_audits/debug_release_profile_axis.md`'s rule to run gates in release**. The instruction and
+the gate are in direct conflict, and nothing said so.
+
+The fix pattern for that conflict is riir-ai `.issues/855` Class 3's: an alloc
+budget and a wall-clock budget cannot be asserted in the same test, because no
+single profile can observe both. Split them, `#[cfg_attr(…, ignore)]` each into
+its own profile, and never stub the absent half to a fabricated zero (Issue
+856). Measured there: 3 ms/cycle in debug against 14.35 µs in release, a 209×
+profile artefact on a bar the code clears by 70×.
+
+### How it is detected
+
+`NOT_DEBUG_ASSERTIONS` matches the parenthesised form, so
+`not(all(debug_assertions, …))` and a bare `debug_assertions` elsewhere in the
+same cfg cannot be confused. `selftest()` pins it in **both** directions plus a
+`not(target_os = …)` non-claim, because both failure modes are silent: a
+matcher that stops seeing the term takes the column to a confident zero, and
+one that fires on any file mentioning it makes the column unreadable.
+
+
 ## The shape
 
 A test file opening with `#![cfg(feature = "x")]` compiles to an **empty

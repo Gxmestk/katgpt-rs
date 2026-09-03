@@ -370,6 +370,28 @@ classifier **bug**; nothing licenses it against a classifier being
 congenitally **narrow**. The defence is the corpus-wide candidate-token table
 in `.docs/10_audits/cfg_gated_silent_zero_pass.md` T4c, not a second opinion.
 
+**A third kind was added 2026-09-03, and it is the one a green `w/ req-f`
+column lies about.** The report modelled feature-expressible gates and
+`target_os`/`miri` ones. `debug_assertions` was pooled with the latter, and
+that hid the worst case in the set: every *other* predicate is silent only in
+a configuration somebody **chose** (the wrong platform, miri,
+`--no-default-features` typed), while `not(debug_assertions)` is silent under
+plain **`cargo test`** — the default invocation, on the right machine, with no
+flags. It also **survives the fix**: adding a `required-features` row moves the
+target into "w/ req-f", which reads as protected, and does not make it compile.
+So it is reported as an overlapping **dimension**, not a fourth bucket, leaving
+the partition assertion untouched. Measured over 19 repos: **133 targets, 29
+load-bearing, 11 already "covered"** — and split by direction, since pooling
+would repeat the error that report already documents for platform gates:
+**130 `not(debug_assertions)`** (green zero on `cargo test`; 26 load-bearing,
+almost all riir-ai GPU benches) against **3 bare `debug_assertions`** (green
+zero under `--release`) — and *all three of those are load-bearing alloc
+gates, which vanish exactly when someone follows the rule above to run gates
+in release*. The instruction and the gate were in direct conflict and nothing
+said so. Found by riir-ai `.issues/855` Class 2, whose fix pattern for the
+conflict is to split the alloc assertion from the wall-clock one, since no
+single profile can observe both.
+
 The verdict half is `scripts/cfg_gated_floor_gate.py`, a docs-gate check. The
 report and the gate are deliberately separate files: the report must stay
 runnable over the siblings whose owners have not taken Issue 713 T3, and a

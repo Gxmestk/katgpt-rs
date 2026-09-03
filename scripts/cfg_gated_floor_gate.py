@@ -53,6 +53,8 @@ REQUIRED_PINS = (
     "min_gated",
     "max_reasonless_ignores",
     "min_ignore_targets",
+    "max_profile_release_only",
+    "max_profile_debug_only",
 )
 
 
@@ -112,6 +114,34 @@ def check(m: dict[str, int], pins: dict[str, int]) -> list[str]:
             f"only {m['gated']} whole-file #![cfg] gates recognised, floor "
             f"{pins['min_gated']} — the gate-recognition regex has gone blind. "
             "SILENT-NOW would read 0 for the wrong reason."
+        )
+
+    # The PROFILE dimension (riir-ai `.issues/855` Class 2, 2026-09-03). Two
+    # pins, not one, because the two directions are OPPOSITE in severity and a
+    # single number over both says nothing — the same argument this report
+    # already makes for positive-vs-negated platform gates.
+    pro = m["profile_gated_release_only"]
+    if pro > pins["max_profile_release_only"]:
+        fail.append(
+            f"profile-gated (release-only) {pro} > pinned "
+            f"{pins['max_profile_release_only']} — a "
+            "`#![cfg(..., not(debug_assertions))]` target compiles to an EMPTY "
+            "binary under plain `cargo test`, the DEFAULT invocation, and a "
+            "`required-features` row cannot fix it (cargo has no profile "
+            "predicate). A release-only bench is legitimate; raise the pin and "
+            "say WHY, so the next reader knows the green zero is intended."
+        )
+    pdo = m["profile_gated_debug_only"]
+    if pdo > pins["max_profile_debug_only"]:
+        fail.append(
+            f"profile-gated (debug-only) {pdo} > pinned "
+            f"{pins['max_profile_debug_only']} — a `#![cfg(..., "
+            "debug_assertions)]` target vanishes under `--release`, which is "
+            "the profile AGENTS.md tells everyone to run gates in. Legitimate "
+            "for an alloc gate (the counters are debug-only); NOT legitimate "
+            "if the same file also asserts a wall-clock budget — no single "
+            "profile can observe both, so split it (riir-ai `.issues/855` "
+            "Class 3 is the worked example)."
         )
 
     # Issue 713 T6's axis. `#[ignore]` itself is NOT gated — it is the correct
@@ -197,6 +227,8 @@ def selftest() -> None:
     }
     pins["max_reasonless_ignores"] = 0
     pins["min_ignore_targets"] = 400
+    pins["max_profile_release_only"] = 0
+    pins["max_profile_debug_only"] = 1
     ok = {
         "scanned": 921,
         "gated": 541,
@@ -204,6 +236,8 @@ def selftest() -> None:
         "silent_now_load_bearing": 0,
         "reasonless_targets": 0,
         "ignore_scanned": 653,
+        "profile_gated_release_only": 0,
+        "profile_gated_debug_only": 1,
     }
     assert check(ok, pins) == [], "the observed measurement must pass"
 
@@ -216,6 +250,24 @@ def selftest() -> None:
     # report of all zeroes satisfies both ceilings.
     assert check({**ok, "reasonless_targets": 1}, pins), "a reasonless ignore passed"
 
+    # The PROFILE dimension, both directions and both boundaries. Driven
+    # separately because the two pins have DIFFERENT values (0 and 1), so a
+    # copy-paste that reads one pin for both checks would still pass a
+    # single-direction test.
+    assert check({**ok, "profile_gated_release_only": 1}, pins), (
+        "a new release-only gated target passed — it is a green zero on the "
+        "DEFAULT `cargo test`"
+    )
+    assert check({**ok, "profile_gated_debug_only": 2}, pins), (
+        "a new debug-only gated target passed"
+    )
+    assert check({**ok, "profile_gated_debug_only": 1}, pins) == [], (
+        "the existing debug-only alloc gate must not red the push"
+    )
+    assert check({**ok, "profile_gated_debug_only": 0}, pins) == [], (
+        "an IMPROVEMENT on the profile axis failed"
+    )
+
     blind = {
         "scanned": 0,
         "gated": 0,
@@ -223,6 +275,11 @@ def selftest() -> None:
         "silent_now_load_bearing": 0,
         "reasonless_targets": 0,
         "ignore_scanned": 0,
+        # A blind auditor reports ZERO here too, which satisfies both profile
+        # ceilings — exactly why the population FLOORS are the pins that carry
+        # this gate, and why adding two more ceilings does not change the 3.
+        "profile_gated_release_only": 0,
+        "profile_gated_debug_only": 0,
     }
     assert len(check(blind, pins)) == 3, "a blind auditor passed the gate"
 
@@ -241,7 +298,9 @@ def main() -> int:
         f"{m['scanned']} targets, {m['gated']} #![cfg]-gated, {m['covered']} covered, "
         f"SILENT-NOW {m['silent_now']} (load-bearing {m['silent_now_load_bearing']}), "
         f"{m['all_ignored']} all-#[ignore]d target(s), "
-        f"{m['reasonless_targets']} of them reasonless"
+        f"{m['reasonless_targets']} of them reasonless; "
+        f"profile-gated {m['profile_gated_release_only']} release-only / "
+        f"{m['profile_gated_debug_only']} debug-only"
     )
 
     fail = check(m, pins)
