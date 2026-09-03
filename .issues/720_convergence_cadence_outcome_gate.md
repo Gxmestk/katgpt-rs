@@ -23,7 +23,7 @@ Constraints carried from the source + cousins:
 
 ## Tasks
 
-- [ ] T1: `ConvergenceCadence` probe (katgpt-core, feature-gated `cadence_gate`): zero-alloc ring of last-K update norms (‖Δh‖ or ‖Δbelief‖, caller-fed — the halter and `evolve_belief` both already have the delta in hand), emits `Settled { mag } | Churning { mag, plateau_len }` from decay-ratio + plateau detection. G1: bit-identical when feature off; G4 alloc-free.
+- [x] T1: `ConvergenceCadence` probe (katgpt-core, feature-gated `cadence_gate`): zero-alloc ring of last-K update norms (‖Δh‖ or ‖Δbelief‖, caller-fed — the halter and `evolve_belief` both already have the delta in hand), emits `Settled { mag } | Churning { mag, plateau_len }` from decay-ratio + plateau detection. G1: bit-identical when feature off; G4 alloc-free. *(LANDED 2026-09-03, katgpt-rs `99920de2` — 12/12 feature-on tests incl. paper-shape fixtures + G4 0-alloc hot path + shuffled non-vacuity; default 1992/0 bit-unchanged; clippy 0 both states.)*
 - [ ] T2: Falsifiable A/B on a controlled loop (defend-wrong, riir-poc): three arms on `forward_looped` T=64 — (a) no gate, (b) halt-only (shipped halter), (c) halt + cadence-escalation (on plateau-high: apply 717 damping / restart from perturbed state). Metric: accuracy-at-equal-or-less compute + abort-precision (cadence verdict vs ground-truth solved/failed on a suite with known outcomes). Non-vacuity: gate must FAIL when fed shuffled cadences.
 - [ ] T3: NPC consumer sketch (riir-mmorpg-examples, Issue 054 L2 deliberation): belief-churn over the think window as an ALTERNATIVE/ADDITIONAL stuck trigger (indecision detection, generalizes position-stuck), + settled-belief early-commit (skip think cycle when no new evidence and cadence settled). Gated, default-off; measure think-tick savings + deliberation precision on the 1000-NPC harness.
 - [ ] T4: Doc pins: (a) GainCostLoopHalter docs gain the outcome-semantics note (halt ≠ classify); (b) Research 529's three-law combo (absolute Δ / windowed shape / tangential-first) recorded at the probe site; (c) cross-link Issue 717 (its detector) and riir-neuron-db `can_freeze` (its consolidation-side sibling).
@@ -37,5 +37,5 @@ Constraints carried from the source + cousins:
 
 **(1) Original task:** file the convergence-cadence extraction from the HRM dissection paper.
 **(2) Accomplished:** issue filed with signal-diff against halter/surprise/can_freeze/717, constraints (absolute Δ, windowed, tangential-first), T1-T5.
-**(3) What remains:** all tasks open; T5 deferred.
-**(4) Active plan state:** this issue (OPEN); Research 529 (RECORD); Issue 717 (OPEN — its detector).
+**(3) What remains:** T2 (riir-poc A/B), T3 (mmorpg Issue 054 L2 consumer), T4 doc pins (module-level half DONE in `99920de2` — the three laws + signal-diff + cross-links live at the probe site; halter-doc note (a) + can_freeze cross-link (c) remain), T5 deferred.
+**(4) Active plan state:** this issue (OPEN — T1 DONE); Research 529 (RECORD); Issue 717 (OPEN — its detector; sibling lane landing T1-T4).
