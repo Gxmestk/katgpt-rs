@@ -76,8 +76,11 @@ cargo test -p katgpt-core --features <feature_name> --lib
 
 ### The full gate — none of the above is a whole-repo claim
 
-Every command listed above is narrow in at least one of three **independent**
-axes, and a green result says nothing about what it compiled to nothing:
+Every command listed above is narrow in at least one **independent** axis, and
+a green result says nothing about what it compiled to nothing. (The count is
+deliberately not written here — this sentence said "three" for months while
+the table below carried five, which is the drift the table exists to catch,
+committed by the sentence introducing it.)
 
 | Axis | Blind spot |
 |---|---|
@@ -86,8 +89,22 @@ axes, and a green result says nothing about what it compiled to nothing:
 | `-p <crate>` vs `--workspace` | *at the same default features*: a crate's own non-default feature can be switched on by the ROOT crate's defaults once the root is in the selected set |
 | no `--all-targets` | skips every test / bench / example — which is where gated code lives |
 | dev vs `--release` | `debug_assertions` is always **ON**, so every item behind `#[cfg(debug_assertions)]` — and everything that depends on one — is only ever compiled in the configuration where it works (`.docs/10_audits/debug_release_profile_axis.md`) |
+| **compile vs EXECUTE** | every axis above is about *compilation*. **No CI in this repo runs a test.** `clippy` and `check` compile test targets and execute none, and `grep -rnE "cargo (test\|nextest\|bench)" scripts/ .github/` returns only prose. **477 integration-test targets, 31 lib targets and 176 bench targets over 32 packages are executed by nothing automatic** (`.issues/718`) |
 
-The third axis is the least obvious. `cargo test -p katgpt-backend --lib`
+**The last axis is the one that changes how to read every gate below.** A
+green full gate is a claim that the workspace *compiles* under one feature
+set on one platform in one profile — never that an assertion in it holds.
+This repo's own rule is that an uninvoked assertion is *unknown*, not
+passing, so by that standard every Rust assertion here is unknown: the 39
+GOAT gates armed with `required-features` in Issue 713 T3 included, because
+arming made a **named** run honest and nothing names them. AGENTS.md records
+"All 39 pass there" under `--release` — that was a **workstation** run, and
+nothing repeats it. Whether to close this with a scheduled test job is an
+owner cost call (`.issues/718` T3); what is *not* optional is reading a
+green gate as nothing more than "it built" — because that is all it ever
+said.
+
+The `-p` vs `--workspace` axis is the least obvious. `cargo test -p katgpt-backend --lib`
 compiled clean while `cargo test --workspace --lib` failed, because `gpu.rs` is
 behind `katgpt-backend/gpu_inference` and the chain
 `katgpt-rs/default -> async_qdq_overlap -> inference_router -> gpu_inference`
