@@ -158,6 +158,24 @@ stale_residual = []
 # exists.
 cond_audit = ["stale_residual"]
 
+# cadence_gate (Issue 720 T1 / Research 529, HRM mechanistic dissection,
+# Rodrigues & Kang ICML 2026 Mech Interp Workshop — Finding 4, n=93/107):
+# ConvergenceCadence — windowed update-magnitude outcome classifier for any
+# iterative latent loop. Solved runs' ‖Δz‖ DECAYS (0.30 by step 7-8); failed
+# runs PLATEAU HIGH (1.46, ~4.9×) — the windowed shape (two half-window means
+# + absolute floors) classifies settled vs churning long before the final
+# step. The OUTCOME read the halt-only GainCostLoopHalter (gain_cost_halt
+# feature) lacks: halt ≠ classify; plateau-high churn warrants ESCALATION
+# (damp per Issue 717 — tangential-first, cos_updates ≈ 0 — deliberate per
+# NPC think loops, restart per CGSP), never just halt. Three laws recorded at
+# the probe site: absolute Δ (never relative — R35/717-T6 trap), windowed
+# shape (never single-step), tangential-first. Zero-alloc fixed ring, O(1)
+# push/classify, caller-fed norms (step_size / evolve_belief already hold the
+# delta). Pure f32, zero deps. Opt-in — T2 (riir-poc defend-wrong A/B) + T3
+# (mmorpg Issue 054 L2 consumer) pending; promotion per the no-default-
+# consumer rule.
+cadence_gate = []
+
 # support_regime (Issue 693 / Research 513, arXiv:2608.22764 — LpWM: A Case
 # for Sparse Representations in World Models, Kuang et al. 2026-08-24): the
 # consecutive-tick TEMPORAL consumer of the iou kernel — support instability
