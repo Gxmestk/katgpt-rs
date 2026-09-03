@@ -107,7 +107,7 @@ plain all-features break.
 | riir-neuron-db | 214 | 0 | — | — | — | clean |
 | riir-clippy | 530 | 0 | — | — | — | clean |
 | riir-game-sdk | 854 | 0 | — | — | — | clean |
-| riir-chain | 678 | 12 | 12 | **0** | 0 | all-features break, profile-NEUTRAL |
+| riir-chain | 678 | 12 | 12 | **0** | 0 | all-features break, profile-NEUTRAL — **FIXED** `feadd573` |
 | riir-train | 1139 | 30 | 31 | **0** | **1** | profile break, DEV-only |
 | riir-ai | 1766 | 282 | 6 | **30** | 1 | **RELEASE BROKEN** |
 
@@ -115,7 +115,16 @@ Counts are raw diagnostics; REL-only / DEV-only are **distinct** `(package,
 target, message)` triples, which is the column that means anything — riir-chain's
 12-vs-12 is the same six triples twice over, i.e. the profile changed nothing
 and its errors are a pre-existing `--all-features` break (`riir_ffi` unresolved
-in three `riir-chaind` tests). Filed with its owner, not here.
+in three `riir-chaind` tests). Filed with its owner as riir-chain `.issues/120`
+and **CLOSED there 2026-09-03** (`feadd573`): Plan 040 moved `LatentSidecar`
+from `riir-ffi` to `riir-wasm` and missed three files, so the fix was a 12-token
+repoint — and it un-hid **8 green tests** (four latency GOAT gates, four
+wire-protocol E2Es) that had been unbuildable for 12 days while reporting
+`ok. 0 passed`, because the three files are `#![cfg(feature =
+"chain_mcp_latent")]` and that feature is default-off. Worth noting *which*
+instrument found it: this sweep's contribution was `--all-features`, and Issue
+713 T3's `required-features` rows were what turned the resulting
+`ok. 0 passed` into an exit-101. Neither alone was enough.
 
 **The axis cuts BOTH ways, which this repo had not yet recorded.** Every prior
 finding was release-only. riir-train's single DEV-only error is a
