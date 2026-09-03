@@ -26,11 +26,23 @@
 # entries) and filtered afterwards, at four call sites per run. Doc drift is
 # also introduced per-commit and is cheapest to catch in the commit that
 # introduces it, which is the opposite of the full gate's slow-rot failure mode.
+#
+# ── Why per-push on MAIN only (owner call, 2026-09-03) ──────────────────────
+# The push trigger originally carried [main, develop]. It is narrowed to [main]
+# by owner ask: develop pushes no longer burn runs, and the gate now gates the
+# promote lane. The honest cost, stated rather than buried: doc/skill drift
+# introduced on develop is no longer caught at the commit that introduces it —
+# it surfaces at the next main push (or `./scripts/docs_gate.sh`, which stays
+# the workstation's per-commit check for develop work). main is synced to the
+# develop tip by fast-forward, so the file exists on the branch it gates — a
+# push trigger reads the workflow file from the PUSHED ref, and a main without
+# this file would make the trigger dead exactly like the pre-.issues/704 rot
+# check was.
 name: Docs gate
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     # NOTE: duplicated rather than shared via a YAML anchor — GitHub Actions
     # does not support anchors/aliases, and a local `yaml.safe_load` DOES
     # resolve them, so validating here would have reported a green workflow
@@ -78,6 +90,9 @@ on:
       - 'scripts/docs_gate.sh'
       - '.github/workflows/docs_gate.yml'
   pull_request:
+    # Same branch scope as push: PRs targeting main only — a PR against
+    # develop is develop work, which this gate no longer covers.
+    branches: [main]
     paths:
       - 'README.md'
       - 'examples/README.md'

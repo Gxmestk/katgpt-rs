@@ -217,6 +217,15 @@ choices are deliberately the inverse of the full gate's, and both files say why:
 this gate has no `cfg(target_os)` surface so platform cannot change its verdict,
 and it costs ~3s rather than >13 min.
 
+Per-push is scoped to **`main` only** (owner call 2026-09-03, was
+`[main, develop]`): develop pushes no longer fire the gate, so the
+introduce-commit catch now applies only to the promote lane — run
+`./scripts/docs_gate.sh` locally for develop work, or the drift surfaces at the
+next main push. The same change fast-forwarded `main` to the develop tip,
+because a push trigger reads the workflow file from the PUSHED ref and a `main`
+without this file would be a dead trigger — the exact shape of the pre-704 rot
+check.
+
 The `CHECKS` array in that script is the list. **The count is deliberately not
 written here** — this paragraph said "the three" for one commit after the fourth
 was added, which is the drift the gate itself exists to catch, committed by the
