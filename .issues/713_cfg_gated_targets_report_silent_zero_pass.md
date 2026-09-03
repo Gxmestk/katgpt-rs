@@ -167,6 +167,36 @@ shapes are pinned, and two matter specifically:
   batch — errors without the features, and the same test count with them.
   **The count must not move.** A target that starts failing once it actually
   runs is a separate finding and gets its own issue, not a silent revert.
+- [x] **T2b RAN 2026-09-03 — the armed gates' actual verdicts.** All 39 newly
+  armed katgpt-rs gates executed under their features for the first time.
+  **35 green, 4 red.** (The 4 `NO-RESULT-LINE` rows in the raw log are the
+  dotted-name false positives, corrected above — they were always fine.)
+
+  Every feature involved is **opt-in**, verified against each manifest's
+  `default` closure, so **none of these reds ships in the default build.**
+  That is the reassuring half. The other half is that four verdicts were
+  invisible for as long as the targets have existed.
+
+  The reds are **not one finding** and must not be reported as one:
+
+  | gate | feature | verdict | class |
+  |---|---|---|---|
+  | `plan414_hla_committed_belief_probe_goat` | `hla_committed_belief_probe` | 6 allocs/1000, expected 0 | **harness defect — `.issues/714`, FIXED**, gate now green |
+  | `bench_668_effective_degree_goat` | `effective_degree` | 2145/2166/2163 ns/path vs a **500 ns** bound | **real** — 3 quiet runs, tightly clustered, 4.3× over |
+  | `fast_bpe_goat` | `fast_bpe` | 2311× vs its own `≤1000×` bound | **real** — a *documented* regression whose documented bound no longer holds |
+  | `bench_145_binary_plasma_goat` | `binary_plasma` | binary only 1.05× vs `≥1.2×` | **NOT a regression** — a *promotion* gate returning its designed NO ("Ternary stays as plasma"). The feature is opt-in and unpromoted, so gate and reality agree |
+
+  **The load-flakiness hypothesis was tested and rejected, not assumed.** The
+  first readings came off a box running four other agent sessions plus this
+  sweep, and a latency gate under load is the canonical false red. So each
+  was re-measured on a quiet box, three times: `bench_668` returned
+  2145 / 2166 / 2163 ns — a spread of under 1%, which is not contention.
+
+- [ ] **T2c** File the two genuine perf findings (`bench_668`'s 4.3× miss,
+  `fast_bpe`'s documented-bound drift) as their own issues. They are *not*
+  713's business — 713's claim is that the verdicts were invisible, and that
+  claim is now discharged.
+
 - [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
   katgpt-rs (done in T2). Read the numbers from the table, not from here.
   Deliberately NOT done from here: adding `required-features` converts a silent
