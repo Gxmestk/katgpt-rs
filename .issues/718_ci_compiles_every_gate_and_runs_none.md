@@ -1,7 +1,8 @@
 # Issue 718 — CI compiles every gate in this repo and EXECUTES none
 
-**Status:** OPEN — T1 DONE, filed 2026-09-03. T2 (the cheap selftest lane) is
-ungated and actionable now; T3 (a full test job) is an
+**Status:** OPEN — T1 DONE, **T2 WITHDRAWN on measurement (its premise was
+false — no Rust selftest population exists; the 9 Python auditor selftests
+are already run per-push, and T2 collapses into T3)**, filed 2026-09-03. T3 (a full test job) is an
 owner cost call. Found sideways, while closing a *different* instance of the
 same class in seal-remake (`seal-remake` `e1ead85`).
 
@@ -111,27 +112,58 @@ Two mechanisms, one class:
   row: the gate does not execute anything. State plainly that CI is
   compile-only, so a green is never evidence that a test passes. Cheap,
   ungated, and it stops the misreading immediately.
-- [ ] **T2 — a per-push lane for the INSTRUMENT selftests.** The auditors
-  that gate this repo carry `selftest()` functions precisely because a
-  tokenizer regression is silent, and several are Python (already run by
-  `docs_gate.yml`). The Rust-side equivalents — e.g. the quantile /
-  parser / classifier selftests — are fast, have no GPU or platform
-  surface, and are the highest-value-per-second tests in the repo, because
-  they guard the gates that DO run. Enumerate them, then run exactly those
-  per-push. Must be a DERIVED set, not a hand-typed list (the workspace rule:
-  a hand-typed population is what makes a cross-repo gate permanently
-  green), and must assert a per-target floor so a target that compiles to
-  nothing FAILS rather than reporting `ok. 0 passed` — the seal-remake
-  `layer 3b` shape.
+- [-] **T2 — a per-push lane for the INSTRUMENT selftests. WITHDRAWN — the
+  premise was false, measured 2026-09-03 within the hour of filing it.**
+  This task assumed katgpt-rs had Rust-side analogues of the auditors'
+  `selftest()` functions. It does not. Measured over the whole Rust corpus:
+
+  | vocabulary | distinct `fn` names |
+  |---|---:|
+  | `self_?test` | **1** (`self_test`, in `benches/bench_420_kv_consolidation_poc.rs`) |
+  | `instrument` | 2 |
+  | `canary` | 1 |
+  | `sentinel` | 5 |
+  | `harness` | 4 |
+
+  (A first cut of that probe was wrong in the *loose* direction — a
+  `pin[a-z_]*` pattern matched **map**ping / clam**ping** / tap**ping** /
+  overlap**ping** — which is the mirror of the narrow-classifier failure
+  `.docs/10_audits/cfg_gated_silent_zero_pass.md` T4c documents. Word boundaries, then re-measure.)
+
+  Meanwhile the `selftest()` population that *does* exist is **9 Python
+  auditors** (`all_ignored_target_audit`, `bench_doc_audit`,
+  `cfg_gated_floor_gate`, `cfg_gated_target_audit`, `ci_gate_coverage`,
+  `feature_isolation_gate`, `orphaned_attr_gate`, `percentile_index_audit`,
+  `staged_set_audit`) and **`docs_gate.yml` already runs them per-push**.
+  The instrument layer is covered; it is the Rust layer that is not, and
+  there is no cheap subset of it that is selftest-shaped.
+
+  **So T2 collapses into T3.** The realistic cheap lane is
+  `cargo test --workspace --lib` (skips the 477 integration binaries, which
+  are the expensive part), but it still pays the workspace COMPILE that got
+  per-push declined in the first place. There is no free option hiding
+  here, which is worth knowing before anyone else goes looking for one.
+
 - [ ] **T3 — a full test job (OWNER COST CALL, do not self-authorize).**
   `cargo test --workspace --all-features --release` is the complete fix and
   is expensive: AGENTS.md already records the full gate at >13 min for
   compile alone and says per-push was *deliberately* declined on measured
   cost, and `--release` is required because four gates false-RED in debug
   and `fast_bpe_goat` is 388 s debug vs 15.6 s release. Price it first
-  (one dispatch run, wall-clock + Actions minutes), then let the owner
-  choose weekly / dispatch-only / a subset. **Do not add a per-push job for
-  this.**
+  (one dispatch run), then let the owner choose weekly / dispatch-only / a
+  subset. **Do not add a per-push job for this.**
+
+  **Price it in CPU-seconds, not wall-clock** — and that is not a detail.
+  A wall-clock figure taken on this workstation is uninterpretable: the box
+  ran at load average 44-87 all of 2026-09-03 from sibling work. CPU time
+  and peak RSS measure what a process *consumed* rather than how long it
+  *waited*, which `seal-remake` `.benchmarks/002_png_vs_ktx2_host_cpu_rss.md`
+  measured directly: over a 2x swing in box load the CPU ratios moved by
+  under 0.11 and never reordered an arm. `/usr/bin/time -l` on the cargo
+  invocation is the whole instrument, and CPU-seconds is also closer to what
+  Actions actually bills than wall-clock is. **Not run here on purpose:**
+  starting a second heavy cargo job alongside the one already running would
+  have contaminated both and degraded the shared box for other sessions.
 - [ ] **T4 — sweep the other 17 contract repos for both mechanisms.**
   `scripts/ci_gate_coverage.py` answers "does anything automatically start
   the compile/lint surface" and deliberately does not ask "does anything
@@ -145,8 +177,8 @@ Two mechanisms, one class:
 | Gate | Criterion |
 |---|---|
 | G1 | T1's AGENTS.md row exists and the docs gate stays green |
-| G2 | T2's selftest lane FAILS on a target that reports `ok. 0 passed` — canaried by making one report zero, not argued |
-| G3 | T2's population is derived from the tree, never typed; the derivation is asserted by a `selftest()` |
+| G2 | ~~T2's selftest lane FAILS on a target that reports `ok. 0 passed`~~ — VOID, T2 withdrawn. If T3 lands a test job the criterion transfers to it: a target reporting `ok. 0 passed` must FAIL, canaried by making one report zero rather than argued (the `seal-remake` `layer 3b` shape) |
+| G3 | ~~T2's population is derived~~ — VOID with T2. Transfers to T3 and to T4 unchanged: derived from the tree, never typed |
 | G4 | T4's report distinguishes "compiles, not executed" from "not compiled" — pooling them reproduces the pooled-total mistake `.docs/10_audits/cfg_gated_silent_zero_pass.md` corrects twice |
 
 ## Honest caveats
