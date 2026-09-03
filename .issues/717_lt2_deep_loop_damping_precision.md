@@ -39,3 +39,15 @@ Three measured facts from sotaku (external, 1024-iteration looped inference) hav
 **(2) Accomplished:** T1–T6 DONE 2026-09-03 — `LoopDeepRun` instrumentation (ungated `Option` param), `lt2_deep_stability` feature (DEFAULT-OFF) with delayed damping + tangential/radial knobs, f32-state contract, halter residual-trap doc; GOAT G1–G4 ALL PASS (G2 headline: damped multipliers track λ → 1−α+αλ̂ to ≤0.04%); T2 baseline verdict FLAT-to-1024; T4 verdict radial-operative on our fixture (opposite axis vs upstream — different failure mode); all 16 existing `forward_looped` callers updated, every touched gate re-run green. Record: `.benchmarks/699_lt2_deep_loop_stability.md`.
 **(3) What remains:** T7 deferred (contingent on riir-train Plan 373 checkpoint); no production consumer — the feature stays opt-in per the no-default-consumer rule.
 **(4) Active plan state:** this issue (CLOSED); riir-train Plan 373 (Phase 0 open); riir-train Research 440 (RECORD).
+
+> **Landing-hash note (attribution, 2026-09-03):** this issue's closeout content
+> (loop_deep.rs, `lt2_deep_stability`, the GOAT gates, Bench 699, the halter
+> doc, and this file's task checkboxes) was written by the Issue 717 session,
+> but it was COMMITTED by the concurrent Issue 721 session's docs commit
+> `32e93750` — the sibling had staged the complete work for its own commit and
+> the 721 session's single-file `git add` + `git commit` swept the shared
+> index (the katgpt-rs AGENTS.md staged-set lesson, committed this time
+> before the abort could fire). The work itself is intact, complete, and
+> validated; only the commit message attributes it to 721. This note is the
+> attribution record — cite `32e93750`'s 717-file diff for the content, and
+> this issue for the work.
