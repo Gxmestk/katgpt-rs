@@ -8,8 +8,10 @@ WITHDRAWN. T4 + T4b **LANDED** — `cfg_gated_floor_gate.py` is now a
 classifier ships in the auditor. **T3 is an owner call in each sibling repo**,
 deliberately not made here. T6 **MEASURED** — 244 all-`#[ignore]`d
 targets across 19 repos (60 load-bearing); it stays a report, and it found the
-release-build break in `.issues/715`. T5 (21 platform-cfg targets) remains
-open.
+release-build break in `.issues/715`. T5 **MEASURED** — the "21 platform"
+targets were 3 pooled classes; only **2** (both riir-ai wasm32) are a real
+coverage gap, and no new instrument is needed. **All tasks are now closed
+except T3**, the sibling-repo owner call.
 
 > **CORRECTED 2026-09-03, same day, by the fix itself.** The first published
 > figures were **over-counted**: the auditor keyed a declared target by its
@@ -408,10 +410,41 @@ shapes are pinned, and two matter specifically:
   excluded: a custom-harness target legitimately has no `#[test]` and its exit
   code is its verdict, and including them would make the report mostly noise.
 
-- [ ] **T5** The 21 platform-`cfg` targets are correctly gated and unfixable by
-  `required-features`. Whether they need a *different* instrument (a per-target
-  "did this run on any CI platform?" question) is a separate, unasked question.
-  Recorded so it is not mistaken for done.
+- [x] **T5 MEASURED 2026-09-03 — the "21 platform-`cfg` targets" were THREE
+  unrelated things pooled under one label, and only 2 of the 21 are a coverage
+  question at all.**
+
+  Enumerated, not sampled:
+
+  | class | n | what it means |
+  |---|---|---|
+  | `not(target_arch = "wasm32")` | **11** | compiles **everywhere except** one arch — the *inverse* of a coverage hazard |
+  | `target_arch = "wasm32"` | **2** | compiles **only** there |
+  | `#![cfg(test)]` | **8** | a **no-op**: cargo passes `--test` to integration targets, so `cfg(test)` always holds |
+
+  The negated and positive platform gates differ by the single token `not(`
+  and are **opposite in severity**. Pooling them produced a number that meant
+  nothing — 11 of the 21 run on every ordinary CI runner and were never at
+  risk. The auditor now splits the class three ways (`plat-only` / `plat-exc` /
+  `cfg(test)` columns), with each case pinned in `selftest()`; the split moves
+  no target between the defect and non-defect classes, so **SILENT-NOW stays
+  382** and the partition still holds.
+
+  **The answer to the original question is 2 targets, both in riir-ai:**
+
+  - `crates/riir-engine/tests/browser_e2e_inference.rs`
+  - `crates/riir-engine/tests/wasm_simd_bench.rs`
+
+  Neither compiles on any CI platform. Verified rather than assumed: riir-ai
+  has exactly 3 workflows (`rust.yml`, `docs_drift.yml`, `lean_proofs.yml`) and
+  **none builds for `wasm32`** — the single `wasm` match in them is a comment
+  about a `.wasm` artifact, not a `--target`. So **no new instrument is
+  needed**; the question just needed answering, and its answer is a two-row
+  owner call for riir-ai (same shape as T3).
+
+  Predicate detection was also substring-based (`"test" in body`) and is now
+  token-based (`\btest\b`), so a feature named e.g. `fastest_path` can no
+  longer be reported as carrying the `test` predicate.
 
 ## Why this is not `feature_isolation_gate.py` or `ci_feature_guard.sh`
 

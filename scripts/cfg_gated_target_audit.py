@@ -168,7 +168,9 @@ class RepoReport:
     scanned: int = 0
     gated: int = 0
     findings: list[Finding] = field(default_factory=list)
-    unexpressible: list[Finding] = field(default_factory=list)
+    platform_only: list[Finding] = field(default_factory=list)
+    platform_except: list[Finding] = field(default_factory=list)
+    cfg_test: list[Finding] = field(default_factory=list)
     any_of: list[Finding] = field(default_factory=list)
     covered: int = 0
 
@@ -179,6 +181,13 @@ class RepoReport:
     def silent_latent(self) -> list[Finding]:
         """Findings that zero only under `--no-default-features`."""
         return [f for f in self.findings if f.default_on]
+
+    @property
+    def unexpressible(self) -> list[Finding]:
+        """The three non-feature classes pooled — kept so the partition
+        assertion (1,016 + 382 + 320 + 21 + 1 = 1,740) still holds and so the
+        `--json` contract keeps its shape for existing consumers."""
+        return self.platform_only + self.platform_except + self.cfg_test
 
     def silent_now_load_bearing(self) -> list[Finding]:
         """The severe class, restricted to targets whose green is evidence."""
@@ -289,7 +298,9 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
             key = f.resolve()
             name = declared_name.get(key) or f.stem
             feats = sorted(set(FEATURE_IN_CFG.findall(body)))
-            preds = sorted({p for p in NON_FEATURE_PREDICATES if p in body})
+            preds = sorted(
+                {p for p in NON_FEATURE_PREDICATES if re.search(rf"\b{p}\b", body)}
+            )
             has_rf = declared.get(key)
 
             base = Finding(
@@ -309,10 +320,34 @@ def scan_manifest(repo: Path, manifest: Path, rep: RepoReport) -> None:
                 rep.covered += 1
                 continue
             if not feats:
-                # Purely a platform/arch/miri gate — correctly gated, and
-                # `required-features` could not express it.
-                base.reason = "non-feature cfg (required-features cannot express)"
-                rep.unexpressible.append(base)
+                # `required-features` cannot express any of these — but they are
+                # three DIFFERENT things, and pooling them under the label
+                # "platform" hid that for one measurement (Issue 713 T5):
+                #
+                #   not(target_arch = "wasm32")  compiles EVERYWHERE except one
+                #                                arch. The inverse of a coverage
+                #                                hazard. 11 of the 21.
+                #   target_arch = "wasm32"       compiles ONLY there, so it runs
+                #                                on no CI platform unless one
+                #                                targets it. 2 of the 21 — the
+                #                                only real coverage question.
+                #   test                         a NO-OP in an integration
+                #                                target: cargo passes --test, so
+                #                                cfg(test) always holds. 8 of 21.
+                #
+                # The negated and positive cases differ by the single token
+                # `not(`, and are OPPOSITE in severity. One number over both
+                # says nothing.
+                compact = body.replace(" ", "").replace("\n", "")
+                if preds == ["test"]:
+                    base.reason = "cfg(test) — a no-op in an integration target"
+                    rep.cfg_test.append(base)
+                elif "not(" in compact:
+                    base.reason = "negated platform gate — compiles everywhere but one"
+                    rep.platform_except.append(base)
+                else:
+                    base.reason = "positive platform gate — compiles ONLY there"
+                    rep.platform_only.append(base)
                 continue
             if "any(" in body.replace(" ", "") and len(feats) > 1:
                 base.reason = "any(feature,...) — cargo's required-features is AND-only"
@@ -429,6 +464,37 @@ def selftest() -> None:
         assert r.covered == 1, "a path-declared, required-features row read as UNCOVERED"
         assert not r.findings, f"false positive: {[f.path for f in r.findings]}"
 
+    # The three-way split of the non-feature class. `not(target_arch)` and
+    # `target_arch` differ by one token and are OPPOSITE in severity, so a
+    # classifier that pools them reports a number that means nothing — which is
+    # what it did until Issue 713 T5 enumerated the 21 by hand.
+    import tempfile as _tf
+
+    for src, want in (
+        ('#![cfg(not(target_arch = "wasm32"))]\n', "platform_except"),
+        ('#![cfg(target_arch = "wasm32")]\n', "platform_only"),
+        ("#![cfg(test)]\n", "cfg_test"),
+    ):
+        with _tf.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tests").mkdir()
+            (root / "tests" / "t.rs").write_text(src)
+            (root / "Cargo.toml").write_text(
+                '[package]\nname = "p"\nversion = "0.0.0"\n'
+            )
+            r = RepoReport(repo="p")
+            scan_manifest(root, root / "Cargo.toml", r)
+            got = {
+                k: len(getattr(r, k))
+                for k in ("platform_only", "platform_except", "cfg_test")
+            }
+            assert got[want] == 1 and sum(got.values()) == 1, f"{src!r} -> {got}"
+            assert len(r.unexpressible) == 1, "the pooled property drifted"
+
+    # Predicate detection must be TOKEN-based: a feature whose NAME contains a
+    # predicate word must not be reported as carrying that predicate.
+    assert not re.search(r"\btest\b", 'feature = "fastest_path"')
+
     # An empty/absent [features] table means NOTHING is default-on, so every
     # gated target is severe rather than latent. The wrong way round would
     # silently downgrade every finding in a crate with no feature table.
@@ -509,6 +575,10 @@ def main(argv: list[str]) -> int:
                         ),
                         "latent": len(r.silent_latent()),
                         "platform": len(r.unexpressible),
+                        "platform_only": len(r.platform_only),
+                        "platform_only_paths": sorted(f.path for f in r.platform_only),
+                        "platform_except": len(r.platform_except),
+                        "cfg_test": len(r.cfg_test),
                         "any_of": len(r.any_of),
                     }
                     for r in (audit(x) for x in repos)
@@ -522,8 +592,8 @@ def main(argv: list[str]) -> int:
     print(f"cfg-gated target audit — {len(repos)} repo(s), population {scope}\n")
     header = (
         f"{'repo':<24} {'targets':>8} {'#![cfg]':>8} {'w/ req-f':>9} "
-        f"{'SILENT-NOW':>11} {'load-bear':>10} {'latent':>7} {'platform':>9} "
-        f"{'any()':>6}"
+        f"{'SILENT-NOW':>11} {'load-bear':>10} {'latent':>7} {'plat-only':>10} "
+        f"{'plat-exc':>9} {'cfg(test)':>10} {'any()':>6}"
     )
     print(header)
     print("-" * len(header))
@@ -538,7 +608,8 @@ def main(argv: list[str]) -> int:
             f"{rep.repo:<24} {rep.scanned:>8} {rep.gated:>8} {rep.covered:>9} "
             f"{len(rep.silent_now()):>11} {len(rep.silent_now_load_bearing()):>10} "
             f"{len(rep.silent_latent()):>7} "
-            f"{len(rep.unexpressible):>9} {len(rep.any_of):>6}"
+            f"{len(rep.platform_only):>10} {len(rep.platform_except):>9} "
+            f"{len(rep.cfg_test):>10} {len(rep.any_of):>6}"
         )
 
     print(
