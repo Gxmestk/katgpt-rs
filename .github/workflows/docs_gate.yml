@@ -62,6 +62,9 @@ on:
       - 'scripts/cfg_gated_target_audit.py'
       - 'scripts/cfg_gated_floor_gate.py'
       - 'scripts/cfg_gated_floors.txt'
+      # cfg_gated_floor_gate.py consumes BOTH auditors' --json, so this one is
+      # an input to the gate even though its own name says "report".
+      - 'scripts/all_ignored_target_audit.py'
       # The orphaned-attribute gate reads ALL Rust source, not just targets.
       - 'src/**/*.rs'
       - 'crates/**/src/**/*.rs'
@@ -96,6 +99,9 @@ on:
       - 'scripts/cfg_gated_target_audit.py'
       - 'scripts/cfg_gated_floor_gate.py'
       - 'scripts/cfg_gated_floors.txt'
+      # cfg_gated_floor_gate.py consumes BOTH auditors' --json, so this one is
+      # an input to the gate even though its own name says "report".
+      - 'scripts/all_ignored_target_audit.py'
       # The orphaned-attribute gate reads ALL Rust source, not just targets.
       - 'src/**/*.rs'
       - 'crates/**/src/**/*.rs'
