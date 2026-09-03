@@ -124,7 +124,7 @@ impl FftLoRAPlayer {
                 (Some(&v[5]), mlp, n), // mlp2
             ];
             let dims_ok = checks.iter().all(|(a, ein, eout)| {
-                a.map_or(false, |ad| ad.in_dim == *ein && ad.out_dim == *eout)
+                a.is_some_and(|ad| ad.in_dim == *ein && ad.out_dim == *eout)
             });
             if dims_ok {
                 let mut it = v.into_iter();

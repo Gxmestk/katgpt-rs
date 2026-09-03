@@ -123,7 +123,6 @@ pub fn canonicalize<const D: usize, const N: usize>(
 mod tests {
     use super::*;
     use crate::spectral_pencil::init::seeded_dense;
-    use crate::spectral_pencil::sym::SymPacked;
 
     struct Lcg(u64);
     impl Lcg {

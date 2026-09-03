@@ -110,7 +110,11 @@ pub fn jacobi_eigen<const D: usize>(
     let fro = (fro_sq as f32).sqrt().max(f32::MIN_POSITIVE);
     let tol = OFF_TOL * fro;
 
-    let mut report = JacobiReport { sweeps: 0, off_residual: 0.0, converged: false };
+    let mut report = JacobiReport {
+        sweeps: 0,
+        off_residual: 0.0,
+        converged: false,
+    };
     for sweep in 0..MAX_SWEEPS {
         // off-diagonal residual
         let mut off_sq = 0.0_f64;
@@ -240,7 +244,12 @@ mod tests {
     #[test]
     fn diagonal_matrix_is_one_sweep_exact() {
         const D: usize = 4;
-        let a = [[3.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, 2.0, 0.0], [0.0, 0.0, 0.0, 0.5]];
+        let a = [
+            [3.0, 0.0, 0.0, 0.0],
+            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 0.0, 2.0, 0.0],
+            [0.0, 0.0, 0.0, 0.5],
+        ];
         let mut s = DenseScratch::<D>::new();
         let r = jacobi_eigen(&a, true, &mut s);
         assert!(r.converged);
@@ -261,7 +270,7 @@ mod tests {
         assert!(approx(s.values[0], 1.0, 1e-6));
         assert!(approx(s.values[1], 3.0, 1e-6));
         // eigenvector check: v0 ∝ (1, −1)/√2 for λ=1
-        assert!((s.v[0][0] - s.v[1][0] * -1.0).abs() < 1e-5 || (s.v[0][0] + s.v[1][0]).abs() < 1e-5);
+        assert!((s.v[0][0] - -s.v[1][0]).abs() < 1e-5 || (s.v[0][0] + s.v[1][0]).abs() < 1e-5);
     }
 
     #[test]
@@ -271,7 +280,9 @@ mod tests {
         let mut a = [[0.0_f32; D]; D];
         for i in 0..D {
             for j in i..D {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
                 a[i][j] = v;
                 a[j][i] = v;
@@ -299,7 +310,9 @@ mod tests {
         let mut a = [[0.0_f32; D]; D];
         for i in 0..D {
             for j in i..D {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
                 a[i][j] = v;
                 a[j][i] = v;

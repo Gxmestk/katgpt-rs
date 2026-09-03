@@ -1158,7 +1158,7 @@ mod tests {
         // A then X ×9 (11 steps): purity = (100+1)/121 ≈ 0.835 ≥ 0.75 → K=2.
         let mut m = StructuralTraceMonitor::new(HaltPolicy::Never);
         let mut trace = vec!["A"];
-        trace.extend(std::iter::repeat("X").take(9));
+        trace.extend(std::iter::repeat_n("X", 9));
         let _ = run(&mut m, &trace);
         let c = m.classify_prefix();
         assert_eq!(c.pattern, Pattern::LateLanding);

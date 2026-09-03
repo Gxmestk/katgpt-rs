@@ -690,7 +690,7 @@ mod tests {
         let mut out = [[0.0_f32; 4]; 6];
         let mut defect = 0.0_f32;
         orthonormalize_into(&vectors, &mut out, &mut defect);
-        let zero_rows = out.iter().filter(|r| dot_f64(*r, *r) == 0.0).count();
+        let zero_rows = out.iter().filter(|r| dot_f64(r, r) == 0.0).count();
         assert!(zero_rows >= 2, "6 vectors in d=4 ⇒ ≥2 rank-spill rows");
         assert!(defect > 0.1);
         assert!(max_abs_pair_cos(&out) < 1e-6);
@@ -894,7 +894,7 @@ mod tests {
         for _ in 0..64 {
             let mut s = [0.0_f32; 6];
             for (idx, v) in s.iter_mut().enumerate() {
-                *v = if idx == r + 0 { 7.0 } else { rng.normal() };
+                *v = if idx == r { 7.0 } else { rng.normal() };
             }
             scratch.observe_sample(&s);
         }

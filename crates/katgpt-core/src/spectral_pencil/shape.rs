@@ -59,7 +59,11 @@ pub enum FeatureShape {
     /// NSD diagonal (non-increasing feature) — negated PSD targets.
     NsdDiagonal { targets: [f32; 32], len: usize },
     /// Rank-one `β·d·dᵀ` over a direction vector (PSD iff `β ≥ 0`).
-    RankOne { beta: f32, dir: [f32; 32], len: usize },
+    RankOne {
+        beta: f32,
+        dir: [f32; 32],
+        len: usize,
+    },
 }
 
 /// Build a PSD diagonal feature matrix from positive targets
@@ -104,12 +108,8 @@ impl FeatureShape {
     #[must_use]
     pub fn materialize<const D: usize>(&self) -> SymPacked<D> {
         match *self {
-            Self::PsdDiagonal { targets, len } => {
-                psd_diagonal_feature::<D>(&targets[..len.min(D)])
-            }
-            Self::NsdDiagonal { targets, len } => {
-                nsd_diagonal_feature::<D>(&targets[..len.min(D)])
-            }
+            Self::PsdDiagonal { targets, len } => psd_diagonal_feature::<D>(&targets[..len.min(D)]),
+            Self::NsdDiagonal { targets, len } => nsd_diagonal_feature::<D>(&targets[..len.min(D)]),
             Self::RankOne { beta, dir, len } => rank_one_feature::<D>(beta, &dir[..len.min(D)]),
         }
     }
@@ -138,7 +138,7 @@ mod tests {
     fn rank_one_fast_path_matches_dense_quadratic() {
         const D: usize = 8;
         let mut rng = 99_u64;
-        let mut next = |rng: &mut u64| -> f32 {
+        let next = |rng: &mut u64| -> f32 {
             *rng = rng
                 .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
@@ -226,7 +226,10 @@ mod tests {
         const D: usize = 5;
         const N: usize = 2;
         let init = crate::spectral_pencil::init::seeded_dense::<D, N>(b"shape-convex", 2);
-        let pencil = crate::spectral_pencil::DensePencil::<D, N> { a0: init.a0, a: init.a };
+        let pencil = crate::spectral_pencil::DensePencil::<D, N> {
+            a0: init.a0,
+            a: init.a,
+        };
         let mut scratch = DenseScratch::<D>::new();
         let pts: Vec<f32> = (0..21).map(|i| -3.0 + 6.0 * (i as f32) / 20.0).collect();
         for w in pts.windows(3) {

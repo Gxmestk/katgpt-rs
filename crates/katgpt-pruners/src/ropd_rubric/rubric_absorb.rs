@@ -298,7 +298,7 @@ impl<P: ScreeningPruner> RubricGatedAbsorbCompress<P> {
     pub fn is_above_threshold(&self, arm: usize) -> bool {
         self.arm_states
             .get(arm)
-            .map_or(false, |s| s.above_threshold)
+            .is_some_and(|s| s.above_threshold)
     }
 
     /// Get the last computed gaps for an arm.

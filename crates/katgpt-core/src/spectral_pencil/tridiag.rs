@@ -35,7 +35,10 @@ pub struct TriScratch<const D: usize> {
 impl<const D: usize> TriScratch<D> {
     #[must_use]
     pub fn new() -> Self {
-        Self { diag: [0.0; D], off: [0.0; D] }
+        Self {
+            diag: [0.0; D],
+            off: [0.0; D],
+        }
     }
 }
 
@@ -117,11 +120,7 @@ pub fn count_below<const D: usize>(
 /// is deterministic per binary by construction (integer iteration count,
 /// no library).
 #[must_use]
-pub fn kth_eigenvalue_bisect<const D: usize>(
-    diag: &[f32; D],
-    off: &[f32; D],
-    k: usize,
-) -> f32 {
+pub fn kth_eigenvalue_bisect<const D: usize>(diag: &[f32; D], off: &[f32; D], k: usize) -> f32 {
     debug_assert!(k < D, "k={k} out of range for D={D}");
     let kk = k.min(D - 1);
     // Gershgorin over the fused matrix.
@@ -161,7 +160,7 @@ mod tests {
 
     fn random_tridiag<const D: usize>(seed: u64) -> ([f32; D], [f32; D]) {
         let mut rng = seed;
-        let mut next = |rng: &mut u64| -> f32 {
+        let next = |rng: &mut u64| -> f32 {
             *rng = rng
                 .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);

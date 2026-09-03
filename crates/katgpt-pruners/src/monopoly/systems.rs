@@ -115,7 +115,7 @@ fn build_ctx_into(
                 // (railroads/utilities have Property with placeholder Brown group)
                 let is_street = world
                     .get::<BoardSquare>(sq_entity)
-                    .map_or(false, |bs| matches!(bs.kind, SquareKind::Property(_)));
+                    .is_some_and(|bs| matches!(bs.kind, SquareKind::Property(_)));
                 if is_street
                     && let Some(prop) = world.get::<Property>(sq_entity)
                     && (prop.group as usize) < group_counts.len()
@@ -179,7 +179,7 @@ fn is_player_active(world: &World, id: u8) -> bool {
     let entity = pe.entities[id as usize];
     world
         .get::<Player>(entity)
-        .map_or(false, |p| !p.is_bankrupt)
+        .is_some_and(|p| !p.is_bankrupt)
 }
 
 fn count_active_players(world: &World) -> u8 {
@@ -189,7 +189,7 @@ fn count_active_players(world: &World) -> u8 {
         let entity = pe.entities[i as usize];
         if world
             .get::<Player>(entity)
-            .map_or(false, |p| !p.is_bankrupt)
+            .is_some_and(|p| !p.is_bankrupt)
         {
             count += 1;
         }
@@ -327,7 +327,7 @@ pub fn owns_complete_set(world: &World, entity: Entity, group: PropertyGroup) ->
         let sq_entity = squares[sq as usize];
         world
             .get::<Owned>(sq_entity)
-            .map_or(false, |o| o.owner == entity && !o.is_mortgaged)
+            .is_some_and(|o| o.owner == entity && !o.is_mortgaged)
     })
 }
 
@@ -339,7 +339,7 @@ pub fn count_railroads(world: &World, entity: Entity) -> u8 {
         .filter(|&&sq| {
             world
                 .get::<Owned>(squares[sq as usize])
-                .map_or(false, |o| o.owner == entity)
+                .is_some_and(|o| o.owner == entity)
         })
         .count() as u8
 }
@@ -352,7 +352,7 @@ pub fn count_utilities(world: &World, entity: Entity) -> u8 {
         .filter(|&&sq| {
             world
                 .get::<Owned>(squares[sq as usize])
-                .map_or(false, |o| o.owner == entity)
+                .is_some_and(|o| o.owner == entity)
         })
         .count() as u8
 }
@@ -695,7 +695,7 @@ fn execute_card_effect(
                 if other != entity && is_player_active(world, i as u8) {
                     let can_pay = world
                         .get::<Player>(other)
-                        .map_or(false, |p| p.cash >= amount);
+                        .is_some_and(|p| p.cash >= amount);
                     if can_pay {
                         if let Some(mut o) = world.get_mut::<Player>(other) {
                             o.pay(amount);
@@ -775,7 +775,7 @@ pub fn execute_turn(
     events.push(GameEvent::TurnStarted { player: player_id });
 
     // ── Phase 1: PreTurn (Jail) ──
-    let in_jail = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
+    let in_jail = world.get::<Player>(entity).is_some_and(|p| p.in_jail);
 
     // Reusable buffer for owned properties across build_ctx calls
     let mut owned_buf = Vec::new();
@@ -796,7 +796,7 @@ pub fn execute_turn(
             JailDecision::UseCard => {
                 let has_card = world
                     .get::<Player>(entity)
-                    .map_or(false, |p| p.get_out_of_jail_free > 0);
+                    .is_some_and(|p| p.get_out_of_jail_free > 0);
                 if has_card {
                     if let Some(mut p) = world.get_mut::<Player>(entity) {
                         p.get_out_of_jail_free -= 1;
@@ -846,7 +846,7 @@ pub fn execute_turn(
                             );
                         }
                     }
-                    let bankrupt = world.get::<Player>(entity).map_or(false, |p| p.is_bankrupt);
+                    let bankrupt = world.get::<Player>(entity).is_some_and(|p| p.is_bankrupt);
                     return TurnResult {
                         player: player_id,
                         events,
@@ -916,7 +916,7 @@ pub fn execute_turn(
         }
 
         if is_doubles {
-            let jailed = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
+            let jailed = world.get::<Player>(entity).is_some_and(|p| p.in_jail);
             if jailed {
                 break;
             }
@@ -934,7 +934,7 @@ pub fn execute_turn(
     }
 
     // ── Phase 5: Strategic (Build) ──
-    let jailed = world.get::<Player>(entity).map_or(false, |p| p.in_jail);
+    let jailed = world.get::<Player>(entity).is_some_and(|p| p.in_jail);
     if !jailed {
         let turn_number = world.resource::<TurnState>().turn_number;
         let ctx = build_ctx_into(world, player_id, turn_number, &mut owned_buf);
@@ -947,7 +947,7 @@ pub fn execute_turn(
                 let cost = world.get::<Property>(sq_entity).map_or(0, |p| p.house_cost);
                 let can_afford = world
                     .get::<Player>(entity)
-                    .map_or(false, |p| p.cash >= cost);
+                    .is_some_and(|p| p.cash >= cost);
                 if can_afford {
                     if let Some(mut p) = world.get_mut::<Player>(entity) {
                         p.pay(cost);
@@ -972,7 +972,7 @@ pub fn execute_turn(
         stats.turns_played += 1;
     }
 
-    let bankrupt = world.get::<Player>(entity).map_or(false, |p| p.is_bankrupt);
+    let bankrupt = world.get::<Player>(entity).is_some_and(|p| p.is_bankrupt);
     TurnResult {
         player: player_id,
         events,
@@ -1102,7 +1102,7 @@ fn resolve_property(
 ) {
     let owned_opt = world.get::<Owned>(sq_entity);
     let is_owned = owned_opt.is_some();
-    let is_self = owned_opt.map_or(false, |o| o.owner == entity);
+    let is_self = owned_opt.is_some_and(|o| o.owner == entity);
     let owner_entity = owned_opt.map(|o| o.owner);
     let _ = owned_opt;
 
@@ -1135,7 +1135,7 @@ fn resolve_property(
         // Own property — nothing
     } else if let Some(owner_e) = owner_entity {
         // Opponent's property — pay rent
-        let owner_bankrupt = world.get::<Player>(owner_e).map_or(true, |p| p.is_bankrupt);
+        let owner_bankrupt = world.get::<Player>(owner_e).is_none_or(|p| p.is_bankrupt);
         if owner_bankrupt {
             return;
         }
@@ -1197,7 +1197,7 @@ fn run_auction(
             let min_bid = (base_price / 2).max(super::AUCTION_MIN_BID);
             let can_afford = world
                 .get::<Player>(bidder_entity)
-                .map_or(false, |p| p.cash >= min_bid);
+                .is_some_and(|p| p.cash >= min_bid);
             if can_afford {
                 highest_bid = min_bid;
                 highest_bidder = Some(i);

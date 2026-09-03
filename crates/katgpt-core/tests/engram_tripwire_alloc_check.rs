@@ -77,8 +77,12 @@ fn engram_tripwire_steady_state_is_alloc_free() {
     };
 
     // Deterministic benign world: retrieval order == gate order (rank 1).
-    let retrieval: Vec<f32> = (0..K).map(|i| 0.9 - 0.03 * i as f32 + rng.jitter(0.01)).collect();
-    let gates: Vec<f32> = (0..K).map(|i| 0.95 - 0.03 * i as f32 + rng.jitter(0.005)).collect();
+    let retrieval: Vec<f32> = (0..K)
+        .map(|i| 0.9 - 0.03 * i as f32 + rng.jitter(0.01))
+        .collect();
+    let gates: Vec<f32> = (0..K)
+        .map(|i| 0.95 - 0.03 * i as f32 + rng.jitter(0.005))
+        .collect();
 
     // Warm-up: fill the ring past capacity so evictions + full-length sort
     // scratch are both engaged before the measured window.
@@ -90,7 +94,9 @@ fn engram_tripwire_steady_state_is_alloc_free() {
     // Steady state — the measured window.
     ALLOC_COUNT.store(0, Ordering::Relaxed);
     for _ in 0..STEADY_ITERS {
-        black_box(tw.observe_benign(black_box(&retrieval), black_box(&gates), &mut m));
+        // `observe_benign` returns `()`, so a `black_box` on its result is a
+        // no-op that reads like a guard. The INPUTS carry the guard.
+        tw.observe_benign(black_box(&retrieval), black_box(&gates), &mut m);
         let v = tw.check(black_box(&retrieval), black_box(&gates), &mut m);
         black_box(v.fired);
     }

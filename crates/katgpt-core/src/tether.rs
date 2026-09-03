@@ -563,7 +563,7 @@ mod tests {
     /// and adversarial streams.
     #[test]
     fn in_sample_never_worse_than_either_endpoint() {
-        let mut streams: Vec<Vec<(f32, f32, f32)>> = vec![
+        let streams: Vec<Vec<(f32, f32, f32)>> = vec![
             // Random mixed stream.
             {
                 let mut rng = Rng::new(6752);

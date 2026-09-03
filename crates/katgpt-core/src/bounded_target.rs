@@ -340,8 +340,8 @@ mod tests {
         let x = [0.25f32; 16];
         let q = |v: &[f32]| v.iter().map(|t| t * t).sum::<f32>();
         for seed in [0u64, 1, 42, u64::MAX] {
-            let a = spsa_direction(&q, &x, 1e-2, seed).unwrap();
-            let b = spsa_direction(&q, &x, 1e-2, seed).unwrap();
+            let a = spsa_direction(q, &x, 1e-2, seed).unwrap();
+            let b = spsa_direction(q, &x, 1e-2, seed).unwrap();
             assert_eq!(a, b, "seed {seed} must be bit-identical across calls");
         }
     }
@@ -352,8 +352,8 @@ mod tests {
         // (an XOF stuck at one output would silently collapse exploration).
         let x = [0.0f32; 8];
         let q = |v: &[f32]| v.iter().sum::<f32>();
-        let a = spsa_direction(&q, &x, 1e-2, 1).unwrap();
-        let b = spsa_direction(&q, &x, 1e-2, 2).unwrap();
+        let a = spsa_direction(q, &x, 1e-2, 1).unwrap();
+        let b = spsa_direction(q, &x, 1e-2, 2).unwrap();
         assert_ne!(a, b, "seeds 1 and 2 collided");
     }
 
@@ -369,7 +369,7 @@ mod tests {
         for seed in 0..32u64 {
             // A draw exactly orthogonal to ∇Q in f32 carries no information
             // (dq = 0) — legitimately indeterminate, not an ascent violation.
-            let Some(d) = spsa_direction(&q, &x, 1e-3, seed) else {
+            let Some(d) = spsa_direction(q, &x, 1e-3, seed) else {
                 continue;
             };
             informative += 1;
@@ -383,32 +383,32 @@ mod tests {
             }
         }
         assert!(informative >= 24, "only {informative}/32 seeds informative");
-        assert!(ascending >= 24, "only {ascending}/{informative} non-orthogonal");
+        assert!(
+            ascending >= 24,
+            "only {ascending}/{informative} non-orthogonal"
+        );
     }
 
     #[test]
     fn g1_flat_scorer_is_indeterminate() {
         let x = [0.5f32; 16];
         let q = |_v: &[f32]| 7.0f32; // exactly flat: identical bits both sides
-        assert!(spsa_direction(&q, &x, 1e-2, 0).is_none());
+        assert!(spsa_direction(q, &x, 1e-2, 0).is_none());
         // σ-aware floor: sub-floor signal is indeterminate even when nonzero.
         let q2 = |v: &[f32]| if v[0] > 0.5 { 1.0 } else { 0.0 };
-        assert!(spsa_direction_with_floor(&q2, &x, 1e-2, 0, 10.0).is_none());
+        assert!(spsa_direction_with_floor(q2, &x, 1e-2, 0, 10.0).is_none());
         // Non-finite / non-positive δ: refuse.
-        assert!(spsa_direction(&q, &x, 0.0, 0).is_none());
-        assert!(spsa_direction(&q, &x, f32::NAN, 0).is_none());
+        assert!(spsa_direction(q, &x, 0.0, 0).is_none());
+        assert!(spsa_direction(q, &x, f32::NAN, 0).is_none());
     }
 
     #[test]
     fn g1_unit_norm_by_construction() {
         let x = [0.1f32; 64];
         let q = |v: &[f32]| v.iter().sum::<f32>();
-        let d = spsa_direction(&q, &x, 1e-2, 7).unwrap();
+        let d = spsa_direction(q, &x, 1e-2, 7).unwrap();
         let n = l2_norm(d.as_slice());
-        assert!(
-            (n - 1.0).abs() <= 1e-5,
-            "‖d̂‖ = {n} at D=64 (rounding only)"
-        );
+        assert!((n - 1.0).abs() <= 1e-5, "‖d̂‖ = {n} at D=64 (rounding only)");
         // Every component is ±1/√D — the pure-sign shape.
         let inv = 1.0f32 / (64.0f32).sqrt();
         for &c in d.as_slice() {
@@ -423,7 +423,7 @@ mod tests {
     fn g1_bounded_correction_norm_bound_bit_exact() {
         let x = [0.25f32; 32];
         let q = |v: &[f32]| v.iter().map(|t| t * t).sum::<f32>();
-        let d = spsa_direction(&q, &x, 1e-2, 3).unwrap();
+        let d = spsa_direction(q, &x, 1e-2, 3).unwrap();
         for &eps in &[0.001f32, 0.25, 1.0, 8.0] {
             let c = BoundedCorrection::new(d, eps);
             let step = c.delta();
@@ -450,7 +450,7 @@ mod tests {
         let x = [0.0f32];
         let dir = UnitDir::from_normalized([1.0f32], 1e-3).unwrap();
         let q = |v: &[f32]| (v[0] - 1.5f32).powi(2);
-        let out = eps_ladder(&q, &x, &dir, 1.0);
+        let out = eps_ladder(q, &x, &dir, 1.0);
         assert_eq!(out.best_idx, 2, "first strict min at scale ε");
         assert!((out.best_scale - 1.0).abs() < 1e-6);
         assert!((out.best_q - 0.25).abs() < 1e-6);
@@ -465,13 +465,13 @@ mod tests {
         let x = [0.0f32];
         let dir = UnitDir::from_normalized([1.0f32], 1e-3).unwrap();
         let q = |v: &[f32]| -v[0]; // Q strictly decreasing along +d̂
-        let out = eps_ladder(&q, &x, &dir, 1.0);
+        let out = eps_ladder(q, &x, &dir, 1.0);
         assert_eq!(out.best_idx, 4);
         assert!(out.monotone, "strictly-decreasing Q must flag monotone");
         assert!(out.any_improvement);
         // And a direction that never improves: ascending Q along +d̂.
         let q_up = |v: &[f32]| v[0];
-        let out2 = eps_ladder(&q_up, &x, &dir, 1.0);
+        let out2 = eps_ladder(q_up, &x, &dir, 1.0);
         assert!(!out2.any_improvement, "no probe beats Q(x)");
         assert!(!out2.monotone);
     }
@@ -482,13 +482,13 @@ mod tests {
         let dir = UnitDir::from_normalized([1.0f32], 1e-3).unwrap();
         // Linear scorer, gradient 1 along d̂: |ΔQ| = 2ε exactly.
         let alive = |v: &[f32]| v[0];
-        assert_eq!(contrast(&alive, &x, &dir, 0.1, 1.0), Canary::Alive);
+        assert_eq!(contrast(alive, &x, &dir, 0.1, 1.0), Canary::Alive);
         // g_min above the true gradient: the floor exceeds the measurable
         // contrast → dead.
-        assert_eq!(contrast(&alive, &x, &dir, 0.1, 2.0), Canary::Dead);
+        assert_eq!(contrast(alive, &x, &dir, 0.1, 2.0), Canary::Dead);
         // Flat scorer: zero contrast → dead.
         let flat = |_v: &[f32]| 3.0f32;
-        assert_eq!(contrast(&flat, &x, &dir, 0.1, 0.5), Canary::Dead);
+        assert_eq!(contrast(flat, &x, &dir, 0.1, 0.5), Canary::Dead);
     }
 
     #[test]
@@ -498,7 +498,7 @@ mod tests {
         // MAX_D-dim path exercises the fixed buffers end-to-end.
         let x = [0.2f32; MAX_D];
         let q = |v: &[f32]| v.iter().sum::<f32>();
-        assert!(spsa_direction(&q, &x, 1e-2, 11).is_some());
+        assert!(spsa_direction(q, &x, 1e-2, 11).is_some());
         assert!(UnitDir::from_normalized([1.0f32, 0.0], 1e-3).is_some());
         // D=0 is refused by the adopt path.
         assert!(UnitDir::<0>::from_normalized([], 1e-3).is_none());
@@ -514,11 +514,11 @@ mod tests {
         const BUDGET_NS: f64 = 200.0;
         const N: u64 = 10_000;
 
-let x = [0.1f32; 16];
+        let x = [0.1f32; 16];
         let q = |v: &[f32]| v.iter().sum::<f32>();
         let mut acc = 0.0f32;
         for seed in 0..256u64 {
-            if let Some(d) = spsa_direction(&q, &x, 1e-2, seed) {
+            if let Some(d) = spsa_direction(q, &x, 1e-2, seed) {
                 acc += d.as_slice()[0];
             }
         }
@@ -526,7 +526,7 @@ let x = [0.1f32; 16];
         let t0 = std::time::Instant::now();
         acc = 0.0;
         for seed in 0..N {
-            if let Some(d) = spsa_direction(&q, &x, 1e-2, seed) {
+            if let Some(d) = spsa_direction(q, &x, 1e-2, seed) {
                 acc += d.as_slice()[seed as usize & 15];
             }
         }

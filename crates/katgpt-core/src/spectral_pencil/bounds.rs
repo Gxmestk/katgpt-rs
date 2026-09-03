@@ -109,16 +109,15 @@ impl<const D: usize, const N: usize> SpectralNorms<D, N> {
     /// Norms via power iteration (default estimate path). Construction
     /// cost: `(N+1)·iters` matvecs — amortize at pencil build time.
     #[must_use]
-    pub fn estimate_pencil(
-        a0: &SymPacked<D>,
-        a: &[SymPacked<D>; N],
-        iters: u16,
-    ) -> Self {
+    pub fn estimate_pencil(a0: &SymPacked<D>, a: &[SymPacked<D>; N], iters: u16) -> Self {
         let mut norms = [0.0_f32; N];
         for (m, out) in a.iter().zip(norms.iter_mut()) {
             *out = norm_power_iter(m, iters);
         }
-        Self { a0: norm_power_iter(a0, iters), a: norms }
+        Self {
+            a0: norm_power_iter(a0, iters),
+            a: norms,
+        }
     }
 
     /// Linear growth envelope `‖A₀‖₂ + Σ|xᵢ|·‖Aᵢ‖₂` — an upper bound on
@@ -143,10 +142,7 @@ impl<const D: usize, const N: usize> SpectralNorms<D, N> {
 /// power estimate is checked against in tests; also fine for
 /// construction-time use when `(N+1)·Jacobi` fits the budget).
 #[must_use]
-pub fn norm_jacobi_exact<const D: usize>(
-    a: &SymPacked<D>,
-    scratch: &mut DenseScratch<D>,
-) -> f32 {
+pub fn norm_jacobi_exact<const D: usize>(a: &SymPacked<D>, scratch: &mut DenseScratch<D>) -> f32 {
     let full = a.to_full();
     jacobi_eigen(&full, false, scratch);
     let lo = scratch.values[0].abs();
@@ -173,7 +169,9 @@ mod tests {
         let mut full = [[0.0_f32; D]; D];
         for i in 0..D {
             for j in i..D {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
                 full[i][j] = v;
                 full[j][i] = v;
@@ -184,7 +182,10 @@ mod tests {
         let est = norm_power_iter(&packed, 60);
         let exact = norm_jacobi_exact(&packed, &mut s);
         assert!(est <= exact * (1.0 + 1e-3), "est {est} vs exact {exact}");
-        assert!(est >= exact * 0.9, "est {est} too far below exact {exact} (60 iters)");
+        assert!(
+            est >= exact * 0.9,
+            "est {est} too far below exact {exact} (60 iters)"
+        );
     }
 
     #[test]
@@ -194,8 +195,10 @@ mod tests {
         const D: usize = 4;
         const N: usize = 3;
         let mut rng = 31_u64;
-        let mut next = |rng: &mut u64| -> f32 {
-            *rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let next = |rng: &mut u64| -> f32 {
+            *rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (((*rng >> 33) as f32) / 2.0_f32.powi(31)) * 2.0 - 1.0
         };
         let a0_full = {
