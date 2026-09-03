@@ -105,6 +105,23 @@ pub enum HaltReason {
 /// which is semantically wrong (patience = 0 would halt on the first loop;
 /// tau = 0 would halt whenever gain < 0). The plan's documented defaults are
 /// `tau = 1.0`, `oscillation_patience = 1`, `l_min = 1`.
+///
+/// # Halt-signal warning: never normalize a residual by ‖h‖ for non-fixed-point recurrences (Issue 717 T6)
+///
+/// Never use the RELATIVE residual `‖F(h) − h‖ / ‖h‖` as a convergence or
+/// halting signal for this model class (weight-tied looped recurrences that
+/// are NOT converging to a fixed point). Upstream measured (sotaku,
+/// riir-train Research 440 §3 "DEQ / fixed point"): over iterations 16 →
+/// 1024 the state RMS GREW 24 → 706 while the absolute residual
+/// `‖F(h) − h‖` plateaued at ≈ 0.63 — so the relative residual fell to a
+/// median 0.000894 purely because the DENOMINATOR grew. Tiny relative
+/// residual there is a growing-denominator artifact, not convergence:
+/// Anderson/Broyden root-solvers driven by it diverged to norms 1e5–1e8.
+/// The signals this halter consumes are safe against exactly this trap:
+/// `step_size` is the ABSOLUTE `‖h^(r) − h^(r−1)‖₂` and `angular_change`
+/// is a DIRECTION (cos θ) — neither divides by ‖h‖. Preserve that property;
+/// a future "normalized gain" that divides by the current state norm would
+/// read fake convergence off a diverging trajectory.
 #[derive(Clone, Debug)]
 pub struct GainCostLoopHalter {
     /// Effective rank at the previous loop (for delta computation).

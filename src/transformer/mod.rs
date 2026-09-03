@@ -164,6 +164,16 @@ pub use variants::forward_looped;
 #[cfg(feature = "domain_latent")]
 pub use variants::forward_with_domain_latent;
 
+// Issue 717 — deep-loop instrumentation + stabilization knobs. The stats
+// surface is ungated (an `Option` parameter on `forward_looped`, the
+// elastic-override precedent); the damping/scale knob types are gated on
+// `lt2_deep_stability` (DEFAULT-OFF) so the stabilization path compiles to
+// nothing without it.
+pub mod loop_deep;
+pub use loop_deep::{LoopDeepRun, LoopDeepStats};
+#[cfg(feature = "lt2_deep_stability")]
+pub use loop_deep::{DirectionScales, LoopDamping, project_lambda};
+
 #[cfg(feature = "collapse_aware_thinking")]
 pub use generators::generate_with_collapse_detection;
 #[cfg(feature = "domain_latent")]

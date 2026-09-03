@@ -232,6 +232,7 @@ fn run_once(
         Some(loops), // elastic_loop_override
         #[cfg(feature = "gain_cost_halt")]
         None,
+        None, // Issue 717: deep_run — None = bit-identical baseline
     );
     logits.to_vec()
 }
@@ -403,6 +404,7 @@ fn t698_t2_fixed_anchor_ab_ordering() {
             Some(8),
             #[cfg(feature = "gain_cost_halt")]
             None,
+            None, // Issue 717: deep_run — None = bit-identical baseline
         );
         assert_eq!(ctx.loop_anchor.len(), cfg_f.n_embd);
         assert_eq!(

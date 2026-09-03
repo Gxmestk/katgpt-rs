@@ -10,9 +10,7 @@
 > (highwater+1, highwater bumped). No external file referenced this issue at
 > renumber time — the cheapest possible moment to move it.
 
-**Status:** OPEN — measured, not yet fixed. The fix has real cross-repo blast
-radius and is an owner call on sequencing, not on whether. Found 2026-09-03
-while closing riir-ai `.issues/855` Class 3.
+**Status:** OPEN — T1/T2/T4 DONE 2026-09-03 (audit + full sentinel sweep + the xhc_train_phase7 interim, riir-train `e2373492`); **T3 remains: the owner sequencing call** (move the registration out of `src/lib.rs`). T2's precondition is discharged. Found 2026-09-03 while closing riir-ai `.issues/855` Class 3.
 
 ## The defect
 
@@ -100,21 +98,36 @@ removing the root static changes nothing for it.
       counter? Any that asserts without one is a live vacuous gate, independent
       of T2/T3, and should be fixed first. *(DONE 2026-09-03 — see the audit
       table below.)*
-- [ ] **T2** — the non-negotiable half, cheap and independent of the rest:
+- [x] **T2** — the non-negotiable half, cheap and independent of the rest:
       every consumer that asserts on `get_alloc_stats()` gets a **liveness
       sentinel** — force a known heap allocation, assert the counter saw it,
       *before* the measurement. `riir-games-quest/tests/issue847_tpr_goat.rs`
       (riir-ai `b35f8b901`) is the reference implementation. This makes both
       failure modes loud and is worth doing even if T3 never happens.
+      *(CLOSED 2026-09-03 — full-workspace sentinel sweep, see the T2 audit
+      table below. Verdict: every asserting consumer is now covered by a
+      sentinel, a self-protecting nonzero assert, or a stronger type-level
+      mechanism; the one true gap was xhc_train_phase7, fixed under T4 the
+      same day, riir-train `e2373492`.)*
 - [ ] **T3** — owner call on sequencing: move the registration out of
       `src/lib.rs` and into each target that needs it. Correct, and the only
       thing that removes the conflict class rather than guarding it per
       consumer. Blocked on T2 across all repos first — without sentinels, T3
-      converts a compile error into a silent zero, which is strictly worse and
-      is the trade riir-ai `.issues/856` already refused once.
-- [ ] **T4** — `riir-train-engine/tests/xhc_train_phase7.rs` needs *something*
+      converts a compile error into a silent zero, which is strictly worse
+      and is the trade riir-ai `.issues/856` already refused once. *(T2 now
+      closed — the blocker is discharged; awaiting the owner's sequencing
+      call.)*
+- [x] **T4** — `riir-train-engine/tests/xhc_train_phase7.rs` needs *something*
       today; it is the one known live conflict. If T3 is deferred, it needs the
-      five-term feature guard plus a sentinel. Prefer T3.
+      five-term feature guard plus a sentinel. Prefer T3. *(DONE 2026-09-03 as
+      the sanctioned interim — riir-train `e2373492`: the static guards on
+      `not(any(kimi_k3_train, go_training_arena, go-latent-steering,
+      go-data-tools, bonsai-go))` (grep-verified as the manifest's COMPLETE
+      `dep:katgpt-rs` set — L472/1122/1524/1534/1535), and the G4 test gained
+      the liveness sentinel. Validated BOTH arms: own-static arm G4 PASS;
+      kimi_k3_train arm COMPILES (was the duplicate-allocator error) + G4
+      PASS under the root-lib static. The guard is T3-fodder — when T3 lands
+      it is deleted with the root static.*
 
 ## T1 audit — DONE 2026-09-03, one gap found + fixed
 
@@ -156,6 +169,41 @@ assert!(
 so the T2 doctrine ("force a known allocation, assert the counter saw it,
 BEFORE the measurement") now covers BOTH halves of that gate, and weakening
 the artifact half can no longer silently re-vacuous the greedy half.
+
+## T2 sweep audit — DONE 2026-09-03 (the full consumer set, not just the 5 root-static files)
+
+Method: `grep -rl get_alloc_stats` across riir-ai/crates, riir-train/crates,
+riir-neuron-db, katgpt-rs {tests,crates,examples,src} minus the
+sentinel-vocabulary files, then per-file reads of every remaining candidate.
+Verdict per candidate:
+
+| file | verdict |
+|---|---|
+| riir-games-quest `issue847_tpr_goat.rs` | **the T2 reference impl itself** — guard + LIVENESS SENTINEL + doctrine text |
+| riir-engine `cgsp_runtime/evpi_gate.rs` tests | covered — Issue 830 probe ("exact counts when live, capacity witness when not") |
+| riir-games-civ `tests/common/alloc_delta.rs` + its 13 targets | covered STRONGER — Issue 856 `AllocCount` newtype (invalid state unrepresentable; release loudly "NOT EVALUATED", never a fabricated 0) + `extern crate katgpt_rs` force-link doctrine |
+| riir-poc `benches/archetype_trajectory_consolidation_poc.rs` | covered — force-link + honest `None` release policy |
+| riir-train-gpu `bench_490` / `bench_558` / `probe_684` | covered — `> 0` asserts ARE sentinels (inert-0 reds loudly) |
+| riir-agents `goat_phase6_g2_g4.rs` | covered de facto — exact-count assert against a NONZERO expectation (`count == 2*MEASURED`) + byte floor red at inert-0 |
+| katgpt-rs tests (`bench_271/272/274/275/280`, …) | covered — `assert_alloc_tracking_live` helpers (Issue 682) |
+| riir-neuron-db `freeze_lineage_gates.rs` / `steering_g5_zero_alloc.rs` | covered — sentinels (Issue 604) |
+| katgpt-core `src/*.rs` cfg(test) blocks (incl. the new `convergence_cadence.rs`) | house style — served by the crate's own `cfg(all(test, debug_assertions))` static; the release-profile axis is the documented Issue 716/855 territory, not a per-test gap |
+| `examples/kimi_k3_hello_world.rs`, riir-games-civ `map_tick/mod.rs` | audit rows 1/3 — print-only / diagnostic, honest in both profiles |
+| riir-train-engine `xhc_train_phase7.rs` | **THE GAP → fixed** (T4, riir-train `e2373492`): equality asserts `c1==c2`/`b1==b2` passed vacuously at 0==0 under inert linkage, and the own static conflicted under the 5 root-pulling features |
+
+Also worth noting: the idle-loop sibling landed the riir-poc
+`behavior_gate_poc.rs` greedy-half sentinel (row 2 of the T1 audit) in
+riir-ai in parallel — the last open sentinel gap from the T1 table.
+
+**T4 guard-staleness note (the issue's own prediction, now written down):**
+the five-term `not(any(...))` disjunction goes stale the next time a
+riir-train-engine feature starts pulling `dep:katgpt-rs`. The detector is
+cheap and mechanical: `grep -n "dep:katgpt-rs\|katgpt-rs/"
+crates/riir-train-engine/Cargo.toml` must return exactly the five guarded
+lines (472/1122/1524/1534/1535) + the two dep rows (37/1599). A new feature
+edge that misses the guard re-creates the duplicate-allocator compile error
+— LOUD, the failure direction this issue prefers — and the fix is one more
+`feature = "…"` term in the disjunction until T3 deletes the whole shape.
 
 ## Related
 

@@ -327,6 +327,7 @@ fn bench_lt2_ahla_loop() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             );
         }
     }
@@ -355,6 +356,7 @@ fn bench_lt2_ahla_loop() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             ));
         }
     }
@@ -426,6 +428,7 @@ fn bench_lt2_hybrid() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             );
         }
     }
@@ -454,6 +457,7 @@ fn bench_lt2_hybrid() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             ));
         }
     }
@@ -568,6 +572,7 @@ fn proof_lt2_hybrid_throughput() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             );
         }
     }
@@ -596,6 +601,7 @@ fn proof_lt2_hybrid_throughput() {
                 None,
                 #[cfg(feature = "gain_cost_halt")]
                 None,
+                None, // Issue 717: deep_run — None = bit-identical baseline
             ));
         }
     }

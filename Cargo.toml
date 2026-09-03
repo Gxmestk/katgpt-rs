@@ -362,6 +362,7 @@ bckvss = ["katgpt-band/bckvss"]  # Fusion A: Band-Conditioned KV Segment Selecto
 collider_consistency = ["katgpt-band/collider_consistency"]  # Fusion C: Collider-Consistency ConstraintPruner for DDTree (Plan 265 Phase 3) — DEFAULT-ON (T5.3, 2026-07-02): G7-G9 pass. Phase 11 (2026-07-04): module moved to katgpt-band; root forwards (the katgpt-core/local_branch_routing forward is preserved inside katgpt-band/collider_consistency).
 adaptive_cot_identifiability = ["katgpt-band/adaptive_cot_identifiability"]  # Phase 4: Theory-backed adaptive CoT stopping criterion (Plan 265 Phase 4) — opt-in — Plan 265 GOAT G10 PASS (2026-07-02, .plans/265_task_relevant_identifiability_modelless.md — adaptive CoT depth 40% shorter than fixed-depth at equal quality, target ≥30%); stays opt-in per T5.3 scope exclusion (only band_conditioner/specialist_projection/collider_consistency were promoted to default; Phase 4 adaptive_cot was not in T5.3 promotion scope). Phase 11 (2026-07-04): module moved to katgpt-band; root forwards.
 lt2_looped = ["hla_attention"]  # LT2 looped inference pipeline — weight-shared T-pass loop (Plan 108, Research 73)
+lt2_deep_stability = ["lt2_looped"]  # Issue 717 T3/T4: runtime deep-loop stabilization for `forward_looped` at T≫4 — delayed damping `h ← (1−α)h + α·F(h)` after burn-in B (sotaku, riir-train Research 440; closed form λ → 1−α+αλ) + tangential/radial update-scale knobs + the direction-drift probe. DEFAULT-OFF: `None`/`α=0`/`{1,1}` knobs are bit-identical to plain `lt2_looped` (G1); the eigenvalue-map gate runs on a gate-driven (ρ>1) deterministically-destabilized fixture (G2); stable-fixture cost recorded against the upstream 1.5–2.3 pt class (G3); zero-alloc hot loop (G4).
 sleep_consolidation = ["lt2_looped", "gdn2_attention"]  # Sleep-time offline recursive memory consolidation at eviction (Plan 154 GOAT 14/14, Research 116) — default-ON
 plasma_path = ["katgpt-core/plasma_path", "katgpt-transformer/plasma_path", "katgpt-forward/plasma_path"]  # Bit-plane ternary SIMD matvec — multiplication-free CPU inference (Plan 148, Research 110). Plan 400: also forwarded to katgpt-forward so the moved flashar_consensus.rs's `#[cfg(feature = "plasma_path")]` block compiles. Issue 145 reclassification: this now gates the HOT-tier ternary CPU path (ternary moved from Plasma to Hot; binary is the new Plasma tier under `binary_plasma`). Flag name retained for minimal churn.
 binary_plasma = ["katgpt-core/binary_plasma", "katgpt-transformer/binary_plasma", "katgpt-forward/binary_plasma"]  # Binary {−1,+1} plasma tier — single bit-plane + group-wise FP16 scale (Issue 145, Bonsai 27B). GOAT gate PASSED (1.22× faster + 1.82× smaller than ternary at 1024²); stays OPT-IN per T2.4 — latency gain (1.22×) is below the 1.5× decisive threshold required for default-on promotion. Ternary (plasma_path) is now the Hot-tier CPU path; binary is the Plasma tier.
@@ -1372,6 +1373,28 @@ required-features = ["lt2_looped", "loop_stability_fix"]
 name = "issue_698_t8_conditional_ab"
 path = "tests/issue_698_t8_conditional_ab.rs"
 required-features = ["lt2_looped", "loop_stability_fix"]
+
+# Issue 717 T1/T2/T5 — deep-loop baseline: `LoopDeepRun` instrumentation
+# driving `forward_looped` at T ∈ {16, 64, 256, 1024} on the deterministic
+# micro fixture; accuracy/consistency-vs-T + state-norm-vs-T at DEFAULT
+# settings (T2 verdict — flat or degrade, either is a result); the f32-state
+# contract pin (T5: no sub-f32 lattice in the carried trajectory; the
+# Bench-802 contrast documented at the carry site).
+[[test]]
+name = "issue_717_t1_t2_deep_baseline"
+path = "tests/issue_717_t1_t2_deep_baseline.rs"
+required-features = ["lt2_looped"]
+
+# Issue 717 T3/T4 — damping + direction-scale GOAT gate (feature
+# `lt2_deep_stability`): G1 bit-identity at None/α=0/{1,1}; G2 rescue +
+# eigenvalue-map monotonicity on a gate-driven (ρ>1) destabilized fixture;
+# G3 stable-fixture cost bound vs the upstream 1.5–2.3 pt class; G4
+# alloc-free hot loop (TrackingAllocator counters, deterministic — no
+# wall-clock); T4 tangential-vs-radial probe + direction-drift diagnostic.
+[[test]]
+name = "issue_717_t3_t4_damping_goat"
+path = "tests/issue_717_t3_t4_damping_goat.rs"
+required-features = ["lt2_looped", "lt2_deep_stability"]
 
 # Issue 699 T1-T3 — structural CoT halting PoC substrate (TRACE,
 # arXiv:2510.07880): answer-ring + transition classifier + SelfLoopHalt /

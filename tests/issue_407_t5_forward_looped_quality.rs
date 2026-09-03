@@ -153,6 +153,7 @@ fn run_once(
         None, // elastic_loop_override
         #[cfg(feature = "gain_cost_halt")]
         None,
+        None, // Issue 717: deep_run — None = bit-identical baseline
     );
     logits.to_vec()
 }

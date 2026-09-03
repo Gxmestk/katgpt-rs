@@ -193,6 +193,14 @@ pub fn forward_looped<'a>(
     #[cfg(feature = "gain_cost_halt")] halter: Option<
         &mut katgpt_core::gain_cost_halt::GainCostLoopHalter,
     >,
+    // Issue 717 T1/T3/T4: opt-in deep-run control (per-K state-norm snapshots
+    // + logit-finite tripwire + the `lt2_deep_stability` damping /
+    // direction-scale knobs). `None` = bit-identical to pre-Issue-717
+    // behavior. The parameter itself is ungated (the Issue 035
+    // elastic-override precedent: "no feature gate required, zero cost when
+    // None"); only the knob FIELDS are feature-gated, so the stabilization
+    // path compiles to nothing under `lt2_looped` alone.
+    deep_run: Option<&mut super::loop_deep::LoopDeepRun>,
 ) -> &'a mut [f32] {
     use crate::types::HybridPattern;
 
@@ -263,6 +271,23 @@ cache.advance_pos(pos);
     // default; riir-ai can override with coherence-decay/staleness).
     #[cfg(feature = "gain_cost_halt")]
     let mut cost_floor: f32 = 0.0;
+
+    // Issue 717 — hoist the deep-run actives ONCE (hot-loop rule: the
+    // per-iteration work at the bottom of this loop is data-driven off these
+    // bools; `None` / knob-absent ⇒ branch-not-taken ⇒ bit-identical, the
+    // G1 contract). `deep_run` is reborrown per use; `mut` only enables
+    // `as_deref_mut`.
+    let mut deep_run = deep_run;
+    #[cfg(feature = "lt2_deep_stability")]
+    let scales_active = deep_run
+        .as_ref()
+        .and_then(|r| r.direction_scales.as_ref())
+        .is_some_and(|s| s.radial != 1.0 || s.tangential != 1.0);
+    #[cfg(feature = "lt2_deep_stability")]
+    let damping_active = deep_run
+        .as_ref()
+        .and_then(|r| r.damping.as_ref())
+        .is_some_and(|d| d.alpha > 0.0);
 
     // 2. Outer loop: T passes over all layers
     for tau in 0..loop_count {
@@ -645,6 +670,97 @@ cache.advance_pos(pos);
             // at the top of the next evaluation.
             std::mem::swap(&mut curr_step_buf, &mut prev_step_buf);
             h.update_prev_step(gain);
+        }
+
+        // ── Issue 717 T4 — tangential/radial update rescale ─────────────
+        // Decomposes THIS iteration's full update (post residual-gate
+        // injection) against the pre-pass state `prev_h` and rescales the
+        // two components. Skipped entirely when the knob is absent/neutral
+        // ({1,1}): the decompose-recombine round-trip is NOT bit-identical
+        // (reassociation), so neutrality must skip, not recompute.
+        //
+        // T5 (f32-state contract, carried at the site it protects): the
+        // state crossing every loop-iteration boundary is `ctx.x: Vec<f32>`
+        // — full f32 in, full f32 out, no sub-f32 storage anywhere in the
+        // carry path of ANY arm of this loop. This is the OPPOSITE numerics
+        // regime of riir-ai Bench 802, where f16-KV deviation DILUTES with
+        // attention context: attention rounding averages out across
+        // positions, while weight-tied recurrence AMPLIFIES rounding with
+        // depth (upstream sotaku: BF16 @4096 = 43.7% vs FP32 98.6%; compiled
+        // chunks retaining f32 intermediates recovered to 92.5%). Deep-loop
+        // serving must never route this state through f16/bf16 — pinned
+        // behaviorally by `issue_717_t1_t2_deep_baseline::f32_state_contract`.
+        #[cfg(feature = "lt2_deep_stability")]
+        if tau > 0
+            && scales_active
+            && let Some(run) = deep_run.as_deref_mut()
+            && let Some(s) = run.direction_scales
+        {
+            super::loop_deep::apply_direction_scales(
+                &mut ctx.x[..n],
+                &ctx.prev_h[..n],
+                s.radial,
+                s.tangential,
+            );
+        }
+
+        // ── Issue 717 T3 — delayed damping ──────────────────────────────
+        // `h ← (1−α)·h + α·h_prev` once the burn-in has elapsed (sotaku's
+        // runtime, checkpoint-agnostic rescue; closed form `project_lambda`:
+        // a locally-linear mode λ → 1−α+αλ). Applied LAST in the iteration
+        // body — after every injection/gate/halter path — so halter gain
+        // measurements stay undamped while the state that carries forward,
+        // and the final readout, see the damped value. `alpha == 0.0` never
+        // reaches here (`damping_active` is false ⇒ bit-identical, G1).
+        #[cfg(feature = "lt2_deep_stability")]
+        if tau > 0
+            && damping_active
+            && let Some(run) = deep_run.as_deref_mut()
+            && let Some(d) = run.damping
+            && tau >= d.burn_in
+        {
+            super::loop_deep::apply_damping(&mut ctx.x[..n], &ctx.prev_h[..n], d.alpha);
+        }
+
+        // ── Issue 717 T1 — per-K deep-run stats (zero cost when None) ───
+        // Snapshot AFTER the knobs above, so the recorded state is exactly
+        // what carries into the next iteration (and, at the last snapshot,
+        // into the readout). `robust_norm` is max-abs-scaled — deep-loop
+        // states overflow the naive Σv² at ‖x‖ ≳ 1e19 while still far
+        // inside the f32 value range — and returns NaN iff the state
+        // contains a non-finite value (the tripwire marker).
+        if let Some(run) = deep_run.as_deref_mut()
+            && run.snapshot_every > 0
+            && (tau + 1) % run.snapshot_every == 0
+        {
+            let x = &ctx.x[..n];
+            let norm = super::loop_deep::robust_norm(x);
+            run.stats.snapshots_taken += 1;
+            run.stats.state_norms.push(norm);
+            if norm.is_nan() && run.stats.state_non_finite_at.is_none() {
+                run.stats.state_non_finite_at = Some(run.stats.snapshots_taken - 1);
+            }
+            if run.capture_states {
+                run.stats.state_snapshots.push(x.to_vec());
+            }
+            if run.check_logits {
+                // Logit-finite tripwire: one extra `lm_head` matmul per
+                // snapshot, opt-in (`check_logits`). Scratch grown once,
+                // reused thereafter.
+                run.logit_scratch.resize(config.vocab_size, 0.0);
+                standard_lm_head(
+                    &mut run.logit_scratch,
+                    &ctx.x,
+                    &weights.lm_head,
+                    config.vocab_size,
+                    n,
+                );
+                if run.stats.logits_non_finite_at.is_none()
+                    && run.logit_scratch.iter().any(|l| !l.is_finite())
+                {
+                    run.stats.logits_non_finite_at = Some(run.stats.snapshots_taken - 1);
+                }
+            }
         }
     }
 
