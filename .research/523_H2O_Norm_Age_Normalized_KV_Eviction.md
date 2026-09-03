@@ -97,3 +97,7 @@ Two advocates spawned in one parallel batch with the §4 searches (brief hygiene
 ## 6. PoC Addendum
 
 None yet. The quality-parity claim ("mass/age ≥ raw-H2O at matched budget") is exactly what Plan 585's GOAT bench tests on a planted age-bias fixture (falsifiable by construction: a config where raw-H2O provably evicts the hot row must exist for the bench to be non-vacuous). The training track's G1 premise probe (Plan 367 P0) is its own falsification-first PoC.
+
+## 7. Cross-Ref (2026-09-03)
+
+> **Cross-ref (Research 528 / Issue 719):** any un-defer of this eviction policy must gate on the **conditioning-consistency audit** (per-junction forward-KL → unconditional Pinsker `TV <= sqrt(eps/2)` between evicted-conditioned and full-context forwards) — hit-rate/quality metrics alone do not measure the train/serve conditioning-gap class (arXiv:2609.00865). T4 of Issue 719.

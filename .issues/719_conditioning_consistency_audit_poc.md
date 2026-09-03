@@ -1,0 +1,31 @@
+# Issue 719: Conditioning-consistency audit PoC — per-junction KL + Pinsker TV gate for semantic context compression
+
+**Status:** OPEN — POC design filed from Research 528; no live consumer; all work trigger-gated
+
+**Source:** arXiv:2609.00865 "MemoryWalker" (Research 528, 2026-09-03). The modelless extract: at any serving site that conditions on a *semantically compressed* context (window, eviction, summarization, budget packing), a two-forward pair (compressed-conditioned vs full-context teacher) yields a per-junction forward-KL whose **unconditional** Pinsker bound `TV <= sqrt(eps_KL/2)` is a proven behavioral-gap verdict between context regimes. No instrument in the stack computes a KL/TV distance between conditioning regimes today (grepped 2026-09-03, Research 528 §4).
+
+**Why not bit-identity:** every shipped *numeric* compression surface (f16 KV, q8kv, PoT scales) is already gated at bit-identity — stronger than any KL bound. The audit matters only where compression is semantic by construction, i.e. where bit-identity is impossible:
+- Gemma-4 sliding-window ring (`kv_cache.rs` ctors "do-not-pass-yet"; designated consumer riir-train Plan 343 T1.6) — Issue 752 pins truncation-differ existence-only; the audit would quantify bounded-vs-unbounded across `sw`.
+- `rt_turbo` window + sink decode (katgpt-speculative).
+- `TokenBudgetPacker` (riir-rag) — budget levels rankable by measured audit KL instead of byte count.
+- H2O eviction (Research 523, deferred) — if un-deferred, hit-rate alone is insufficient; this is the gate.
+
+## Tasks
+
+- [ ] **T1 — audit core in katgpt-core** (opt-in feature `cond_audit`, zero new deps): `audited pair = (student forward, teacher no-grad forward)` → per-junction forward-KL, total `eps_KL`, verdict `sqrt(eps_KL/2)`, greedy-stream flip counter, calibrated-zero arm (compression-off control; quiet-box discipline per Bench 649). Deterministic ×3.
+- [ ] **T2 — first consumer: Gemma-4 sliding ring** — blocked on the ctors' designated consumer (Plan 343 T1.6) or an explicit un-pin; sweep `sw` and report the TV-gap curve. `[-]` until then.
+- [ ] **T3 — TokenBudgetPacker budget ranking** (riir-rag consumer, opt-in) — `[-]` until a packed-context consumer exists.
+- [ ] **T4 — H2O un-defer gate** — wire as Research 523's behavioral gate before any eviction PR lands. `[-]`.
+- [ ] **G8 non-vacuity (part of T1):** planted logit corruption must flip the verdict — an audit that cannot fail proves nothing (Bench 804 gate-9 lesson).
+- [ ] G2 cost: audit overhead ≤ a measured budget of the paired forward (assert measured, never asserted-in-prose).
+
+## Reopen triggers (any one un-defers T2–T4)
+
+1. Any PR introducing semantic context eviction/windowing into a serving path.
+2. The Gemma-4 sliding-ring consumer lands (Plan 343 T1.6) or the ctors un-pin.
+3. L4 fixer lane revival with a train/serve context-regime divergence (Research 528 §5 recipe becomes a riir-train plan at the same time).
+4. Research 523 H2O un-defers.
+
+## Discipline
+
+Opt-in, no default promotion, no GOAT claim until a consumer exists. Do not cite the paper's 26x drift figure for our surfaces — it is their harness, their densities; Issue 719 T1+T2 is what produces our number.
