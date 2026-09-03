@@ -543,6 +543,41 @@ rather than the worktree's: build HEAD's version + your edit, `git hash-object
 -w`, then `git update-index --cacheinfo`. Their hunks stay uncommitted and the
 worktree stays coherent for them (used for `bench_707` in `8c7ca74b`).
 
+### Several sessions, one target dir — a gate can produce a FALSE RED
+
+Every axis above is about a gate being *wrongly green*. This one is the
+inverse and it costs more, because a red gets investigated: **a count-pinned
+or feature-switching gate run concurrently with another cargo process in the
+same `target/` reports a failing test that passes when run alone.** Cargo
+rebuilds and replaces test binaries while another run is executing them.
+
+Read the failure's **shape** before its content. `error: test failed, to
+rerun pass …` with **no `failures:` block and no `test … FAILED` line** means
+the harness process *died*; nothing asserted anything. The count is
+truncated too, because cargo stops at the first failing binary — so one
+environmental cause emits two independent wrong signals, a fake failing test
+*and* apparent pin drift.
+
+Measured 2026-09-03 (riir-game-sdk `.issues/023` T4): a row read `105 passed
+(pinned 182)` and named `prod_l3_partition_heal`. That suite has no
+wall-clock component — seeded deterministic drills — so load flake was ruled
+out and a riir-chain comparator change from the day before looked like a
+cross-repo regression. It was neither: the freshly built binary run
+**directly** passed 6/6. Three `cargo test -p riir-e2e` runs were live on
+three different feature sets at once, two of them mine.
+
+Two things follow. **Running the compiled binary directly needs no build
+lock**, so it is the way to diagnose while siblings are compiling — find it
+under `target/<profile>/deps/`, filtering out the `#![cfg]`-gated copies that
+`--list` reports as 0 tests. And a gate whose verdict the box can invalidate
+should **refuse**, not warn: riir-game-sdk `scripts/test_gate.sh` now detects
+concurrent cargo by **working directory** (`lsof` over `pgrep -x cargo`)
+rather than by command-line pattern — a pattern is blind to a plain `cargo
+build` in the same dir and conversely matches harmless sibling-repo runs
+whose command lines mention our crates. A lock-based check cannot work at
+all: cargo releases `target/<profile>/.cargo-lock` *before* running the test
+binaries, which is exactly the damage window.
+
 ## Lint healing — `cargo heal` before manual fixes (adopted 2026-08-24)
 
 Mechanical clippy findings (format-arg inlining, `match_bool`, `map_or`,
