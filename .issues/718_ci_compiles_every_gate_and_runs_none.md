@@ -167,6 +167,15 @@ Two mechanisms, one class:
   Actions actually bills than wall-clock is. **Not run here on purpose:**
   starting a second heavy cargo job alongside the one already running would
   have contaminated both and degraded the shared box for other sessions.
+
+  **Re-check 2026-09-03 (follow-up session):** box conditions re-read before
+  pricing — load average 61–73 with 6 sibling cargo/rustc processes live. The
+  same exclusion still binds, so the run stays deferred. The methodology
+  survives the wait: CPU-seconds via `/usr/bin/time -l` is load-invariant (the
+  seal-remake `.benchmarks/002` lesson — CPU ratios moved <0.11 over a 2× load
+  swing), so the measurement remains valid whenever a quiet window appears.
+  No other work remains on this issue: T1/T4 DONE, T2 withdrawn, G4 MET — T3
+  is the sole open item and it is owner-gated on cost plus box quiet.
 - [x] **T4 — sweep every contract repo. DONE — `scripts/ci_test_execution_report.py`.**
   A report, not a gate (always exit 0); population derived (BOUNDARY.md +
   a `.git` dir), vocabulary committed as data, `selftest()` on every
