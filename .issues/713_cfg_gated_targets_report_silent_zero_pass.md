@@ -178,6 +178,22 @@ shapes are pinned, and two matter specifically:
   derive an empty population and print a confident green over zero repos — the
   same reason `docs_drift_sweep.py` is deliberately excluded). A committed
   floor file, in the `docs_drift_floors.txt` idiom, is the shape that works.
+- [ ] **T6 (new axis, observed during T2b — NOT yet measured)** A **second**
+  way a target prints a green zero, found by the sweep rather than by the
+  auditor: `test_120_vpd_arena_goat` runs under its features and reports
+  `ok. 0 passed; 0 failed; 3 ignored`. Every test in it is `#[ignore]`d.
+
+  This is **not automatically a defect** — `#[ignore]` is the correct marker
+  for a slow or hardware-gated test, and that is why it must not be folded into
+  the SILENT-NOW count. But the reader-facing output is the same lie: a green
+  `ok` over zero executed assertions, on a target named `_goat`.
+
+  The distinction worth measuring is between a target with *some* ignored tests
+  (normal) and one where **every** test is ignored, so the binary can never
+  report anything but zero. The latter is the same shape as this issue one
+  level in, and nothing counts it. Deliberately left unmeasured rather than
+  guessed at.
+
 - [ ] **T5** The 21 platform-`cfg` targets are correctly gated and unfixable by
   `required-features`. Whether they need a *different* instrument (a per-target
   "did this run on any CI platform?" question) is a separate, unasked question.
