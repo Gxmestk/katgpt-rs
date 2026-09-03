@@ -193,9 +193,32 @@ Two mechanisms, one class:
   `schedule`/`workflow_dispatch` fire only from the DEFAULT branch — so its
   daily `30 17 * * *` cron has **never fired**. 706 fixed three repos by
   adding a schedule that fires from the default branch; this one has the
-  schedule and the wrong branch, which is why it did not match. Needs an
-  owner action in that repo (it is also the repo that ships the vessel
-  packer `seal-remake` Issue 001 depends on).
+  schedule and the wrong branch, which is why it did not match.
+
+  **CORRECTION — it was already owned, and I asserted otherwise without
+  checking.** This task first read "needs an owner action in that repo".
+  `riir-game-sdk/.issues/024` had already been filed the same day, by a
+  sibling session, from `ci_gate_coverage.py`, and it is MORE complete than
+  my finding: it carries the 162-commits-behind-`main` measurement, the
+  uninvoked `scripts/test_gate.sh` with its 8 count-pinned rows, the
+  five-day pin drift that went unnoticed for exactly this reason, and a
+  defect I did not have — even if `nightly.yml` were reachable it would
+  **skip cleanly** on a hosted runner, because this workspace's sibling path
+  deps are not fetched by `actions/checkout` and the job exits 0. I
+  contributed the size (1,035 sites) and the cross-repo context to 024
+  (`riir-game-sdk` `204c55e`) rather than filing a duplicate. **Check for an
+  existing issue before writing "needs an owner action" — a sweep finds the
+  symptom, not who already owns it.** (It is also the repo shipping the
+  vessel packer `seal-remake` Issue 001 depends on.)
+
+  **Ownership of all three instances, checked rather than assumed:**
+  katgpt-rs = this issue; `riir-game-sdk` = ALREADY FILED (`.issues/024`,
+  cross-referenced not duplicated); `riir-train` = NOT owned (22 issues,
+  none on this axis) → now `riir-train/.issues/507`, filed rather than
+  fixed, because that repo is GPU/training-heavy, a blanket `cargo test
+  --workspace` is likely the wrong shape (some suites need a 4090 CI does
+  not have), and a suite that skips its real content and exits 0 is *this
+  issue's own failure mode one level down*.
 
   **Two defects in the report were found by disagreement, and both changed a
   verdict** — recorded because each is a trap for the next reader:
