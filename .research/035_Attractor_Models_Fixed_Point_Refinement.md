@@ -7,6 +7,8 @@
 
 ---
 
+> **PASS-Redirects (synthesis):** Sotaku [github.com/chenglou/sotaku "Sotaku v2 — 99.12% of a 25K-puzzle Sudoku benchmark with an 800K-parameter looped transformer"] (Cheng Lou, Sep 2026, MIT, pinned `6cdb9a9b`) — the **supervised, non-fixed-point counterpoint** to this note's IFT line: its DEQ analysis shows state RMS growing 24→706 (16→1024 iters) while the update residual plateaus ≈0.63 (growing-denominator artifact) and Anderson/Broyden root-solvers diverge to 1e5–1e8 — i.e. **one-step/IFT backward is structurally inapplicable to growing-state recurrences**, and its late-state windowed CE (no-grad burn-in to sampled horizon 32–512 + fixed 16-iteration CE tail, O(16) memory) is the O(k)-memory backward that works there. 797K params → 99.12% @1024 inference iterations (25K frozen, FP32) beats HRM 27M/55% and TRM 7M/87.4% per-parameter as rule-agnostic (LDT 2605.08605, 800K/100%-with-abstention, keeps the tiny-model SOTA claim). Attractor's "25–31% fewer training FLOPs / equilibrium internalization" stands for near-fixed-point attractors; sotaku's recipe is the complement for recurrences with no equilibrium. Recipe → riir-train Plan 373 (note: Research 440 there); runtime damping/tangential rescue + f32-state law → katgpt-rs Issue 717.
+
 ## TL;DR
 
 Attractor Models split inference into **backbone** (proposes output embedding ŷ₀) + **attractor** (refines to fixed point ŷ⋆ via `ŷ_{t+1} = T_θₐ(ŷ_t, ŷ₀)` until convergence). Key results:
