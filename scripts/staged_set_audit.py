@@ -46,17 +46,24 @@ unambiguous evidence is the specific identifiers the newest commit introduced,
 which is exactly what signal 3 reports back (`best_ssr` 5 occurrences at HEAD,
 0 in the stale copy). Grep those, don't read the diffstat.
 
-**A fourth signal is proposed but NOT implemented here** (Issue 709 T3c): the
-rustfmt round-trip. `git show HEAD:$f | rustfmt --edition 2024 --emit stdout |
-diff - $f` — if identical, the worktree copy is exactly "HEAD, formatted" and
-provably carries zero content, so reverting it cannot lose anyone's work. It
-splits "dirty because churn" from "dirty because work" with no mtime heuristic
-and no false positives from line re-wrapping, which is what an
-`--ignore-all-space` diff cannot do (it called 214/215 files non-whitespace in
-one measured case). It is what made the 204-file revert here *provably* safe
-rather than probably safe: 188 pure churn, 16 real. It is Rust-only and needs
-a toolchain, hence a separate signal rather than a replacement for these
-three.
+  4. **rustfmt round-trip** (Rust only, `--fmt`): `git show HEAD:$f | rustfmt
+     --emit stdout | diff - $f`. Identical ⇒ the worktree copy is exactly
+     "HEAD, formatted", provably carries **zero content**, and reverting it
+     cannot lose anyone's work. This is the only signal here that yields a
+     *proof* rather than evidence; the other three are heuristics.
+
+Signal 4 is opt-in (`--fmt`) because it shells out to rustfmt per file and
+needs a toolchain. It splits "dirty because churn" from "dirty because work"
+with no mtime heuristic and no false positives from line re-wrapping — which
+an `--ignore-all-space` diff cannot do, having called 214/215 files
+non-whitespace in one measured case, because rustfmt re-wraps tokens ACROSS
+lines. It made a 204-file revert provably rather than probably safe: 188 pure
+churn, 16 real.
+
+It also does something the peer's original formulation did not: the diff
+against `rustfmt(HEAD)` **isolates the content**. Formatting cancels, so what
+remains is exactly the semantic change, which is the review you actually want
+on a file whose real edit is buried under a whole-file reformat.
 
 Usage:  scripts/staged_set_audit.py [repo_path]
 """
@@ -71,6 +78,10 @@ from pathlib import Path
 # Two edits more than this far apart are different episodes. Deliberately
 # generous: a session that takes 10 min to write 4 files must read as one.
 GAP_SECONDS = 900.0
+
+# rustfmt needs an edition; a wrong one changes the formatting and would
+# manufacture a false "content" verdict on every file.
+RUST_EDITION = "2024"
 
 
 def cluster(stamps: list[float], gap: float = GAP_SECONDS) -> list[list[float]]:
@@ -115,6 +126,10 @@ def selftest() -> None:
     # printed evidence is an identifier to grep rather than the commit's prose.
     assert is_comment("  // Best-iterate guard (Issue 712)"), "rust comment"
     assert not is_comment("    let mut best_ssr = prev;"), "code is not a comment"
+    # Signal 4 must never classify a non-Rust or unparseable file as churn:
+    # that verdict authorises a revert, so its failure mode is destructive
+    # while every other signal here only over- or under-warns.
+    assert fmt_roundtrip(Path("."), "README.md")[0] == "skip", "non-Rust is skip"
     assert sorted(["// why", "let x = 1;"], key=is_comment)[0] == "let x = 1;", (
         "code sorts first"
     )
@@ -163,6 +178,50 @@ def reverted_lines(repo: Path, path: str, sha: str) -> list[str]:
     # the weakest evidence in the set — an identifier like `best_ssr`
     # settles reformat-vs-revert with one grep, a comment does not.
     return sorted(lost, key=is_comment)
+
+
+def fmt_roundtrip(repo: Path, path: str) -> tuple[str, list[str]]:
+    """Classify a dirty Rust file as pure formatting churn or real content.
+
+    Returns `(verdict, isolated_diff)` where verdict is:
+
+    - `"churn"`   — worktree == rustfmt(HEAD). Zero content. Reverting is
+                    lossless BY PROOF, not by inspection.
+    - `"content"` — a semantic change survives after formatting cancels. The
+                    returned diff is that change, isolated.
+    - `"skip"`    — not Rust, or rustfmt could not parse either side. Reported
+                    as unknown rather than assumed either way: a parse failure
+                    that silently read as "churn" would authorise a destructive
+                    revert, which is the one error this must not make.
+    """
+    if not path.endswith(".rs"):
+        return "skip", []
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(repo), "show", f"HEAD:{path}"],
+            capture_output=True, check=True,
+        ).stdout
+        fmt = subprocess.run(
+            ["rustfmt", "--edition", RUST_EDITION, "--emit", "stdout"],
+            input=head, capture_output=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return "skip", []
+    if fmt.returncode != 0:
+        return "skip", []
+
+    want = fmt.stdout.decode(errors="replace").splitlines()
+    have = (repo / path).read_text(errors="replace").splitlines()
+    if want == have:
+        return "churn", []
+    import difflib
+
+    delta = [
+        ln
+        for ln in difflib.unified_diff(want, have, "rustfmt(HEAD)", "worktree", n=0)
+        if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))
+    ]
+    return "content", delta
 
 
 def stale_vs_head(
@@ -284,6 +343,24 @@ def main() -> int:
                 print(f"        would lose: {ln.strip()[:96]}")
         if len(stale) > 8:
             print(f"      … {len(stale) - 8} more")
+
+    if "--fmt" in sys.argv:
+        churn, content, skip = [], [], []
+        for p in sorted(set(staged) | also_dirty):
+            verdict, delta = fmt_roundtrip(repo, p)
+            {"churn": churn, "content": content, "skip": skip}[verdict].append((p, delta))
+        print(
+            f"  rustfmt round-trip: {len(churn)} pure churn (revert is lossless "
+            f"BY PROOF), {len(content)} carry content, {len(skip)} unclassifiable"
+        )
+        for p, _ in churn:
+            print(f"      churn    {p}")
+        for p, delta in content:
+            print(f"      CONTENT  {p}  ({len(delta)} isolated line(s))")
+            for ln in delta[:4]:
+                print(f"          {ln[:100]}")
+        for p, _ in skip:
+            print(f"      skip     {p}")
 
     match len(groups) > 1:
         case True if staged:

@@ -236,9 +236,12 @@ three agents' WIP in six files; one was a build regression nobody saw for a day
 scripts/staged_set_audit.py            # any repo: pass its path as $1
 ```
 
-Also a **report, not a gate** (always exit 0). The refusing pre-commit hook is
-deliberately NOT shipped — it trades a real class of loss against friction on
-every legitimate multi-file commit, which is an owner call (`.issues/709` T3b).
+Also a **report, not a gate** (always exit 0). The refusing pre-commit hook was
+**decided against** (`.issues/709` T3b, 2026-09-03) on the evidence the report
+itself produced: every signal cheap enough for a blocking hook has a
+legitimate-use false positive, and the one signal with none (`--fmt`) costs a
+rustfmt subprocess per file. A report that is read beats a gate that is
+bypassed.
 Measuring the signal is not. Three signals, none subsuming another:
 
 1. **mtime clusters** — the technique that caught this by hand twice:
@@ -265,6 +268,19 @@ claims, restricted to lines specific enough that their absence is evidence (a
 `}` proves nothing). A workspace sweep over all 19 contract repos returned
 exactly one hazard, with two other repos dirty-but-clean — so it is not
 always-on.
+
+4. **rustfmt round-trip** (`--fmt`, Rust only) — `git show HEAD:$f | rustfmt
+   --emit stdout | diff - $f`. Identical ⇒ the worktree copy is exactly "HEAD,
+   formatted", provably carries **zero content**, and reverting cannot lose
+   work. The only signal here that yields a *proof*; the other three are
+   heuristics. Diffing against `rustfmt(HEAD)` also **isolates the content**,
+   which is the review you want on a file whose real edit is buried under a
+   whole-file reformat — `-w` cannot produce it, because rustfmt re-wraps
+   tokens *across* lines. On its first run it refuted a standing belief: 15
+   files described for hours as "a sibling's rustfmt churn" came back **0
+   churn, 15 content**, every one a real lint fix (`989f1bdf`). Its `skip`
+   verdict is pinned by `selftest()` — a `churn` verdict authorises a revert,
+   so unlike the other three this signal can destroy work if it errs that way.
 
 Single-linkage, not fixed-width bins: a session editing continuously for an
 hour is one episode because no two consecutive edits are `GAP_SECONDS` apart.

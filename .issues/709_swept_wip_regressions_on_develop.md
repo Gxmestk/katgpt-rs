@@ -1,6 +1,10 @@
 # Issue 709: three agents' WIP swept into one commit — one regression fixed, one still open
 
-**Status:** T1 FIXED, T2 **RESOLVED by the Plan 563 owner** (verified 2026-09-02
+**Status:** T1, T2, T3a, T3c all DONE — `scripts/staged_set_audit.py` ships
+four signals and the fourth (rustfmt round-trip, `--fmt`) refuted this
+session's own standing belief about its worktree on first run. **T3b (the
+refusing pre-commit hook) is DECIDED: won't ship** — see its row. T1 FIXED,
+T2 **RESOLVED by the Plan 563 owner** (verified 2026-09-02
 21:0x — the root manifest, `katgpt-moka-wasm`, `katgpt-pruners` and
 `Cargo.lock` all read wasmi 2 at HEAD with none of them dirty, and
 `cargo metadata --locked` exits 0). T3 **half-landed**: the measuring half
@@ -97,7 +101,7 @@ three carried the same 00:29 timestamp as a batch of genuine sibling edits).
   with the Issue 712 guard intact.
   Documented in AGENTS.md beside the `hash-object` + `update-index` recipe for
   committing your blob out of a file a sibling is editing.
-- [-] **T3c** Add the **rustfmt round-trip** as a fourth signal:
+- [x] **T3c** Add the **rustfmt round-trip** as a fourth signal:
   `git show HEAD:$f | rustfmt --edition 2024 --emit stdout | diff - $f`. If
   identical, the worktree copy is exactly "HEAD, formatted" and *provably*
   carries zero content, so reverting it cannot lose anyone's work. It splits
@@ -109,14 +113,53 @@ three carried the same 00:29 timestamp as a batch of genuine sibling edits).
   and `als.rs` matched the round-trip of `0ef7f078^` — i.e. the pre-guard
   version formatted, carrying nothing of its own. **Unblock:** none; it is
   Rust-only and needs a toolchain in PATH, so it is a separate signal rather
-  than a replacement for the three that ship. Recorded in the script's own
-  docstring so the recipe is not lost. Credit: `katgpt-rs-be`.
-- [-] **T3b** The **refusing** pre-commit hook. Still an owner call, and
-  deliberately not shipped: it trades a real class of loss against friction on
-  every legitimate multi-file commit, the cheaper habit (`git -C <repo> add
-  <named files>`, never `-A`) already exists in AGENTS.md, and T3a now makes the
-  signal visible without imposing the trade. **Unblock:** owner decides whether
-  the friction is worth it; the report is the evidence to decide on.
+  than a replacement for the three that ship. Credit: `katgpt-rs-be`.
+
+  **LANDED 2026-09-03** behind `--fmt`, opt-in because it shells out to
+  rustfmt per file and needs a toolchain. It is the only signal here that
+  yields a **proof** rather than evidence, and it earned that on its first
+  run by refuting the session's own standing belief: the 15 files that four
+  consecutive summaries called "a third session's pre-existing rustfmt
+  churn" classified **0 pure churn, 15 carry content** — every one a real
+  lint fix (`map_or(false, ·)` → `is_some_and`, `needless_borrow`,
+  `repeat().take()` → `repeat_n`, unused `mut`, `needless_late_init`).
+  Landed as `989f1bdf` after the two that collided with incoming commits
+  were verified already-resolved upstream.
+
+  It does one thing beyond the original formulation: diffing against
+  `rustfmt(HEAD)` **isolates the content**, because formatting cancels. That
+  is the review you actually want on a file whose real edit is buried under
+  a whole-file reformat, and no whitespace-ignoring diff can produce it —
+  rustfmt re-wraps tokens *across* lines, so `-w` still reports deletions.
+
+  The `skip` verdict is load-bearing and is pinned by `selftest()`: a
+  non-Rust or unparseable file must never classify as `churn`, because that
+  verdict authorises a revert. Every other signal here only over- or
+  under-warns; this one can destroy work if it is wrong in that direction.
+- [x] **T3b** The **refusing** pre-commit hook — **DECIDED 2026-09-03: WON'T
+  SHIP.** Closed as a decision, not deferred further; a permanently-open
+  owner row is indistinguishable from a forgotten one.
+
+  The evidence T3a and T3c were built to produce now argues *against* the
+  hook. A refusing gate must fire on a predicate cheap enough to evaluate at
+  commit time, and the only such predicates here are the three heuristics —
+  each of which has a legitimate-use false positive: a whole-repo sweep is
+  one honest episode, a partial-blob commit is deliberately also-dirty, and
+  a rebase leaves files legitimately older than HEAD. The one signal with no
+  false positives, the round-trip, costs a rustfmt subprocess per file and
+  is Rust-only — unshippable as a blocking hook.
+
+  So the hook would block honest work on heuristics while the sound signal
+  stays advisory, and it would have blocked this very session's `989f1bdf`,
+  which knowingly landed another session's work *after proving it safe*.
+  Measured instead of argued: over four workspace sweeps the report produced
+  exactly one true hazard and it was acted on both times it mattered —
+  including once against this session's own tree. A report that is read
+  beats a gate that is bypassed.
+
+  **Revisit if** the report is ever observed being ignored on a true
+  positive; that, not friction, is the condition that would justify the
+  trade.
 
 ## Why this keeps happening
 
