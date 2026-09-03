@@ -347,6 +347,80 @@ about the one you didn't. Arming the gates still paid: it surfaced
 `.docs/10_audits/alloc_gate_per_thread_counter.md`, an alloc gate counting a sibling test's allocations, which
 reproduces in release.
 
+### A reported "p99" is often the MAX — `scripts/percentile_index_audit.py`
+
+`sorted[(n as f64 * 0.99) as usize]` and `sorted[n * 99 / 100]` both land on
+`n - 1` — the **maximum** — for every `n <= 1/(1-p)`: n ≤ 100 at p99, n ≤ 20 at
+p95, n ≤ 1000 at p999. Below that boundary the site reports one observation
+under a percentile's name. A `.min(len - 1)` clamp prevents a panic, not a
+wrong statistic.
+
+Direction matters and is the opposite of the usual worry: the naive index is
+one rank **too high**, so a `p99 < budget` assert becomes *stricter*. The
+failure mode is a false **RED**, not a false green — nothing currently green
+turns red by fixing a site. What it costs is the ability to notice a real
+regression, because the tail is decided by a single sample.
+
+The quantity nobody prints is **tail support** = `n - idx`, the number of
+samples at or above the reported rank: **1 at n=100**, 2 at n=200, 10 at
+n=1000. The report calls anything under 10 weak whether or not it is
+degenerate.
+
+```bash
+scripts/percentile_index_audit.py             # all contract repos (derived)
+scripts/percentile_index_audit.py ../riir-ai  # or one, by path
+```
+
+A **report, not a gate** (always exit 0), for the reason
+`cfg_gated_target_audit.py` is: half the sites take their sample count from a
+runtime length or a fn parameter that no static pass can reach, and a report
+that exits 1 on those is a report nobody runs. Read the split — **UNRESOLVED
+is not "clean"**, it is "needs a per-site read".
+
+Do not re-type its numbers from here. Measured 2026-09-03: **130 sites over 8
+of 19 repos — 12 DEGENERATE (all print-only), 7 WEAK, 32 OK, 65 UNRESOLVED,
+14 SAFE, and 0 DEGENERATE-AND-ASSERTED.** That last zero is the one worth
+having, and it is a zero only because riir-mmorpg-examples `.issues/093` fixed
+the single asserted one (its G2 gate, `ee9da24`).
+
+**This file's own history is the lesson about classifiers.** The audit was
+wrong three times, each time by a *narrow vocabulary* rather than a bug, and
+each time the narrow version looked like good news:
+
+1. The first cut grepped only the **float** forms and published a 14-row hand
+   table as an audit of "all 19 contract repos". The integer form
+   `n * 99 / 100` is the more common one here and was invisible; riir-e2e's
+   copy was found by accident.
+2. Both `resolve_n` and `is_load_bearing` were **file-scoped**, so a binding
+   or an `assert!` in a *different function* counted. That manufactured a
+   false ASSERTED (riir-neuron-db `bench_003`, where the assert is on
+   `mean_us` — the p99's neighbour in a returned tuple) and sized a slice
+   *parameter* from an unrelated caller (riir-chain `bench_012`).
+3. The literal-only pattern reported **riir-game-sdk as having zero sites**
+   while its `percentiles` helper — `|p: usize| durs[(n * p / 100)...]`,
+   called as `at(50)`, `at(99)` — feeds that repo's wall-clock budget gates.
+   A variable percentile is not statically known, so it must land in
+   UNRESOLVED, not vanish.
+
+So the vocabulary is **data** (listed exhaustively in `VOCAB`) and the
+population is **derived** (BOUNDARY.md + a `.git` dir), per the workspace rule
+that deriving both from one walk is what makes a cross-repo report
+permanently empty. `selftest()` runs on every invocation and **exits 2 rather
+than printing**, pinning the tokenizer, the scoping, the rounding exclusion
+and the arithmetic. It was canaried by reintroducing bug 1 above — a greedy
+character class that swallowed `sorted[(n` — which took every site to
+UNRESOLVED; without the selftest the run would have printed 130 sites, zero
+findings, and read as a clean repo.
+
+Two exclusions are deliberate and must not be "fixed":
+`((n - 1) as f64 * 0.99)` is bounded by `n - 2` and can never return the max
+(verified over n ∈ 2..=20000; it is the shape
+`katgpt-speculative/tests/weaver_real_checkpoint.rs` uses, and the one site in
+the workspace that got this right), and `.ceil()` / `.round()` on the product
+is the *correct* nearest-rank form — requiring it also removes the largest
+false-positive class, `0.95 * n as f32` computing a top-p **nucleus size**,
+which indexes nothing.
+
 ### Before committing in a shared worktree — `scripts/staged_set_audit.py`
 
 Several agent sessions write into one worktree routinely, and `git add -A` from
