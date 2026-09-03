@@ -440,3 +440,115 @@ fn t3_1_g2_perf_batch_acquisition_and_expansion_at_crowd_scale() {
         per_variance * 1e6
     );
 }
+
+// ── T5.3 — the dual form's regime claim, measured in-tree ──────────────────
+//
+// Plan 580 T5.3 shipped `DualPosteriorBuffer` on the consumer's measurement
+// (riir-train Bench 563, D = 32: 79.6x at n = 256, O(1) in n). That is the
+// consumer's box, not ours, so the claim is re-measured here. The bars below
+// are deliberately far looser than the quoted figures: what is being gated is
+// the **scaling class**, which is a property of the algorithm, not the
+// microsecond count, which is a property of the machine.
+//
+// Release-only, like the rest of this file — a debug build measures an
+// unoptimised binary and has manufactured false perf reds in this repo before
+// (`.issues/713` T2b).
+mod t53_dual_perf {
+    use katgpt_core::certified_frontier::{DualPosteriorBuffer, PosteriorBuffer};
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    const DD: usize = 32;
+    const PRIMAL_CAP: usize = 256;
+    const QUERIES: usize = 2_000;
+
+    fn feat(i: usize) -> [f32; DD] {
+        let mut f = [0.0f32; DD];
+        for (k, v) in f.iter_mut().enumerate() {
+            // Deterministic, full-rank-ish, and not axis-aligned.
+            *v = ((i * 31 + k * 17) % 97) as f32 / 97.0 - 0.5;
+        }
+        f
+    }
+
+    /// ns per `posterior_variance_linear` query, both arms warmed first (a cold
+    /// arm has produced a 174x-wrong verdict in this workspace before).
+    fn time_dual(n: usize) -> f64 {
+        let mut p = DualPosteriorBuffer::<DD>::new(1e-2);
+        for i in 0..n {
+            p.append_observation(&feat(i), 1.0);
+        }
+        let probe = feat(7);
+        for _ in 0..QUERIES / 4 {
+            black_box(p.posterior_variance_linear(black_box(&probe)));
+        }
+        let t = Instant::now();
+        for _ in 0..QUERIES {
+            black_box(p.posterior_variance_linear(black_box(&probe)));
+        }
+        t.elapsed().as_secs_f64() * 1e9 / QUERIES as f64
+    }
+
+    fn time_primal(n: usize) -> f64 {
+        assert!(n <= PRIMAL_CAP);
+        let mut p = Box::new(PosteriorBuffer::<PRIMAL_CAP, DD>::new(1e-2));
+        for i in 0..n {
+            p.append_observation(&feat(i), 1.0);
+        }
+        let probe = feat(7);
+        let mut scratch = vec![0.0f32; PRIMAL_CAP];
+        for _ in 0..QUERIES / 4 {
+            black_box(p.posterior_variance_linear(black_box(&probe), &mut scratch));
+        }
+        let t = Instant::now();
+        for _ in 0..QUERIES {
+            black_box(p.posterior_variance_linear(black_box(&probe), &mut scratch));
+        }
+        t.elapsed().as_secs_f64() * 1e9 / QUERIES as f64
+    }
+
+    /// **G2-dual.** Three claims, each two-sided against its own arm rather
+    /// than against an absolute latency budget:
+    ///
+    /// 1. the dual is `O(1)` in `n` — 4096 observations cost the same as 16;
+    /// 2. the primal is not — it grows superlinearly over the same span;
+    /// 3. at the crossover the plan cites (`n = 256`, `D = 32`) the dual wins
+    ///    by a wide margin.
+    #[test]
+    fn t53_g2_dual_is_o1_in_n_and_beats_the_primal_past_the_crossover() {
+        let d16 = time_dual(16);
+        let d256 = time_dual(256);
+        let d4096 = time_dual(4096);
+        let p16 = time_primal(16);
+        let p64 = time_primal(64);
+        let p256 = time_primal(256);
+
+        println!("T5.3 G2 (D={DD}, ns/query)");
+        println!("  n        dual      primal");
+        println!("  16    {d16:8.1}   {p16:8.1}");
+        println!("  64         —      {p64:8.1}");
+        println!("  256   {d256:8.1}   {p256:8.1}   speedup {:.1}x", p256 / d256);
+        println!("  4096  {d4096:8.1}          —   (primal would be 64 MiB of state)");
+        println!(
+            "  scaling 16->4096: dual {:.3}x   |   primal 16->256: {:.1}x",
+            d4096 / d16,
+            p256 / p16
+        );
+
+        assert!(
+            d4096 / d16 < 2.0,
+            "dual is not O(1) in n: {d16:.1} -> {d4096:.1} ns ({:.2}x)",
+            d4096 / d16
+        );
+        assert!(
+            p256 / p16 > 4.0,
+            "primal did not grow with n ({:.2}x) — the arms are not measuring what we think",
+            p256 / p16
+        );
+        assert!(
+            p256 / d256 > 5.0,
+            "dual only {:.1}x faster at the crossover (n=256, D={DD})",
+            p256 / d256
+        );
+    }
+}

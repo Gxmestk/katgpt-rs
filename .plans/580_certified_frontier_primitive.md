@@ -1,6 +1,6 @@
 # Plan 580: Certified Frontier — Open Primitive
 
-**Status:** **Phases 0-3 + T4.1/T4.2 EXECUTED + PASSED 2026-08-28; NOT PROMOTED (stays opt-in)** — G1/G2/G3/G4 all PASS ([Bench 688](../.benchmarks/688_certified_frontier_goat.md), commits `e3f64479` + this one). The T3.4 floor gate SPLIT: the primitive is the only arm that holds delta (0.000 vs the floor's 0.306, 6.1x over), but LOSES the plan's stated `growth * (1 - violation_rate)` composite — which the bench measures to be **degenerate** (it expands to the true-positive count, so it carries no false-positive penalty and is maximised by certifying everything; the floor scored exactly `n_valid` on all 5 seeds). Promotion deferred to a re-gate on the corrected two-stage metric proposed in Bench 688, because redefining a gate's metric after seeing the result and promoting on the redefinition is how a gate stops being a gate. T4.3 is ROUTED to riir-ai Issue 774 and is the only remaining gate before a promotion re-gate.
+**Status:** **Phases 0-3 + T4.1/T4.2 EXECUTED + PASSED 2026-08-28; NOT PROMOTED (stays opt-in)** — G1/G2/G3/G4 all PASS ([Bench 688](../.benchmarks/688_certified_frontier_goat.md), commits `e3f64479` + this one). The T3.4 floor gate SPLIT: the primitive is the only arm that holds delta (0.000 vs the floor's 0.306, 6.1x over), but LOSES the plan's stated `growth * (1 - violation_rate)` composite — which the bench measures to be **degenerate** (it expands to the true-positive count, so it carries no false-positive penalty and is maximised by certifying everything; the floor scored exactly `n_valid` on all 5 seeds). Promotion deferred to a re-gate on the corrected two-stage metric proposed in Bench 688, because redefining a gate's metric after seeing the result and promoting on the redefinition is how a gate stops being a gate. **Corrected 2026-09-03 — this sentence was stale.** It said T4.3 was "ROUTED ... and is the only remaining gate"; T4.3 **ran and PASSED on 2026-08-30** ([riir-ai Bench 822](../riir-ai/.benchmarks/822_certified_frontier_four_arm_gate.md)) under exactly the corrected two-stage metric this paragraph asks for — 239/240 corridor coverage, 0 violations in 16/16 seeds, the lean-valid floor excluded at stage 1. **No gate remains open.** What blocks promotion is the no-default-consumer rule (riir-poc is POC-grade), which is an owner call, not a measurement. **T5.3 LANDED 2026-09-03**: `DualPosteriorBuffer` — 69–84× at n = 256, `O(1)` in n, 4 368 B at any n ([Bench 688 §T5.3](../.benchmarks/688_certified_frontier_goat.md)); it changes the cost of the primitive, not its promotion status.
 **Phase 0 status (superseded, kept for the record):** **EXECUTED + PASSED 2026-08-28** ([Bench 687](../.benchmarks/687_certified_frontier_phase0_poc.md), example `crates/katgpt-core/examples/certified_frontier_01_basic.rs`) — run under the owner's standing "continue remains, make decisions for best perf/sec prod grade" delegation, because T0 is precisely the gate that informs the scheduling decision. All three stated exits PASS. **Phase 1 is justified, but with a scope amendment — see T0.3 below: the dilation half is CONDITIONAL and coarse grids make `expand_certified` a silent no-op.** Phases 1-4 remain owner-scheduled.
 **Date:** 2026-08-27
 **Research:** [katgpt-rs/.research/510_ActFlow_Certified_Frontier_Expansion.md](../.research/510_ActFlow_Certified_Frontier_Expansion.md)
@@ -131,7 +131,7 @@ its literal metric, (b) the in-tree fusion consumer landed with T4.1 but the cro
 two-stage gate — admissibility (violation rate <= delta) as a hard filter, then
 growth among admissible arms only — for the re-gate once a consumer exists.
 
-- [ ] **T5.1** If G1–G4 + floor PASS → add to `default = [...]` (both Cargo.tomls) + README showcase row + `.docs/01_orientation/overview.md` Feature Flags row.
+- [-] **T5.1 OWNER CALL, not an open engineering task** — every gate this row names has now passed: G1–G4 (Bench 688) and the corrected two-stage floor gate on a real consumer (T4.3 / riir-ai Bench 822, 239/240 corridor coverage, floor excluded at stage 1). What blocks the flip is the **no-default-consumer rule**: riir-poc is POC-grade consumer evidence, not a production consumer. That is a scheduling decision, so this row is left for the owner rather than taken. T5.3's 69–84× does NOT move it either — a perf gain is not a promotion criterion. Original text: if G1–G4 + floor PASS → add to `default = [...]` (both Cargo.tomls) + README showcase row + `.docs/01_orientation/overview.md` Feature Flags row.
 - [x] **T5.2** If floor FAILS → keep opt-in, document the regime where adjacency-only wins (dense-frontier worlds), demote honestly in R510 footer.
 
 ### First external consumer landed — 2026-08-31 (unblocks the re-gate precondition)
@@ -169,7 +169,7 @@ k(x,x) − k(x,X)(XXᵀ + λI)⁻¹k(X,x)  ==  λ · xᵀ(XᵀX + λI)⁻¹x
 observation sequence, so the near-duplicate-feature floor the primal needs
 (`chol[n][n] = rem.max(lambda * 1e-6).sqrt()`) has no analogue.
 
-- [ ] **T5.3 (ADDED)** Add a regime-conditional dual path beside
+- [x] **T5.3 LANDED 2026-09-03** Add a regime-conditional dual path beside
       `PosteriorBuffer` — `DualPosteriorBuffer<D>` with the same
       `append_observation` / `posterior_variance_linear` / `ridge_mean` surface,
       selected when `n > D`. The primal stays: it is the correct factorisation
@@ -177,6 +177,29 @@ observation sequence, so the near-duplicate-feature floor the primal needs
       is gated against (riir-train's gate can be mirrored in-tree). Cheap —
       ~80 LOC, std-only, and the consumer's implementation is already written and
       equivalence-tested.
+
+      **Done.** `DualPosteriorBuffer<D>` + a `LinearPosterior<D>` trait (so one
+      caller drives either arm and sizes its scratch off `scratch_len()`) +
+      `prefer_dual(expected_obs, d)`. Measured in-tree on M3 Max rather than
+      quoting the consumer's box: **69–84× at n = 256**, dual scaling
+      **0.967–0.997× from n = 16 to 4096** (`O(1)`), primal **88.9–94.5×** over
+      the same span, state **4 368 B at any n**. Equivalence to the primal
+      oracle: worst relative deviation **3.229e-6** on variance / **1.614e-4**
+      on `ridge_mean` against a 2e-3 bar, across every `n` in 0..=48 × three
+      ridges — tolerance, not bit-identity, because two f32 expression trees for
+      the same real number cannot agree bit-for-bit (bit-identity IS asserted
+      where available: one arm against itself). 7 new gates, 31 green in
+      `certified_frontier_correctness`; full record in
+      [Bench 688 §T5.3](../.benchmarks/688_certified_frontier_goat.md).
+
+      At **n = 16 the primal is faster** (195 vs 253 ns) — which is the point of
+      `prefer_dual` and means the rule `expected_obs > d` is validated by
+      measurement, not asserted.
+
+      Arming the two `certified_frontier` test targets on the way (they were
+      auto-discovered with no `[[test]]` row, so naming either without the
+      feature reported a green `0 passed`) exposed a **classifier** defect in
+      Issue 713's load-bearing token set — see `.issues/713` T4c.
 
 ## Risk register
 

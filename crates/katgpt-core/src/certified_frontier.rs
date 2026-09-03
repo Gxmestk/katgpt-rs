@@ -586,6 +586,295 @@ impl<const MAX_OBS: usize, const D: usize> PosteriorBuffer<MAX_OBS, D> {
     }
 }
 
+// ── regime-conditional dual form (Plan 580 T5.3) ───────────────────────────
+
+/// The surface both posterior parameterisations share, so a caller can be
+/// written once and the *factorisation* chosen by regime.
+///
+/// The two impls compute the **same quantity by two identities** that are equal
+/// in exact arithmetic (Woodbury, below) but not bit-identical in `f32`. Treat
+/// a swap as a tolerance-equivalent change, never a bit-identical one — which
+/// is why neither of these is on a sync surface.
+pub trait LinearPosterior<const D: usize> {
+    /// Absorb one observation. `false` means **nothing changed** — the primal
+    /// says that when it is full, the dual when a coordinate is non-finite.
+    fn append_observation(&mut self, feat: &[f32; D], y: f32) -> bool;
+
+    /// `sigma^2(x)` for the linear kernel `k(a, b) = <a, b>`.
+    ///
+    /// `scratch` must hold at least [`Self::scratch_len`] floats. An impl whose
+    /// query is `O(D^2)` in fixed state ignores it entirely.
+    fn posterior_variance_linear(&self, x: &[f32; D], scratch: &mut [f32]) -> f32;
+
+    /// Ridge posterior mean.
+    fn ridge_mean(&self, x: &[f32; D]) -> f32;
+
+    /// Observations absorbed.
+    fn len(&self) -> usize;
+
+    /// `true` when nothing has been absorbed.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Floats [`Self::posterior_variance_linear`] needs in `scratch`. Zero for
+    /// a dual-form impl; a generic caller sizes off this rather than assuming.
+    fn scratch_len(&self) -> usize;
+}
+
+impl<const MAX_OBS: usize, const D: usize> LinearPosterior<D> for PosteriorBuffer<MAX_OBS, D> {
+    #[inline]
+    fn append_observation(&mut self, feat: &[f32; D], y: f32) -> bool {
+        PosteriorBuffer::append_observation(self, feat, y)
+    }
+    #[inline]
+    fn posterior_variance_linear(&self, x: &[f32; D], scratch: &mut [f32]) -> f32 {
+        PosteriorBuffer::posterior_variance_linear(self, x, scratch)
+    }
+    #[inline]
+    fn ridge_mean(&self, x: &[f32; D]) -> f32 {
+        PosteriorBuffer::ridge_mean(self, x)
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        PosteriorBuffer::len(self)
+    }
+    #[inline]
+    fn scratch_len(&self) -> usize {
+        self.n
+    }
+}
+
+/// Linear-kernel posterior in the **dual** (feature-space) parameterisation: an
+/// incremental Cholesky of `A = X^T X + lambda I`, which is `D x D` and so
+/// **independent of the observation count**.
+///
+/// Same three answers as [`PosteriorBuffer`], by the Woodbury identity — for a
+/// linear kernel these are the same number exactly:
+///
+/// ```text
+/// k(x,x) - k(x,X) (X X^T + lambda I)^-1 k(X,x)  ==  lambda * x^T (X^T X + lambda I)^-1 x
+/// ```
+///
+/// # When to use which — the regime, not a preference
+///
+/// [`PosteriorBuffer`] factorises the `n x n` Gram matrix, which is the right
+/// end when observations are scarce and the latent is wide (`n < D`) — this
+/// plan's own per-cell setting, and it is the *oracle* the dual is gated
+/// against. Invert the regime (a long warm-up against a narrow projected
+/// feature, `n > D`) and the primal is the wrong factorisation. Measured by the
+/// first external consumer (riir-train Plan 357 T1.2,
+/// [Bench 563](../../../../riir-train/.benchmarks/563_plan357_t1_2_gp_uncertainty.md))
+/// at `D = 32`:
+///
+/// | | primal | dual |
+/// |---|---|---|
+/// | variance @ `n = 256` | 158.7 us/query | 1.99 us/query (**79.6x**) |
+/// | scaling in `n` | `O(n^2)` | **`O(1)`** (1.007x, `n` = 16 -> 4096) |
+/// | state | 291 KiB @ `MAX_OBS = 256`; **64 MiB @ 4096** | **4368 B at any `n`** (`4 D (D+2)` payload + `lambda`/`n`) |
+///
+/// Use [`prefer_dual`] rather than re-deriving the rule. The choice is made
+/// once, at construction: carrying both would give back the memory the dual
+/// exists to save.
+///
+/// # Numerics
+///
+/// Better-conditioned than the primal, not merely smaller. `A`'s diagonal
+/// starts at `lambda` and only grows, so every pivot is bounded below by
+/// `sqrt(lambda)` for *every* observation sequence — the primal's
+/// near-duplicate-feature floor (`rem.max(lambda * 1e-6)`) has no analogue
+/// here and is not needed.
+#[derive(Debug, Clone)]
+pub struct DualPosteriorBuffer<const D: usize> {
+    /// Lower-triangular Cholesky factor `L` of `A = X^T X + lambda I`.
+    chol: [[f32; D]; D],
+    /// `X^T y`, kept because this form does not store the observations.
+    xty: [f32; D],
+    /// `A^-1 X^T y` — refreshed on append so the mean is an `O(D)` dot product.
+    weights: [f32; D],
+    lambda: f32,
+    n: usize,
+}
+
+impl<const D: usize> DualPosteriorBuffer<D> {
+    /// Empty posterior with ridge `lambda`.
+    ///
+    /// # Panics
+    ///
+    /// If `lambda` is not finite and `> 0`: a non-positive ridge makes `A`
+    /// singular at `n = 0`, and rejecting it here beats returning infinities
+    /// from the first query.
+    #[must_use]
+    pub fn new(lambda: f32) -> Self {
+        assert!(lambda.is_finite() && lambda > 0.0, "lambda must be finite and > 0");
+        let root = lambda.sqrt();
+        let mut chol = [[0.0f32; D]; D];
+        for (i, row) in chol.iter_mut().enumerate() {
+            row[i] = root;
+        }
+        Self { chol, xty: [0.0; D], weights: [0.0; D], lambda, n: 0 }
+    }
+
+    /// Observations absorbed. There is no cap.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.n
+    }
+
+    /// `true` when nothing has been absorbed.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.n == 0
+    }
+
+    /// The ridge in force.
+    #[inline]
+    #[must_use]
+    pub fn lambda(&self) -> f32 {
+        self.lambda
+    }
+
+    /// Drop every observation, keeping the ridge. Allocation-free.
+    pub fn clear(&mut self) {
+        *self = Self::new(self.lambda);
+    }
+
+    /// Absorb one observation, `O(D^2)` with no re-factorisation.
+    ///
+    /// Returns `false` — having changed nothing — when any coordinate or the
+    /// label is non-finite. That is not defensive noise: one NaN in the factor
+    /// poisons it permanently, so every *later* query about an unrelated
+    /// direction would return NaN too.
+    pub fn append_observation(&mut self, feat: &[f32; D], y: f32) -> bool {
+        if !y.is_finite() || !feat.iter().all(|v| v.is_finite()) {
+            return false;
+        }
+        Self::rank1_update(&mut self.chol, feat);
+        for (b, v) in self.xty.iter_mut().zip(feat.iter()) {
+            *b += y * v;
+        }
+        self.n += 1;
+        self.refresh_weights();
+        true
+    }
+
+    /// Eq 10 in dual form: `sigma^2(x) = lambda * x^T (X^T X + lambda I)^-1 x`.
+    ///
+    /// `O(D^2)`, no allocation, **no dependence on `n`**. At `n = 0` this is
+    /// `||x||^2`, matching the primal's `k(x, x)`.
+    #[must_use]
+    pub fn posterior_variance_linear(&self, x: &[f32; D]) -> f32 {
+        let mut v = *x;
+        Self::solve_lower(&self.chol, &mut v);
+        let quad: f32 = v.iter().map(|t| t * t).sum();
+        (self.lambda * quad).max(0.0)
+    }
+
+    /// `sigma(x)` — the acquisition score [`should_advance`] consumes.
+    #[inline]
+    #[must_use]
+    pub fn sigma(&self, x: &[f32; D]) -> f32 {
+        self.posterior_variance_linear(x).sqrt()
+    }
+
+    /// Ridge posterior mean `x^T (X^T X + lambda I)^-1 X^T y`, `O(D)` off the
+    /// cached weights. Identical to the primal's `k(x,X)(K + lambda I)^-1 y`.
+    #[must_use]
+    pub fn ridge_mean(&self, x: &[f32; D]) -> f32 {
+        self.weights.iter().zip(x.iter()).map(|(w, v)| w * v).sum()
+    }
+
+    fn refresh_weights(&mut self) {
+        self.weights = self.xty;
+        Self::solve_lower(&self.chol, &mut self.weights);
+        Self::solve_lower_transposed(&self.chol, &mut self.weights);
+    }
+
+    /// `A += x x^T` in place on the Cholesky factor (Golub & Van Loan
+    /// `cholupdate`), `O(D^2)` with no re-factorisation.
+    fn rank1_update(chol: &mut [[f32; D]; D], x: &[f32; D]) {
+        let mut w = *x;
+        for k in 0..D {
+            let lkk = chol[k][k];
+            let r = lkk.hypot(w[k]);
+            // `lkk >= sqrt(lambda) > 0` in every reachable state (the diagonal
+            // of `A` only grows), so neither ratio can divide by zero.
+            let c = r / lkk;
+            let s = w[k] / lkk;
+            chol[k][k] = r;
+            for i in (k + 1)..D {
+                let updated = (chol[i][k] + s * w[i]) / c;
+                chol[i][k] = updated;
+                w[i] = c * w[i] - s * updated;
+            }
+        }
+    }
+
+    /// Solve `L v = rhs` in place (forward substitution).
+    fn solve_lower(chol: &[[f32; D]; D], out: &mut [f32; D]) {
+        for i in 0..D {
+            let mut acc = out[i];
+            for j in 0..i {
+                acc -= chol[i][j] * out[j];
+            }
+            out[i] = acc / chol[i][i];
+        }
+    }
+
+    /// Solve `L^T v = rhs` in place (back substitution).
+    fn solve_lower_transposed(chol: &[[f32; D]; D], out: &mut [f32; D]) {
+        for i in (0..D).rev() {
+            let mut acc = out[i];
+            for j in (i + 1)..D {
+                acc -= chol[j][i] * out[j];
+            }
+            out[i] = acc / chol[i][i];
+        }
+    }
+}
+
+impl<const D: usize> LinearPosterior<D> for DualPosteriorBuffer<D> {
+    #[inline]
+    fn append_observation(&mut self, feat: &[f32; D], y: f32) -> bool {
+        DualPosteriorBuffer::append_observation(self, feat, y)
+    }
+    /// `scratch` is ignored — the dual query is `O(D^2)` in fixed state.
+    #[inline]
+    fn posterior_variance_linear(&self, x: &[f32; D], _scratch: &mut [f32]) -> f32 {
+        DualPosteriorBuffer::posterior_variance_linear(self, x)
+    }
+    #[inline]
+    fn ridge_mean(&self, x: &[f32; D]) -> f32 {
+        DualPosteriorBuffer::ridge_mean(self, x)
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        self.n
+    }
+    #[inline]
+    fn scratch_len(&self) -> usize {
+        0
+    }
+}
+
+/// Which factorisation to construct, given the observation count you expect to
+/// reach and the feature dimension.
+///
+/// `true` -> [`DualPosteriorBuffer`], `false` -> [`PosteriorBuffer`]. The rule
+/// is the crossover of the two costs (`O(n^2)` vs `O(D^2)` per query, `n^2` vs
+/// `D^2` state), so it is exactly `expected_obs > d`.
+///
+/// Take the decision **once, at construction**, off the count you expect to
+/// *reach* — not the count you currently hold. Switching mid-run would mean
+/// carrying both factors, which gives back the memory the dual exists to save.
+#[inline]
+#[must_use]
+pub const fn prefer_dual(expected_obs: usize, d: usize) -> bool {
+    expected_obs > d
+}
+
 // ── the frontier (plan functions 4, 5, 6 + the type) ───────────────────────
 
 /// Fixed-capacity certified cell set. Zero-allocation by construction.

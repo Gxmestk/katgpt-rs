@@ -1020,3 +1020,258 @@ fn t4_1_geodesics_over_a_certified_graph_never_leave_the_certified_set() {
     }
     assert!(checked > 0, "no reachable pair — the navigation check was vacuous");
 }
+
+// ── T5.3 — the regime-conditional dual form ────────────────────────────────
+//
+// `DualPosteriorBuffer` answers the same three questions as `PosteriorBuffer`
+// by the Woodbury identity, at `O(D^2)` state and `O(D^2)` query instead of
+// `O(n^2)`/`O(n^2)`. The primal is the ORACLE here: it is the arm already
+// gated by T2.1 against an independent dense f64 solve, so equivalence to it
+// is transitive evidence and not a fresh unverified claim.
+//
+// Mirrors the first external consumer's gate (riir-train Plan 357 T1.2,
+// Bench 563), which independently wrote the dual and agreed with our primal.
+
+mod t53_dual {
+    use katgpt_core::certified_frontier::{
+        DualPosteriorBuffer, LinearPosterior, PosteriorBuffer, prefer_dual,
+    };
+
+    const D: usize = 8;
+    const MAX_OBS: usize = 64;
+
+    /// Deterministic LCG — no rand dep, and the sequence is part of the gate.
+    struct Lcg(u64);
+    impl Lcg {
+        fn next_f32(&mut self) -> f32 {
+            self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            ((self.0 >> 33) as f32 / (1u64 << 31) as f32) * 2.0 - 1.0
+        }
+        fn feat(&mut self) -> [f32; D] {
+            let mut f = [0.0; D];
+            for v in &mut f {
+                *v = self.next_f32();
+            }
+            f
+        }
+    }
+
+    /// Relative-or-absolute agreement. The primal computes `k(x,x) - quad` as a
+    /// difference of two possibly-large terms, so it loses digits exactly where
+    /// `sigma^2` is small; a pure relative bound would be dishonest there.
+    fn close(a: f32, b: f32, tol: f32) -> bool {
+        (a - b).abs() <= tol * a.abs().max(b.abs()).max(1.0)
+    }
+
+    /// **The T5.3 gate.** Primal vs dual on both answers, at every observation
+    /// count from 0 to 48 — spanning `n < D` (the primal's regime) and `n > D`
+    /// (the dual's) — across three ridges. Prints the worst deviation seen so a
+    /// regression is diagnosable, then pins it.
+    #[test]
+    fn t53_primal_dual_equivalence_across_n_and_lambda() {
+        const TOL: f32 = 2e-3;
+        let mut worst_var = 0.0f32;
+        let mut worst_mean = 0.0f32;
+        let mut worst_at = (0usize, 0.0f32);
+
+        for &lambda in &[1.0f32, 1e-1, 1e-2] {
+            let mut primal = Box::new(PosteriorBuffer::<MAX_OBS, D>::new(lambda));
+            let mut dual = DualPosteriorBuffer::<D>::new(lambda);
+            let mut obs = Lcg(0x5EED_1234);
+            let mut scratch = [0.0f32; MAX_OBS];
+
+            for n in 0..=48usize {
+                // Query at a fixed probe set so every n is compared on the same
+                // inputs; drawn from its own stream so appends cannot shift it.
+                let mut probe = Lcg(0xC0FF_EE00);
+                for _ in 0..16 {
+                    let x = probe.feat();
+                    let vp = LinearPosterior::posterior_variance_linear(&*primal, &x, &mut scratch);
+                    let vd = LinearPosterior::posterior_variance_linear(&dual, &x, &mut scratch);
+                    let mp = LinearPosterior::ridge_mean(&*primal, &x);
+                    let md = LinearPosterior::ridge_mean(&dual, &x);
+
+                    let dv = (vp - vd).abs() / vp.abs().max(vd.abs()).max(1.0);
+                    let dm = (mp - md).abs() / mp.abs().max(md.abs()).max(1.0);
+                    if dv > worst_var {
+                        worst_var = dv;
+                        worst_at = (n, lambda);
+                    }
+                    worst_mean = worst_mean.max(dm);
+
+                    assert!(
+                        close(vp, vd, TOL),
+                        "variance diverged at n={n} lambda={lambda}: primal={vp} dual={vd}"
+                    );
+                    assert!(
+                        close(mp, md, TOL),
+                        "ridge_mean diverged at n={n} lambda={lambda}: primal={mp} dual={md}"
+                    );
+                }
+
+                let f = obs.feat();
+                let y = obs.next_f32();
+                assert!(LinearPosterior::append_observation(&mut *primal, &f, y));
+                assert!(LinearPosterior::append_observation(&mut dual, &f, y));
+                assert_eq!(LinearPosterior::len(&*primal), LinearPosterior::len(&dual));
+            }
+        }
+        println!(
+            "T5.3 equivalence: worst rel-dev variance {worst_var:.3e} (at n={}, lambda={}), \
+             ridge_mean {worst_mean:.3e}; bound {TOL:.0e}",
+            worst_at.0, worst_at.1
+        );
+    }
+
+    /// At `n = 0` both forms must be exactly `k(x, x) = ||x||^2`. The dual gets
+    /// there through `lambda * ||x/sqrt(lambda)||^2`, so this is a real
+    /// cancellation check on the initial factor, not a tautology.
+    #[test]
+    fn t53_empty_posterior_is_k_self_in_both_forms() {
+        for &lambda in &[1.0f32, 1e-1, 1e-2, 1e-4] {
+            let primal = PosteriorBuffer::<MAX_OBS, D>::new(lambda);
+            let dual = DualPosteriorBuffer::<D>::new(lambda);
+            let mut scratch = [0.0f32; MAX_OBS];
+            let x = [0.5, -1.5, 2.0, 0.0, 0.25, -0.75, 1.0, 3.0];
+            let k_self: f32 = x.iter().map(|v| v * v).sum();
+            let vp = primal.posterior_variance_linear(&x, &mut scratch);
+            let vd = dual.posterior_variance_linear(&x);
+            assert!(close(vp, k_self, 1e-6), "primal n=0: {vp} vs {k_self}");
+            assert!(close(vd, k_self, 1e-5), "dual n=0 lambda={lambda}: {vd} vs {k_self}");
+        }
+    }
+
+    /// The dual's own determinism: same stream twice, **bit-identical** state
+    /// and answers. Bit-identity is available here (it is one arm compared with
+    /// itself) and is asserted as such — unlike the cross-form gate above.
+    #[test]
+    fn t53_dual_is_bit_identical_across_runs() {
+        let run = || {
+            let mut p = DualPosteriorBuffer::<D>::new(1e-2);
+            let mut g = Lcg(0xABCD_0001);
+            for _ in 0..200 {
+                let f = g.feat();
+                let y = g.next_f32();
+                p.append_observation(&f, y);
+            }
+            let mut probe = Lcg(0x1111_2222);
+            let mut out = Vec::new();
+            for _ in 0..32 {
+                let x = probe.feat();
+                out.push(p.posterior_variance_linear(&x).to_bits());
+                out.push(p.ridge_mean(&x).to_bits());
+            }
+            out
+        };
+        assert_eq!(run(), run(), "dual posterior is not run-to-run bit-identical");
+    }
+
+    /// A non-finite observation is **rejected**, not absorbed: `false`, the
+    /// count is unchanged, and — the part that matters — every LATER query
+    /// about an unrelated direction is still finite. One NaN in a Cholesky
+    /// factor poisons it permanently, so "silently returns NaN forever" is the
+    /// failure this rules out.
+    #[test]
+    fn t53_non_finite_observation_cannot_poison_the_factor() {
+        let mut p = DualPosteriorBuffer::<D>::new(1e-2);
+        let good = [1.0f32; D];
+        assert!(p.append_observation(&good, 1.0));
+        let before = p.posterior_variance_linear(&good);
+
+        let mut nan_feat = [0.5f32; D];
+        nan_feat[3] = f32::NAN;
+        assert!(!p.append_observation(&nan_feat, 1.0), "NaN feature was absorbed");
+        assert!(!p.append_observation(&good, f32::INFINITY), "inf label was absorbed");
+        assert_eq!(p.len(), 1, "a rejected observation changed the count");
+
+        let mut probe = [0.0f32; D];
+        probe[0] = 2.0;
+        assert!(p.posterior_variance_linear(&probe).is_finite());
+        assert!(p.ridge_mean(&probe).is_finite());
+        assert_eq!(
+            p.posterior_variance_linear(&good).to_bits(),
+            before.to_bits(),
+            "a rejected observation perturbed the factor"
+        );
+    }
+
+    /// Near-duplicate features are the case the primal needs a numerical floor
+    /// for (`rem.max(lambda * 1e-6)`). The dual's pivots are bounded below by
+    /// `sqrt(lambda)` by construction, so it needs none — assert the observable
+    /// consequence: finite, non-negative, monotonically non-increasing variance
+    /// along a repeated direction.
+    #[test]
+    fn t53_duplicate_features_need_no_numerical_floor() {
+        let mut p = DualPosteriorBuffer::<D>::new(1e-2);
+        let mut x = [0.0f32; D];
+        x[0] = 1.0;
+        let mut last = p.posterior_variance_linear(&x);
+        for i in 0..500 {
+            assert!(p.append_observation(&x, 1.0));
+            let v = p.posterior_variance_linear(&x);
+            assert!(v.is_finite() && v >= 0.0, "variance went bad at repeat {i}: {v}");
+            assert!(v <= last + 1e-6, "variance rose on a repeated observation at {i}");
+            last = v;
+        }
+        assert!(last < 1e-3, "500 identical observations left sigma^2 = {last}");
+    }
+
+    /// The regime rule and the state-size claim the doc table makes. `size_of`
+    /// is the honest instrument: the dual's footprint cannot depend on `n`
+    /// because `n` is not in its type.
+    #[test]
+    fn t53_regime_rule_and_state_size() {
+        assert!(!prefer_dual(0, 32));
+        assert!(!prefer_dual(32, 32));
+        assert!(prefer_dual(33, 32));
+        assert!(prefer_dual(4096, 32));
+
+        use core::mem::size_of;
+        // Payload is `4 D (D + 2)` = 4352 B at D = 32 (chol D*D + xty D + weights
+        // D), and the type rounds to 4368 with `lambda` + `n` + alignment. That
+        // is the figure the consumer's Bench 563 quotes, so pin the whole type.
+        assert_eq!(size_of::<DualPosteriorBuffer<32>>(), 4368);
+        assert!(size_of::<DualPosteriorBuffer<32>>() >= 4 * 32 * (32 + 2));
+        assert!(
+            size_of::<DualPosteriorBuffer<32>>() < size_of::<PosteriorBuffer<256, 32>>() / 50,
+            "dual {} vs primal {}",
+            size_of::<DualPosteriorBuffer<32>>(),
+            size_of::<PosteriorBuffer<256, 32>>()
+        );
+        // The point of the whole task: the primal at the consumer's n is 64 MiB.
+        assert!(size_of::<PosteriorBuffer<4096, 32>>() > 64 * 1024 * 1024);
+    }
+
+    /// A caller written once against the trait must be able to size its scratch
+    /// off `scratch_len()` and drive either arm. Pins that the dual really
+    /// declares zero (a non-zero declaration would make generic callers
+    /// over-allocate forever) and that a zero-length scratch is accepted.
+    #[test]
+    fn t53_trait_lets_one_caller_drive_both_arms() {
+        fn drive<const D2: usize, P: LinearPosterior<D2>>(p: &mut P, feats: &[[f32; D2]]) -> f32 {
+            let mut scratch = vec![0.0f32; p.scratch_len().max(feats.len())];
+            for f in feats {
+                assert!(p.append_observation(f, 1.0));
+            }
+            assert_eq!(p.len(), feats.len());
+            assert!(!p.is_empty());
+            p.posterior_variance_linear(&feats[0], &mut scratch)
+        }
+        let feats: Vec<[f32; D]> = (0..20)
+            .map(|i| {
+                let mut f = [0.0f32; D];
+                f[i % D] = 1.0 + i as f32 * 0.1;
+                f
+            })
+            .collect();
+        let mut primal = Box::new(PosteriorBuffer::<MAX_OBS, D>::new(1e-2));
+        let mut dual = DualPosteriorBuffer::<D>::new(1e-2);
+        let vp = drive(&mut *primal, &feats);
+        let vd = drive(&mut dual, &feats);
+        assert_eq!(dual.scratch_len(), 0);
+        assert_eq!(primal.scratch_len(), 20);
+        assert!(close(vp, vd, 2e-3), "trait-driven arms disagree: {vp} vs {vd}");
+        // Zero-length scratch is legal for the dual and must not panic.
+        assert!(LinearPosterior::posterior_variance_linear(&dual, &feats[0], &mut []).is_finite());
+    }
+}

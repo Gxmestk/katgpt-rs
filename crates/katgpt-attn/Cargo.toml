@@ -167,3 +167,16 @@ required-features = ["kda_linear"]
 [[test]]
 name = "mla_g1_spec_match"
 required-features = ["mla_attention"]
+
+# Issue 713 (2026-09-03): armed after the load-bearing classifier was widened
+# to see the alloc / correctness / determinism / equivalence / floor / grad
+# naming dialect. Each of these reported `ok. 0 passed` when named without
+# its feature; they now error with exit 101 instead.
+
+[[test]]
+name = "kda_backward_grad_check"
+required-features = ["kda_backward"]
+
+[[test]]
+name = "mla_backward_grad_check"
+required-features = ["mla_backward"]

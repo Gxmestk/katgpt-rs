@@ -203,3 +203,87 @@ a coverage guarantee actually needs to know.
 - **Re-gate** on the corrected two-stage metric, once a consumer exists.
 - **`beta_union_bound` rigour**: an exact Clopper-Pearson / Beta-quantile variant
   would make the tighter width worst-case sound rather than approximate.
+
+---
+
+## T5.3 addendum — the regime-conditional dual form (2026-09-03)
+
+**Status:** LANDED + measured in-tree. `DualPosteriorBuffer<D>` ships beside
+`PosteriorBuffer<MAX_OBS, D>` behind the same `certified_frontier` feature,
+with a `LinearPosterior<D>` trait so one caller can drive either arm and
+`prefer_dual(expected_obs, d)` naming the crossover.
+
+### Why a second factorisation and not a replacement
+
+`PosteriorBuffer` factorises the `n × n` Gram matrix, which is correct for this
+plan's own setting (`n < D`: observations scarce, latent wide) — and it is now
+also the **oracle** the dual is gated against, since T2.1 already gated it
+against an independent dense f64 solve. The first external consumer inverts the
+regime (riir-train Plan 357 T1.2 — a 4096-sample warm-up against a 32-D
+projected feature), which is where the primal is the wrong end. For a linear
+kernel the two are the same number exactly, by Woodbury:
+
+```text
+k(x,x) − k(x,X)(X Xᵀ + λI)⁻¹k(X,x)  ==  λ · xᵀ(XᵀX + λI)⁻¹x
+```
+
+### G2-dual — measured on this box, not quoted from the consumer
+
+`cargo test --release -p katgpt-core --features certified_frontier --test
+bench_688_certified_frontier_goat -- t53 --nocapture`, M3 Max, D = 32,
+2 000 queries/point, both arms warmed:
+
+| n | dual ns/query | primal ns/query | speedup |
+|---|---|---|---|
+| 16 | 253 | **195** | 0.8× (primal wins — `n < D`) |
+| 64 | — | 1 210 | — |
+| 256 | 208–256 | 17 530–17 788 | **69–84×** |
+| 4096 | 252 | — (64 MiB of state) | — |
+
+- **dual scaling 16 → 4096: 0.967–0.997×** across four runs — `O(1)` in `n`.
+- **primal scaling 16 → 256: 88.9–94.5×** — the `O(n²)` it is.
+- State: `size_of::<DualPosteriorBuffer<32>>()` = **4 368 B at any `n`**, pinned
+  by test, versus 291 KiB at `MAX_OBS = 256` and >64 MiB at 4096.
+
+The n = 16 row is the point of `prefer_dual`, not a defect: below the crossover
+the primal is genuinely faster, so the rule `expected_obs > d` is validated by
+measurement rather than asserted. Bars are on the **scaling class** (a property
+of the algorithm) rather than a microsecond budget (a property of the machine).
+
+### G1-dual — equivalence, and what kind of equivalence
+
+`t53_primal_dual_equivalence_across_n_and_lambda`: every `n` in 0..=48 (spanning
+both regimes) × λ ∈ {1, 1e-1, 1e-2} × 16 fixed probes.
+
+| quantity | worst relative deviation | bound |
+|---|---|---|
+| `posterior_variance_linear` | **3.229e-6** (at n=8, λ=0.01) | 2e-3 |
+| `ridge_mean` | **1.614e-4** | 2e-3 |
+
+**Tolerance, not bit-identity — and that is a fact about the identity, not a
+weakened bar.** Two different f32 expression trees for the same real number
+cannot agree bit-for-bit; the primal in particular computes `k(x,x) − quad` as
+a difference of two possibly-large terms and loses digits exactly where `σ²` is
+small, which is why the bar is relative-or-absolute. Neither arm is on a sync
+surface, so no quorum claim depends on this. Bit-identity *is* asserted where it
+is available: `t53_dual_is_bit_identical_across_runs` compares one arm with
+itself over 200 observations and 32 probes.
+
+Five more gates in `certified_frontier_correctness` (31 tests total, all green):
+`n = 0` parity with `k(x,x)` in both forms; NaN/inf rejection that cannot poison
+the factor (one NaN in a Cholesky factor poisons *every later query about an
+unrelated direction*, so this is the failure mode being ruled out, not
+defensive noise); 500 identical observations needing no numerical floor —
+the dual's pivots are bounded below by `√λ` by construction, so the primal's
+`rem.max(λ·1e-6)` has no analogue; the regime rule and the state-size pin; and
+a generic caller driving both arms through the trait off `scratch_len()`.
+
+### Two things this addendum does NOT claim
+
+- **It is not a promotion.** `certified_frontier` stays opt-in. The blocker is
+  unchanged and is not perf: the T3.4 floor gate's stated product metric is
+  degenerate and the re-gate awaits a default-path consumer.
+- **It does not make riir-train's copy redundant on its own.** riir-train wrote
+  the dual independently and the two agree; folding its copy onto this one is a
+  riir-train call, and the boundary direction (katgpt-rs is upstream) says that
+  is the eventual home. Filed as a note, not done here.

@@ -5,7 +5,11 @@
 all 39 pass in release; the debug reds were retracted (`83cb1d56`). T2c
 WITHDRAWN. T4 + T4b **LANDED** — `cfg_gated_floor_gate.py` is now a
 `docs_gate.sh` check with four two-sided pins, canaried, and the load-bearing
-classifier ships in the auditor. **T3 is an owner call in each sibling repo**,
+classifier ships in the auditor. T4c **LANDED** — the load-bearing classifier's
+TOKEN SET was itself a blind spot (`max_load_bearing = 0` was a green over a
+population it could not see): seven tokens added after a 2,157-target
+measurement, **17 more katgpt-rs targets armed and run (45/45 pass)**,
+SILENT-NOW 61 → 44. **T3 is an owner call in each sibling repo**,
 deliberately not made here. T6 **MEASURED** — 244 all-`#[ignore]`d
 targets across 19 repos (60 load-bearing); it stays a report, and it found the
 release-build break in `.issues/715`. T5 **MEASURED** — the "21 platform"
@@ -260,6 +264,61 @@ shapes are pinned, and two matter specifically:
   classifiers agreeing is worth more than either one's number, and the
   agreement is what licenses `max_load_bearing = 0` as a pin — a false negative
   in the classifier would have turned that pin into a permanent green.
+
+- [x] **T4c LANDED 2026-09-03 — `max_load_bearing = 0` was a green over a
+  population the CLASSIFIER COULD NOT SEE.** Found sideways: Plan 580 T5.3
+  added tests to `certified_frontier_correctness`, and arming it revealed that
+  neither it (31 assertions) nor `bench_688_certified_frontier_alloc_check`
+  (an alloc budget) had a `[[test]]` row — both reported `ok. 0 passed` when
+  named without the feature. Neither was in T2's armed 39, and the reason was
+  not that T2 missed them: **`is_load_bearing` did not classify them.** The
+  token set knew `goat`/`gate`/`g<N>`/`drill`/`proof`/`invariant`/`guard`/
+  `conservation`/`safety`/`security`/`audit` and did not know the
+  `*_correctness` / `*_alloc_check` / `*_determinism` dialect.
+
+  **Every candidate token was measured against all 2,157 workspace test+bench
+  target names before being added**, and the measurement is why three were
+  rejected:
+
+  | token | newly classified | verdict |
+  |---|---|---|
+  | `alloc` | 36 | ADDED — `*_alloc_check` is G4 in this repo's own convention |
+  | `floor` | 15 | ADDED — `conformal_floor_*`, the Report-the-Floor mandate |
+  | `grad` | 9 | ADDED — `*_backward_grad_check` |
+  | `determinism` | 6 | ADDED |
+  | `correctness` | 5 | ADDED |
+  | `equivalence` | 3 | ADDED |
+  | `soundness` | 1 | ADDED |
+  | `budget` | 5 | **rejected** — admits a sweep (`bench_578_mcts_budget_sweep`) and a config (`game_budgets`) |
+  | `calibration` | 1 | **rejected** — names a measurement record, not an assertion |
+  | `check` | 13 | **rejected** — admits any smoke test |
+  | `coverage` / `regression` / `bound` | 0 | rejected, matched nothing new |
+
+  Consequence in katgpt-rs: **17 more load-bearing SILENT-NOW targets** — 8
+  `*_alloc_check` G4 budgets, 4 `*_backward_grad_check`, a Report-the-Floor UQ
+  gate, a determinism gate, a checkpoint-equivalence gate, two grad gates. All
+  17 armed and then **RUN in release: 45 assertions, 45 pass, 0 fail.** Same
+  finding as `.issues/714` T3 — silently **unverified**, not silently broken,
+  which is precisely why nothing surfaced them. SILENT-NOW 61 → **44**, covered
+  378 → **395**, `max_silent_now` re-pinned.
+
+  `selftest()` pins the new dialect in **both** directions: seven real target
+  names that read as not-load-bearing before, and four substring traps
+  (`allocator_pressure_bench`, `flooring_math`, `gradient_descent_driver`,
+  `determine_route`) that must stay excluded — the same discipline that keeps
+  `aggregate`/`delegate` out of `gate`.
+
+  **The transferable lesson, and it generalises past this gate:** a ceiling of
+  zero over a classifier is only as wide as that classifier's vocabulary, and a
+  vocabulary gap is indistinguishable from a clean repo. T4b established that
+  two independently-built classifiers agreeing licenses the pin; T4c is the
+  reminder that they can agree on the wrong *population*. The workspace-wide
+  token table above is the population check, and it should be re-run whenever a
+  new naming dialect appears.
+
+  **Not extended to siblings**, deliberately — the widened classifier reports
+  63 more load-bearing SILENT-NOW targets outside katgpt-rs, which is T3's
+  scope and T3's owners' call.
 
 - [ ] **T3 (owner call, sibling repos)** The load-bearing table above, minus
   katgpt-rs (done in T2). Read the numbers from the table, not from here.

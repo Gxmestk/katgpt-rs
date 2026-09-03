@@ -100,6 +100,31 @@ LOAD_BEARING_TOKENS = frozenset(
         "safety",
         "security",
         "audit",
+        # ── added 2026-09-03, after Plan 580 T5.3 armed two targets that this
+        # set did not classify: `certified_frontier_correctness` (31 assertions)
+        # and `bench_688_certified_frontier_alloc_check` (an alloc budget).
+        # Both are gates by any reading, both were SILENT-NOW, and neither was
+        # in T2's armed 39 *because the classifier could not see them*. So the
+        # `max_load_bearing = 0` pin was a green over a population that excluded
+        # a whole naming dialect.
+        #
+        # Each of these was measured across all 2,157 workspace test/bench
+        # targets before being added (see the token table in `.issues/713`),
+        # and every one names a property the file exists to FAIL on:
+        "alloc",         # G4 in this repo's GOAT convention: `*_alloc_check`
+        "correctness",   # G1
+        "determinism",   # the bit-identity arm of nearly every gate here
+        "equivalence",
+        "soundness",
+        "floor",         # the Report-the-Floor rule (AGENTS.md), `conformal_floor_*`
+        "grad",          # `*_backward_grad_check` — numerical-gradient gates
+        # DELIBERATELY NOT added, and the reason is the same one that keeps
+        # "gate" a token rather than a substring: `budget` admits a sweep
+        # (`bench_578_mcts_budget_sweep`) and a config (`game_budgets`);
+        # `check` admits any smoke test; `calibration` names a measurement
+        # record, not an assertion; `coverage`/`regression`/`bound` matched
+        # nothing new at all. A column that cries wolf stops being read.
+        #
         # An explicit compound, not a substring rule. riir-clippy's
         # `t40_fixer_regate_harness` is a re-gate harness, and the only way a
         # token matcher sees it is by naming it — a substring rule for "gate"
@@ -523,6 +548,15 @@ def selftest() -> None:
         "kat_vote_client_g9gov.rs",
         "t40_fixer_regate_harness.rs",      # a named compound, not a substring
         "prod_l3_sigkill_drills.rs",        # plural
+        # The dialect the 2026-09-03 addition exists for — every one a real
+        # workspace target that read as NOT load-bearing before it.
+        "certified_frontier_correctness.rs",
+        "bench_688_certified_frontier_alloc_check.rs",
+        "hla_eigenbasis_determinism.rs",
+        "kimi_k3_checkpoint_equivalence.rs",
+        "merkle_soundness_spec_match.rs",
+        "conformal_floor_bom.rs",
+        "mla_backward_grad_check.rs",
     ):
         assert is_load_bearing(name), f"load-bearing name missed: {name}"
     for name in (
@@ -534,6 +568,13 @@ def selftest() -> None:
         "g_probe.rs",                     # bare `g` is not a G<N> ordinal
         "spinning_up.rs",                 # contains "pin"
         "audition_pool.rs",               # contains "audit"
+        # The 2026-09-03 tokens must stay TOKENS too: an allocator benchmark is
+        # not an alloc gate, a flooring routine is not a floor gate, and a
+        # gradient-descent driver is not a grad check.
+        "allocator_pressure_bench.rs",    # contains "alloc"
+        "flooring_math.rs",               # contains "floor"
+        "gradient_descent_driver.rs",     # contains "grad"
+        "determine_route.rs",             # contains "determin"
     ):
         assert not is_load_bearing(name), f"substring false positive: {name}"
 

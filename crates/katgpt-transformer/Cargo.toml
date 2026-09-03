@@ -157,3 +157,12 @@ required-features = ["transformer_attn_res"]
 [[test]]
 name = "moe_g1_spec_match"
 required-features = ["transformer_moe"]
+
+# Issue 713 (2026-09-03): armed after the load-bearing classifier was widened
+# to see the alloc / correctness / determinism / equivalence / floor / grad
+# naming dialect. Each of these reported `ok. 0 passed` when named without
+# its feature; they now error with exit 101 instead.
+
+[[test]]
+name = "moe_backward_grad_check"
+required-features = ["moe_backward"]

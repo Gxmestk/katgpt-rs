@@ -57,13 +57,28 @@
 #                            zero, and a parser that stops recognising
 #                            `#[test]` satisfies it perfectly.
 #
-# Observed 2026-09-03: 921 targets, 541 gated, 376 covered, 63 SILENT-NOW,
-# 0 load-bearing SILENT-NOW, 100 latent, 2 platform (0 positive), 1 any();
-# 653 ignore-scanned targets, 460 with tests, 19 ALL-IGNORED (3 load-bearing),
-# 0 reasonless.
+# Observed 2026-09-03 (second measurement, same day): 921 targets, 541 gated,
+# 395 covered, 44 SILENT-NOW, 0 load-bearing SILENT-NOW, 100 latent, 2 platform
+# (0 positive), 1 any(); 653 ignore-scanned targets, 460 with tests, 19
+# ALL-IGNORED (3 load-bearing), 0 reasonless.
+#
+# The first measurement of the day read 376 covered / 63 SILENT-NOW, and the
+# delta is NOT churn: `max_load_bearing = 0` was a green over a population the
+# CLASSIFIER COULD NOT SEE. Widening its token set to the alloc / correctness /
+# determinism / equivalence / floor / grad dialect (measured against all 2,157
+# workspace test+bench targets first) surfaced 17 more load-bearing katgpt-rs
+# targets — 8 `*_alloc_check` G4 budgets, 4 `*_backward_grad_check`, a
+# Report-the-Floor UQ gate, a determinism gate, a checkpoint-equivalence gate,
+# and two grad gates. All 17 were armed and then RUN in release: 45 assertions,
+# 45 pass, 0 fail. Same finding as `.issues/714` T3 — they were silently
+# UNVERIFIED, not silently broken, which is exactly why nobody noticed.
+#
+# The lesson for anyone tempted to trust a zero: a ceiling of zero over a
+# classifier is only as wide as the classifier's vocabulary, and a vocabulary
+# gap looks identical to a clean repo.
 
 max_load_bearing	0
-max_silent_now	63
+max_silent_now	44
 min_targets	700
 min_gated	400
 max_reasonless_ignores	0
