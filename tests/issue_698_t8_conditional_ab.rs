@@ -303,10 +303,9 @@ fn freeze_loops(
                 if let Some(g) = arm
                     .gate
                     .conditional_gate_at(tau, &states[tau - 1], &states[tau - 2])
+                    && g > FREEZE_G
                 {
-                    if g > FREEZE_G {
-                        return Some(tau);
-                    }
+                    return Some(tau);
                 }
             }
             None

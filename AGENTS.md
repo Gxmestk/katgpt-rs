@@ -96,8 +96,14 @@ four crates reporting "0 tests" per-crate contributed 704 under `--workspace`.
 So before claiming a repo-wide green, run:
 
 ```bash
-cargo clippy --workspace --all-targets --all-features --keep-going
+cargo clippy --workspace --all-targets --all-features --keep-going -- -D clippy::needless_range_loop -D clippy::map_clone -D clippy::iter_cloned_collect -D clippy::identity_op -D clippy::bool_comparison -D clippy::manual_is_multiple_of -D clippy::collapsible_if -D clippy::map_all_any_identity -D clippy::unnecessary_cast -D clippy::manual_repeat_n -D clippy::question_mark -D clippy::empty_line_after_outer_attr -D clippy::unusual_byte_groupings -D unused_mut -D unused_parens
 ```
+
+The `-D` list (Issue 701 R3b, 2026-09-03) is the mechanical lints whose
+all-features warning surface was healed to ZERO residual (67 → 13 distinct
+findings; the 13 survivors are judgement-class and stay warnings), so a
+regression now reds the gate instead of silently re-growing the ungated
+warning surface. A lint with residual > 0 must NOT be added to it.
 
 `--keep-going` is not optional — without it the run stops at the first failing
 target and under-reports. This gate was **red on `develop` from at least

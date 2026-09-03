@@ -278,22 +278,20 @@ mod tests {
         const D: usize = 5;
         let mut rng = 123_u64;
         let mut a = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                rng = rng
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
-                let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
-                a[i][j] = v;
-                a[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
+            a[i][j] = v;
+            a[j][i] = v;
         }
         let mut s = DenseScratch::<D>::new();
         jacobi_eigen(&a, true, &mut s);
         // A·V == V·diag(λ)
-        for i in 0..D {
+        for (i, a_row) in a.iter().enumerate() {
             for k in 0..D {
-                let av: f32 = (0..D).map(|j| a[i][j] * s.v[j][k]).sum();
+                let av: f32 = (0..D).map(|j| a_row[j] * s.v[j][k]).sum();
                 let vl = s.values[k] * s.v[i][k];
                 assert!(
                     (av - vl).abs() < 1e-4,
@@ -308,15 +306,13 @@ mod tests {
         const D: usize = 6;
         let mut rng = 999_u64;
         let mut a = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                rng = rng
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
-                let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
-                a[i][j] = v;
-                a[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
+            a[i][j] = v;
+            a[j][i] = v;
         }
         let mut s1 = DenseScratch::<D>::new();
         let mut s2 = DenseScratch::<D>::new();

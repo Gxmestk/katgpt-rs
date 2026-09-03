@@ -285,10 +285,10 @@ fn main() {
             "{:<20} {:>9} {:>9} {:>9} {:>9} {:>9}",
             "prover", "strength", "D", "Al", "bound", "gate"
         );
-        for i in 0..4 {
+        for (i, name) in PROVER_NAMES.iter().enumerate() {
             println!(
-                "{:<20} {:>9.4} {:>9.4} {:>9.4} {:>9.4} {:>9.4}",
-                PROVER_NAMES[i], r.strength[i], r.d[i], r.al[i], r.bound[i], r.gate[i]
+                "{:<20} {:>9} {:>9} {:>9} {:>9} {:>9}",
+                name, r.strength[i], r.d[i], r.al[i], r.bound[i], r.gate[i]
             );
         }
         println!(

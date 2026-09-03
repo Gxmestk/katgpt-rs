@@ -57,7 +57,7 @@ impl Xs {
 
 #[test]
 fn engram_tripwire_steady_state_is_alloc_free() {
-    let mut rng = Xs(0xA110_C);
+    let mut rng = Xs(0x000A_110C);
     let mut q = [0.0f32; D];
     for x in q.iter_mut() {
         *x = rng.f32();

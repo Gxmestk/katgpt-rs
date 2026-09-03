@@ -45,7 +45,6 @@
 //! **Source:** [SDAR: Self-Distilled Agentic RL](https://arxiv.org/abs/2605.15155)
 
 #[cfg(debug_assertions)]
-
 use crate::absorb_compress::{AbsorbCompress, AbsorbCompressLayer};
 use crate::review_metrics::ReviewMetrics;
 use crate::sdar_gate::{SDAR_BETA, sdar_benefit_gate, sdar_should_promote};

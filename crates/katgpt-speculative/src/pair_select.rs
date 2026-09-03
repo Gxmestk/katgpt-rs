@@ -413,7 +413,7 @@ mod tests {
         dist[0] = 1.0;
         let mut scratch = PairSelectScratch::new();
         let marginals = tstep_marginals_into(&table, 0, 3, 8, &mut scratch);
-        for step in 0..3 {
+        for (step, step_marginals) in marginals.iter().enumerate() {
             // Dense step.
             let mut next = [0.0f32; 4];
             for j in 0..4 {
@@ -426,7 +426,7 @@ mod tests {
             dist = next;
             // Compare (dense entries below a tiny floor may be truncated out
             // of the sparse row entirely — only compare tokens the table kept).
-            for &(tok, mass) in &marginals[step] {
+            for &(tok, mass) in step_marginals {
                 assert!(
                     (mass - dist[tok as usize]).abs() < 1e-5,
                     "step {step}, token {tok}: sparse mass {mass} vs dense {}",

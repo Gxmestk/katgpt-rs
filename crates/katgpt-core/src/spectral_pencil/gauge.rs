@@ -154,21 +154,21 @@ mod tests {
         for c in 0..D {
             for p in 0..c {
                 let mut dot = 0.0_f64;
-                for r in 0..D {
-                    dot += f64::from(cols[r][c]) * f64::from(cols[r][p]);
+                for row in &cols {
+                    dot += f64::from(row[c]) * f64::from(row[p]);
                 }
                 let d = dot as f32;
-                for r in 0..D {
-                    cols[r][c] -= d * cols[r][p];
+                for row in &mut cols {
+                    row[c] -= d * row[p];
                 }
             }
             let mut n = 0.0_f64;
-            for r in 0..D {
-                n += f64::from(cols[r][c]) * f64::from(cols[r][c]);
+            for row in &cols {
+                n += f64::from(row[c]) * f64::from(row[c]);
             }
             let n = (n as f32).sqrt().max(f32::MIN_POSITIVE);
-            for r in 0..D {
-                cols[r][c] /= n;
+            for row in &mut cols {
+                row[c] /= n;
             }
         }
         cols
@@ -260,12 +260,10 @@ mod tests {
             jacobi_eigen(&ax.to_full(), false, &mut scratch);
             let v1 = scratch.values;
             jacobi_eigen(&cx.to_full(), false, &mut scratch);
-            for k in 0..D {
+            for (k, (a, b)) in v1.iter().zip(scratch.values.iter()).enumerate() {
                 assert!(
-                    (v1[k] - scratch.values[k]).abs() < 1e-4,
-                    "canonical f drifted at k {k}: {} vs {}",
-                    v1[k],
-                    scratch.values[k]
+                    (a - b).abs() < 1e-4,
+                    "canonical f drifted at k {k}: {a} vs {b}"
                 );
             }
         }

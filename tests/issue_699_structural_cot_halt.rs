@@ -202,7 +202,7 @@ fn purity_dominant_landing_grades_k2() {
     // A then X ×9: purity (100+1)/121 ≈ 0.835 ≥ 0.75 → K=2.
     let mut obs = StructuralTraceMonitor::new(HaltPolicy::Never);
     let mut trace = vec!["A"];
-    trace.extend(std::iter::repeat("X").take(9));
+    trace.extend(std::iter::repeat_n("X", 9));
     for a in &trace {
         let _ = obs.step(a);
     }
@@ -220,7 +220,7 @@ fn g1_double_run_bit_identical_decision_sequence() {
     // A trace exercising every transition class + both policies + fusion,
     // run twice through fresh monitors: identical decision encodings.
     let mut trace: Vec<&str> = vec!["A", "B", "A", "C", "A", "A"];
-    trace.extend(std::iter::repeat("X").take(12));
+    trace.extend(std::iter::repeat_n("X", 12));
     trace.extend(["Y", "Z", "Y", "W"]);
 
     let decisions_a = {

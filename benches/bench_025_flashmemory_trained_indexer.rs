@@ -437,7 +437,7 @@ fn run_bench() {
     let n_epochs = 100;
     for epoch in 0..n_epochs {
         let mut total_loss = 0.0f32;
-        let mut n_correct = 0usize;
+        let n_correct = 0usize;
         for t in &triples {
             let loss = trainer.train_step(&t.q_c, &t.k_centroid, t.label);
             total_loss += loss;
@@ -506,7 +506,7 @@ fn run_bench() {
         simd_matmul_rows(&mut q_c, &mla_weights.w_uq, &c_q, n_heads * d_h, mla_config.q_lora_rank);
 
         // Build a fresh block cache for this position.
-        let mut bc = FlashMemoryBlockCache::new(&mla_config, &fm_config, q_pos + 1);
+        let bc = FlashMemoryBlockCache::new(&mla_config, &fm_config, q_pos + 1);
         // We need a cache populated up to q_pos. Use the dense cache.
         // Actually, rebuild from the dense cache up to q_pos.
         // For simplicity, use the full block_cache we already built.

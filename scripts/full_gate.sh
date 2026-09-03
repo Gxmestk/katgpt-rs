@@ -64,7 +64,36 @@ cd "$REPO_ROOT"
 
 # The gate command, defined once. Layer 5 asserts AGENTS.md quotes this string,
 # so the doc and the assertion cannot drift apart silently.
-GATE_ARGS=(cargo clippy --workspace --all-targets --all-features --keep-going)
+#
+# The deny list (Issue 701 R3b, 2026-09-03): the mechanical lints whose
+# all-features warning surface was healed to ZERO residual (67 -> 13 distinct
+# findings; the 13 survivors are judgement-class: unused_variables, dead_code,
+# non_snake_case, too_many_arguments, assertions_on_constants) are now denied
+# so a regression reds the gate instead of silently re-growing the ungated
+# warning surface. Before -> after per lint: needless_range_loop 34 -> 0,
+# map_clone 2 -> 0, iter_cloned_collect 0 -> 0 (the map_clone successor —
+# healing map_clone revealed it; denied so the family cannot slide back),
+# identity_op 1 -> 0, unused_parens 0 -> 0, bool_comparison 2 -> 0,
+# manual_is_multiple_of 1 -> 0, collapsible_if 2 -> 0, map_all_any_identity
+# 1 -> 0, unnecessary_cast 2 -> 0, manual_repeat_n 2 -> 0, unused_mut 2 -> 0,
+# question_mark 1 -> 0, empty_line_after_outer_attr 1 -> 0,
+# unusual_byte_groupings 3 -> 0. A lint with residual > 0 must NOT be added.
+GATE_ARGS=(cargo clippy --workspace --all-targets --all-features --keep-going
+    -- -D clippy::needless_range_loop
+    -D clippy::map_clone
+    -D clippy::iter_cloned_collect
+    -D clippy::identity_op
+    -D clippy::bool_comparison
+    -D clippy::manual_is_multiple_of
+    -D clippy::collapsible_if
+    -D clippy::map_all_any_identity
+    -D clippy::unnecessary_cast
+    -D clippy::manual_repeat_n
+    -D clippy::question_mark
+    -D clippy::empty_line_after_outer_attr
+    -D clippy::unusual_byte_groupings
+    -D unused_mut
+    -D unused_parens)
 GATE_CMD="${GATE_ARGS[*]}"
 
 # ── Layer 1: cargo present ──────────────────────────────────────────────────

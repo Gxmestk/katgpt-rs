@@ -233,7 +233,7 @@ fn spearman(xs: &[f32], ys: &[f32]) -> f32 {
     rank_average(xs)
         .iter()
         .zip(rank_average(ys).iter())
-        .map(|(&a, &b)| (a as f64, b as f64))
+        .map(|(&a, &b)| (a, b))
         .collect::<Vec<_>>()
         .pipe(|pairs| pearson_f64(&pairs)) as f32
 }

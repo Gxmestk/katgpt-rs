@@ -319,7 +319,7 @@ fn t698_t6_state_noise_wash() {
     // Same code path (the caller skips the injection), so this must hold on
     // ANY platform — the strongest pin in this bench.
     for &r in R_GRID.iter().chain(std::iter::once(&R_REF)) {
-        for t in 0..N_PROMPTS {
+        for (t, br) in base_ref.iter().enumerate() {
             let z = run_once(
                 &make_config(LoopStabilityMode::StateNoise { scale: 0.0 }),
                 &weights,
@@ -329,7 +329,7 @@ fn t698_t6_state_noise_wash() {
                 r,
             );
             let b = if r == R_REF {
-                base_ref[t].1.clone()
+                br.1.clone()
             } else {
                 run_once(&base_cfg, &weights, &base_gate, &sdpa_gate, t, r)
             };
@@ -429,12 +429,11 @@ fn t698_t6_state_noise_wash() {
     let s20_cfg = make_config(LoopStabilityMode::StateNoise { scale: 0.20 });
     let s20_gate = ResidualGate::new(R_REF, weights_config.n_embd);
     let differs = (0..N_PROMPTS)
-        .map(|t| {
+        .any(|t| {
             let n = run_once(&s20_cfg, &weights, &s20_gate, &sdpa_gate, t, 8);
             let b = run_once(&base_cfg, &weights, &base_gate, &sdpa_gate, t, 8);
             n.iter().zip(b.iter()).any(|(x, y)| x.to_bits() != y.to_bits())
-        })
-        .any(|d| d);
+        });
     assert!(differs, "non-vacuity: s20 logits must differ from base somewhere");
 
     // ── Report ───────────────────────────────────────────────────

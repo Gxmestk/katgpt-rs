@@ -91,8 +91,8 @@ fn seeded_tridiag_eigengap_ge_half_on_box() {
                     full[i + 1][i] = pencil.a0.off[i];
                 }
                 for (m, &xi) in pencil.a.iter().zip(x.iter()) {
-                    for i in 0..D {
-                        full[i][i] += xi * m.diag[i];
+                    for (i, d) in m.diag.iter().enumerate() {
+                        full[i][i] += xi * d;
                     }
                     for i in 0..(D - 1) {
                         full[i][i + 1] += xi * m.off[i];
@@ -126,12 +126,10 @@ fn mirror_duality_holds() {
     let mut rng = Lcg(5);
     for _ in 0..64 {
         let mut full = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                let v = rng.next_f32();
-                full[i][j] = v;
-                full[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            let v = rng.next_f32();
+            full[i][j] = v;
+            full[j][i] = v;
         }
         let packed = SymPacked::<D>::pack_from_full(&full);
         let mut neg = packed;
@@ -271,16 +269,16 @@ fn tridiag_pencil_eval_matches_dense() {
             let sturm = pencil.eval(&x, k, &mut ts);
             // dense on the fused matrix
             let mut full = [[0.0_f32; D]; D];
-            for i in 0..D {
-                full[i][i] = pencil.a0.diag[i];
+            for (i, d) in pencil.a0.diag.iter().enumerate() {
+                full[i][i] = *d;
             }
             for i in 0..(D - 1) {
                 full[i][i + 1] = pencil.a0.off[i];
                 full[i + 1][i] = pencil.a0.off[i];
             }
             for (m, &xi) in pencil.a.iter().zip(x.iter()) {
-                for i in 0..D {
-                    full[i][i] += xi * m.diag[i];
+                for (i, d) in m.diag.iter().enumerate() {
+                    full[i][i] += xi * d;
                 }
                 for i in 0..(D - 1) {
                     full[i][i + 1] += xi * m.off[i];

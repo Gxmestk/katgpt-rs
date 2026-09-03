@@ -1011,11 +1011,11 @@ pub fn kimi_k3_backward_sequence_with_input_grad(
     // the gradient the caller must receive, and there is no embedding row to
     // credit.
     for t in 0..l {
-        if let Some(out) = d_input_hidden.as_mut() {
-            if let Some(slot) = out.get_mut(t) {
-                slot.clear();
-                slot.extend_from_slice(&d_prefix[t][..d]);
-            }
+        if let Some(out) = d_input_hidden.as_mut()
+            && let Some(slot) = out.get_mut(t)
+        {
+            slot.clear();
+            slot.extend_from_slice(&d_prefix[t][..d]);
         }
         if saved_tokens[t].is_latent {
             // Skip the scatter: `token_id` is an iteration index here. Writing to

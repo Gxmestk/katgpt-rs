@@ -411,6 +411,56 @@ What this slice closed (default-features Windows axis, before → after):
 `katgpt-rs` clean in both feature states (sole residue = the `slod:745`
 owner-documented site).
 
+### R3b third slice (2026-09-03, M3, all-features axis) — heal + flip DONE
+
+`cargo clippy --fix --workspace --all-targets --all-features --keep-going`
+(the correct tool for this surface, per the first slice's finding) applied 15
+edits across 8 files (map_clone ×2, unused_variables ×4 + unused_mut ×2 at the
+same lines, bool_comparison ×2, manual_is_multiple_of ×1, collapsible_if ×2,
+map_all_any_identity ×1, unnecessary_cast ×2, manual_repeat_n ×2 — three of
+the applied unused_variables underscores REVERTED per the judgement-class
+rule, keeping only the mut removals on the same lines), then 34
+`needless_range_loop` sites rewritten by hand (clippy marks them
+MaybeIncorrect; `--fix` skipped every one):
+
+- 8 triangular symmetric fills (`for i { for j in i..D { v[i][j]=x; v[j][i]=x
+  } }`, LCG-drawn — bounds ×3, dense ×2, sym ×2, tests ×1 nests) →
+  `(0..D).flat_map(|i| (i..D).map(move |j| (i, j)))` header swaps: the tuple
+  iteration preserves the exact lexicographic RNG draw order AND takes the
+  loop vars out of index-only duty. Zero body edits.
+- 10 trivial sites → `iter().enumerate()` / `zip` / row iteration, order-
+  preserving (gauge ×5, kv_eviction, dense, sym-accumulation, tests ×3 diag
+  loops, bench_683 ×3, bench_684, pair_select, issue_698_t6).
+
+The fix pass itself introduced 3 findings — the map_clone rewrite revealed
+`iter_cloned_collect` ×2 (`.iter().cloned().collect()` → `.to_vec()`) and the
+identity_op rewrite emitted `keys[(t * kv_dim)]` → `unused_parens`; both
+families closed to zero in the same pass.
+
+**67 → 13 distinct findings** (fresh baseline 2026-09-03; the recorded 119 had
+already been healed down by sibling slices). The 13 survivors are exactly the
+documented judgement classes and stay warnings: unused_variables ×4,
+dead_code ×3, non_snake_case ×2 (the math-`K` vars), too_many_arguments ×2,
+assertions_on_constants ×2 (test-intent asserts — removal is the unsafe fix).
+
+**The `-D` flip** (`scripts/full_gate.sh` GATE_ARGS + the AGENTS.md quote,
+same commit): needless_range_loop, map_clone, iter_cloned_collect (the
+map_clone successor), identity_op, unused_parens, bool_comparison,
+manual_is_multiple_of, collapsible_if, map_all_any_identity,
+unnecessary_cast, manual_repeat_n, question_mark,
+empty_line_after_outer_attr, unusual_byte_groupings, unused_mut — the 15
+lints at zero residual. `FULL_GATE_LOG=... ./scripts/full_gate.sh` → **PASS,
+0 errors, 13 warning findings across 3 targets, 32 units compiled**.
+
+Validation (all green): katgpt-core lib 1992/0/7i (count exact), katgpt-pruners
+126/0, katgpt-speculative 305/0, katgpt-types 132/0, katgpt-attn
++flashmemory_sparse 174/0, root lib 201/0, issue_698 t6/t8-probe/t8-ab
+1+1+1/0, issue_699 15/0, engram_tripwire 1+3/0, bench_582 5/0/1i, bench_684
+run end-to-end VERDICT PASS. bench_683/bench_025 compile-only (need real
+Kimi weights). Every file touched carried PRE-EXISTING rustfmt drift at HEAD
+(only issue_699 was fmt-clean and stays clean), so no rustfmt pass — house
+rule.
+
 ## Closing conditions
 
 - [x] R1a: a per-feature-isolation check runs on a stated cadence with its
@@ -454,7 +504,11 @@ owner-documented site).
 - [x] R3a: the warning surface is measured (118 findings / 24 lints / per-crate
       + per-lint histogram above) and the gate decision recorded: heal the
       mechanical 64% first, re-measure, then choose the `-D` scope.
-- [ ] R3b: execute that order — heal, re-measure, flip the chosen `-D` set.
+- [x] R3b: execute that order — heal, re-measure, flip the chosen `-D` set.
+      **DONE 2026-09-03** (third slice above): 67 → 13 distinct, 15 lints at
+      zero residual denied in `scripts/full_gate.sh` (+ AGENTS.md parity),
+      full gate PASS with the deny list live. R2 remains the only open
+      condition; this file stays until it closes.
 - [ ] Remove this file in the closing commit per the noise-reduction rule.
 
 Refs: `scripts/full_gate.sh`, `.github/workflows/full_gate.yml`,

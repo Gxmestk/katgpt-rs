@@ -270,12 +270,10 @@ mod tests {
         const D: usize = 5;
         let mut rng = Lcg(7);
         let mut full = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                let v = rng.next_f32() * 3.0;
-                full[i][j] = v;
-                full[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            let v = rng.next_f32() * 3.0;
+            full[i][j] = v;
+            full[j][i] = v;
         }
         let packed = SymPacked::<D>::pack_from_full(&full);
         let rt = packed.to_full();
@@ -310,9 +308,9 @@ mod tests {
         // Frobenius norm of the FULL matrix vs the packed representation's
         // upper-triangle norm (the isometry).
         let mut fro = 0.0_f64;
-        for i in 0..D {
-            for j in 0..D {
-                fro += f64::from(f1[i][j]) * f64::from(f1[i][j]);
+        for row in &f1 {
+            for v in row {
+                fro += f64::from(*v) * f64::from(*v);
             }
         }
         let fro = (fro as f32).sqrt();
@@ -350,12 +348,10 @@ mod tests {
         const D: usize = 4;
         let mut rng = Lcg(11);
         let mut full = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                let v = rng.next_f32();
-                full[i][j] = v;
-                full[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            let v = rng.next_f32();
+            full[i][j] = v;
+            full[j][i] = v;
         }
         let p = SymPacked::<D>::pack_from_full(&full);
         let mut v = [0.0_f32; packed_len(D)];

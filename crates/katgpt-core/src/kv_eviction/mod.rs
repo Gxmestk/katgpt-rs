@@ -312,8 +312,8 @@ mod tests {
     fn observe_guard_predicate_rejects_bad_increments() {
         // The guard predicate itself (debug builds abort on the first bad
         // call by design, so the predicate is exercised directly here).
-        assert!(f32::NAN.is_finite() == false);
-        assert!(f32::INFINITY.is_finite() == false);
+        assert!(!f32::NAN.is_finite());
+        assert!(!f32::INFINITY.is_finite());
         assert!(-0.5f32 < 0.0);
         // Good increments pass the guard:
         assert!((0.0f32).is_finite() && 0.0f32 >= 0.0);
@@ -521,10 +521,10 @@ mod tests {
         let mut t = UsageScoreTable::with_capacity(n);
         let mut naive_mass = vec![0.0f32; n];
         let mut naive_adm = vec![0u64; n];
-        for idx in 0..n {
+        for (idx, adm) in naive_adm.iter_mut().enumerate() {
             let tick = rng.next_u64() % 50;
             t.reset_row(idx, tick);
-            naive_adm[idx] = tick;
+            *adm = tick;
         }
         let mut naive_scores = Vec::new();
         let mut table_scores = Vec::new();
@@ -535,7 +535,7 @@ mod tests {
             step += 1;
             observe(t.row_mut(idx), mass, step);
             naive_mass[idx] += mass; // same accumulation order per row
-            if step % 100 == 0 {
+            if step.is_multiple_of(100) {
                 naive_scores.clear();
                 for i in 0..n {
                     let age = step.saturating_sub(naive_adm[i]).max(1) as f32;

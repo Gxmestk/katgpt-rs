@@ -302,7 +302,7 @@ fn calibrate_900(tw: &mut EngramTripwire, q: &[f32; D], rng: &mut Xs, m: &mut Tr
 
 #[test]
 fn engram_tripwire_g8_detector_poc_arms() {
-    let mut rng = Xs(0x837_832_2026_0901);
+    let mut rng = Xs(0x0083_7832_2026_0901);
     let q = random_unit(&mut rng);
     let mut tw = fresh_tripwire();
     let mut m = metrics_scratch();

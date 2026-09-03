@@ -2063,9 +2063,7 @@ mod tests {
         let first: Vec<Vec<usize>> = indexer
             .select_gqa(&query, &cache, 0)
             .blocks_per_head
-            .iter()
-            .map(|v| v.clone())
-            .collect();
+            .to_vec();
         assert!(
             first.iter().map(|v| v.len()).sum::<usize>() > 0,
             "select_gqa should select at least one block"
@@ -2078,9 +2076,7 @@ mod tests {
         let second: Vec<Vec<usize>> = indexer
             .select_gqa(&query, &cache, 1)
             .blocks_per_head
-            .iter()
-            .map(|v| v.clone())
-            .collect();
+            .to_vec();
         assert_eq!(first, second);
     }
 
@@ -2222,7 +2218,7 @@ mod tests {
         let mut keys = vec![0.0f32; seq_len * kv_dim];
         for t in 0..2 {
             // Block 0, head 0: strong keys.
-            keys[t * kv_dim + 0] = 5.0;
+            keys[t * kv_dim] = 5.0;
             keys[t * kv_dim + 1] = 5.0;
         }
         cache.rebuild_from_keys(&keys, seq_len);

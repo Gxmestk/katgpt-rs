@@ -256,9 +256,9 @@ fn run() {
     let mut streams = vec![Vec::new(); n_layer];
     for row in &caps {
         for cap in row {
-            for layer in 0..n_layer - 1 {
-                streams[layer].extend_from_slice(&cap.x_in[layer]);
-                streams[layer].extend_from_slice(&cap.x_in[layer + 1]);
+            for (layer, stream) in streams.iter_mut().enumerate().take(n_layer - 1) {
+                stream.extend_from_slice(&cap.x_in[layer]);
+                stream.extend_from_slice(&cap.x_in[layer + 1]);
             }
             // Last layer: x_out^7 = pre-output-attn-res hidden (captured).
             streams[n_layer - 1].extend_from_slice(&cap.x_in[n_layer - 1]);
@@ -333,10 +333,10 @@ fn run() {
     let t0 = std::time::Instant::now();
     for row in &caps {
         for cap in row {
-            for delay in 0..n_layer - 1 {
+            for (delay, bucket) in outcomes_by_delay.iter_mut().enumerate() {
                 let stale = cap.x_in[delay].clone();
                 let out = sim.replay_stale(cap, delay, &stale);
-                outcomes_by_delay[delay].push(out.core);
+                bucket.push(out.core);
             }
         }
     }
@@ -354,8 +354,8 @@ fn run() {
         let mut preserves = Vec::new();
         let mut kls = Vec::new();
         let mut cells = Vec::new();
-        for delay in 0..n_layer - 1 {
-            let cell = sweep_cell(&outcomes_by_delay[delay], theta, delay);
+        for (delay, outcomes) in outcomes_by_delay.iter().enumerate() {
+            let cell = sweep_cell(outcomes, theta, delay);
             accepts.push(cell.accept_rate);
             preserves.push(cell.top1_preserve_given_accept);
             kls.push(cell.mean_kl_given_accept);

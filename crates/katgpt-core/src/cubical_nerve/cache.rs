@@ -76,9 +76,7 @@ impl NerveFlowField {
     ///
     /// O(1) — single HashMap lookup + index increment.
     pub fn next_zone(&self, current: ZoneId) -> Option<ZoneId> {
-        let Some(&idx) = self.zone_index.get(&current) else {
-            return None;
-        };
+        let &idx = self.zone_index.get(&current)?;
 
         // Already at goal?
         let next_idx = idx + 1;

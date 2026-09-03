@@ -167,15 +167,13 @@ mod tests {
         const N: usize = 2;
         let mut rng = 77_u64;
         let mut full = [[0.0_f32; D]; D];
-        for i in 0..D {
-            for j in i..D {
-                rng = rng
-                    .wrapping_mul(6364136223846793005)
-                    .wrapping_add(1442695040888963407);
-                let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
-                full[i][j] = v;
-                full[j][i] = v;
-            }
+        for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            let v = ((rng >> 33) as f32 / 2.0_f32.powi(31)) * 2.0 - 1.0;
+            full[i][j] = v;
+            full[j][i] = v;
         }
         let packed = SymPacked::<D>::pack_from_full(&full);
         let mut s = DenseScratch::<D>::new();
@@ -203,12 +201,10 @@ mod tests {
         };
         let a0_full = {
             let mut f = [[0.0_f32; D]; D];
-            for i in 0..D {
-                for j in i..D {
-                    let v = next(&mut rng);
-                    f[i][j] = v;
-                    f[j][i] = v;
-                }
+            for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+                let v = next(&mut rng);
+                f[i][j] = v;
+                f[j][i] = v;
             }
             f
         };
@@ -216,12 +212,10 @@ mod tests {
             let mut arr = [SymPacked::zeroed(); N];
             for m in arr.iter_mut() {
                 let mut f = [[0.0_f32; D]; D];
-                for i in 0..D {
-                    for j in i..D {
-                        let v = next(&mut rng);
-                        f[i][j] = v;
-                        f[j][i] = v;
-                    }
+                for (i, j) in (0..D).flat_map(|i| (i..D).map(move |j| (i, j))) {
+                    let v = next(&mut rng);
+                    f[i][j] = v;
+                    f[j][i] = v;
                 }
                 *m = SymPacked::pack_from_full(&f);
             }

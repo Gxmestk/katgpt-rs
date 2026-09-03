@@ -397,7 +397,7 @@ fn g1_matches_bit_plane_tier_at_benchmark_scale() {
 fn g2d_row_parallel_keeps_pace() {
     // 4096 rows is past PARALLEL_ROW_MIN (256) by enough to amortize rayon.
     let (rows, cols) = (4096usize, 5120usize);
-    let plane = big_plane_weights(rows, cols, 0x582_D);
+    let plane = big_plane_weights(rows, cols, 0x582D);
     let trit = TernaryTritWeights::from_group(&plane);
 
     let mut s = 0xBEEF_u64;
